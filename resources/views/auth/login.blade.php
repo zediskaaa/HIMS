@@ -1,53 +1,98 @@
-<x-guest-layout>
-    <div class="space-y-6">
-        <x-auth-session-status class="mb-4" :status="session('status')" />
-
-        <div class="text-center">
-            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m0 0v2m0-2h2m-2 0H10m2-8a3 3 0 100 6 3 3 0 000-6zm-7 8a7 7 0 0114 0v1H5v-1z" />
-                </svg>
+<x-guest-layout title="Sign in">
+    <div class="space-y-8">
+        <header>
+            <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
+                <span class="h-1.5 w-1.5 rounded-full bg-primary-500"></span>
+                Secure staff portal
             </div>
-            <h2 class="mt-4 text-2xl font-semibold text-slate-900">Sign in to HIMS</h2>
-            <p class="mt-2 text-sm text-slate-500">Access your supply chain and inventory workspace.</p>
-        </div>
 
-        <form method="POST" action="{{ route('login') }}" class="space-y-4">
+            <h1 class="text-3xl font-semibold tracking-tight text-neutral-900">Sign in to HIMS</h1>
+            <p class="mt-3 max-w-sm text-sm leading-6 text-neutral-500">
+                Access procurement, inventory, and hospital supply operations from one workspace.
+            </p>
+        </header>
+
+        <x-auth-session-status
+            class="rounded-lg border border-success-100 bg-success-50 px-4 py-3 text-success-700"
+            :status="session('status')"
+        />
+
+        <form method="POST" action="{{ route('login') }}" class="space-y-5" x-data="{ showPassword: false }">
             @csrf
 
             <div>
-                <x-input-label for="email" :value="__('Email')" />
-                <x-text-input id="email" class="block mt-1 w-full rounded-xl border-slate-200 bg-slate-50 px-3 py-2 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" />
-                <x-input-error :messages="$errors->get('email')" class="mt-2" />
+                <x-input-label for="email" :value="__('Email address')" class="text-neutral-700" />
+                <x-text-input
+                    id="email"
+                    class="mt-2 block h-11 w-full rounded-lg border-neutral-300 bg-white px-3.5 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:border-primary-500 focus:ring-primary-500"
+                    type="email"
+                    name="email"
+                    :value="old('email')"
+                    placeholder="name@hospital.org"
+                    required
+                    autofocus
+                    autocomplete="username"
+                />
+                <x-input-error :messages="$errors->get('email')" class="mt-2 text-danger-600" />
             </div>
 
             <div>
-                <x-input-label for="password" :value="__('Password')" />
-                <x-text-input id="password" class="block mt-1 w-full rounded-xl border-slate-200 bg-slate-50 px-3 py-2 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
-                    type="password"
-                    name="password"
-                    required autocomplete="current-password" />
-                <x-input-error :messages="$errors->get('password')" class="mt-2" />
+                <div class="flex items-center justify-between gap-4">
+                    <x-input-label for="password" :value="__('Password')" class="text-neutral-700" />
+
+                    @if (Route::has('password.request'))
+                        <a
+                            class="rounded text-xs font-medium text-primary-600 transition-colors hover:text-primary-700"
+                            href="{{ route('password.request') }}"
+                        >
+                            {{ __('Forgot password?') }}
+                        </a>
+                    @endif
+                </div>
+
+                <div class="relative mt-2">
+                    <x-text-input
+                        id="password"
+                        class="block h-11 w-full rounded-lg border-neutral-300 bg-white px-3.5 pr-11 text-sm text-neutral-900 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                        x-bind:type="showPassword ? 'text' : 'password'"
+                        name="password"
+                        required
+                        autocomplete="current-password"
+                    />
+
+                    <button
+                        type="button"
+                        class="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-neutral-400 transition-colors hover:text-neutral-700 focus-visible:ring-inset"
+                        x-on:click="showPassword = !showPassword"
+                        x-bind:aria-label="showPassword ? 'Hide password' : 'Show password'"
+                        x-bind:aria-pressed="showPassword"
+                        aria-controls="password"
+                    >
+                        <x-ui.icon name="eye" class="h-5 w-5" x-show="!showPassword" />
+                        <x-ui.icon name="eye-slash" class="h-5 w-5" x-show="showPassword" x-cloak />
+                    </button>
+                </div>
+                <x-input-error :messages="$errors->get('password')" class="mt-2 text-danger-600" />
             </div>
 
-            <div class="flex items-center justify-between">
-                <label for="remember_me" class="inline-flex items-center text-sm text-slate-600">
-                    <input id="remember_me" type="checkbox" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500" name="remember">
-                    <span class="ms-2">{{ __('Remember me') }}</span>
-                </label>
+            <label for="remember_me" class="flex w-fit cursor-pointer items-center gap-2.5 text-sm text-neutral-600">
+                <input
+                    id="remember_me"
+                    type="checkbox"
+                    class="rounded border-neutral-300 text-primary-600 shadow-sm focus:ring-primary-500"
+                    name="remember"
+                >
+                <span>{{ __('Keep me signed in') }}</span>
+            </label>
 
-                @if (Route::has('password.request'))
-                    <a class="text-sm font-medium text-emerald-600 hover:text-emerald-700" href="{{ route('password.request') }}">
-                        {{ __('Forgot your password?') }}
-                    </a>
-                @endif
-            </div>
-
-            <div class="pt-2">
-                <x-primary-button class="w-full justify-center rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700">
-                    {{ __('Log in') }}
-                </x-primary-button>
-            </div>
+            <x-ui.button type="submit" size="lg" icon="arrow-right-on-rectangle" class="w-full">
+                {{ __('Sign in') }}
+            </x-ui.button>
         </form>
+
+        <div class="flex items-center gap-2.5 border-t border-neutral-200 pt-6 text-xs leading-5 text-neutral-500">
+            <x-ui.icon name="shield-check" class="h-4 w-4 shrink-0 text-primary-600" />
+            <p>For authorized hospital personnel only. Your session is securely protected.</p>
+        </div>
     </div>
 </x-guest-layout>
