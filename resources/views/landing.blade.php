@@ -3,139 +3,102 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>HIMS | Supply Chain & Inventory Management</title>
+        <meta name="description" content="HIMS keeps hospital procurement, stock levels, and replenishment on one record — from warehouse to ward.">
+        <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+        <title>HIMS | Supply Chain &amp; Inventory Management</title>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="min-h-screen bg-slate-950 text-slate-100">
-        <div class="relative min-h-screen overflow-hidden">
-            <div class="absolute inset-0 z-0">
-                <img src="{{ asset('img/landingpage.jpg') }}" alt="Hospital background" class="h-full w-full object-cover" />
-                <div class="absolute inset-0 bg-[linear-gradient(135deg,rgba(2,6,23,0.95)_0%,rgba(2,6,23,0.7)_45%,rgba(15,23,42,0.85)_100%)]"></div>
+    <body class="bg-neutral-950 text-neutral-100 antialiased">
+        <div class="relative flex min-h-screen flex-col overflow-hidden">
+            {{-- Decorative backdrop. The page reads the same with images off. --}}
+            <div class="absolute inset-0 z-0" aria-hidden="true">
+                <img src="{{ asset('img/landingpage.jpg') }}" alt="" class="h-full w-full object-cover object-center" />
+                {{-- Layered scrims: the text column stays dark enough for contrast,
+                     the right side keeps the photograph visible. --}}
+                <div class="absolute inset-0 bg-neutral-950/55"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-neutral-950 via-neutral-950/85 via-45% to-neutral-950/20"></div>
+                <div class="absolute inset-0 bg-gradient-to-b from-neutral-950/60 via-neutral-950/20 to-neutral-950/85"></div>
+                <div class="absolute -left-24 top-24 h-80 w-80 rounded-full bg-primary-600/20 blur-3xl"></div>
             </div>
 
-            <div class="relative z-10 mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-4 sm:px-6 lg:px-8">
-                <header class="flex items-center justify-between rounded-full border border-white/10 bg-white/10 px-4 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.25)] backdrop-blur-xl sm:px-6">
-                    <a href="{{ url('/') }}" class="flex items-center gap-3 text-lg font-semibold tracking-wide text-white">
-                        <span class="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-400/30">H</span>
-                        <span>HIMS</span>
+            <div class="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 lg:px-8">
+                <header class="flex items-center justify-between py-6">
+                    <a href="{{ url('/') }}" class="flex items-center gap-3 rounded-lg focus-visible:ring-offset-neutral-950">
+                        <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 font-bold text-primary-200 ring-1 ring-inset ring-white/15">H</span>
+                        <span class="text-base font-semibold tracking-tight text-white">HIMS</span>
                     </a>
-                    <nav class="flex items-center gap-2 text-sm text-slate-300 sm:gap-3">
-                        @if (Route::has('login'))
+
+                    @if (Route::has('login'))
+                        <nav>
                             @auth
-                                <a href="{{ url('/dashboard') }}" class="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 font-medium text-cyan-300 transition hover:bg-cyan-500/20">
+                                <a href="{{ route('dashboard') }}" class="rounded-lg px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-white/10 hover:text-white focus-visible:ring-offset-neutral-950">
                                     Dashboard
                                 </a>
                             @else
-                                <a href="{{ route('login') }}" class="rounded-full px-4 py-2 transition hover:bg-white/10 hover:text-white">
+                                <a href="{{ route('login') }}" class="rounded-lg px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-white/10 hover:text-white focus-visible:ring-offset-neutral-950">
                                     Log in
                                 </a>
-                                @if (Route::has('register'))
-                                    <a href="{{ route('register') }}" class="rounded-full bg-white px-4 py-2 font-medium text-slate-900 transition hover:bg-slate-200">
-                                        Request access
-                                    </a>
-                                @endif
                             @endauth
-                        @endif
-                    </nav>
+                        </nav>
+                    @endif
                 </header>
 
-                <main class="flex-1 py-10 sm:py-14 lg:py-20">
-                    <section class="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-                        <div>
-                            <div class="mb-6 inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-sm font-medium text-cyan-300">
-                                Intelligent operations for modern teams
-                            </div>
-                            <h1 class="max-w-3xl text-4xl font-semibold leading-tight text-white sm:text-5xl lg:text-6xl">
-                                Supply Chain & Inventory Management
-                            </h1>
-                            <p class="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
-                                Track suppliers, monitor stock movement, automate replenishment, and keep every department aligned with real-time visibility.
-                            </p>
-                            <div class="mt-8 flex flex-wrap gap-4">
-                                @if (Route::has('login'))
-                                    <a href="{{ route('login') }}" class="rounded-full bg-cyan-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400">
-                                        Open the dashboard
-                                    </a>
-                                @endif
-                                @if (Route::has('register'))
-                                    <a href="{{ route('register') }}" class="rounded-full border border-white/15 bg-white/10 px-6 py-3 font-semibold text-white transition hover:bg-white/20">
-                                        Request access
-                                    </a>
-                                @endif
-                            </div>
+                <main class="flex flex-1 flex-col justify-center py-16 sm:py-24">
+                    {{-- max-w-full keeps this pill from forcing horizontal overflow
+                         on narrow screens; the tracking is what makes it wide. --}}
+                    <p class="inline-flex w-fit max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-neutral-300 sm:text-xs sm:tracking-widest">
+                        <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-primary-400"></span>
+                        <span>Hospital Inventory Management System</span>
+                    </p>
 
-                            <div class="mt-10 grid gap-4 sm:grid-cols-3">
-                                <div class="rounded-2xl border border-white/10 bg-white/10 p-4 shadow-lg shadow-black/20 backdrop-blur">
-                                    <p class="text-2xl font-semibold text-white">24/7</p>
-                                    <p class="mt-1 text-sm text-slate-300">Live stock visibility</p>
-                                </div>
-                                <div class="rounded-2xl border border-white/10 bg-white/10 p-4 shadow-lg shadow-black/20 backdrop-blur">
-                                    <p class="text-2xl font-semibold text-white">99.2%</p>
-                                    <p class="mt-1 text-sm text-slate-300">Order accuracy</p>
-                                </div>
-                                <div class="rounded-2xl border border-white/10 bg-white/10 p-4 shadow-lg shadow-black/20 backdrop-blur">
-                                    <p class="text-2xl font-semibold text-white">3x</p>
-                                    <p class="mt-1 text-sm text-slate-300">Faster approvals</p>
-                                </div>
-                            </div>
-                        </div>
+                    {{-- Keep "Supply Chain" and "Inventory Management" as unbroken
+                         text nodes — tests/Feature/LandingPageTest.php asserts them. --}}
+                    <h1 class="mt-6 max-w-3xl text-balance text-4xl font-semibold leading-[1.1] tracking-tight text-white sm:text-5xl lg:text-6xl">
+                        Supply Chain &amp; Inventory Management
+                    </h1>
 
-                        <div class="rounded-[28px] border border-white/10 bg-slate-900/70 p-6 shadow-[0_25px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-                            <div class="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
-                                <div>
-                                    <p class="text-sm text-slate-400">Warehouse health</p>
-                                    <p class="text-xl font-semibold text-white">Stock aligned</p>
-                                </div>
-                                <span class="rounded-full bg-emerald-500/15 px-3 py-1 text-sm font-medium text-emerald-300">Stable</span>
-                            </div>
+                    <p class="mt-6 max-w-xl text-pretty text-lg leading-8 text-neutral-300">
+                        Track suppliers, monitor stock movement, and keep replenishment on schedule across every department.
+                    </p>
 
-                            <div class="mt-6 space-y-4">
-                                <div class="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
-                                    <div class="flex items-center justify-between">
-                                        <p class="font-medium text-white">Procurement requests</p>
-                                        <span class="text-sm text-cyan-300">12 pending</span>
-                                    </div>
-                                    <div class="mt-3 h-2 rounded-full bg-slate-800">
-                                        <div class="h-2 w-3/4 rounded-full bg-cyan-500"></div>
-                                    </div>
-                                </div>
-                                <div class="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
-                                    <div class="flex items-center justify-between">
-                                        <p class="font-medium text-white">Low stock alerts</p>
-                                        <span class="text-sm text-amber-300">4 urgent</span>
-                                    </div>
-                                    <div class="mt-3 h-2 rounded-full bg-slate-800">
-                                        <div class="h-2 w-2/3 rounded-full bg-amber-500"></div>
-                                    </div>
-                                </div>
-                                <div class="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
-                                    <div class="flex items-center justify-between">
-                                        <p class="font-medium text-white">Supplier performance</p>
-                                        <span class="text-sm text-emerald-300">+14%</span>
-                                    </div>
-                                    <div class="mt-3 h-2 rounded-full bg-slate-800">
-                                        <div class="h-2 w-4/5 rounded-full bg-emerald-500"></div>
-                                    </div>
-                                </div>
-                            </div>
+                    @if (Route::has('login'))
+                        <div class="mt-10">
+                            @auth
+                                <a href="{{ route('dashboard') }}" class="group inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-semibold text-neutral-900 shadow-lg shadow-neutral-950/40 transition hover:bg-neutral-200 focus-visible:ring-offset-neutral-950">
+                                    Go to dashboard
+                                    <x-ui.icon name="chevron-right" class="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                                </a>
+                            @else
+                                <a href="{{ route('login') }}" class="group inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-semibold text-neutral-900 shadow-lg shadow-neutral-950/40 transition hover:bg-neutral-200 focus-visible:ring-offset-neutral-950">
+                                    Log in to HIMS
+                                    <x-ui.icon name="chevron-right" class="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                                </a>
+                            @endauth
                         </div>
-                    </section>
-
-                    <section class="mt-16 grid gap-6 md:grid-cols-3">
-                        <div class="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-lg shadow-black/20 backdrop-blur">
-                            <h2 class="text-xl font-semibold text-white">Procurement control</h2>
-                            <p class="mt-3 text-sm leading-7 text-slate-300">Create purchase requests, review supplier quotes, and keep approvals moving without bottlenecks.</p>
-                        </div>
-                        <div class="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-lg shadow-black/20 backdrop-blur">
-                            <h2 class="text-xl font-semibold text-white">Inventory visibility</h2>
-                            <p class="mt-3 text-sm leading-7 text-slate-300">Monitor stock across locations, identify low units, and manage movement with accurate updates.</p>
-                        </div>
-                        <div class="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-lg shadow-black/20 backdrop-blur">
-                            <h2 class="text-xl font-semibold text-white">Operations reporting</h2>
-                            <p class="mt-3 text-sm leading-7 text-slate-300">Turn warehouse activity into concise dashboards for planning, audits, and executive review.</p>
-                        </div>
-                    </section>
+                    @endif
                 </main>
+
+                @php
+                    $features = [
+                        ['icon' => 'truck', 'title' => 'Procurement', 'body' => 'Raise requests, compare supplier quotes, and move approvals along.'],
+                        ['icon' => 'cube', 'title' => 'Inventory', 'body' => 'Track batches and stock levels across warehouses, wards, and pharmacies.'],
+                        ['icon' => 'chart-bar', 'title' => 'Reporting', 'body' => 'Turn warehouse activity into reports for planning and audits.'],
+                    ];
+                @endphp
+
+                <section class="grid gap-4 sm:grid-cols-3">
+                    @foreach ($features as $feature)
+                        <div class="rounded-xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-sm transition duration-200 hover:border-white/20 hover:bg-white/[0.07]">
+                            <x-ui.icon :name="$feature['icon']" class="h-5 w-5 text-primary-300" />
+                            <h2 class="mt-4 font-semibold text-white">{{ $feature['title'] }}</h2>
+                            <p class="mt-2 text-sm leading-6 text-neutral-400">{{ $feature['body'] }}</p>
+                        </div>
+                    @endforeach
+                </section>
+
+                <footer class="mt-10 border-t border-white/10 py-6 text-xs text-neutral-500">
+                    &copy; {{ date('Y') }} HIMS — hospital supply chain operations.
+                </footer>
             </div>
         </div>
     </body>
