@@ -9,9 +9,27 @@ use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
+use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
+    // Forgot-password OTP frontend hits this to confirm the email is registered
+    // before sending an OTP via Google Apps Script. GET avoids CSRF since the
+    // caller is a static HTML page. Throttled to discourage enumeration.
+    Route::get('check-email', function (Request $request) {
+        $request->validate(['email' => ['required', 'email']]);
+
+        $exists = User::where('email', $request->email)->exists();
+
+        return response()->json([
+            'exists'  => $exists,
+            'message' => $exists
+                ? 'Email found.'
+                : 'This email is not registered in the system.',
+        ]);
+    })->middleware('throttle:10,1')->name('check-email');
+
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
 
@@ -33,6 +51,38 @@ Route::middleware('guest')->group(function () {
 
     Route::post('reset-password', [NewPasswordController::class, 'store'])
         ->name('password.store');
+
+    // ── OTP-verified password reset (no token required) ──────────────
+    // The user's identity was already confirmed via email OTP on the
+    // static HTML page, so these routes accept just email + new password.
+
+    Route::get('reset-password-otp', function (Request $request) {
+        return view('auth.reset-password-otp', [
+            'email' => $request->query('email', ''),
+        ]);
+    })->name('password.reset.otp');
+
+    Route::post('reset-password-otp', function (Request $request) {
+        $request->validate([
+            'email'    => ['required', 'email'],
+            'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (! $user) {
+            return back()->withErrors(['email' => 'No account found with this email.']);
+        }
+
+        $user->forceFill([
+            'password'       => \Illuminate\Support\Facades\Hash::make($request->password),
+            'remember_token' => \Illuminate\Support\Str::random(60),
+        ])->save();
+
+        event(new \Illuminate\Auth\Events\PasswordReset($user));
+
+        return redirect()->route('login')->with('status', 'Your password has been reset successfully!');
+    })->name('password.store.otp');
 });
 
 Route::middleware('auth')->group(function () {

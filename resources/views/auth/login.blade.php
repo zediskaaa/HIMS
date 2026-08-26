@@ -44,7 +44,7 @@
                     @if (Route::has('password.request'))
                         <a
                             class="rounded text-xs font-medium text-primary-600 transition-colors hover:text-primary-700"
-                            href="{{ route('password.request') }}"
+                            href="{{ asset('email-verification/email-verify.html') }}"
                         >
                             {{ __('Forgot password?') }}
                         </a>
