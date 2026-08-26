@@ -10,8 +10,13 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Models\User;
+use App\Rules\NotCurrentPassword;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 
 Route::middleware('guest')->group(function () {
     // Forgot-password OTP frontend hits this to confirm the email is registered
@@ -23,7 +28,7 @@ Route::middleware('guest')->group(function () {
         $exists = User::where('email', $request->email)->exists();
 
         return response()->json([
-            'exists'  => $exists,
+            'exists' => $exists,
             'message' => $exists
                 ? 'Email found.'
                 : 'This email is not registered in the system.',
@@ -72,8 +77,8 @@ Route::middleware('guest')->group(function () {
 
     Route::post('reset-password-otp', function (Request $request) {
         $request->validate([
-            'email'    => ['required', 'email'],
-            'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
+            'email' => ['required', 'email'],
+            'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
         $user = User::where('email', $request->email)->first();
@@ -82,12 +87,16 @@ Route::middleware('guest')->group(function () {
             return back()->withErrors(['email' => 'No account found with this email.']);
         }
 
+        $request->validate([
+            'password' => [new NotCurrentPassword($user)],
+        ]);
+
         $user->forceFill([
-            'password'       => \Illuminate\Support\Facades\Hash::make($request->password),
-            'remember_token' => \Illuminate\Support\Str::random(60),
+            'password' => Hash::make($request->password),
+            'remember_token' => Str::random(60),
         ])->save();
 
-        event(new \Illuminate\Auth\Events\PasswordReset($user));
+        event(new PasswordReset($user));
 
         return redirect()->route('login')->with('status', 'Your password has been reset successfully!');
     })->name('password.store.otp');

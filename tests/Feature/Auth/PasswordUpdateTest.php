@@ -48,4 +48,25 @@ class PasswordUpdateTest extends TestCase
             ->assertSessionHasErrorsIn('updatePassword', 'current_password')
             ->assertRedirect('/profile');
     }
+
+    public function test_current_password_cannot_be_reused_as_the_new_password(): void
+    {
+        $user = User::factory()->create();
+        $originalPasswordHash = $user->password;
+
+        $response = $this
+            ->actingAs($user)
+            ->from('/profile')
+            ->put('/password', [
+                'current_password' => 'password',
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ]);
+
+        $response
+            ->assertSessionHasErrorsIn('updatePassword', 'password')
+            ->assertRedirect('/profile');
+
+        $this->assertSame($originalPasswordHash, $user->refresh()->password);
+    }
 }

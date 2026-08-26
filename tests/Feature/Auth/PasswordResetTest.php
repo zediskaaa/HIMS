@@ -5,6 +5,7 @@ namespace Tests\Feature\Auth;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
@@ -82,8 +83,8 @@ class PasswordResetTest extends TestCase
             $response = $this->post('/reset-password', [
                 'token' => $notification->token,
                 'email' => $user->email,
-                'password' => 'password',
-                'password_confirmation' => 'password',
+                'password' => 'new-password',
+                'password_confirmation' => 'new-password',
             ]);
 
             $response
@@ -92,5 +93,47 @@ class PasswordResetTest extends TestCase
 
             return true;
         });
+    }
+
+    public function test_current_password_cannot_be_reused_with_a_valid_reset_token(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create();
+        $originalPasswordHash = $user->password;
+
+        $this->post('/forgot-password', ['email' => $user->email]);
+
+        Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user, $originalPasswordHash) {
+            $response = $this->post('/reset-password', [
+                'token' => $notification->token,
+                'email' => $user->email,
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ]);
+
+            $response->assertSessionHasErrors('password');
+
+            $this->assertSame($originalPasswordHash, $user->refresh()->password);
+            $this->assertTrue(Hash::check('password', $user->password));
+
+            return true;
+        });
+    }
+
+    public function test_current_password_cannot_be_reused_in_the_otp_reset_flow(): void
+    {
+        $user = User::factory()->create();
+        $originalPasswordHash = $user->password;
+
+        $response = $this->post('/reset-password-otp', [
+            'email' => $user->email,
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ]);
+
+        $response->assertSessionHasErrors('password');
+
+        $this->assertSame($originalPasswordHash, $user->refresh()->password);
     }
 }
