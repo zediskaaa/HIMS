@@ -1,6 +1,7 @@
 <x-guest-layout title="Sign in">
     <div class="space-y-8">
-        <header>
+        {{-- Delays start after the card itself has settled (see layouts/guest.blade.php). --}}
+        <header class="animate-fade-up [animation-delay:320ms]">
             <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
                 <span class="h-1.5 w-1.5 rounded-full bg-primary-500"></span>
                 Secure staff portal
@@ -13,11 +14,11 @@
         </header>
 
         <x-auth-session-status
-            class="rounded-lg border border-success-100 bg-success-50 px-4 py-3 text-success-700"
+            class="animate-fade-up rounded-lg border border-success-100 bg-success-50 px-4 py-3 text-success-700 [animation-delay:380ms]"
             :status="session('status')"
         />
 
-        <form method="POST" action="{{ route('login') }}" class="space-y-5" x-data="{ showPassword: false }">
+        <form method="POST" action="{{ route('login') }}" class="animate-fade-up space-y-5 [animation-delay:440ms]" x-data="{ showPassword: false }">
             @csrf
 
             <div>
