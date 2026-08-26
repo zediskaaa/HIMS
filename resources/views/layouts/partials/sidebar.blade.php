@@ -5,8 +5,7 @@
 >
     {{-- Brand --}}
     <div class="flex items-center gap-2.5 h-16 px-5 border-b border-neutral-200 shrink-0">
-        <span class="flex items-center justify-center w-9 h-9 rounded-md bg-primary-600 text-white
-                     text-sm font-bold tracking-tight shrink-0">DJ</span>
+        <img src="{{ asset('img/hims-logo.png') }}" alt="" class="h-9 w-9 shrink-0 rounded-md bg-white object-cover ring-1 ring-inset ring-neutral-200" />
         <div class="min-w-0">
             <p class="text-sm font-semibold text-neutral-900 leading-tight truncate">DJNRMHS</p>
             <p class="text-[11px] text-neutral-500 leading-tight truncate">Supply Chain &amp; Inventory</p>

@@ -5,6 +5,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="description" content="HIMS keeps hospital procurement, stock levels, and replenishment on one record — from warehouse to ward.">
         <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+        <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32x32.png') }}">
+        <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('favicon-16x16.png') }}">
+        <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
         <title>HIMS | Supply Chain &amp; Inventory Management</title>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
@@ -23,7 +26,7 @@
             <div class="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 lg:px-8">
                 <header class="flex animate-fade-in items-center justify-between border-b border-white/10 py-5">
                     <a href="{{ url('/') }}" class="group flex items-center gap-3 rounded-lg focus-visible:ring-offset-neutral-950">
-                        <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 font-bold text-primary-200 ring-1 ring-inset ring-white/15 transition duration-300 group-hover:scale-105 group-hover:bg-white/15 group-hover:ring-primary-300/30">H</span>
+                        <img src="{{ asset('img/hims-logo.png') }}" alt="" class="h-10 w-10 rounded-lg bg-white object-cover ring-1 ring-inset ring-white/20 transition duration-300 group-hover:scale-105 group-hover:ring-primary-300/40" />
                         <span>
                             <span class="block text-base font-semibold tracking-tight text-white">HIMS</span>
                             <span class="hidden text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-400 sm:block">Hospital operations</span>
