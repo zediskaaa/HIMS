@@ -15,6 +15,7 @@
 var OTP_LENGTH    = 6;
 var OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 var EMAIL_SUBJECT = "HIMS – Password Reset Code";
+var SENDER_NAME   = "HIMS Supply Chain and Inventory";
 
 // ─── Main Entry Point ───────────────────────────────────────────────────────────
 
@@ -67,35 +68,88 @@ function handleSendOtp(email) {
   });
   store.setProperty("otp_" + email, data);
 
-  // Build the email HTML
-  var htmlBody =
-    '<div style="font-family: \'Segoe UI\', Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 0;">' +
-      // Header bar
-      '<div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 32px 32px 24px; border-radius: 12px 12px 0 0;">' +
-        '<div style="display: inline-block; background: rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 12px; font-size: 18px; font-weight: bold; color: #818cf8;">H</div>' +
-        '<span style="margin-left: 12px; font-size: 18px; font-weight: 600; color: #fff; vertical-align: middle;">HIMS</span>' +
-        '<p style="margin: 16px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: #94a3b8;">Password Reset Request</p>' +
-      '</div>' +
-      // Body
-      '<div style="background: #ffffff; padding: 32px; border: 1px solid #e2e8f0; border-top: none;">' +
-        '<p style="color: #334155; font-size: 15px; line-height: 1.6; margin: 0 0 24px;">You requested a password reset for your HIMS account. Use the verification code below to proceed. This code expires in <strong>5 minutes</strong>.</p>' +
-        '<div style="background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 24px; text-align: center; margin: 0 0 24px;">' +
-          '<span style="font-size: 40px; font-weight: 800; letter-spacing: 14px; color: #1a1a2e; font-family: \'Courier New\', monospace;">' + otp + '</span>' +
-        '</div>' +
-        '<p style="color: #64748b; font-size: 13px; line-height: 1.5; margin: 0;">If you did not request this password reset, you can safely ignore this email. Your account remains secure.</p>' +
-      '</div>' +
-      // Footer
-      '<div style="background: #f8fafc; padding: 20px 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px; text-align: center;">' +
-        '<p style="color: #94a3b8; font-size: 11px; margin: 0;">Hospital Inventory Management System</p>' +
-      '</div>' +
-    '</div>';
+  var htmlBody = buildPasswordResetEmail(otp);
+  var plainTextBody =
+    "HIMS Supply Chain and Inventory\n\n" +
+    "Your password reset verification code is: " + otp + "\n\n" +
+    "This code expires in 5 minutes. Do not share it with anyone.\n\n" +
+    "If you did not request a password reset, you can safely ignore this email.";
 
-  GmailApp.sendEmail(email, EMAIL_SUBJECT, "Your HIMS password reset code is: " + otp + " (expires in 5 minutes)", {
+  GmailApp.sendEmail(email, EMAIL_SUBJECT, plainTextBody, {
     htmlBody: htmlBody,
-    name: "HIMS Supplier and Inventory Management"
+    name: SENDER_NAME
   });
 
   return { success: true, message: "Verification code sent to " + email };
+}
+
+// ─── Transactional Email Template ──────────────────────────────────────────────
+
+function buildPasswordResetEmail(otp) {
+  return '<!DOCTYPE html>' +
+    '<html lang="en">' +
+    '<head>' +
+      '<meta charset="UTF-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+      '<title>HIMS Password Reset Code</title>' +
+    '</head>' +
+    '<body style="margin:0; padding:0; background-color:#f5f5f5; font-family:Inter,Segoe UI,Arial,sans-serif; color:#262626; -webkit-font-smoothing:antialiased;">' +
+      '<div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent;">Use this secure verification code to reset your HIMS password.</div>' +
+      '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%; background-color:#f5f5f5; border-collapse:collapse;">' +
+        '<tr>' +
+          '<td align="center" style="padding:32px 16px;">' +
+            '<table role="presentation" width="560" cellspacing="0" cellpadding="0" border="0" style="width:100%; max-width:560px; border-collapse:separate; border-spacing:0; background-color:#ffffff; border:1px solid #e5e5e5; border-radius:16px; box-shadow:0 12px 32px rgba(10,10,10,0.10); overflow:hidden;">' +
+              '<tr>' +
+                '<td style="height:4px; background-color:#3395ff; font-size:0; line-height:0;">&nbsp;</td>' +
+              '</tr>' +
+              '<tr>' +
+                '<td style="padding:28px 32px; background-color:#0a0a0a; border-radius:15px 15px 0 0;">' +
+                  '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">' +
+                    '<tr>' +
+                      '<td width="44" height="44" align="center" valign="middle" style="width:44px; height:44px; border-radius:10px; background-color:#174cb6; color:#ffffff; font-size:20px; line-height:44px; font-weight:700;">H</td>' +
+                      '<td style="padding-left:14px;">' +
+                        '<div style="color:#ffffff; font-size:18px; line-height:24px; font-weight:700; letter-spacing:-0.2px;">HIMS</div>' +
+                        '<div style="margin-top:2px; color:#a3a3a3; font-size:10px; line-height:14px; font-weight:500; letter-spacing:1.4px; text-transform:uppercase;">Supply Chain and Inventory</div>' +
+                      '</td>' +
+                    '</tr>' +
+                  '</table>' +
+                '</td>' +
+              '</tr>' +
+              '<tr>' +
+                '<td style="padding:32px; background-color:#ffffff;">' +
+                  '<div style="display:inline-block; margin:0 0 16px; padding:5px 11px; border:1px solid #d9edff; border-radius:999px; background-color:#eef7ff; color:#145ee1; font-size:11px; line-height:16px; font-weight:600; letter-spacing:0.8px; text-transform:uppercase;">Secure account recovery</div>' +
+                  '<h1 style="margin:0; color:#171717; font-size:28px; line-height:36px; font-weight:700; letter-spacing:-0.6px;">Reset your password</h1>' +
+                  '<p style="margin:12px 0 24px; color:#525252; font-size:15px; line-height:24px;">We received a request to reset the password for your HIMS account. Enter the verification code below to continue.</p>' +
+                  '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%; border-collapse:separate; border-spacing:0;">' +
+                    '<tr>' +
+                      '<td align="center" style="padding:24px 12px; border:1px solid #d9edff; border-radius:12px; background-color:#eef7ff;">' +
+                        '<div style="margin-bottom:8px; color:#525252; font-size:11px; line-height:16px; font-weight:600; letter-spacing:1.2px; text-transform:uppercase;">Verification code</div>' +
+                        '<div style="color:#145ee1; font-family:Consolas,Courier New,monospace; font-size:36px; line-height:44px; font-weight:700; letter-spacing:10px; white-space:nowrap;">' + otp + '</div>' +
+                      '</td>' +
+                    '</tr>' +
+                  '</table>' +
+                  '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%; margin-top:20px; border-collapse:separate; border-spacing:0;">' +
+                    '<tr>' +
+                      '<td width="4" style="width:4px; border-radius:4px 0 0 4px; background-color:#3395ff; font-size:0;">&nbsp;</td>' +
+                      '<td style="padding:13px 16px; border-radius:0 8px 8px 0; background-color:#fafafa; color:#404040; font-size:13px; line-height:20px;"><strong>This code expires in 5 minutes.</strong> For your security, never share this code with anyone.</td>' +
+                    '</tr>' +
+                  '</table>' +
+                  '<div style="height:1px; margin:24px 0; background-color:#e5e5e5; font-size:0; line-height:0;">&nbsp;</div>' +
+                  '<p style="margin:0; color:#737373; font-size:13px; line-height:21px;">Did not request this password reset? You can safely ignore this email. Your password will remain unchanged.</p>' +
+                '</td>' +
+              '</tr>' +
+              '<tr>' +
+                '<td align="center" style="padding:20px 32px; border-top:1px solid #e5e5e5; border-radius:0 0 15px 15px; background-color:#fafafa;">' +
+                  '<p style="margin:0; color:#525252; font-size:12px; line-height:18px; font-weight:600;">HIMS Supply Chain and Inventory</p>' +
+                  '<p style="margin:4px 0 0; color:#a3a3a3; font-size:11px; line-height:17px;">Automated security message · Please do not reply</p>' +
+                '</td>' +
+              '</tr>' +
+            '</table>' +
+          '</td>' +
+        '</tr>' +
+      '</table>' +
+    '</body>' +
+    '</html>';
 }
 
 // ─── Verify OTP ──────────────────────────────────────────────────────────────────
