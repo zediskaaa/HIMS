@@ -46,6 +46,14 @@ Route::middleware('guest')->group(function () {
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
         ->name('password.email');
 
+    // Keep previously cached OTP pages working. They used /reset-password with
+    // an email query string, while Laravel reserves that path for POST submits.
+    Route::get('reset-password', function (Request $request) {
+        return redirect()->route('password.reset.otp', [
+            'email' => $request->query('email', ''),
+        ]);
+    })->name('password.reset.otp.redirect');
+
     Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
         ->name('password.reset');
 

@@ -47,6 +47,29 @@ class PasswordResetTest extends TestCase
         });
     }
 
+    public function test_otp_reset_password_screen_can_be_rendered(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->get('/reset-password-otp?email='.urlencode($user->email));
+
+        $response
+            ->assertOk()
+            ->assertSee('Set new password')
+            ->assertSee($user->email);
+    }
+
+    public function test_legacy_otp_reset_url_redirects_to_the_otp_form(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->get('/reset-password?email='.urlencode($user->email));
+
+        $response->assertRedirect(route('password.reset.otp', [
+            'email' => $user->email,
+        ]));
+    }
+
     public function test_password_can_be_reset_with_valid_token(): void
     {
         Notification::fake();

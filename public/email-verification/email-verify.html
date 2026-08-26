@@ -685,9 +685,9 @@
     // Option B: show password fields inline (extend step-success)
     function proceedToReset() {
       var email = document.getElementById("emailInput").value.trim();
-      // Redirect to your Laravel reset-password page or custom page.
-      // You can pass the email as a query param so the form knows who to reset.
-      window.location.href = "/reset-password?email=" + encodeURIComponent(email);
+      // The OTP flow has its own GET route. Laravel's /reset-password endpoint
+      // accepts POST only; its GET form requires a broker token in the URL.
+      window.location.href = "/reset-password-otp?email=" + encodeURIComponent(email);
     }
 
     // ════════════════════════════════════════════════════════════
