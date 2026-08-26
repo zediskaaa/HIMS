@@ -687,7 +687,7 @@
       var email = document.getElementById("emailInput").value.trim();
       // Redirect to your Laravel reset-password page or custom page.
       // You can pass the email as a query param so the form knows who to reset.
-      window.location.href = "/reset-password-otp?email=" + encodeURIComponent(email);
+      window.location.href = "/reset-password?email=" + encodeURIComponent(email);
     }
 
     // ════════════════════════════════════════════════════════════
@@ -756,49 +756,28 @@
         ? document.getElementById("btnResend")
         : document.getElementById("btnSendOtp");
 
-      setLoading(btn, true, "Checking…");
+      setLoading(btn, true, "Sending…");
 
-      // ── Step A: Check if email exists in the database (Laravel) ──
-      fetch("/check-email?email=" + encodeURIComponent(email), {
-        headers: { "Accept": "application/json" }
-      })
-      .then(function(response) { return response.json(); })
-      .then(function(data) {
-        if (!data.exists) {
-          // Email not found in the database
+      jsonp(APPS_SCRIPT_URL, { action: "sendOtp", email: email },
+        function(res) {
           setLoading(btn, false, btn.id === "btnResend" ? "Resend code" : "Send verification code");
-          showToast(data.message || "This email is not registered in the system.", "error");
-          return;
-        }
 
-        // ── Step B: Email exists → send OTP via Google Apps Script ──
-        setLoading(btn, true, "Sending…");
-
-        jsonp(APPS_SCRIPT_URL, { action: "sendOtp", email: email },
-          function(res) {
-            setLoading(btn, false, btn.id === "btnResend" ? "Resend code" : "Send verification code");
-
-            if (res.success) {
-              showToast(res.message, "success");
-              document.getElementById("displayEmail").textContent = email;
-              goToStep("step-otp");
-              startCountdown();
-              clearOtpBoxes();
-              document.querySelector(".otp-box").focus();
-            } else {
-              showToast(res.message, "error");
-            }
-          },
-          function() {
-            setLoading(btn, false, btn.id === "btnResend" ? "Resend code" : "Send verification code");
-            showToast("Network error. Please check your connection and try again.", "error");
+          if (res.success) {
+            showToast(res.message, "success");
+            document.getElementById("displayEmail").textContent = email;
+            goToStep("step-otp");
+            startCountdown();
+            clearOtpBoxes();
+            document.querySelector(".otp-box").focus();
+          } else {
+            showToast(res.message, "error");
           }
-        );
-      })
-      .catch(function() {
-        setLoading(btn, false, btn.id === "btnResend" ? "Resend code" : "Send verification code");
-        showToast("Unable to verify email. Please try again.", "error");
-      });
+        },
+        function() {
+          setLoading(btn, false, btn.id === "btnResend" ? "Resend code" : "Send verification code");
+          showToast("Network error. Please check your connection and try again.", "error");
+        }
+      );
     }
 
     // ════════════════════════════════════════════════════════════
