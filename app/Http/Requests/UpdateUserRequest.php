@@ -17,15 +17,6 @@ class UpdateUserRequest extends FormRequest
         return $this->user()?->hasPermission(Permission::ManageUsers) ?? false;
     }
 
-    protected function prepareForValidation(): void
-    {
-        if ($this->has('phone')) {
-            $this->merge([
-                'phone' => preg_replace('/[\s()-]+/', '', (string) $this->input('phone')),
-            ]);
-        }
-    }
-
     /**
      * @return array<string, mixed>
      */
@@ -47,7 +38,7 @@ class UpdateUserRequest extends FormRequest
             'role' => ['required', Rule::enum(UserRole::class)],
             'status' => ['required', Rule::enum(UserStatus::class)],
             'department' => ['required', 'string', Rule::in($departments)],
-            'phone' => ['required', 'string', 'max:13', 'regex:/^(?:\+63|0)9\d{9}$/'],
+            'phone' => ['bail', 'required', 'string', 'digits:11', 'regex:/^09[0-9]{9}$/'],
         ];
     }
 
@@ -61,7 +52,8 @@ class UpdateUserRequest extends FormRequest
             'department.required' => 'Pick the department this employee belongs to.',
             'department.in' => 'Pick a valid department from the list.',
             'phone.required' => 'Phone number is required.',
-            'phone.regex' => 'Enter a valid Philippine mobile number, such as 09171234567.',
+            'phone.digits' => 'Contact number must contain numbers only and exactly 11 digits.',
+            'phone.regex' => 'Contact number must start with 09 and contain exactly 11 digits.',
             'password.confirmed' => 'The two passwords do not match.',
         ];
     }

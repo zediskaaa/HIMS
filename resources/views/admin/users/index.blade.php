@@ -71,6 +71,7 @@
                 <x-ui.table.th>First Name</x-ui.table.th>
                 <x-ui.table.th>Middle Name</x-ui.table.th>
                 <x-ui.table.th>Department</x-ui.table.th>
+                <x-ui.table.th>Contact Number</x-ui.table.th>
                 <x-ui.table.th>Role</x-ui.table.th>
                 <x-ui.table.th>Status</x-ui.table.th>
                 <x-ui.table.th>Last Sign-in</x-ui.table.th>
@@ -112,6 +113,8 @@
                         <x-ui.table.td muted>{{ $nameComponents['middle_name'] ?? '—' }}</x-ui.table.td>
 
                         <x-ui.table.td muted>{{ $account->department ?? '—' }}</x-ui.table.td>
+
+                        <x-ui.table.td muted>{{ $account->phone ?? '—' }}</x-ui.table.td>
 
                         <x-ui.table.td>
                             <x-ui.badge :variant="$account->isAdministrator() ? 'primary' : 'neutral'">
@@ -156,7 +159,7 @@
                     </x-ui.table.row>
                 @empty
                     <x-ui.table.empty
-                        :colspan="9"
+                        :colspan="10"
                         icon="users"
                         title="No accounts match"
                         message="Adjust the filters, or add the first staff account." />

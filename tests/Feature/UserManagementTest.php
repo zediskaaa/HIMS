@@ -162,7 +162,10 @@ class UserManagementTest extends TestCase
 
         $this->actingAs($admin)->get('/admin/users')
             ->assertSee('Juan Santos Dela Cruz')
-            ->assertSeeInOrder(['Employee ID', 'Surname', 'First Name', 'Middle Name', 'Department', 'Role']);
+            ->assertSee('09171234567')
+            ->assertSeeInOrder([
+                'Employee ID', 'Surname', 'First Name', 'Middle Name', 'Department', 'Contact Number', 'Role',
+            ]);
     }
 
     public function test_a_new_account_gets_exactly_its_role_permissions(): void
@@ -266,7 +269,7 @@ class UserManagementTest extends TestCase
             'password_confirmation' => 'Password123!',
             'role' => UserRole::Viewer->value,
             'department' => 'Central Supply',
-            'phone' => '0917 123 4567',
+            'phone' => '09171234567',
         ])->assertRedirect('/admin/users');
 
         $created = User::where('email', 'ana.reyes@djnrmhs.test')->firstOrFail();
@@ -300,23 +303,65 @@ class UserManagementTest extends TestCase
         $this->assertSame($nextEmployeeNumber, DB::table('employee_id_sequences')->value('next_value'));
     }
 
-    public function test_an_invalid_phone_number_prevents_user_creation(): void
+    public function test_every_invalid_phone_format_prevents_user_creation(): void
     {
-        $this->actingAs($this->admin())->from('/admin/users/create')->post('/admin/users', [
-            'surname' => 'Bad Phone',
-            'first_name' => 'User',
-            'email' => 'bad-phone@djnrmhs.test',
-            'password' => 'Password123!',
-            'password_confirmation' => 'Password123!',
-            'role' => UserRole::Viewer->value,
-            'department' => 'Administration',
-            'phone' => '12345',
-        ])->assertRedirect('/admin/users/create')
-            ->assertSessionHasErrors([
-                'phone' => 'Enter a valid Philippine mobile number, such as 09171234567.',
-            ]);
+        $admin = $this->admin();
+        $invalidNumbers = [
+            '0912345678',
+            '091234567890',
+            '9123456789',
+            '08123456789',
+            '09123abc789',
+            '0912 345 6789',
+            '09-1234-56789',
+            '09(123)456789',
+            '+639123456789',
+            'abc09123456789',
+            '09@123456789',
+        ];
 
-        $this->assertDatabaseMissing('users', ['email' => 'bad-phone@djnrmhs.test']);
+        foreach ($invalidNumbers as $index => $phone) {
+            $email = "bad-phone-{$index}@djnrmhs.test";
+
+            $this->actingAs($admin)->from('/admin/users/create')->post('/admin/users', [
+                'surname' => 'Bad Phone',
+                'first_name' => 'User',
+                'email' => $email,
+                'password' => 'Password123!',
+                'password_confirmation' => 'Password123!',
+                'role' => UserRole::Viewer->value,
+                'department' => 'Administration',
+                'phone' => $phone,
+            ])->assertRedirect('/admin/users/create')
+                ->assertSessionHasErrors('phone');
+
+            $this->assertDatabaseMissing('users', ['email' => $email]);
+        }
+    }
+
+    public function test_each_supported_phone_number_is_saved_exactly_with_its_leading_zero(): void
+    {
+        $admin = $this->admin();
+
+        foreach (['09123456789', '09987654321', '09051234567'] as $index => $phone) {
+            $email = "valid-phone-{$index}@djnrmhs.test";
+
+            $this->actingAs($admin)->post('/admin/users', [
+                'surname' => 'Valid Phone',
+                'first_name' => 'User',
+                'email' => $email,
+                'password' => 'Password123!',
+                'password_confirmation' => 'Password123!',
+                'role' => UserRole::Viewer->value,
+                'department' => 'Administration',
+                'phone' => $phone,
+            ])->assertRedirect('/admin/users');
+
+            $this->assertDatabaseHas('users', [
+                'email' => $email,
+                'phone' => $phone,
+            ]);
+        }
     }
 
     public function test_employee_ids_are_automatic_sequential_and_unique(): void
@@ -431,6 +476,26 @@ class UserManagementTest extends TestCase
         $staff->refresh();
         $this->assertFalse(Hash::check('OriginalPass1!', $staff->password));
         $this->assertTrue(Hash::check('BrandNewPass1!', $staff->password));
+    }
+
+    public function test_an_invalid_phone_number_cannot_update_a_user(): void
+    {
+        $admin = $this->admin();
+        $staff = User::factory()->warehouseStaff()->create(['phone' => '09123456789']);
+
+        $this->actingAs($admin)
+            ->from("/admin/users/{$staff->id}/edit")
+            ->put("/admin/users/{$staff->id}", [
+                ...$staff->nameComponents(),
+                'email' => $staff->email,
+                'role' => $staff->role->value,
+                'status' => $staff->status->value,
+                'department' => $staff->department,
+                'phone' => '+639123456789',
+            ])->assertRedirect("/admin/users/{$staff->id}/edit")
+            ->assertSessionHasErrors('phone');
+
+        $this->assertSame('09123456789', $staff->fresh()->phone);
     }
 
     // ------------------------------------------------------------------ status
@@ -642,7 +707,10 @@ class UserManagementTest extends TestCase
             ->assertSee('Select a department')
             ->assertSee('name="role"', false)
             ->assertSee('name="phone"', false)
-            ->assertSee('inputmode="tel"', false)
+            ->assertSee('inputmode="numeric"', false)
+            ->assertSee('maxlength="11"', false)
+            ->assertSee('pattern="09[0-9]{9}"', false)
+            ->assertSee('placeholder="09XXXXXXXXX"', false)
             ->assertDontSee('name="name"', false);
 
         $this->actingAs($admin)->get("/admin/users/{$staff->id}/edit")

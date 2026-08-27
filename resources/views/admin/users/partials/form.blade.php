@@ -83,11 +83,18 @@
         <x-ui.field
             name="phone"
             label="Contact Number"
+            type="tel"
             :value="$user?->phone"
             required
-            inputmode="tel"
+            inputmode="numeric"
             autocomplete="tel"
-            placeholder="e.g. 0917 000 0000" />
+            minlength="11"
+            maxlength="11"
+            pattern="09[0-9]{9}"
+            title="Enter exactly 11 digits beginning with 09."
+            x-on:input="$el.value = $el.value.replace(/[^0-9]/g, '').slice(0, 11)"
+            placeholder="09XXXXXXXXX"
+            hint="Exactly 11 digits beginning with 09." />
 
         <x-ui.field
             name="role"
