@@ -25,7 +25,7 @@
                 <x-input-label for="email" :value="__('Email address')" class="text-neutral-700" />
                 <x-text-input
                     id="email"
-                    class="mt-2 block h-11 w-full rounded-lg border-neutral-300 bg-white px-3.5 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:border-primary-500 focus:ring-primary-500"
+                    class="mt-2 block h-11 w-full rounded-lg bg-white px-3.5 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:ring-primary-500 {{ $errors->has('email') ? '!border-danger-500 focus:!border-danger-500' : 'border-neutral-300 focus:border-primary-500' }}"
                     type="email"
                     name="email"
                     :value="old('email')"
@@ -54,7 +54,7 @@
                 <div class="relative mt-2">
                     <x-text-input
                         id="password"
-                        class="block h-11 w-full rounded-lg border-neutral-300 bg-white px-3.5 pr-11 text-sm text-neutral-900 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                        class="block h-11 w-full rounded-lg bg-white px-3.5 pr-11 text-sm text-neutral-900 shadow-sm {{ $errors->has('email') || $errors->has('password') ? '!border-danger-500 focus:!border-danger-500' : 'border-neutral-300 focus:border-primary-500' }} focus:ring-primary-500"
                         x-bind:type="showPassword ? 'text' : 'password'"
                         name="password"
                         required
