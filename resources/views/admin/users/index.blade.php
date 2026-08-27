@@ -66,8 +66,10 @@
         :padding="false">
         <x-ui.table>
             <x-ui.table.head>
-                <x-ui.table.th>Name</x-ui.table.th>
                 <x-ui.table.th>Employee ID</x-ui.table.th>
+                <x-ui.table.th>Surname</x-ui.table.th>
+                <x-ui.table.th>First Name</x-ui.table.th>
+                <x-ui.table.th>Middle Name</x-ui.table.th>
                 <x-ui.table.th>Department</x-ui.table.th>
                 <x-ui.table.th>Role</x-ui.table.th>
                 <x-ui.table.th>Status</x-ui.table.th>
@@ -76,7 +78,12 @@
             </x-ui.table.head>
             <tbody>
                 @forelse ($users as $account)
+                    @php($nameComponents = $account->nameComponents())
                     <x-ui.table.row>
+                        <x-ui.table.td muted>
+                            <span class="font-mono text-xs">{{ $account->employee_id ?? '—' }}</span>
+                        </x-ui.table.td>
+
                         <x-ui.table.td>
                             <div class="flex items-center gap-2.5">
                                 <span class="flex items-center justify-center w-8 h-8 rounded-full shrink-0
@@ -86,20 +93,23 @@
                                 </span>
                                 <div class="min-w-0">
                                     <a href="{{ route('admin.users.show', $account) }}"
+                                       title="{{ $account->name }}"
                                        class="font-medium text-neutral-900 hover:text-primary-700 hover:underline">
-                                        {{ $account->name }}
+                                        {{ $nameComponents['surname'] ?? $account->name }}
                                     </a>
                                     @if ($account->is(auth()->user()))
                                         <span class="ml-1 text-[11px] font-medium text-neutral-400">(you)</span>
                                     @endif
-                                    <span class="block text-xs text-neutral-500 truncate">{{ $account->email }}</span>
                                 </div>
                             </div>
                         </x-ui.table.td>
 
-                        <x-ui.table.td muted>
-                            <span class="font-mono text-xs">{{ $account->employee_id ?? '—' }}</span>
+                        <x-ui.table.td>
+                            <span class="text-neutral-900">{{ $nameComponents['first_name'] ?? '—' }}</span>
+                            <span class="block text-xs text-neutral-500 truncate">{{ $account->email }}</span>
                         </x-ui.table.td>
+
+                        <x-ui.table.td muted>{{ $nameComponents['middle_name'] ?? '—' }}</x-ui.table.td>
 
                         <x-ui.table.td muted>{{ $account->department ?? '—' }}</x-ui.table.td>
 
@@ -146,7 +156,7 @@
                     </x-ui.table.row>
                 @empty
                     <x-ui.table.empty
-                        :colspan="7"
+                        :colspan="9"
                         icon="users"
                         title="No accounts match"
                         message="Adjust the filters, or add the first staff account." />

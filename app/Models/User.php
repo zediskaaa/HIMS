@@ -26,6 +26,9 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'surname',
+        'first_name',
+        'middle_name',
         'email',
         'password',
         'role',
@@ -59,6 +62,98 @@ class User extends Authenticatable
             'role' => UserRole::class,
             'status' => UserStatus::class,
         ];
+    }
+
+    /**
+     * Keep the legacy display name and the structured fields synchronized.
+     * This also protects existing registration/profile flows that still write
+     * only `name`.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $user): void {
+            if ($user->isDirty(['surname', 'first_name', 'middle_name'])) {
+                $user->name = self::composeName(
+                    $user->first_name,
+                    $user->middle_name,
+                    $user->surname,
+                );
+
+                return;
+            }
+
+            if ($user->isDirty('name')) {
+                [$firstName, $middleName, $surname] = self::splitName($user->name);
+
+                $user->first_name = $firstName;
+                $user->middle_name = $middleName;
+                $user->surname = $surname;
+            }
+        });
+    }
+
+    public static function composeName(?string $firstName, ?string $middleName, ?string $surname): string
+    {
+        return collect([$firstName, $middleName, $surname])
+            ->map(fn (?string $part) => preg_replace('/\s+/u', ' ', trim((string) $part)))
+            ->filter(fn (?string $part) => filled($part))
+            ->implode(' ');
+    }
+
+    /**
+     * @return array{first_name: ?string, middle_name: ?string, surname: ?string}
+     */
+    public function nameComponents(): array
+    {
+        if (filled($this->first_name) || filled($this->middle_name) || filled($this->surname)) {
+            return [
+                'first_name' => $this->first_name,
+                'middle_name' => $this->middle_name,
+                'surname' => $this->surname,
+            ];
+        }
+
+        [$firstName, $middleName, $surname] = self::splitName($this->name);
+
+        return [
+            'first_name' => $firstName,
+            'middle_name' => $middleName,
+            'surname' => $surname,
+        ];
+    }
+
+    /**
+     * Split legacy full names without changing their stored display value.
+     * A comma-delimited "Surname, Given Names" value is also supported.
+     *
+     * @return array{0: ?string, 1: ?string, 2: ?string}
+     */
+    public static function splitName(?string $name): array
+    {
+        $name = trim((string) $name);
+
+        if ($name === '') {
+            return [null, null, null];
+        }
+
+        if (str_contains($name, ',')) {
+            [$surname, $givenNames] = array_map('trim', explode(',', $name, 2));
+            $parts = preg_split('/\s+/u', $givenNames, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $firstName = array_shift($parts);
+
+            return [$firstName ?: null, $parts === [] ? null : implode(' ', $parts), $surname ?: null];
+        }
+
+        $parts = preg_split('/\s+/u', $name, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        if (count($parts) === 1) {
+            return [$parts[0], null, null];
+        }
+
+        $firstName = array_shift($parts);
+        $surname = array_pop($parts);
+
+        return [$firstName, $parts === [] ? null : implode(' ', $parts), $surname];
     }
 
     /**

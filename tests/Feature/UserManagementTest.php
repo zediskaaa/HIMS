@@ -8,6 +8,7 @@ use App\Enums\UserStatus;
 use App\Models\User;
 use App\Services\UserAccountService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -64,11 +65,13 @@ class UserManagementTest extends TestCase
                 ->assertForbidden();
 
             $this->actingAs($user)->post('/admin/users', [
-                'name' => 'Sneaky Hire',
+                'surname' => 'Hire',
+                'first_name' => 'Sneaky',
                 'email' => 'sneaky@example.com',
                 'password' => 'Password123!',
                 'password_confirmation' => 'Password123!',
                 'role' => UserRole::Administrator->value,
+                'phone' => '09171234567',
             ])->assertForbidden();
         }
 
@@ -128,21 +131,27 @@ class UserManagementTest extends TestCase
         $admin = $this->admin();
 
         $this->actingAs($admin)->post('/admin/users', [
-            'name' => 'Ana Reyes',
-            'email' => 'ana.reyes@djnrmhs.test',
+            'surname' => 'Dela Cruz',
+            'first_name' => 'Juan',
+            'middle_name' => 'Santos',
+            'email' => 'juan.delacruz@djnrmhs.test',
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
             'role' => UserRole::InventoryManager->value,
-            'employee_id' => 'EMP-0002',
+            'employee_id' => 'EMP-9999', // A forged value must be ignored.
             'department' => 'Central Supply',
             'phone' => '09171234567',
         ])->assertRedirect('/admin/users');
 
-        $created = User::where('email', 'ana.reyes@djnrmhs.test')->firstOrFail();
+        $created = User::where('email', 'juan.delacruz@djnrmhs.test')->firstOrFail();
 
+        $this->assertSame('Dela Cruz', $created->surname);
+        $this->assertSame('Juan', $created->first_name);
+        $this->assertSame('Santos', $created->middle_name);
+        $this->assertSame('Juan Santos Dela Cruz', $created->name);
         $this->assertSame(UserRole::InventoryManager, $created->role);
         $this->assertSame(UserStatus::Active, $created->status);
-        $this->assertSame('EMP-0002', $created->employee_id);
+        $this->assertSame('EMP-0001', $created->employee_id);
 
         // Stored hashed by the model's 'hashed' cast, never in the clear.
         $this->assertNotSame('Password123!', $created->password);
@@ -150,6 +159,10 @@ class UserManagementTest extends TestCase
 
         // Created by an administrator in person, so no verification email step.
         $this->assertNotNull($created->email_verified_at);
+
+        $this->actingAs($admin)->get('/admin/users')
+            ->assertSee('Juan Santos Dela Cruz')
+            ->assertSeeInOrder(['Employee ID', 'Surname', 'First Name', 'Middle Name', 'Department', 'Role']);
     }
 
     public function test_a_new_account_gets_exactly_its_role_permissions(): void
@@ -157,11 +170,14 @@ class UserManagementTest extends TestCase
         $admin = $this->admin();
 
         $this->actingAs($admin)->post('/admin/users', [
-            'name' => 'Cely Dizon',
+            'surname' => 'Dizon',
+            'first_name' => 'Cely',
             'email' => 'cely@djnrmhs.test',
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
             'role' => UserRole::PharmacyStaff->value,
+            'department' => 'Pharmacy',
+            'phone' => '09171234567',
         ])->assertRedirect('/admin/users');
 
         $pharmacy = User::where('email', 'cely@djnrmhs.test')->firstOrFail();
@@ -181,29 +197,36 @@ class UserManagementTest extends TestCase
         $this->assertFalse($pharmacy->hasPermission(Permission::ManageProcurement));
     }
 
-    public function test_duplicate_email_and_employee_id_are_rejected(): void
+    public function test_duplicate_email_is_rejected_and_employee_id_input_is_ignored(): void
     {
         $admin = $this->admin();
         User::factory()->create(['email' => 'taken@djnrmhs.test', 'employee_id' => 'EMP-9001']);
 
         $this->actingAs($admin)->post('/admin/users', [
-            'name' => 'Clash',
+            'surname' => 'Account',
+            'first_name' => 'Clash',
             'email' => 'taken@djnrmhs.test',
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
             'role' => UserRole::Viewer->value,
             'employee_id' => 'EMP-9001',
-        ])->assertSessionHasErrors(['email', 'employee_id']);
+            'department' => 'Warehouse',
+            'phone' => '09171234567',
+        ])->assertSessionHasErrors('email')
+            ->assertSessionDoesntHaveErrors('employee_id');
     }
 
     public function test_mismatched_password_confirmation_is_rejected(): void
     {
         $this->actingAs($this->admin())->post('/admin/users', [
-            'name' => 'Typo',
+            'surname' => 'Account',
+            'first_name' => 'Typo',
             'email' => 'typo@djnrmhs.test',
             'password' => 'Password123!',
             'password_confirmation' => 'Password456!',
             'role' => UserRole::Viewer->value,
+            'department' => 'Warehouse',
+            'phone' => '09171234567',
         ])->assertSessionHasErrors('password');
 
         $this->assertDatabaseMissing('users', ['email' => 'typo@djnrmhs.test']);
@@ -212,12 +235,134 @@ class UserManagementTest extends TestCase
     public function test_an_unknown_role_is_rejected(): void
     {
         $this->actingAs($this->admin())->post('/admin/users', [
-            'name' => 'Made Up',
+            'surname' => 'Up',
+            'first_name' => 'Made',
             'email' => 'madeup@djnrmhs.test',
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
             'role' => 'chief_wizard',
+            'department' => 'Warehouse',
+            'phone' => '09171234567',
         ])->assertSessionHasErrors('role');
+    }
+
+    public function test_surname_and_first_name_are_required_but_middle_name_is_optional(): void
+    {
+        $admin = $this->admin();
+
+        $before = User::count();
+
+        $this->actingAs($admin)->from('/admin/users/create')->post('/admin/users', [])
+            ->assertRedirect('/admin/users/create')
+            ->assertSessionHasErrors(['surname', 'first_name', 'email', 'password', 'role', 'department', 'phone']);
+
+        $this->assertSame($before, User::count());
+
+        $this->actingAs($admin)->from('/admin/users/create')->post('/admin/users', [
+            'surname' => 'Reyes',
+            'first_name' => 'Ana',
+            'email' => 'ana.reyes@djnrmhs.test',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'role' => UserRole::Viewer->value,
+            'department' => 'Central Supply',
+            'phone' => '0917 123 4567',
+        ])->assertRedirect('/admin/users');
+
+        $created = User::where('email', 'ana.reyes@djnrmhs.test')->firstOrFail();
+        $this->assertNull($created->middle_name);
+        $this->assertSame('Ana Reyes', $created->name);
+        $this->assertSame('09171234567', $created->phone);
+    }
+
+    public function test_a_missing_phone_number_prevents_user_creation(): void
+    {
+        $admin = $this->admin();
+        $nextEmployeeNumber = DB::table('employee_id_sequences')->value('next_value');
+
+        $this->actingAs($admin)->from('/admin/users/create')->post('/admin/users', [
+            'surname' => 'No Phone',
+            'first_name' => 'User',
+            'email' => 'no-phone@djnrmhs.test',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'role' => UserRole::Viewer->value,
+            'department' => 'Administration',
+            'phone' => '',
+        ])->assertRedirect('/admin/users/create')
+            ->assertSessionHasErrors([
+                'phone' => 'Phone number is required.',
+            ])
+            ->assertSessionHasInput('surname', 'No Phone')
+            ->assertSessionHasInput('email', 'no-phone@djnrmhs.test');
+
+        $this->assertDatabaseMissing('users', ['email' => 'no-phone@djnrmhs.test']);
+        $this->assertSame($nextEmployeeNumber, DB::table('employee_id_sequences')->value('next_value'));
+    }
+
+    public function test_an_invalid_phone_number_prevents_user_creation(): void
+    {
+        $this->actingAs($this->admin())->from('/admin/users/create')->post('/admin/users', [
+            'surname' => 'Bad Phone',
+            'first_name' => 'User',
+            'email' => 'bad-phone@djnrmhs.test',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'role' => UserRole::Viewer->value,
+            'department' => 'Administration',
+            'phone' => '12345',
+        ])->assertRedirect('/admin/users/create')
+            ->assertSessionHasErrors([
+                'phone' => 'Enter a valid Philippine mobile number, such as 09171234567.',
+            ]);
+
+        $this->assertDatabaseMissing('users', ['email' => 'bad-phone@djnrmhs.test']);
+    }
+
+    public function test_employee_ids_are_automatic_sequential_and_unique(): void
+    {
+        $admin = $this->admin();
+
+        foreach ([1 => 'first', 2 => 'second'] as $number => $emailPrefix) {
+            $this->actingAs($admin)->post('/admin/users', [
+                'surname' => 'Employee',
+                'first_name' => ucfirst($emailPrefix),
+                'email' => $emailPrefix.'@djnrmhs.test',
+                'password' => 'Password123!',
+                'password_confirmation' => 'Password123!',
+                'role' => UserRole::Viewer->value,
+                'department' => 'Records Management',
+                'employee_id' => 'EMP-9001',
+                'phone' => '09171234567',
+            ])->assertRedirect('/admin/users');
+
+            $this->assertDatabaseHas('users', [
+                'email' => $emailPrefix.'@djnrmhs.test',
+                'employee_id' => 'EMP-'.str_pad((string) $number, 4, '0', STR_PAD_LEFT),
+            ]);
+        }
+
+        $assigned = User::whereIn('email', ['first@djnrmhs.test', 'second@djnrmhs.test'])
+            ->pluck('employee_id');
+        $this->assertCount(2, $assigned);
+        $this->assertCount(2, $assigned->unique());
+        $this->assertSame(3, DB::table('employee_id_sequences')->value('next_value'));
+    }
+
+    public function test_an_invalid_department_is_rejected(): void
+    {
+        $this->actingAs($this->admin())->post('/admin/users', [
+            'surname' => 'Intruder',
+            'first_name' => 'Department',
+            'email' => 'invalid-department@djnrmhs.test',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'role' => UserRole::Viewer->value,
+            'department' => 'Made Up Department',
+            'phone' => '09171234567',
+        ])->assertSessionHasErrors('department');
+
+        $this->assertDatabaseMissing('users', ['email' => 'invalid-department@djnrmhs.test']);
     }
 
     // ------------------------------------------------------------------ update
@@ -230,10 +375,12 @@ class UserManagementTest extends TestCase
         $this->assertFalse($staff->hasPermission(Permission::ManageProcurement));
 
         $this->actingAs($admin)->put("/admin/users/{$staff->id}", [
-            'name' => $staff->name,
+            ...$staff->nameComponents(),
             'email' => $staff->email,
             'role' => UserRole::InventoryManager->value,
             'status' => UserStatus::Active->value,
+            'department' => $staff->department,
+            'phone' => $staff->phone,
         ])->assertRedirect('/admin/users');
 
         $this->assertTrue($staff->fresh()->hasPermission(Permission::ManageProcurement));
@@ -249,10 +396,14 @@ class UserManagementTest extends TestCase
         $staff = User::factory()->create(['password' => Hash::make('OriginalPass1!')]);
 
         $this->actingAs($admin)->put("/admin/users/{$staff->id}", [
-            'name' => 'Renamed Person',
+            'surname' => 'Person',
+            'first_name' => 'Renamed',
+            'middle_name' => null,
             'email' => $staff->email,
             'role' => $staff->role->value,
             'status' => UserStatus::Active->value,
+            'department' => $staff->department,
+            'phone' => $staff->phone,
             'password' => '',
         ])->assertRedirect('/admin/users');
 
@@ -267,10 +418,12 @@ class UserManagementTest extends TestCase
         $staff = User::factory()->create(['password' => Hash::make('OriginalPass1!')]);
 
         $this->actingAs($admin)->put("/admin/users/{$staff->id}", [
-            'name' => $staff->name,
+            ...$staff->nameComponents(),
             'email' => $staff->email,
             'role' => $staff->role->value,
             'status' => UserStatus::Active->value,
+            'department' => $staff->department,
+            'phone' => $staff->phone,
             'password' => 'BrandNewPass1!',
             'password_confirmation' => 'BrandNewPass1!',
         ])->assertRedirect('/admin/users');
@@ -329,10 +482,12 @@ class UserManagementTest extends TestCase
         $this->actingAs($admin)
             ->from("/admin/users/{$admin->id}/edit")
             ->put("/admin/users/{$admin->id}", [
-                'name' => $admin->name,
+                ...$admin->nameComponents(),
                 'email' => $admin->email,
                 'role' => UserRole::Viewer->value,
                 'status' => UserStatus::Active->value,
+                'department' => $admin->department,
+                'phone' => $admin->phone,
             ])->assertSessionHasErrors('role');
 
         $this->assertSame(UserRole::Administrator, $admin->fresh()->role);
@@ -404,10 +559,12 @@ class UserManagementTest extends TestCase
         $manager = User::factory()->inventoryManager()->create();
 
         $this->actingAs($admin)->put("/admin/users/{$manager->id}", [
-            'name' => $manager->name,
+            ...$manager->nameComponents(),
             'email' => $manager->email,
             'role' => UserRole::Viewer->value,
             'status' => UserStatus::Inactive->value,
+            'department' => $manager->department,
+            'phone' => $manager->phone,
         ])->assertSessionHasNoErrors();
 
         $manager->refresh();
@@ -425,10 +582,12 @@ class UserManagementTest extends TestCase
         $other = $this->admin();
 
         $this->actingAs($admin)->put("/admin/users/{$other->id}", [
-            'name' => $other->name,
+            ...$other->nameComponents(),
             'email' => $other->email,
             'role' => UserRole::Viewer->value,
             'status' => UserStatus::Active->value,
+            'department' => $other->department,
+            'phone' => $other->phone,
         ])->assertSessionHasNoErrors();
 
         $this->assertSame(UserRole::Viewer, $other->fresh()->role);
@@ -472,8 +631,76 @@ class UserManagementTest extends TestCase
         $admin = $this->admin();
         $staff = User::factory()->create();
 
-        $this->actingAs($admin)->get('/admin/users/create')->assertStatus(200);
-        $this->actingAs($admin)->get("/admin/users/{$staff->id}/edit")->assertStatus(200);
+        $this->actingAs($admin)->get('/admin/users/create')
+            ->assertStatus(200)
+            ->assertSee('name="surname"', false)
+            ->assertSee('name="first_name"', false)
+            ->assertSee('name="middle_name"', false)
+            ->assertSee('name="employee_id"', false)
+            ->assertSee('Generated automatically after creation')
+            ->assertSee('name="department"', false)
+            ->assertSee('Select a department')
+            ->assertSee('name="role"', false)
+            ->assertSee('name="phone"', false)
+            ->assertSee('inputmode="tel"', false)
+            ->assertDontSee('name="name"', false);
+
+        $this->actingAs($admin)->get("/admin/users/{$staff->id}/edit")
+            ->assertStatus(200)
+            ->assertSee('value="'.e($staff->surname).'"', false)
+            ->assertSee('value="'.e($staff->first_name).'"', false)
+            ->assertSee('value="'.e($staff->employee_id).'"', false)
+            ->assertSee('value="'.e($staff->department).'" selected', false)
+            ->assertSee('value="'.$staff->role->value.'"', false);
+    }
+
+    public function test_editing_updates_each_name_part_and_the_complete_name(): void
+    {
+        $admin = $this->admin();
+        $staff = User::factory()->warehouseStaff()->create(['name' => 'Ana Reyes']);
+        $originalEmployeeId = $staff->employee_id;
+
+        $this->actingAs($admin)->put("/admin/users/{$staff->id}", [
+            'surname' => 'Dela Cruz',
+            'first_name' => 'Juan',
+            'middle_name' => 'Santos',
+            'email' => $staff->email,
+            'role' => $staff->role->value,
+            'status' => $staff->status->value,
+            'department' => 'Finance',
+            'employee_id' => 'EMP-9999',
+            'phone' => $staff->phone,
+        ])->assertRedirect('/admin/users');
+
+        $staff->refresh();
+        $this->assertSame('Dela Cruz', $staff->surname);
+        $this->assertSame('Juan', $staff->first_name);
+        $this->assertSame('Santos', $staff->middle_name);
+        $this->assertSame('Juan Santos Dela Cruz', $staff->name);
+        $this->assertSame('Finance', $staff->department);
+        $this->assertSame($originalEmployeeId, $staff->employee_id);
+    }
+
+    public function test_a_legacy_name_still_displays_and_populates_the_edit_form(): void
+    {
+        $admin = $this->admin();
+        $staff = User::factory()->warehouseStaff()->create();
+
+        // Simulate an existing row from before the structured columns existed.
+        DB::table('users')->where('id', $staff->id)->update([
+            'name' => 'Ben Santos',
+            'surname' => null,
+            'first_name' => null,
+            'middle_name' => null,
+        ]);
+
+        $this->actingAs($admin)->get('/admin/users')
+            ->assertSee('Ben Santos');
+
+        $this->actingAs($admin)->get("/admin/users/{$staff->id}/edit")
+            ->assertStatus(200)
+            ->assertSee('value="Santos"', false)
+            ->assertSee('value="Ben"', false);
     }
 
     /**

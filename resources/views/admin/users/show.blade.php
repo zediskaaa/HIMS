@@ -1,4 +1,5 @@
 <x-app-layout>
+    @php($nameComponents = $user->nameComponents())
     <x-ui.page-header
         :title="$user->name"
         :subtitle="$user->role->label().' · '.$user->status->label()"
@@ -29,6 +30,18 @@
                 </div>
 
                 <dl class="mt-5 space-y-3 text-sm">
+                    <div class="flex items-start justify-between gap-3">
+                        <dt class="text-neutral-500">Surname</dt>
+                        <dd class="text-neutral-800">{{ $nameComponents['surname'] ?? '—' }}</dd>
+                    </div>
+                    <div class="flex items-start justify-between gap-3">
+                        <dt class="text-neutral-500">First Name</dt>
+                        <dd class="text-neutral-800">{{ $nameComponents['first_name'] ?? '—' }}</dd>
+                    </div>
+                    <div class="flex items-start justify-between gap-3">
+                        <dt class="text-neutral-500">Middle Name</dt>
+                        <dd class="text-neutral-800">{{ $nameComponents['middle_name'] ?? '—' }}</dd>
+                    </div>
                     <div class="flex items-start justify-between gap-3">
                         <dt class="text-neutral-500">Role</dt>
                         <dd>

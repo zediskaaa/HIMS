@@ -25,26 +25,28 @@ class UserAccountService
      */
     public function create(array $attributes): User
     {
-        $user = new User([
-            'name' => $attributes['name'],
-            'email' => $attributes['email'],
-            'password' => $attributes['password'],
-            'role' => $attributes['role'],
-            'status' => $attributes['status'] ?? UserStatus::Active->value,
-            'employee_id' => $attributes['employee_id'] ?? null,
-            'department' => $attributes['department'] ?? null,
-            'phone' => $attributes['phone'] ?? null,
-        ]);
+        return DB::transaction(function () use ($attributes): User {
+            $user = new User([
+                ...$this->nameAttributes($attributes),
+                'email' => $attributes['email'],
+                'password' => $attributes['password'],
+                'role' => $attributes['role'],
+                'status' => $attributes['status'] ?? UserStatus::Active->value,
+                'employee_id' => $this->nextEmployeeId(),
+                'department' => $attributes['department'],
+                'phone' => $attributes['phone'] ?? null,
+            ]);
 
-        // An administrator created this account in person, so there is nobody
-        // to send a confirmation link to. Set outside the fillable list on
-        // purpose: email_verified_at must never be mass-assignable from a
-        // request, so passing it to User::create() would be dropped silently.
-        $user->email_verified_at = now();
+            // An administrator created this account in person, so there is nobody
+            // to send a confirmation link to. Set outside the fillable list on
+            // purpose: email_verified_at must never be mass-assignable from a
+            // request, so passing it to User::create() would be dropped silently.
+            $user->email_verified_at = now();
 
-        $user->save();
+            $user->save();
 
-        return $user;
+            return $user;
+        }, 5);
     }
 
     /**
@@ -68,12 +70,11 @@ class UserAccountService
             }
 
             $user->fill([
-                'name' => $attributes['name'],
+                ...$this->nameAttributes($attributes),
                 'email' => $attributes['email'],
                 'role' => $newRole,
                 'status' => $newStatus,
-                'employee_id' => $attributes['employee_id'] ?? null,
-                'department' => $attributes['department'] ?? null,
+                'department' => $attributes['department'],
                 'phone' => $attributes['phone'] ?? null,
             ]);
 
@@ -145,6 +146,56 @@ class UserAccountService
         if ($user->is($actor)) {
             throw ValidationException::withMessages(['role' => [$message]]);
         }
+    }
+
+    /**
+     * Structured fields are used by user management. Accepting `name` as a
+     * fallback keeps non-HTTP service callers backward compatible.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function nameAttributes(array $attributes): array
+    {
+        if (array_key_exists('first_name', $attributes) || array_key_exists('surname', $attributes)) {
+            return [
+                'first_name' => $attributes['first_name'] ?? null,
+                'middle_name' => $attributes['middle_name'] ?? null,
+                'surname' => $attributes['surname'] ?? null,
+            ];
+        }
+
+        return ['name' => $attributes['name']];
+    }
+
+    /**
+     * Reserve the next ID while holding a database row lock. All creators
+     * serialize through this single row, and users.employee_id has a unique
+     * index as the final database-level duplicate guard.
+     */
+    private function nextEmployeeId(): string
+    {
+        $sequence = DB::table('employee_id_sequences')
+            ->where('id', 1)
+            ->lockForUpdate()
+            ->first();
+
+        if ($sequence === null) {
+            throw new \RuntimeException('The employee ID sequence has not been initialized.');
+        }
+
+        $number = (int) $sequence->next_value;
+
+        do {
+            $employeeId = 'EMP-'.str_pad((string) $number, 4, '0', STR_PAD_LEFT);
+            $number++;
+        } while (User::query()->where('employee_id', $employeeId)->exists());
+
+        DB::table('employee_id_sequences')->where('id', 1)->update([
+            'next_value' => $number,
+        ]);
+
+        return $employeeId;
     }
 
     /**

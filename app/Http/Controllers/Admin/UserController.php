@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\Permission;
+use App\Enums\UserDepartment;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
@@ -40,6 +41,9 @@ class UserController extends Controller implements HasMiddleware
 
                 $query->where(fn ($q) => $q
                     ->where('name', 'like', $term)
+                    ->orWhere('surname', 'like', $term)
+                    ->orWhere('first_name', 'like', $term)
+                    ->orWhere('middle_name', 'like', $term)
                     ->orWhere('email', 'like', $term)
                     ->orWhere('employee_id', 'like', $term)
                     ->orWhere('department', 'like', $term));
@@ -67,6 +71,7 @@ class UserController extends Controller implements HasMiddleware
     {
         return view('admin.users.create', [
             'roles' => UserRole::cases(),
+            'departments' => UserDepartment::options(),
         ]);
     }
 
@@ -98,6 +103,7 @@ class UserController extends Controller implements HasMiddleware
             'user' => $user,
             'roles' => UserRole::cases(),
             'statuses' => UserStatus::options(),
+            'departments' => UserDepartment::optionsIncluding($user->department),
         ]);
     }
 
