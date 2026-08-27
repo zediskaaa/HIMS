@@ -128,23 +128,31 @@
 
         {{-- Only administrators hold manage_users, so the section is hidden
              rather than shown-and-refused for everyone else. --}}
-        @can(\App\Enums\Permission::ManageUsers->value)
+        @canany([\App\Enums\Permission::ManageUsers->value, \App\Enums\Permission::ViewAuditTrail->value])
             <div>
                 <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                     Administration
                 </p>
                 <div class="space-y-0.5">
-                    <x-ui.nav-item :href="route('admin.users.index')" icon="users"
-                                   :active="request()->routeIs('admin.users.*')">
-                        User Management
-                    </x-ui.nav-item>
-                    <x-ui.nav-item :href="route('admin.permissions')" icon="shield-check"
-                                   :active="request()->routeIs('admin.permissions')">
-                        Access Control
-                    </x-ui.nav-item>
+                    @can(\App\Enums\Permission::ManageUsers->value)
+                        <x-ui.nav-item :href="route('admin.users.index')" icon="users"
+                                       :active="request()->routeIs('admin.users.*')">
+                            User Management
+                        </x-ui.nav-item>
+                        <x-ui.nav-item :href="route('admin.permissions')" icon="shield-check"
+                                       :active="request()->routeIs('admin.permissions')">
+                            Access Control
+                        </x-ui.nav-item>
+                    @endcan
+                    @can(\App\Enums\Permission::ViewAuditTrail->value)
+                        <x-ui.nav-item :href="route('admin.audit-logs.index')" icon="clipboard-document-list"
+                                       :active="request()->routeIs('admin.audit-logs.*')">
+                            Audit Trail
+                        </x-ui.nav-item>
+                    @endcan
                 </div>
             </div>
-        @endcan
+        @endcanany
     </nav>
 
     {{-- Footer --}}

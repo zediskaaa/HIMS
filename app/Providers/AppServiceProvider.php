@@ -2,9 +2,13 @@
 
 namespace App\Providers;
 
+use App\Enums\AuditAction;
 use App\Enums\Permission;
 use App\Models\User;
+use App\Observers\UserObserver;
+use App\Services\AuditLogger;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -25,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerPermissionGates();
-        $this->trackSuccessfulLogins();
+        $this->registerAuditLogging();
     }
 
     /**
@@ -53,11 +57,33 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Stamp `last_login_at` so the user list can show dormant accounts.
      */
-    private function trackSuccessfulLogins(): void
+    private function registerAuditLogging(): void
     {
-        Event::listen(function (Login $event) {
+        User::observe(UserObserver::class);
+
+        Event::listen(function (Login $event): void {
             if ($event->user instanceof User) {
                 $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
+
+                app(AuditLogger::class)->log(
+                    AuditAction::LoggedIn,
+                    $event->user,
+                    "{$event->user->name} logged in.",
+                    $event->user,
+                    'Account',
+                );
+            }
+        });
+
+        Event::listen(function (Logout $event): void {
+            if ($event->user instanceof User) {
+                app(AuditLogger::class)->log(
+                    AuditAction::LoggedOut,
+                    $event->user,
+                    "{$event->user->name} logged out.",
+                    $event->user,
+                    'Account',
+                );
             }
         });
     }

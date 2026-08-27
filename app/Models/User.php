@@ -176,6 +176,15 @@ class User extends Authenticatable
     }
 
     /**
+     * Activities this user performed. The relation becomes empty after a hard
+     * delete, while each AuditLog retains the actor snapshot permanently.
+     */
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(AuditLog::class);
+    }
+
+    /**
      * Whether this account's role grants an ability.
      *
      * Inactive accounts hold no permissions at all, so a deactivated user who

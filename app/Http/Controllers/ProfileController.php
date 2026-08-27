@@ -48,9 +48,14 @@ class ProfileController extends Controller
 
         $user = $request->user();
 
-        Auth::logout();
-
+        // Delete while the actor is still authenticated so UserObserver can
+        // retain both the actor and target snapshots in the audit trail.
+        // Clearing the in-memory token prevents SessionGuard::logout() from
+        // saving (and therefore recreating) the already-deleted user.
+        $user->setRememberToken(null);
         $user->delete();
+
+        Auth::logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

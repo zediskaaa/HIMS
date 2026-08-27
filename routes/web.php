@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\PermissionMatrixController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Inventory\DemandForecastController;
@@ -73,6 +74,7 @@ Route::middleware('auth')->group(function () {
  * out from behind it.
  */
 Route::prefix('admin')->name('admin.')->group(function () {
+    Route::get('/audit-trail', [AuditLogController::class, 'index'])->name('audit-logs.index');
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
     Route::post('/users', [UserController::class, 'store'])->name('users.store');
