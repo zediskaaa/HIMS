@@ -93,6 +93,24 @@ enum AuthenticationPanel: string
         };
     }
 
+    public function passwordOtpRoute(): string
+    {
+        return match ($this) {
+            self::Staff => 'password.otp',
+            self::Admin => 'admin.password.otp',
+            self::SuperAdmin => 'super-admin.password.otp',
+        };
+    }
+
+    public function passwordOtpVerifyRoute(): string
+    {
+        return match ($this) {
+            self::Staff => 'password.otp.verify',
+            self::Admin => 'admin.password.otp.verify',
+            self::SuperAdmin => 'super-admin.password.otp.verify',
+        };
+    }
+
     public function passwordStoreRoute(): string
     {
         return match ($this) {

@@ -7,7 +7,7 @@
             </div>
             <h1 class="text-3xl font-semibold tracking-tight text-neutral-900">Reset your password</h1>
             <p class="mt-3 text-sm leading-6 text-neutral-500">
-                Enter your {{ strtolower($panel->label()) }} account email. If the account is eligible, we will send a secure, time-limited reset link.
+                Enter your {{ strtolower($panel->label()) }} account email. If the account is eligible, we will send a secure, time-limited verification code.
             </p>
         </header>
 
@@ -37,7 +37,7 @@
             </div>
 
             <x-ui.button type="submit" size="lg" class="w-full">
-                {{ __('Email password reset link') }}
+                {{ __('Email password reset code') }}
             </x-ui.button>
         </form>
 

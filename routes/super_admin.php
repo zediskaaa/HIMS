@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\Auth\PasswordResetOtpController;
 use App\Http\Controllers\SuperAdmin\AuthenticatedSessionController;
 use App\Http\Controllers\SuperAdmin\DashboardController;
 use App\Support\AuthenticationPanel;
@@ -17,6 +18,13 @@ Route::prefix('super-admin')->name('super-admin.')->group(function () {
         Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
             ->defaults('auth_panel', AuthenticationPanel::SuperAdmin->value)
             ->name('password.email');
+        Route::get('reset-password-otp', [PasswordResetOtpController::class, 'show'])
+            ->defaults('auth_panel', AuthenticationPanel::SuperAdmin->value)
+            ->name('password.otp');
+        Route::post('reset-password-otp', [PasswordResetOtpController::class, 'verify'])
+            ->defaults('auth_panel', AuthenticationPanel::SuperAdmin->value)
+            ->middleware('throttle:6,1')
+            ->name('password.otp.verify');
         Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
             ->defaults('auth_panel', AuthenticationPanel::SuperAdmin->value)
             ->name('password.reset');

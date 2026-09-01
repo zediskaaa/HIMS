@@ -3,10 +3,11 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
+use App\Notifications\PasswordResetOtp;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class PanelPasswordResetTest extends TestCase
@@ -135,7 +136,7 @@ class PanelPasswordResetTest extends TestCase
                 ->assertSessionMissing('wrong_panel.url')
                 ->assertSessionMissing('wrong_panel.label');
 
-            Notification::assertNotSentTo($account, ResetPassword::class);
+            Notification::assertNotSentTo($account, PasswordResetOtp::class);
         }
     }
 
@@ -151,7 +152,7 @@ class PanelPasswordResetTest extends TestCase
             ->assertSessionMissing('wrong_panel.url')
             ->assertSessionMissing('wrong_panel.label');
 
-        Notification::assertNotSentTo($staff, ResetPassword::class);
+        Notification::assertNotSentTo($staff, PasswordResetOtp::class);
     }
 
     public function test_admin_can_complete_only_the_admin_password_reset_flow(): void
@@ -162,23 +163,23 @@ class PanelPasswordResetTest extends TestCase
         $this->post(route('admin.password.email'), ['email' => $admin->email])
             ->assertSessionHasNoErrors();
 
-        Notification::assertSentTo($admin, ResetPassword::class, function (ResetPassword $notification) use ($admin): bool {
-            $this->assertStringContainsString('/admin/reset-password/', $notification->toMail($admin)->actionUrl);
+        $notification = Notification::sent($admin, PasswordResetOtp::class)->first();
+        $this->assertInstanceOf(PasswordResetOtp::class, $notification);
 
-            $this->get(route('admin.password.reset', [
-                'token' => $notification->token,
-                'email' => $admin->email,
-            ]))->assertOk()->assertSee('Admin password recovery');
+        $verification = $this->post(route('admin.password.otp.verify'), [
+            'email' => $admin->email,
+            'otp' => $notification->otp,
+        ]);
+        $resetUrl = $verification->headers->get('Location');
+        $this->assertStringContainsString('/admin/reset-password/', $resetUrl);
+        $this->get($resetUrl)->assertOk()->assertSee('Admin password recovery');
 
-            $this->post(route('admin.password.store'), [
-                'token' => $notification->token,
-                'email' => $admin->email,
-                'password' => 'new-admin-password',
-                'password_confirmation' => 'new-admin-password',
-            ])->assertSessionHasNoErrors()->assertRedirect(route('admin.login'));
-
-            return true;
-        });
+        $this->post(route('admin.password.store'), [
+            'token' => $this->tokenFromRedirect($verification),
+            'email' => $admin->email,
+            'password' => 'new-admin-password',
+            'password_confirmation' => 'new-admin-password',
+        ])->assertSessionHasNoErrors()->assertRedirect(route('admin.login'));
 
         $this->assertTrue(Hash::check('new-admin-password', $admin->refresh()->password));
     }
@@ -191,23 +192,23 @@ class PanelPasswordResetTest extends TestCase
         $this->post(route('super-admin.password.email'), ['email' => $superAdmin->email])
             ->assertSessionHasNoErrors();
 
-        Notification::assertSentTo($superAdmin, ResetPassword::class, function (ResetPassword $notification) use ($superAdmin): bool {
-            $this->assertStringContainsString('/super-admin/reset-password/', $notification->toMail($superAdmin)->actionUrl);
+        $notification = Notification::sent($superAdmin, PasswordResetOtp::class)->first();
+        $this->assertInstanceOf(PasswordResetOtp::class, $notification);
 
-            $this->get(route('super-admin.password.reset', [
-                'token' => $notification->token,
-                'email' => $superAdmin->email,
-            ]))->assertOk()->assertSee('Super Admin password recovery');
+        $verification = $this->post(route('super-admin.password.otp.verify'), [
+            'email' => $superAdmin->email,
+            'otp' => $notification->otp,
+        ]);
+        $resetUrl = $verification->headers->get('Location');
+        $this->assertStringContainsString('/super-admin/reset-password/', $resetUrl);
+        $this->get($resetUrl)->assertOk()->assertSee('Super Admin password recovery');
 
-            $this->post(route('super-admin.password.store'), [
-                'token' => $notification->token,
-                'email' => $superAdmin->email,
-                'password' => 'new-super-password',
-                'password_confirmation' => 'new-super-password',
-            ])->assertSessionHasNoErrors()->assertRedirect(route('super-admin.login'));
-
-            return true;
-        });
+        $this->post(route('super-admin.password.store'), [
+            'token' => $this->tokenFromRedirect($verification),
+            'email' => $superAdmin->email,
+            'password' => 'new-super-password',
+            'password_confirmation' => 'new-super-password',
+        ])->assertSessionHasNoErrors()->assertRedirect(route('super-admin.login'));
 
         $this->assertTrue(Hash::check('new-super-password', $superAdmin->refresh()->password));
     }
@@ -220,18 +221,20 @@ class PanelPasswordResetTest extends TestCase
 
         $this->post(route('admin.password.email'), ['email' => $admin->email]);
 
-        Notification::assertSentTo($admin, ResetPassword::class, function (ResetPassword $notification) use ($admin): bool {
-            $this->post(route('password.store'), [
-                'token' => $notification->token,
-                'email' => $admin->email,
-                'password' => 'bypass-password',
-                'password_confirmation' => 'bypass-password',
-            ])->assertRedirect(route('admin.password.request'))
-                ->assertSessionMissing('wrong_panel.url')
-                ->assertSessionMissing('wrong_panel.label');
+        $notification = Notification::sent($admin, PasswordResetOtp::class)->first();
+        $verification = $this->post(route('admin.password.otp.verify'), [
+            'email' => $admin->email,
+            'otp' => $notification->otp,
+        ]);
 
-            return true;
-        });
+        $this->post(route('password.store'), [
+            'token' => $this->tokenFromRedirect($verification),
+            'email' => $admin->email,
+            'password' => 'bypass-password',
+            'password_confirmation' => 'bypass-password',
+        ])->assertRedirect(route('admin.password.request'))
+            ->assertSessionMissing('wrong_panel.url')
+            ->assertSessionMissing('wrong_panel.label');
 
         $this->assertSame($originalPassword, $admin->refresh()->password);
     }
@@ -244,21 +247,34 @@ class PanelPasswordResetTest extends TestCase
 
         $this->post(route('super-admin.password.email'), ['email' => $superAdmin->email]);
 
-        Notification::assertSentTo($superAdmin, ResetPassword::class, function (ResetPassword $notification) use ($superAdmin): bool {
-            $this->get(route('password.reset', [
-                'token' => $notification->token,
-                'email' => $superAdmin->email,
-            ]))->assertRedirect(route('super-admin.password.request'));
+        $notification = Notification::sent($superAdmin, PasswordResetOtp::class)->first();
 
-            $this->post(route('password.store'), [
-                'token' => $notification->token,
-                'email' => $superAdmin->email,
-                'password' => 'bypass-password',
-                'password_confirmation' => 'bypass-password',
-            ])->assertRedirect(route('super-admin.password.request'));
+        $this->get(route('password.otp', [
+            'email' => $superAdmin->email,
+        ]))->assertRedirect(route('password.request'));
 
-            return true;
-        });
+        $this->post(route('password.otp.verify'), [
+            'email' => $superAdmin->email,
+            'otp' => $notification->otp,
+        ])->assertRedirect(route('super-admin.password.request'));
+
+        $verification = $this->post(route('super-admin.password.otp.verify'), [
+            'email' => $superAdmin->email,
+            'otp' => $notification->otp,
+        ]);
+        $token = $this->tokenFromRedirect($verification);
+
+        $this->get(route('password.reset', [
+            'token' => $token,
+            'email' => $superAdmin->email,
+        ]))->assertRedirect(route('super-admin.password.request'));
+
+        $this->post(route('password.store'), [
+            'token' => $token,
+            'email' => $superAdmin->email,
+            'password' => 'bypass-password',
+            'password_confirmation' => 'bypass-password',
+        ])->assertRedirect(route('super-admin.password.request'));
 
         $this->assertSame($originalPassword, $superAdmin->refresh()->password);
     }
@@ -269,9 +285,16 @@ class PanelPasswordResetTest extends TestCase
 
         $this->post(route('password.email'), [
             'email' => 'unknown@example.test',
-        ])->assertSessionHas('status', 'If an eligible account matches that email, a password reset link has been sent.')
+        ])->assertSessionHas('status', 'If an eligible account matches that email, a password reset code has been sent.')
             ->assertSessionMissing('wrong_panel');
 
         Notification::assertNothingSent();
+    }
+
+    private function tokenFromRedirect(TestResponse $response): string
+    {
+        $response->assertRedirect();
+
+        return basename((string) parse_url($response->headers->get('Location'), PHP_URL_PATH));
     }
 }

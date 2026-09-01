@@ -109,6 +109,7 @@ return [
             'provider' => 'users',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
+            'otp_expire' => env('AUTH_PASSWORD_RESET_OTP_EXPIRE', 5),
             'throttle' => 60,
         ],
     ],

@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\Auth\PasswordResetOtpController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Support\AuthenticationPanel;
@@ -51,11 +52,14 @@ Route::middleware(['guest:web', 'guest:admin', 'guest:super_admin'])->group(func
         ->defaults('auth_panel', AuthenticationPanel::Staff->value)
         ->name('password.store');
 
-    // Keep old bookmarks working without accepting tokenless resets.
-    Route::match(['get', 'post'], 'reset-password-otp', fn () => redirect()
-        ->route('password.request')
-        ->withErrors(['email' => 'Please request a new secure password reset link.']))
-        ->name('password.reset.otp.legacy');
+    Route::get('reset-password-otp', [PasswordResetOtpController::class, 'show'])
+        ->defaults('auth_panel', AuthenticationPanel::Staff->value)
+        ->name('password.otp');
+
+    Route::post('reset-password-otp', [PasswordResetOtpController::class, 'verify'])
+        ->defaults('auth_panel', AuthenticationPanel::Staff->value)
+        ->middleware('throttle:6,1')
+        ->name('password.otp.verify');
 });
 
 Route::middleware('auth:web,admin,super_admin')->group(function () {
