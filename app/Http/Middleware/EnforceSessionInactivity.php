@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\AuthenticationContext;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -25,13 +26,15 @@ class EnforceSessionInactivity
 
     public function handle(Request $request, Closure $next): Response
     {
-        $guard = Auth::guard('web');
+        $guardName = AuthenticationContext::authenticatedGuard();
 
-        if (! $request->hasSession() || ! $guard->check()) {
+        if (! $request->hasSession() || $guardName === null) {
             return $next($request);
         }
 
-        $lastActivityAt = $request->session()->get(self::LAST_ACTIVITY_AT);
+        $guard = Auth::guard($guardName);
+        $lastActivityKey = self::lastActivityKey($guardName);
+        $lastActivityAt = $request->session()->get($lastActivityKey);
         $lifetimeInSeconds = max(1, (int) config('session.lifetime')) * 60;
         $now = now()->getTimestamp();
 
@@ -42,21 +45,28 @@ class EnforceSessionInactivity
             && ($now - (int) $lastActivityAt) >= $lifetimeInSeconds;
 
         if ($restoredByRememberCookie || $inactivityLimitReached) {
-            return $this->timeout($request);
+            return $this->timeout($request, $guardName);
         }
 
         // Passive requests remain protected and can trigger expiration, but
         // they do not count as user activity and therefore cannot extend it.
         if ($request->header(self::PASSIVE_ACTIVITY_HEADER) !== 'passive') {
-            $request->session()->put(self::LAST_ACTIVITY_AT, $now);
+            $request->session()->put($lastActivityKey, $now);
         }
 
         return $next($request);
     }
 
-    private function timeout(Request $request): JsonResponse|RedirectResponse
+    public static function lastActivityKey(string $guard): string
     {
-        Auth::guard('web')->logout();
+        return $guard === AuthenticationContext::WEB_GUARD
+            ? self::LAST_ACTIVITY_AT
+            : "auth.{$guard}.last_activity_at";
+    }
+
+    private function timeout(Request $request, string $guardName): JsonResponse|RedirectResponse
+    {
+        Auth::guard($guardName)->logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
@@ -71,7 +81,7 @@ class EnforceSessionInactivity
         }
 
         return redirect()
-            ->route('login')
+            ->route(AuthenticationContext::loginRoute($guardName))
             ->with('session_timeout', true);
     }
 }

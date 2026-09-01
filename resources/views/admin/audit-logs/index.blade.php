@@ -2,7 +2,7 @@
     <x-ui.page-header
         title="Audit Trail"
         subtitle="Append-only history of user administration and authentication activity."
-        :breadcrumbs="['Home' => route('dashboard'), 'Audit Trail' => null]" />
+        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Audit Trail' => null]" />
 
     <x-ui.card title="Find Activity" subtitle="Search by actor, employee ID, target, description, or IP address.">
         <form method="GET" action="{{ route('admin.audit-logs.index') }}"

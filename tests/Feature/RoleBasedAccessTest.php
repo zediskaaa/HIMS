@@ -370,15 +370,19 @@ class RoleBasedAccessTest extends TestCase
      * permissions twice — so a permission added later is covered by that
      * bypass rather than needing a second edit to keep the admin working.
      */
-    public function test_an_administrator_passes_every_gate(): void
+    public function test_an_administrator_passes_every_gate_except_audit_trail(): void
     {
         $admin = User::factory()->administrator()->create();
 
         foreach (Permission::cases() as $permission) {
-            $this->assertTrue(
-                $admin->can($permission->value),
-                "Administrator should hold {$permission->value}"
-            );
+            if ($permission === Permission::ViewAuditTrail) {
+                $this->assertFalse($admin->can($permission->value));
+            } else {
+                $this->assertTrue(
+                    $admin->can($permission->value),
+                    "Administrator should hold {$permission->value}"
+                );
+            }
         }
     }
 

@@ -6,6 +6,7 @@ use App\Enums\Permission;
 use App\Enums\UserDepartment;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Services\UserAccountService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -28,7 +29,11 @@ class StoreUserRequest extends FormRequest
             'middle_name' => ['nullable', 'string', 'max:80'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::defaults()],
-            'role' => ['required', Rule::enum(UserRole::class)],
+            'role' => [
+                'required',
+                Rule::enum(UserRole::class),
+                Rule::in(app(UserAccountService::class)->assignableRoleValues($this->user())),
+            ],
             'status' => ['nullable', Rule::enum(UserStatus::class)],
             'department' => ['required', Rule::enum(UserDepartment::class)],
             'phone' => ['bail', 'required', 'string', 'digits:11', 'regex:/^09[0-9]{9}$/'],
@@ -42,6 +47,7 @@ class StoreUserRequest extends FormRequest
     {
         return [
             'role.required' => 'Pick the role this account should have.',
+            'role.in' => 'You are not authorized to assign that role.',
             'department.required' => 'Pick the department this employee belongs to.',
             'department.enum' => 'Pick a valid department from the list.',
             'phone.required' => 'Phone number is required.',

@@ -35,8 +35,8 @@
 
                     @if (Route::has('login'))
                         <nav aria-label="Account navigation">
-                            @auth
-                                <a href="{{ route('dashboard') }}" class="group inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition duration-300 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/15 focus-visible:ring-offset-neutral-950">
+                            @if (\App\Support\AuthenticationContext::authenticatedGuard() !== null)
+                                <a href="{{ route(\App\Support\AuthenticationContext::dashboardRoute()) }}" class="group inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition duration-300 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/15 focus-visible:ring-offset-neutral-950">
                                     Dashboard
                                     <x-ui.icon name="chevron-right" class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
                                 </a>
@@ -45,7 +45,7 @@
                                     Staff log in
                                     <x-ui.icon name="chevron-right" class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
                                 </a>
-                            @endauth
+                            @endif
                         </nav>
                     @endif
                 </header>
@@ -70,8 +70,8 @@
 
                             @if (Route::has('login'))
                                 <div class="mt-9 flex animate-fade-up flex-col gap-4 [animation-delay:480ms] sm:flex-row sm:items-center">
-                                    @auth
-                                        <a href="{{ route('dashboard') }}" class="group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary-950/30 transition duration-300 hover:-translate-y-0.5 hover:bg-primary-500 hover:shadow-xl hover:shadow-primary-950/40 focus-visible:ring-primary-400 focus-visible:ring-offset-neutral-950">
+                                    @if (\App\Support\AuthenticationContext::authenticatedGuard() !== null)
+                                        <a href="{{ route(\App\Support\AuthenticationContext::dashboardRoute()) }}" class="group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary-950/30 transition duration-300 hover:-translate-y-0.5 hover:bg-primary-500 hover:shadow-xl hover:shadow-primary-950/40 focus-visible:ring-primary-400 focus-visible:ring-offset-neutral-950">
                                             {{-- Light sweeps across the button on hover only, so nothing loops in the background. --}}
                                             <span class="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-full" aria-hidden="true"></span>
                                             <span class="relative">Open dashboard</span>
@@ -83,7 +83,7 @@
                                             <span class="relative">Log in to HIMS</span>
                                             <x-ui.icon name="chevron-right" class="relative h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                                         </a>
-                                    @endauth
+                                    @endif
 
                                     <span class="inline-flex items-center justify-center gap-2 text-xs text-neutral-400 sm:justify-start">
                                         <x-ui.icon name="shield-check" class="h-4 w-4 text-primary-300" />

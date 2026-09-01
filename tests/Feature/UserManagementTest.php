@@ -7,6 +7,7 @@ use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\User;
 use App\Services\UserAccountService;
+use App\Support\AuthenticationContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -81,7 +82,7 @@ class UserManagementTest extends TestCase
 
     public function test_a_guest_is_redirected_to_login(): void
     {
-        $this->get('/admin/users')->assertRedirect('/login');
+        $this->get('/admin/users')->assertRedirect('/admin/login');
     }
 
     /**
@@ -98,10 +99,10 @@ class UserManagementTest extends TestCase
         $this->assertSame([], $admin->permissions());
 
         $this->actingAs($admin)->get('/admin/users')
-            ->assertRedirect('/login')
+            ->assertRedirect('/admin/login')
             ->assertSessionHasErrors('email');
 
-        $this->assertGuest();
+        $this->assertGuest(AuthenticationContext::ADMIN_GUARD);
     }
 
     /**
@@ -545,7 +546,6 @@ class UserManagementTest extends TestCase
         $this->admin();
 
         $this->actingAs($admin)
-            ->from("/admin/users/{$admin->id}/edit")
             ->put("/admin/users/{$admin->id}", [
                 ...$admin->nameComponents(),
                 'email' => $admin->email,
@@ -553,7 +553,7 @@ class UserManagementTest extends TestCase
                 'status' => UserStatus::Active->value,
                 'department' => $admin->department,
                 'phone' => $admin->phone,
-            ])->assertSessionHasErrors('role');
+            ])->assertForbidden();
 
         $this->assertSame(UserRole::Administrator, $admin->fresh()->role);
     }
@@ -564,9 +564,8 @@ class UserManagementTest extends TestCase
         $this->admin();
 
         $this->actingAs($admin)
-            ->from('/admin/users')
             ->patch("/admin/users/{$admin->id}/status")
-            ->assertSessionHasErrors('role');
+            ->assertForbidden();
 
         $this->assertSame(UserStatus::Active, $admin->fresh()->status);
     }
@@ -580,7 +579,7 @@ class UserManagementTest extends TestCase
      * that do not go through the gate — the API, a console command, a seeder —
      * and this test stands in for them.
      */
-    public function test_the_service_refuses_to_demote_the_only_administrator(): void
+    public function test_the_service_refuses_a_non_super_admin_demoting_an_administrator(): void
     {
         $onlyAdmin = $this->admin();
         $actor = User::factory()->warehouseStaff()->create();
@@ -588,7 +587,7 @@ class UserManagementTest extends TestCase
         $this->assertSame(1, User::administrators()->active()->count());
 
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('This is the only active administrator.');
+        $this->expectExceptionMessage('Only a Super Administrator may manage administrative accounts.');
 
         app(UserAccountService::class)->update($onlyAdmin, [
             'name' => $onlyAdmin->name,
@@ -598,16 +597,16 @@ class UserManagementTest extends TestCase
         ], $actor);
     }
 
-    public function test_the_service_refuses_to_deactivate_the_only_administrator(): void
+    public function test_the_service_refuses_a_non_super_admin_deactivating_an_administrator(): void
     {
         $onlyAdmin = $this->admin();
         $actor = User::factory()->warehouseStaff()->create();
 
         try {
             app(UserAccountService::class)->toggleStatus($onlyAdmin, $actor);
-            $this->fail('Deactivating the only administrator should have been refused.');
+            $this->fail('A non-Super Administrator must not deactivate an administrator.');
         } catch (ValidationException $e) {
-            $this->assertStringContainsString('only active administrator', $e->getMessage());
+            $this->assertStringContainsString('Only a Super Administrator', $e->getMessage());
         }
 
         // Refused inside a transaction, so nothing was written.
@@ -641,7 +640,7 @@ class UserManagementTest extends TestCase
      * Demoting one administrator while another remains is the normal case and
      * must go through — the guard is not allowed to be over-eager.
      */
-    public function test_an_administrator_can_be_demoted_while_another_remains(): void
+    public function test_an_administrator_cannot_demote_another_administrator(): void
     {
         $admin = $this->admin();
         $other = $this->admin();
@@ -653,10 +652,10 @@ class UserManagementTest extends TestCase
             'status' => UserStatus::Active->value,
             'department' => $other->department,
             'phone' => $other->phone,
-        ])->assertSessionHasNoErrors();
+        ])->assertForbidden();
 
-        $this->assertSame(UserRole::Viewer, $other->fresh()->role);
-        $this->assertSame(1, User::administrators()->active()->count());
+        $this->assertSame(UserRole::Administrator, $other->fresh()->role);
+        $this->assertSame(2, User::administrators()->active()->count());
     }
 
     // -------------------------------------------------------- filters and views

@@ -21,16 +21,69 @@ use Illuminate\Validation\ValidationException;
 class UserAccountService
 {
     /**
+     * Roles the actor may assign. Super Admin may manage Administrator
+     * accounts, while the protected Super Administrator role is never exposed
+     * as a creatable role.
+     *
+     * @return array<int, UserRole>
+     */
+    public function assignableRoles(User $actor, ?User $target = null): array
+    {
+        $roles = collect(UserRole::cases())
+            ->filter(fn (UserRole $role) => $actor->isSuperAdministrator()
+                ? ! $role->isSuperAdministrator()
+                : ! $role->isAdministrator())
+            ->values()
+            ->all();
+
+        // The protected account may preserve its existing role while editing
+        // its own non-security profile fields. It still cannot assign that role
+        // to any other account.
+        if ($target?->isProtected() && $target->is($actor)) {
+            array_unshift($roles, UserRole::SuperAdministrator);
+        }
+
+        return $roles;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function assignableRoleValues(User $actor, ?User $target = null): array
+    {
+        return array_map(
+            fn (UserRole $role) => $role->value,
+            $this->assignableRoles($actor, $target),
+        );
+    }
+
+    public function canManage(User $actor, User $target): bool
+    {
+        if ($target->isProtected()) {
+            return $actor->isSuperAdministrator() && $actor->is($target);
+        }
+
+        if ($actor->isSuperAdministrator()) {
+            return true;
+        }
+
+        return ! $target->isAdministrator();
+    }
+
+    /**
      * @param  array<string, mixed>  $attributes
      */
-    public function create(array $attributes): User
+    public function create(array $attributes, User $actor): User
     {
-        return DB::transaction(function () use ($attributes): User {
+        return DB::transaction(function () use ($attributes, $actor): User {
+            $role = UserRole::from($attributes['role']);
+            $this->assertCanAssignRole($actor, $role);
+
             $user = new User([
                 ...$this->nameAttributes($attributes),
                 'email' => $attributes['email'],
                 'password' => $attributes['password'],
-                'role' => $attributes['role'],
+                'role' => $role,
                 'status' => $attributes['status'] ?? UserStatus::Active->value,
                 'employee_id' => $this->nextEmployeeId(),
                 'department' => $attributes['department'],
@@ -58,8 +111,17 @@ class UserAccountService
     public function update(User $user, array $attributes, User $actor): User
     {
         return DB::transaction(function () use ($user, $attributes, $actor): User {
+            $this->assertCanManage($actor, $user);
+
             $newRole = UserRole::from($attributes['role']);
             $newStatus = UserStatus::from($attributes['status']);
+            $this->assertCanAssignRole($actor, $newRole, $user);
+
+            if ($user->isProtected() && $attributes['email'] !== $user->email) {
+                throw ValidationException::withMessages([
+                    'email' => ['The protected Super Administrator email cannot be changed.'],
+                ]);
+            }
 
             $losesAdmin = $user->isAdministrator()
                 && (! $newRole->isAdministrator() || ! $newStatus->isActive());
@@ -97,6 +159,8 @@ class UserAccountService
     public function toggleStatus(User $user, User $actor): User
     {
         return DB::transaction(function () use ($user, $actor): User {
+            $this->assertCanManage($actor, $user);
+
             if ($user->isActive()) {
                 $this->assertNotSelf($user, $actor, 'You cannot deactivate your own account.');
 
@@ -129,6 +193,7 @@ class UserAccountService
      */
     public function deactivate(User $user, User $actor): User
     {
+        $this->assertCanManage($actor, $user);
         $this->assertNotSelf($user, $actor, 'You cannot deactivate your own account.');
 
         if ($user->isAdministrator()) {
@@ -146,6 +211,28 @@ class UserAccountService
         if ($user->is($actor)) {
             throw ValidationException::withMessages(['role' => [$message]]);
         }
+    }
+
+    private function assertCanManage(User $actor, User $target): void
+    {
+        if (! $this->canManage($actor, $target)) {
+            throw ValidationException::withMessages([
+                'role' => ['Only a Super Administrator may manage administrative accounts.'],
+            ]);
+        }
+    }
+
+    private function assertCanAssignRole(User $actor, UserRole $role, ?User $target = null): void
+    {
+        if (in_array($role, $this->assignableRoles($actor, $target), true)) {
+            return;
+        }
+
+        $message = $role->isSuperAdministrator()
+            ? 'The Super Administrator role is reserved for the protected system account.'
+            : 'Only a Super Administrator may assign the Administrator role.';
+
+        throw ValidationException::withMessages(['role' => [$message]]);
     }
 
     /**

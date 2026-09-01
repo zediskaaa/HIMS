@@ -30,7 +30,7 @@ class UserController extends Controller implements HasMiddleware
      */
     public static function middleware(): array
     {
-        return ['auth', 'can:'.Permission::ManageUsers->value];
+        return ['auth:web,admin,super_admin', 'can:'.Permission::ManageUsers->value];
     }
 
     public function index(Request $request): View
@@ -64,20 +64,23 @@ class UserController extends Controller implements HasMiddleware
                 'active' => User::active()->count(),
                 'administrators' => User::administrators()->active()->count(),
             ],
+            'manageableAccountIds' => $users->getCollection()
+                ->filter(fn (User $user) => $this->accounts->canManage($request->user(), $user))
+                ->modelKeys(),
         ]);
     }
 
     public function create(): View
     {
         return view('admin.users.create', [
-            'roles' => UserRole::cases(),
+            'roles' => $this->accounts->assignableRoles(request()->user()),
             'departments' => UserDepartment::options(),
         ]);
     }
 
     public function store(StoreUserRequest $request): RedirectResponse
     {
-        $user = $this->accounts->create($request->validated());
+        $user = $this->accounts->create($request->validated(), $request->user());
 
         return redirect()
             ->route('admin.users.index')
@@ -88,6 +91,7 @@ class UserController extends Controller implements HasMiddleware
     {
         return view('admin.users.show', [
             'user' => $user,
+            'canManage' => $this->accounts->canManage(request()->user(), $user),
             'recentMovements' => $user->stockMovements()
                 ->with(['item', 'fromLocation', 'toLocation'])
                 ->latest('moved_at')
@@ -99,9 +103,11 @@ class UserController extends Controller implements HasMiddleware
 
     public function edit(User $user): View
     {
+        abort_unless($this->accounts->canManage(request()->user(), $user), 403);
+
         return view('admin.users.edit', [
             'user' => $user,
-            'roles' => UserRole::cases(),
+            'roles' => $this->accounts->assignableRoles(request()->user(), $user),
             'statuses' => UserStatus::options(),
             'departments' => UserDepartment::optionsIncluding($user->department),
         ]);
@@ -122,6 +128,8 @@ class UserController extends Controller implements HasMiddleware
 
     public function toggleStatus(Request $request, User $user): RedirectResponse
     {
+        abort_unless($this->accounts->canManage($request->user(), $user), 403);
+
         $updated = $this->accounts->toggleStatus($user, $request->user());
 
         return redirect()

@@ -58,6 +58,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'is_protected' => 'boolean',
             'password' => 'hashed',
             'role' => UserRole::class,
             'status' => UserStatus::class,
@@ -216,6 +217,16 @@ class User extends Authenticatable
         return $this->role->isAdministrator();
     }
 
+    public function isSuperAdministrator(): bool
+    {
+        return $this->role->isSuperAdministrator();
+    }
+
+    public function isProtected(): bool
+    {
+        return (bool) $this->is_protected;
+    }
+
     public function isActive(): bool
     {
         return $this->status->isActive();
@@ -250,6 +261,14 @@ class User extends Authenticatable
 
     public function scopeAdministrators(Builder $query): Builder
     {
-        return $query->role(UserRole::Administrator);
+        return $query->whereIn('role', [
+            UserRole::SuperAdministrator->value,
+            UserRole::Administrator->value,
+        ]);
+    }
+
+    public function scopeSuperAdministrators(Builder $query): Builder
+    {
+        return $query->role(UserRole::SuperAdministrator);
     }
 }

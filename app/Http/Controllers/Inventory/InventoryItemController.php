@@ -23,7 +23,7 @@ class InventoryItemController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            'auth',
+            'auth:web,admin,super_admin',
             new Middleware('can:'.Permission::ViewInventory->value, only: ['index']),
             new Middleware('can:'.Permission::ManageItems->value, only: ['store']),
         ];

@@ -73,7 +73,7 @@
                 Profile settings
             </a>
 
-            <form method="POST" action="{{ route('logout') }}">
+            <form method="POST" action="{{ route(\App\Support\AuthenticationContext::logoutRoute()) }}">
                 @csrf
                 <button type="submit" role="menuitem"
                         class="flex items-center gap-2 w-full px-3 py-2 text-sm text-left text-neutral-700 hover:bg-neutral-50">

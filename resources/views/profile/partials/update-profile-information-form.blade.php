@@ -25,8 +25,16 @@
 
         <div>
             <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" name="email" type="email" class="mt-1 block w-full" :value="old('email', $user->email)" required autocomplete="username" />
+            <x-text-input id="email" name="email" type="email" class="mt-1 block w-full"
+                          :value="old('email', $user->email)" :readonly="$user->isProtected()"
+                          required autocomplete="username" />
             <x-input-error class="mt-2" :messages="$errors->get('email')" />
+
+            @if ($user->isProtected())
+                <p class="mt-2 text-sm text-gray-600">
+                    This system-owned sign-in address is protected. You can still change your password securely below.
+                </p>
+            @endif
 
             @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
                 <div>

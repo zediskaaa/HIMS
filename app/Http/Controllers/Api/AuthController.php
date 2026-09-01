@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\AuditAction;
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AuditLogger;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -19,7 +21,10 @@ class AuthController extends Controller
             'device_name' => 'nullable|string',
         ]);
 
-        $credentials = $request->only('email', 'password');
+        $credentials = [
+            ...$request->only('email', 'password'),
+            fn (Builder $query) => $query->where('role', '!=', UserRole::SuperAdministrator->value),
+        ];
 
         if (! Auth::attempt($credentials)) {
             return response()->json(['message' => 'Invalid credentials'], 401);

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\AuditAction;
-use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use Carbon\CarbonImmutable;
@@ -19,7 +18,7 @@ class AuditLogController extends Controller implements HasMiddleware
      */
     public static function middleware(): array
     {
-        return ['auth', 'can:'.Permission::ViewAuditTrail->value];
+        return ['auth:web,admin,super_admin', 'super-admin'];
     }
 
     public function index(Request $request): View

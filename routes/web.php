@@ -20,11 +20,11 @@ Route::get('/', function () {
     return view('landing');
 });
 
-Route::get('/dashboard', [InventoryController::class, 'index'])->middleware('auth')->name('dashboard');
+Route::get('/dashboard', [InventoryController::class, 'index'])->middleware('auth:web,admin,super_admin')->name('dashboard');
 
 // Polled by the dashboard's alert panel every 30s. Sits on the web routes so
 // it authenticates with the session cookie the page already has.
-Route::get('/dashboard/live', [InventoryController::class, 'live'])->middleware('auth')->name('dashboard.live');
+Route::get('/dashboard/live', [InventoryController::class, 'live'])->middleware('auth:web,admin,super_admin')->name('dashboard.live');
 
 /*
  * The inventory surface. `auth` here only establishes that somebody is signed
@@ -33,7 +33,7 @@ Route::get('/dashboard/live', [InventoryController::class, 'live'])->middleware(
  * by being forgotten in this file. See App\Enums\UserRole::permissions() for
  * who holds what, and /admin/permissions for the matrix that renders it.
  */
-Route::middleware('auth')->group(function () {
+Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::get('/inventory', function () {
         return redirect()->route('dashboard');
     })->name('inventory');
@@ -89,3 +89,5 @@ Route::prefix('admin')->name('admin.')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+require __DIR__.'/admin_auth.php';
+require __DIR__.'/super_admin.php';

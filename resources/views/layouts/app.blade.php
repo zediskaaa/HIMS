@@ -1,3 +1,8 @@
+@php
+    $sessionActivityRoute = \App\Support\AuthenticationContext::activityRoute();
+    $sessionExpiredRoute = \App\Support\AuthenticationContext::expiredRoute();
+@endphp
+
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
 <head>
@@ -20,8 +25,8 @@
 <body
     class="h-full font-sans antialiased bg-neutral-50 text-neutral-800"
     data-session-timeout-seconds="{{ (int) config('session.lifetime') * 60 }}"
-    data-session-activity-url="{{ route('session.activity') }}"
-    data-session-expired-url="{{ Illuminate\Support\Facades\URL::signedRoute('session.expired', absolute: false) }}"
+    data-session-activity-url="{{ route($sessionActivityRoute) }}"
+    data-session-expired-url="{{ Illuminate\Support\Facades\URL::signedRoute($sessionExpiredRoute, absolute: false) }}"
 >
     <div x-data="{ sidebarOpen: false }" class="min-h-full">
 

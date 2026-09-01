@@ -3,7 +3,7 @@
         title="Edit {{ $user->name }}"
         subtitle="Changes take effect the next time this person loads a page."
         :breadcrumbs="[
-            'Home' => route('dashboard'),
+            'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
             'User Management' => route('admin.users.index'),
             $user->name => null,
         ]">

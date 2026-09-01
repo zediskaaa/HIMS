@@ -16,16 +16,32 @@ class ProfileUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
+        $emailRules = [
+            'required',
+            'string',
+            'lowercase',
+            'email',
+            'max:255',
+            Rule::unique(User::class)->ignore($this->user()->id),
+        ];
+
+        if ($this->user()->isProtected()) {
+            $emailRules[] = Rule::in([$this->user()->email]);
+        }
+
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => [
-                'required',
-                'string',
-                'lowercase',
-                'email',
-                'max:255',
-                Rule::unique(User::class)->ignore($this->user()->id),
-            ],
+            'email' => $emailRules,
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'email.in' => 'The protected Super Administrator email cannot be changed.',
         ];
     }
 }

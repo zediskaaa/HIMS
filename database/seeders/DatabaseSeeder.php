@@ -16,6 +16,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // System-owned and idempotent. It is seeded separately from demo data
+        // so production setup can run only SuperAdminSeeder when appropriate.
+        $this->call(SuperAdminSeeder::class);
+
         // The demo account is the administrator: without it nobody can reach
         // the user-management screens to create anyone else.
         User::factory()->administrator()->create([

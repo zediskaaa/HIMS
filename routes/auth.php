@@ -25,7 +25,7 @@ Route::get('session/expired', [AuthenticatedSessionController::class, 'expired']
     ->middleware('signed:relative')
     ->name('session.expired');
 
-Route::middleware('guest')->group(function () {
+Route::middleware(['guest:web', 'guest:admin', 'guest:super_admin'])->group(function () {
     // Forgot-password OTP frontend hits this to confirm the email is registered
     // before sending an OTP via Google Apps Script. GET avoids CSRF since the
     // caller is a static HTML page. Throttled to discourage enumeration.
@@ -109,7 +109,7 @@ Route::middleware('guest')->group(function () {
     })->name('password.store.otp');
 });
 
-Route::middleware('auth')->group(function () {
+Route::middleware('auth:web,admin,super_admin')->group(function () {
     // Meaningful browser interaction is synchronized here. The global
     // inactivity middleware updates the authoritative timestamp before this
     // no-content response is returned.

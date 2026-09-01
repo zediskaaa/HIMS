@@ -7,6 +7,7 @@ use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Support\AuthenticationContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use LogicException;
@@ -185,21 +186,27 @@ class AuditTrailTest extends TestCase
         ]);
     }
 
-    public function test_only_administrators_can_access_the_audit_trail(): void
+    public function test_only_super_administrators_can_access_the_audit_trail(): void
     {
         $admin = $this->admin();
+        $superAdmin = User::factory()->superAdministrator()->create();
 
-        $this->actingAs($admin)->get('/admin/audit-trail')
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get('/admin/audit-trail')
             ->assertOk()
             ->assertSee('Audit Trail');
+
+        $this->actingAs($admin)->get('/admin/audit-trail')
+            ->assertForbidden();
 
         $this->actingAs(User::factory()->warehouseStaff()->create())
             ->get('/admin/audit-trail')
             ->assertForbidden();
 
-        $this->post('/logout')->assertRedirect('/');
+        $this->app['auth']->guard(AuthenticationContext::SUPER_ADMIN_GUARD)->logout();
+        $this->app['auth']->guard(AuthenticationContext::WEB_GUARD)->logout();
 
-        $this->get('/admin/audit-trail')->assertRedirect('/login');
+        $this->get('/admin/audit-trail')->assertRedirect('/super-admin/login');
     }
 
     public function test_audit_page_displays_philippine_time_and_supports_filters(): void
@@ -207,12 +214,16 @@ class AuditTrailTest extends TestCase
         $this->travelTo(CarbonImmutable::create(2026, 8, 27, 20, 15, 0, 'Asia/Manila'));
         $admin = $this->admin();
 
-        $this->post('/login', [
+        $this->post('/admin/login', [
             'email' => $admin->email,
             'password' => 'password',
         ]);
+        $this->post('/admin/logout');
 
-        $this->get('/admin/audit-trail?action='.AuditAction::LoggedIn->value.'&search=Juan')
+        $superAdmin = User::factory()->superAdministrator()->create();
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get('/admin/audit-trail?action='.AuditAction::LoggedIn->value.'&search=Juan')
             ->assertOk()
             ->assertSee('Juan Dela Cruz')
             ->assertSee('Logged In')
@@ -220,19 +231,28 @@ class AuditTrailTest extends TestCase
             ->assertSee('PHT (UTC+8)');
     }
 
-    public function test_sidebar_link_is_visible_only_to_an_administrator(): void
+    public function test_sidebar_link_is_visible_only_to_a_super_administrator(): void
     {
-        $this->actingAs($this->admin())->get('/dashboard')
-            ->assertSee('Audit Trail');
+        $this->actingAs($this->admin(), AuthenticationContext::ADMIN_GUARD)->get('/dashboard')
+            ->assertDontSee('Audit Trail');
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
 
         $this->actingAs(User::factory()->viewer()->create())->get('/dashboard')
             ->assertDontSee('Audit Trail');
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        $this->actingAs(
+            User::factory()->superAdministrator()->create(),
+            AuthenticationContext::SUPER_ADMIN_GUARD,
+        )->get('/dashboard')->assertSee('Audit Trail');
     }
 
     public function test_audit_logs_are_append_only_and_have_no_mutation_routes(): void
     {
         $admin = $this->admin();
-        $this->post('/login', [
+        $this->post('/admin/login', [
             'email' => $admin->email,
             'password' => 'password',
         ])->assertRedirect(route('dashboard', absolute: false));

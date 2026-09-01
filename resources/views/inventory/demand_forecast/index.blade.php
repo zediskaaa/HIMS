@@ -2,7 +2,7 @@
     <x-ui.page-header
         title="Demand Forecasting"
         subtitle="Reorder quantities worked out from recorded consumption, not from typed-in estimates."
-        :breadcrumbs="['Home' => route('dashboard'), 'Demand Forecast' => null]" />
+        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Demand Forecast' => null]" />
 
     @if ($errors->any())
         <x-ui.alert variant="danger" title="This plan was not saved">
@@ -319,4 +319,3 @@
         </x-ui.table>
     </x-ui.card>
 </x-app-layout>
-

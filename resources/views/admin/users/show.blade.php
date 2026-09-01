@@ -4,15 +4,17 @@
         :title="$user->name"
         :subtitle="$user->role->label().' · '.$user->status->label()"
         :breadcrumbs="[
-            'Home' => route('dashboard'),
+            'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
             'User Management' => route('admin.users.index'),
             $user->name => null,
         ]">
-        <x-slot:actions>
-            <x-ui.button variant="secondary" :href="route('admin.users.edit', $user)" icon="pencil-square">
-                Edit
-            </x-ui.button>
-        </x-slot:actions>
+        @if ($canManage)
+            <x-slot:actions>
+                <x-ui.button variant="secondary" :href="route('admin.users.edit', $user)" icon="pencil-square">
+                    Edit
+                </x-ui.button>
+            </x-slot:actions>
+        @endif
     </x-ui.page-header>
 
     <div class="grid gap-6 lg:grid-cols-3">
@@ -48,6 +50,9 @@
                             <x-ui.badge :variant="$user->isAdministrator() ? 'primary' : 'neutral'">
                                 {{ $user->role->label() }}
                             </x-ui.badge>
+                            @if ($user->isProtected())
+                                <x-ui.badge variant="warning">Protected</x-ui.badge>
+                            @endif
                         </dd>
                     </div>
                     <div class="flex items-start justify-between gap-3">

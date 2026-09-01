@@ -47,11 +47,6 @@ class AppServiceProvider extends ServiceProvider
                 fn (User $user) => $user->hasPermission($permission)
             );
         }
-
-        // An administrator passes every check without each role having to
-        // enumerate the full list. Returning null rather than false lets the
-        // individual gates decide for everyone else.
-        Gate::before(fn (User $user) => $user->isAdministrator() && $user->isActive() ? true : null);
     }
 
     /**

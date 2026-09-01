@@ -2,7 +2,7 @@
     <x-ui.page-header
         title="Reports & Analytics"
         :subtitle="'Inventory valuation, stock status, procurement spend and movement history for the '.$period['days'].'-day window ending '.$period['to']->format('M d, Y').'.'"
-        :breadcrumbs="['Home' => route('dashboard'), 'Reports' => null]">
+        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Reports' => null]">
         <x-slot name="actions">
             {{-- Print rather than a CSV export: the panel and the hospital both
                  want a page that can be signed, and printing needs no new route

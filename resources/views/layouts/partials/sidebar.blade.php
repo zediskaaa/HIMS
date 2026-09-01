@@ -8,7 +8,13 @@
         <img src="{{ asset('img/hims-logo.png') }}" alt="" class="h-9 w-9 shrink-0 rounded-md bg-white object-cover ring-1 ring-inset ring-neutral-200" />
         <div class="min-w-0">
             <p class="text-sm font-semibold text-neutral-900 leading-tight truncate">DJNRMHS</p>
-            <p class="text-[11px] text-neutral-500 leading-tight truncate">Supply Chain &amp; Inventory</p>
+            <p class="text-[11px] text-neutral-500 leading-tight truncate">
+                {{ match (\App\Support\AuthenticationContext::authenticatedGuard()) {
+                    \App\Support\AuthenticationContext::SUPER_ADMIN_GUARD => 'Super Admin Panel',
+                    \App\Support\AuthenticationContext::ADMIN_GUARD => 'Admin Panel',
+                    default => 'Staff Panel',
+                } }}
+            </p>
         </div>
     </div>
 
@@ -26,7 +32,11 @@
     --}}
     <nav class="flex-1 px-3 py-4 space-y-6 overflow-y-auto" aria-label="Main navigation">
         <div class="space-y-0.5">
-            <x-ui.nav-item :href="route('dashboard')" icon="home" :active="request()->routeIs('dashboard')">
+            <x-ui.nav-item
+                :href="route(\App\Support\AuthenticationContext::dashboardRoute())"
+                icon="home"
+                :active="request()->routeIs('dashboard', 'super-admin.dashboard')"
+            >
                 Dashboard
             </x-ui.nav-item>
         </div>

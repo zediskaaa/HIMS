@@ -2,7 +2,7 @@
     <x-ui.page-header
         title="User Management"
         subtitle="Staff accounts and what each role is allowed to do."
-        :breadcrumbs="['Home' => route('dashboard'), 'User Management' => null]">
+        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'User Management' => null]">
         <x-slot:actions>
             <x-ui.button :href="route('admin.users.create')" icon="plus">Add User</x-ui.button>
         </x-slot:actions>
@@ -134,26 +134,31 @@
 
                         <x-ui.table.td align="right">
                             <div class="flex items-center justify-end gap-1.5">
-                                <x-ui.button variant="ghost" size="sm"
-                                             :href="route('admin.users.edit', $account)">
-                                    Edit
-                                </x-ui.button>
+                                @if (in_array($account->getKey(), $manageableAccountIds, true))
+                                    <x-ui.button variant="ghost" size="sm"
+                                                 :href="route('admin.users.edit', $account)">
+                                        Edit
+                                    </x-ui.button>
 
-                                {{-- Deactivating yourself, or the last administrator, is
-                                     refused by the service; the button is hidden here so
-                                     the impossible action is not offered in the first place. --}}
-                                @unless ($account->is(auth()->user()))
-                                    <form method="POST" action="{{ route('admin.users.toggle-status', $account) }}">
-                                        @csrf
-                                        @method('PATCH')
-                                        <x-ui.button
-                                            type="submit"
-                                            size="sm"
-                                            :variant="$account->isActive() ? 'secondary' : 'primary'">
-                                            {{ $account->isActive() ? 'Deactivate' : 'Reactivate' }}
-                                        </x-ui.button>
-                                    </form>
-                                @endunless
+                                    {{-- Deactivating yourself is refused by the service;
+                                         hide the impossible action here as well. --}}
+                                    @unless ($account->is(auth()->user()))
+                                        <form method="POST" action="{{ route('admin.users.toggle-status', $account) }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            <x-ui.button
+                                                type="submit"
+                                                size="sm"
+                                                :variant="$account->isActive() ? 'secondary' : 'primary'">
+                                                {{ $account->isActive() ? 'Deactivate' : 'Reactivate' }}
+                                            </x-ui.button>
+                                        </form>
+                                    @endunless
+                                @elseif ($account->isProtected())
+                                    <x-ui.badge variant="warning">Protected</x-ui.badge>
+                                @else
+                                    <span class="text-xs text-neutral-400">Restricted</span>
+                                @endif
                             </div>
                         </x-ui.table.td>
                     </x-ui.table.row>
