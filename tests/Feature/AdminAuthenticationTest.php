@@ -213,9 +213,12 @@ class AdminAuthenticationTest extends TestCase
         $this->login($admin);
 
         $this->post(route('admin.logout'))
-            ->assertRedirect(route('admin.login'));
+            ->assertRedirect(route('admin.login'))
+            ->assertSessionMissing('session_timeout');
 
         $this->assertGuest(AuthenticationContext::ADMIN_GUARD);
+        $this->get(route('admin.login'))
+            ->assertDontSee('Your session has expired due to inactivity. Please log in again.');
     }
 
     public function test_admin_inactivity_expires_back_to_admin_login(): void
@@ -228,6 +231,10 @@ class AdminAuthenticationTest extends TestCase
         $this->get(route('dashboard'))
             ->assertRedirect(route('admin.login'))
             ->assertSessionHas('session_timeout', true);
+
+        $this->get(route('admin.login'))
+            ->assertSee('Session Timeout')
+            ->assertSee('Your session has expired due to inactivity. Please log in again.');
 
         $this->app['auth']->forgetGuards();
         $this->assertGuest(AuthenticationContext::ADMIN_GUARD);

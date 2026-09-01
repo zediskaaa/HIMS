@@ -190,9 +190,12 @@ class SuperAdminAuthenticationTest extends TestCase
         $this->login($superAdmin);
 
         $this->post(route('super-admin.logout'))
-            ->assertRedirect(route('super-admin.login'));
+            ->assertRedirect(route('super-admin.login'))
+            ->assertSessionMissing('session_timeout');
 
         $this->assertGuest(AuthenticationContext::SUPER_ADMIN_GUARD);
+        $this->get(route('super-admin.login'))
+            ->assertDontSee('Your session has expired due to inactivity. Please log in again.');
     }
 
     public function test_super_admin_inactivity_uses_the_existing_four_minute_policy(): void
@@ -204,6 +207,10 @@ class SuperAdminAuthenticationTest extends TestCase
         $this->get(route('super-admin.dashboard'))
             ->assertRedirect(route('super-admin.login'))
             ->assertSessionHas('session_timeout', true);
+
+        $this->get(route('super-admin.login'))
+            ->assertSee('Session Timeout')
+            ->assertSee('Your session has expired due to inactivity. Please log in again.');
 
         $this->app['auth']->forgetGuards();
         $this->assertGuest(AuthenticationContext::SUPER_ADMIN_GUARD);

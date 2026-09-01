@@ -35,14 +35,12 @@ class EnforceSessionInactivity
         $guard = Auth::guard($guardName);
         $lastActivityKey = self::lastActivityKey($guardName);
         $lastActivityAt = $request->session()->get($lastActivityKey);
-        $lifetimeInSeconds = max(1, (int) config('session.lifetime')) * 60;
         $now = now()->getTimestamp();
 
         // A remember-me cookie must never silently recreate a session after
         // the inactivity window. A normal form login seeds the timestamp.
         $restoredByRememberCookie = $lastActivityAt === null && $guard->viaRemember();
-        $inactivityLimitReached = is_numeric($lastActivityAt)
-            && ($now - (int) $lastActivityAt) >= $lifetimeInSeconds;
+        $inactivityLimitReached = self::hasExceededInactivityLimit($request, $guardName, $now);
 
         if ($restoredByRememberCookie || $inactivityLimitReached) {
             return $this->timeout($request, $guardName);
@@ -62,6 +60,18 @@ class EnforceSessionInactivity
         return $guard === AuthenticationContext::WEB_GUARD
             ? self::LAST_ACTIVITY_AT
             : "auth.{$guard}.last_activity_at";
+    }
+
+    public static function hasExceededInactivityLimit(
+        Request $request,
+        string $guard,
+        ?int $now = null,
+    ): bool {
+        $lastActivityAt = $request->session()->get(self::lastActivityKey($guard));
+        $lifetimeInSeconds = max(1, (int) config('session.lifetime')) * 60;
+
+        return is_numeric($lastActivityAt)
+            && (($now ?? now()->getTimestamp()) - (int) $lastActivityAt) >= $lifetimeInSeconds;
     }
 
     private function timeout(Request $request, string $guardName): JsonResponse|RedirectResponse

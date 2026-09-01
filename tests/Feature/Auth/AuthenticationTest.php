@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Http\Middleware\EnforceSessionInactivity;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -46,9 +47,22 @@ class AuthenticationTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->post('/logout');
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertSee('data-manual-logout', escape: false);
+
+        $response = $this
+            ->withSession([
+                EnforceSessionInactivity::LAST_ACTIVITY_AT => now()->subMinutes(3)->getTimestamp(),
+            ])
+            ->post('/logout');
 
         $this->assertGuest();
-        $response->assertRedirect('/');
+        $response
+            ->assertRedirect('/')
+            ->assertSessionMissing('session_timeout');
+
+        $this->get(route('login'))
+            ->assertDontSee('Your session has expired due to inactivity. Please log in again.');
     }
 }

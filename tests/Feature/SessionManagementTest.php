@@ -129,6 +129,9 @@ class SessionManagementTest extends TestCase
 
         $response = $this
             ->actingAs($user)
+            ->withSession([
+                EnforceSessionInactivity::LAST_ACTIVITY_AT => now()->subMinutes(4)->getTimestamp(),
+            ])
             ->get(URL::signedRoute('session.expired', absolute: false));
 
         $this->assertGuest();
@@ -146,9 +149,71 @@ class SessionManagementTest extends TestCase
             ->assertDontSee('Your session has expired due to inactivity. Please log in again.');
     }
 
+    public function test_signed_timeout_url_cannot_create_a_fake_timeout_before_inactivity_limit(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->withSession([
+                EnforceSessionInactivity::LAST_ACTIVITY_AT => now()->getTimestamp(),
+            ])
+            ->get(URL::signedRoute('session.expired', absolute: false));
+
+        $response
+            ->assertRedirect(route('login'))
+            ->assertSessionMissing('session_timeout');
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_stale_timeout_url_after_manual_logout_does_not_flash_timeout_notice(): void
+    {
+        $user = User::factory()->create();
+        $signedTimeoutUrl = URL::signedRoute('session.expired', absolute: false);
+
+        $this->actingAs($user)
+            ->post(route('logout'))
+            ->assertSessionMissing('session_timeout');
+
+        $this->get($signedTimeoutUrl)
+            ->assertRedirect(route('login'))
+            ->assertSessionMissing('session_timeout');
+
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertDontSee('Your session has expired due to inactivity. Please log in again.');
+    }
+
+    public function test_timeout_notice_does_not_survive_relogin_and_later_manual_logout(): void
+    {
+        $user = User::factory()->create(['password' => bcrypt('password')]);
+
+        $this->actingAs($user)
+            ->withSession([
+                EnforceSessionInactivity::LAST_ACTIVITY_AT => now()->subMinutes(4)->getTimestamp(),
+            ])
+            ->get('/dashboard')
+            ->assertSessionHas('session_timeout', true);
+
+        $this->get(route('login'))
+            ->assertSee('Session Timeout');
+
+        $this->post(route('login'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ])->assertRedirect();
+
+        $this->post(route('logout'))
+            ->assertSessionMissing('session_timeout');
+
+        $this->get(route('login'))
+            ->assertDontSee('Your session has expired due to inactivity. Please log in again.');
+    }
+
     public function test_activity_endpoint_keeps_an_active_session_authenticated(): void
     {
         $user = User::factory()->create();
+        $requestStartedAt = now()->getTimestamp();
 
         $response = $this
             ->actingAs($user)
@@ -161,7 +226,7 @@ class SessionManagementTest extends TestCase
         $this->assertAuthenticatedAs($user);
         $response->assertSessionHas(
             EnforceSessionInactivity::LAST_ACTIVITY_AT,
-            now()->getTimestamp(),
+            fn (int $timestamp) => $timestamp >= $requestStartedAt,
         );
     }
 

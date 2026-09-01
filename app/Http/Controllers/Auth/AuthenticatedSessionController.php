@@ -54,13 +54,22 @@ class AuthenticatedSessionController extends Controller
     }
 
     /**
-     * End an idle browser session and carry a one-time notice to the login page.
+     * End a verified idle browser session and carry a one-time login notice.
      *
      * The route is signed because it is reached by the browser's inactivity
-     * timer with a top-level navigation rather than a form submission.
+     * timer with a top-level navigation rather than a form submission. A stale
+     * timer after manual logout cannot create a timeout notice.
      */
     public function expired(Request $request): RedirectResponse
     {
+        if (! Auth::guard(AuthenticationContext::WEB_GUARD)->check()
+            || ! EnforceSessionInactivity::hasExceededInactivityLimit(
+                $request,
+                AuthenticationContext::WEB_GUARD,
+            )) {
+            return redirect()->route('login');
+        }
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

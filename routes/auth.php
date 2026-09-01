@@ -13,9 +13,9 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Support\AuthenticationPanel;
 use Illuminate\Support\Facades\Route;
 
-// This signed endpoint is intentionally outside the auth/guest groups. It can
-// still clear a session when Laravel's storage lifetime elapsed before the
-// browser timer fired, and always creates a fresh one-time timeout notice.
+// This signed endpoint is intentionally outside the auth/guest groups so the
+// browser timer can reach it. The controller independently requires an
+// authenticated guard whose inactivity deadline has actually elapsed.
 Route::get('session/expired', [AuthenticatedSessionController::class, 'expired'])
     ->middleware('signed:relative')
     ->name('session.expired');

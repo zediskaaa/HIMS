@@ -42,6 +42,14 @@ class AuthenticatedSessionController extends Controller
 
     public function expired(Request $request): RedirectResponse
     {
+        if (! Auth::guard(AuthenticationContext::SUPER_ADMIN_GUARD)->check()
+            || ! EnforceSessionInactivity::hasExceededInactivityLimit(
+                $request,
+                AuthenticationContext::SUPER_ADMIN_GUARD,
+            )) {
+            return redirect()->route('super-admin.login');
+        }
+
         Auth::guard(AuthenticationContext::SUPER_ADMIN_GUARD)->logout();
 
         $request->session()->invalidate();

@@ -23,6 +23,7 @@ const startSessionMonitor = () => {
 
     const timeoutMs = timeoutSeconds * 1000;
     const activityKey = 'hims:session:last-activity';
+    const manualLogoutKey = 'hims:session:manual-logout';
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
     const nativeFetch = window.fetch.bind(window);
     let lastActivityAt = Date.now();
@@ -47,6 +48,14 @@ const startSessionMonitor = () => {
             // Storage can be unavailable in privacy-restricted contexts. The
             // current tab still has a fully functional inactivity timer.
         }
+    };
+
+    const stopSessionMonitor = () => {
+        expirationStarted = true;
+        window.clearTimeout(expirationTimer);
+        window.clearTimeout(heartbeatTimer);
+        expirationTimer = null;
+        heartbeatTimer = null;
     };
 
     const expire = () => {
@@ -140,6 +149,11 @@ const startSessionMonitor = () => {
     });
 
     window.addEventListener('storage', (event) => {
+        if (event.key === manualLogoutKey) {
+            stopSessionMonitor();
+            return;
+        }
+
         if (event.key !== activityKey || !event.newValue) return;
 
         const timestamp = Number(event.newValue);
@@ -151,6 +165,21 @@ const startSessionMonitor = () => {
 
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) scheduleExpiration();
+    });
+
+    document.addEventListener('submit', (event) => {
+        if (!(event.target instanceof HTMLFormElement)
+            || !event.target.matches('[data-manual-logout]')) return;
+
+        // Stop this tab before the POST navigation and notify every other tab.
+        // The server still validates elapsed inactivity independently.
+        stopSessionMonitor();
+
+        try {
+            window.localStorage.setItem(manualLogoutKey, String(Date.now()));
+        } catch {
+            // The current tab is already stopped when storage is unavailable.
+        }
     });
 
     // Normalize expired fetch responses from all existing inline page scripts.
