@@ -18,6 +18,17 @@
             :status="session('status')"
         />
 
+        @if (session('session_timeout'))
+            <x-ui.alert
+                variant="warning"
+                title="Session Timeout"
+                dismissible
+                class="animate-fade-up [animation-delay:400ms]"
+            >
+                Your session has expired due to inactivity. Please log in again.
+            </x-ui.alert>
+        @endif
+
         <form method="POST" action="{{ route('login') }}" class="animate-fade-up space-y-5 [animation-delay:440ms]" x-data="{ showPassword: false }">
             @csrf
 

@@ -5,6 +5,179 @@ import Alpine from 'alpinejs';
 window.Alpine = Alpine;
 
 /**
+ * Browser-side companion to the server-enforced inactivity middleware.
+ *
+ * The server remains authoritative. This monitor only lets an idle page move
+ * to the login screen at the deadline (without waiting for another request),
+ * synchronizes meaningful interaction at a controlled rate, and keeps tabs in
+ * agreement through localStorage.
+ */
+const startSessionMonitor = () => {
+    const timeoutSeconds = Number(document.body.dataset.sessionTimeoutSeconds);
+    const activityUrl = document.body.dataset.sessionActivityUrl;
+    const expiredUrl = document.body.dataset.sessionExpiredUrl;
+
+    if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0 || !activityUrl || !expiredUrl) {
+        return;
+    }
+
+    const timeoutMs = timeoutSeconds * 1000;
+    const activityKey = 'hims:session:last-activity';
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+    const nativeFetch = window.fetch.bind(window);
+    let lastActivityAt = Date.now();
+    let expirationTimer = null;
+    let heartbeatTimer = null;
+    let heartbeatStartedAt = null;
+    let expirationStarted = false;
+
+    const readSharedActivity = () => {
+        try {
+            const value = Number(window.localStorage.getItem(activityKey));
+            return Number.isFinite(value) ? value : 0;
+        } catch {
+            return 0;
+        }
+    };
+
+    const writeSharedActivity = (timestamp) => {
+        try {
+            window.localStorage.setItem(activityKey, String(timestamp));
+        } catch {
+            // Storage can be unavailable in privacy-restricted contexts. The
+            // current tab still has a fully functional inactivity timer.
+        }
+    };
+
+    const expire = () => {
+        if (expirationStarted) return;
+
+        expirationStarted = true;
+        window.location.replace(expiredUrl);
+    };
+
+    const scheduleExpiration = () => {
+        window.clearTimeout(expirationTimer);
+
+        const sharedActivity = readSharedActivity();
+        lastActivityAt = Math.max(lastActivityAt, sharedActivity);
+        const remaining = timeoutMs - (Date.now() - lastActivityAt);
+
+        if (remaining <= 0) {
+            expire();
+            return;
+        }
+
+        expirationTimer = window.setTimeout(() => {
+            const latestSharedActivity = readSharedActivity();
+
+            if (latestSharedActivity > lastActivityAt) {
+                lastActivityAt = latestSharedActivity;
+                scheduleExpiration();
+                return;
+            }
+
+            expire();
+        }, remaining);
+    };
+
+    const sendHeartbeat = async () => {
+        window.clearTimeout(heartbeatTimer);
+        heartbeatTimer = null;
+        heartbeatStartedAt = null;
+
+        try {
+            const response = await nativeFetch(activityUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            if (response.status === 401 || response.status === 419 || response.redirected) {
+                expire();
+            }
+        } catch {
+            // A temporary network outage must not falsely log a user out. The
+            // next protected server request will still enforce the deadline.
+        }
+    };
+
+    const queueHeartbeat = () => {
+        const now = Date.now();
+
+        if (heartbeatStartedAt === null) {
+            heartbeatStartedAt = now;
+        }
+
+        window.clearTimeout(heartbeatTimer);
+
+        // Send 500ms after interaction settles, or at least every 15 seconds
+        // during continuous interaction. This avoids a request per keystroke.
+        const maxWaitRemaining = Math.max(0, 15000 - (now - heartbeatStartedAt));
+        heartbeatTimer = window.setTimeout(sendHeartbeat, Math.min(500, maxWaitRemaining));
+    };
+
+    const recordActivity = () => {
+        if (expirationStarted) return;
+
+        lastActivityAt = Date.now();
+        writeSharedActivity(lastActivityAt);
+        scheduleExpiration();
+        queueHeartbeat();
+    };
+
+    // Loading a protected page is itself an authenticated server request.
+    writeSharedActivity(lastActivityAt);
+    scheduleExpiration();
+
+    ['pointerdown', 'keydown', 'touchstart'].forEach((eventName) => {
+        window.addEventListener(eventName, recordActivity, { passive: true });
+    });
+
+    window.addEventListener('storage', (event) => {
+        if (event.key !== activityKey || !event.newValue) return;
+
+        const timestamp = Number(event.newValue);
+        if (!Number.isFinite(timestamp) || timestamp <= lastActivityAt) return;
+
+        lastActivityAt = timestamp;
+        scheduleExpiration();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) scheduleExpiration();
+    });
+
+    // Normalize expired fetch responses from all existing inline page scripts.
+    window.fetch = async (...args) => {
+        const response = await nativeFetch(...args);
+        const redirectedToLogin = response.redirected
+            && new URL(response.url, window.location.origin).pathname.endsWith('/login');
+
+        if (response.status === 401 || response.status === 419 || redirectedToLogin) {
+            expire();
+        }
+
+        return response;
+    };
+
+    window.axios?.interceptors.response.use(
+        (response) => response,
+        (error) => {
+            if ([401, 419].includes(error.response?.status)) expire();
+            return Promise.reject(error);
+        },
+    );
+};
+
+startSessionMonitor();
+
+/**
  * Dashboard live updates via 30s polling.
  *
  * Swaps in fresh alert HTML and updates the stat tiles so the dashboard
@@ -48,7 +221,12 @@ Alpine.data('dashboardLive', (endpoint) => ({
 
     async poll() {
         try {
-            const response = await fetch(endpoint);
+            const response = await fetch(endpoint, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Session-Activity': 'passive',
+                },
+            });
             if (!response.ok) return;
 
             const data = await response.json();

@@ -17,7 +17,12 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="h-full font-sans antialiased bg-neutral-50 text-neutral-800">
+<body
+    class="h-full font-sans antialiased bg-neutral-50 text-neutral-800"
+    data-session-timeout-seconds="{{ (int) config('session.lifetime') * 60 }}"
+    data-session-activity-url="{{ route('session.activity') }}"
+    data-session-expired-url="{{ Illuminate\Support\Facades\URL::signedRoute('session.expired', absolute: false) }}"
+>
     <div x-data="{ sidebarOpen: false }" class="min-h-full">
 
         @include('layouts.partials.sidebar')

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnforceSessionInactivity;
 use App\Http\Middleware\EnsureUserIsActive;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,7 +20,15 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Runs on every authenticated web request so that deactivating an
         // account takes effect immediately, not at the end of their session.
-        $middleware->web(append: [EnsureUserIsActive::class]);
+        $middleware->web(append: [
+            EnforceSessionInactivity::class,
+            EnsureUserIsActive::class,
+        ]);
+
+        // Stateful browser calls to /api/v1 use the same web session and must
+        // obey the same inactivity cutoff. Bearer-token requests are unchanged
+        // because the middleware only acts on the authenticated web guard.
+        $middleware->api(append: [EnforceSessionInactivity::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
