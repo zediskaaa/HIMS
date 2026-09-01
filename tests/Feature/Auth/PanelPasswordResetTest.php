@@ -1,0 +1,277 @@
+<?php
+
+namespace Tests\Feature\Auth;
+
+use App\Models\User;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
+use Tests\TestCase;
+
+class PanelPasswordResetTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_each_login_panel_links_only_to_its_own_password_reset_request(): void
+    {
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertSee('href="'.route('password.request').'"', escape: false)
+            ->assertDontSee('Go to Admin Login')
+            ->assertDontSee('Go to Super Admin Login')
+            ->assertDontSee('href="'.route('admin.login').'"', escape: false)
+            ->assertDontSee('href="'.route('super-admin.login').'"', escape: false);
+        $this->get(route('admin.login'))
+            ->assertOk()
+            ->assertSee('href="'.route('admin.password.request').'"', escape: false);
+        $this->get(route('super-admin.login'))
+            ->assertOk()
+            ->assertSee('href="'.route('super-admin.password.request').'"', escape: false);
+    }
+
+    public function test_legacy_email_enumeration_endpoint_is_removed(): void
+    {
+        $this->get('/check-email?email=someone@example.test')->assertNotFound();
+    }
+
+    public function test_admin_is_rejected_by_staff_login_with_a_message_only_notice(): void
+    {
+        $admin = User::factory()->administrator()->create(['password' => 'password']);
+
+        $response = $this->from(route('login'))->post(route('login'), [
+            'email' => $admin->email,
+            'password' => 'password',
+        ]);
+
+        $response
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors(['email' => trans('auth.failed')])
+            ->assertSessionHas('wrong_panel.message', "You're using the Staff Login Panel. Please use the Admin Login Panel.")
+            ->assertSessionMissing('wrong_panel.url')
+            ->assertSessionMissing('wrong_panel.label');
+        $this->assertGuest('web');
+
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertSee('Wrong login panel')
+            ->assertSee("You're using the Staff Login Panel. Please use the Admin Login Panel.")
+            ->assertDontSee('Go to Admin Login')
+            ->assertDontSee('Go to Super Admin Login')
+            ->assertDontSee('href="'.route('admin.login').'"', escape: false);
+    }
+
+    public function test_super_admin_is_rejected_by_staff_login_with_a_message_only_notice(): void
+    {
+        $superAdmin = User::factory()->superAdministrator()->create(['password' => 'password']);
+
+        $response = $this->from(route('login'))->post(route('login'), [
+            'email' => $superAdmin->email,
+            'password' => 'password',
+        ]);
+
+        $response
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors(['email' => trans('auth.failed')])
+            ->assertSessionHas('wrong_panel.message', "You're using the Staff Login Panel. Please use the Super Admin Login Panel.")
+            ->assertSessionMissing('wrong_panel.url')
+            ->assertSessionMissing('wrong_panel.label');
+        $this->assertGuest('web');
+
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertSee("You're using the Staff Login Panel. Please use the Super Admin Login Panel.")
+            ->assertDontSee('Go to Super Admin Login')
+            ->assertDontSee('href="'.route('super-admin.login').'"', escape: false);
+    }
+
+    public function test_every_other_wrong_login_panel_stays_on_the_originating_panel_without_an_action_link(): void
+    {
+        $attempts = [
+            [User::factory()->warehouseStaff()->create(['password' => 'password']), 'admin.login', 'admin.login.store', 'Admin', 'Staff'],
+            [User::factory()->superAdministrator()->create(['password' => 'password']), 'admin.login', 'admin.login.store', 'Admin', 'Super Admin'],
+            [User::factory()->administrator()->create(['password' => 'password']), 'super-admin.login', 'super-admin.login.store', 'Super Admin', 'Admin'],
+            [User::factory()->viewer()->create(['password' => 'password']), 'super-admin.login', 'super-admin.login.store', 'Super Admin', 'Staff'],
+        ];
+
+        foreach ($attempts as [$account, $loginRoute, $storeRoute, $currentPanel, $correctPanel]) {
+            $this->from(route($loginRoute))->post(route($storeRoute), [
+                'email' => $account->email,
+                'password' => 'password',
+            ])->assertRedirect(route($loginRoute))
+                ->assertSessionHasErrors(['email' => trans('auth.failed')])
+                ->assertSessionHas('wrong_panel.message', "You're using the {$currentPanel} Login Panel. Please use the {$correctPanel} Login Panel.")
+                ->assertSessionMissing('wrong_panel.url')
+                ->assertSessionMissing('wrong_panel.label');
+        }
+    }
+
+    public function test_invalid_password_does_not_disclose_an_accounts_panel(): void
+    {
+        $admin = User::factory()->administrator()->create(['password' => 'password']);
+
+        $this->post(route('login'), [
+            'email' => $admin->email,
+            'password' => 'incorrect-password',
+        ])->assertSessionMissing('wrong_panel');
+    }
+
+    public function test_staff_forgot_password_rejects_admin_and_super_admin_accounts(): void
+    {
+        Notification::fake();
+
+        $accounts = [
+            User::factory()->administrator()->create(),
+            User::factory()->superAdministrator()->create(),
+        ];
+
+        foreach ($accounts as $account) {
+            $correctPanel = $account->isSuperAdministrator() ? 'Super Admin' : 'Admin';
+
+            $this->from(route('password.request'))->post(route('password.email'), [
+                'email' => $account->email,
+            ])->assertRedirect(route('password.request'))
+                ->assertSessionHas('wrong_panel.message', "You're using the Staff Login Panel. Please use the {$correctPanel} Login Panel.")
+                ->assertSessionMissing('wrong_panel.url')
+                ->assertSessionMissing('wrong_panel.label');
+
+            Notification::assertNotSentTo($account, ResetPassword::class);
+        }
+    }
+
+    public function test_staff_account_cannot_use_an_admin_password_reset_panel(): void
+    {
+        Notification::fake();
+        $staff = User::factory()->warehouseStaff()->create();
+
+        $this->from(route('admin.password.request'))->post(route('admin.password.email'), [
+            'email' => $staff->email,
+        ])->assertRedirect(route('admin.password.request'))
+            ->assertSessionHas('wrong_panel.message', "You're using the Admin Login Panel. Please use the Staff Login Panel.")
+            ->assertSessionMissing('wrong_panel.url')
+            ->assertSessionMissing('wrong_panel.label');
+
+        Notification::assertNotSentTo($staff, ResetPassword::class);
+    }
+
+    public function test_admin_can_complete_only_the_admin_password_reset_flow(): void
+    {
+        Notification::fake();
+        $admin = User::factory()->administrator()->create();
+
+        $this->post(route('admin.password.email'), ['email' => $admin->email])
+            ->assertSessionHasNoErrors();
+
+        Notification::assertSentTo($admin, ResetPassword::class, function (ResetPassword $notification) use ($admin): bool {
+            $this->assertStringContainsString('/admin/reset-password/', $notification->toMail($admin)->actionUrl);
+
+            $this->get(route('admin.password.reset', [
+                'token' => $notification->token,
+                'email' => $admin->email,
+            ]))->assertOk()->assertSee('Admin password recovery');
+
+            $this->post(route('admin.password.store'), [
+                'token' => $notification->token,
+                'email' => $admin->email,
+                'password' => 'new-admin-password',
+                'password_confirmation' => 'new-admin-password',
+            ])->assertSessionHasNoErrors()->assertRedirect(route('admin.login'));
+
+            return true;
+        });
+
+        $this->assertTrue(Hash::check('new-admin-password', $admin->refresh()->password));
+    }
+
+    public function test_super_admin_can_complete_only_the_super_admin_password_reset_flow(): void
+    {
+        Notification::fake();
+        $superAdmin = User::factory()->superAdministrator()->create();
+
+        $this->post(route('super-admin.password.email'), ['email' => $superAdmin->email])
+            ->assertSessionHasNoErrors();
+
+        Notification::assertSentTo($superAdmin, ResetPassword::class, function (ResetPassword $notification) use ($superAdmin): bool {
+            $this->assertStringContainsString('/super-admin/reset-password/', $notification->toMail($superAdmin)->actionUrl);
+
+            $this->get(route('super-admin.password.reset', [
+                'token' => $notification->token,
+                'email' => $superAdmin->email,
+            ]))->assertOk()->assertSee('Super Admin password recovery');
+
+            $this->post(route('super-admin.password.store'), [
+                'token' => $notification->token,
+                'email' => $superAdmin->email,
+                'password' => 'new-super-password',
+                'password_confirmation' => 'new-super-password',
+            ])->assertSessionHasNoErrors()->assertRedirect(route('super-admin.login'));
+
+            return true;
+        });
+
+        $this->assertTrue(Hash::check('new-super-password', $superAdmin->refresh()->password));
+    }
+
+    public function test_admin_cannot_redeem_a_valid_token_through_staff_reset_post(): void
+    {
+        Notification::fake();
+        $admin = User::factory()->administrator()->create();
+        $originalPassword = $admin->password;
+
+        $this->post(route('admin.password.email'), ['email' => $admin->email]);
+
+        Notification::assertSentTo($admin, ResetPassword::class, function (ResetPassword $notification) use ($admin): bool {
+            $this->post(route('password.store'), [
+                'token' => $notification->token,
+                'email' => $admin->email,
+                'password' => 'bypass-password',
+                'password_confirmation' => 'bypass-password',
+            ])->assertRedirect(route('admin.password.request'))
+                ->assertSessionMissing('wrong_panel.url')
+                ->assertSessionMissing('wrong_panel.label');
+
+            return true;
+        });
+
+        $this->assertSame($originalPassword, $admin->refresh()->password);
+    }
+
+    public function test_super_admin_cannot_open_or_submit_staff_reset_routes(): void
+    {
+        Notification::fake();
+        $superAdmin = User::factory()->superAdministrator()->create();
+        $originalPassword = $superAdmin->password;
+
+        $this->post(route('super-admin.password.email'), ['email' => $superAdmin->email]);
+
+        Notification::assertSentTo($superAdmin, ResetPassword::class, function (ResetPassword $notification) use ($superAdmin): bool {
+            $this->get(route('password.reset', [
+                'token' => $notification->token,
+                'email' => $superAdmin->email,
+            ]))->assertRedirect(route('super-admin.password.request'));
+
+            $this->post(route('password.store'), [
+                'token' => $notification->token,
+                'email' => $superAdmin->email,
+                'password' => 'bypass-password',
+                'password_confirmation' => 'bypass-password',
+            ])->assertRedirect(route('super-admin.password.request'));
+
+            return true;
+        });
+
+        $this->assertSame($originalPassword, $superAdmin->refresh()->password);
+    }
+
+    public function test_unknown_email_receives_a_generic_response_without_a_notification(): void
+    {
+        Notification::fake();
+
+        $this->post(route('password.email'), [
+            'email' => 'unknown@example.test',
+        ])->assertSessionHas('status', 'If an eligible account matches that email, a password reset link has been sent.')
+            ->assertSessionMissing('wrong_panel');
+
+        Notification::assertNothingSent();
+    }
+}

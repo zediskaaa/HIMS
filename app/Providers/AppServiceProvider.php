@@ -7,8 +7,10 @@ use App\Enums\Permission;
 use App\Models\User;
 use App\Observers\UserObserver;
 use App\Services\AuditLogger;
+use App\Support\AuthenticationPanel;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -30,6 +32,22 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->registerPermissionGates();
         $this->registerAuditLogging();
+        $this->registerPasswordResetUrls();
+    }
+
+    /**
+     * Every reset email returns to the panel assigned to the account's role.
+     */
+    private function registerPasswordResetUrls(): void
+    {
+        ResetPassword::createUrlUsing(function (User $user, string $token): string {
+            $panel = AuthenticationPanel::forRole($user->role);
+
+            return route($panel->passwordResetRoute(), [
+                'token' => $token,
+                'email' => $user->email,
+            ]);
+        });
     }
 
     /**

@@ -3,11 +3,14 @@
 namespace App\Http\Requests\Auth;
 
 use App\Enums\UserStatus;
+use App\Models\User;
+use App\Support\AuthenticationPanel;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -49,6 +52,7 @@ abstract class RoleRestrictedLoginRequest extends FormRequest
         ], $this->boolean('remember'));
 
         if (! $authenticated) {
+            $this->flashWrongPanelAlertForValidCredentials();
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
@@ -57,6 +61,32 @@ abstract class RoleRestrictedLoginRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
+    }
+
+    /**
+     * Guide a valid account to its own panel without changing the generic
+     * authentication error. Verifying the password first avoids disclosing
+     * another account's role to somebody who only knows its email address.
+     */
+    private function flashWrongPanelAlertForValidCredentials(): void
+    {
+        $account = User::query()
+            ->active()
+            ->where('email', $this->string('email')->toString())
+            ->first();
+
+        if ($account === null || ! Hash::check($this->string('password')->toString(), $account->password)) {
+            return;
+        }
+
+        $currentPanel = AuthenticationPanel::forGuard($this->guard());
+
+        if ($currentPanel->accepts($account->role)) {
+            return;
+        }
+
+        $correctPanel = AuthenticationPanel::forRole($account->role);
+        $this->session()->flash('wrong_panel', $currentPanel->wrongPanelAlert($correctPanel));
     }
 
     /**

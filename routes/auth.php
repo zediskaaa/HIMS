@@ -9,14 +9,8 @@ use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
-use App\Models\User;
-use App\Rules\NotCurrentPassword;
-use Illuminate\Auth\Events\PasswordReset;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use App\Support\AuthenticationPanel;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Str;
-use Illuminate\Validation\Rules\Password;
 
 // This signed endpoint is intentionally outside the auth/guest groups. It can
 // still clear a session when Laravel's storage lifetime elapsed before the
@@ -26,22 +20,6 @@ Route::get('session/expired', [AuthenticatedSessionController::class, 'expired']
     ->name('session.expired');
 
 Route::middleware(['guest:web', 'guest:admin', 'guest:super_admin'])->group(function () {
-    // Forgot-password OTP frontend hits this to confirm the email is registered
-    // before sending an OTP via Google Apps Script. GET avoids CSRF since the
-    // caller is a static HTML page. Throttled to discourage enumeration.
-    Route::get('check-email', function (Request $request) {
-        $request->validate(['email' => ['required', 'email']]);
-
-        $exists = User::where('email', $request->email)->exists();
-
-        return response()->json([
-            'exists' => $exists,
-            'message' => $exists
-                ? 'Email found.'
-                : 'This email is not registered in the system.',
-        ]);
-    })->middleware('throttle:10,1')->name('check-email');
-
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
 
@@ -53,60 +31,31 @@ Route::middleware(['guest:web', 'guest:admin', 'guest:super_admin'])->group(func
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
+        ->defaults('auth_panel', AuthenticationPanel::Staff->value)
         ->name('password.request');
 
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->defaults('auth_panel', AuthenticationPanel::Staff->value)
         ->name('password.email');
 
-    // Keep previously cached OTP pages working. They used /reset-password with
-    // an email query string, while Laravel reserves that path for POST submits.
-    Route::get('reset-password', function (Request $request) {
-        return redirect()->route('password.reset.otp', [
-            'email' => $request->query('email', ''),
-        ]);
-    })->name('password.reset.otp.redirect');
+    // Retire the former client-side OTP flow. It did not carry a Laravel
+    // broker token, so these compatibility endpoints can never reset data.
+    Route::get('reset-password', fn () => redirect()->route('password.request'))
+        ->name('password.reset.legacy');
 
     Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
+        ->defaults('auth_panel', AuthenticationPanel::Staff->value)
         ->name('password.reset');
 
     Route::post('reset-password', [NewPasswordController::class, 'store'])
+        ->defaults('auth_panel', AuthenticationPanel::Staff->value)
         ->name('password.store');
 
-    // ── OTP-verified password reset (no token required) ──────────────
-    // The user's identity was already confirmed via email OTP on the
-    // static HTML page, so these routes accept just email + new password.
-
-    Route::get('reset-password-otp', function (Request $request) {
-        return view('auth.reset-password-otp', [
-            'email' => $request->query('email', ''),
-        ]);
-    })->name('password.reset.otp');
-
-    Route::post('reset-password-otp', function (Request $request) {
-        $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required', 'confirmed', Password::defaults()],
-        ]);
-
-        $user = User::where('email', $request->email)->first();
-
-        if (! $user) {
-            return back()->withErrors(['email' => 'No account found with this email.']);
-        }
-
-        $request->validate([
-            'password' => [new NotCurrentPassword($user)],
-        ]);
-
-        $user->forceFill([
-            'password' => Hash::make($request->password),
-            'remember_token' => Str::random(60),
-        ])->save();
-
-        event(new PasswordReset($user));
-
-        return redirect()->route('login')->with('status', 'Your password has been reset successfully!');
-    })->name('password.store.otp');
+    // Keep old bookmarks working without accepting tokenless resets.
+    Route::match(['get', 'post'], 'reset-password-otp', fn () => redirect()
+        ->route('password.request')
+        ->withErrors(['email' => 'Please request a new secure password reset link.']))
+        ->name('password.reset.otp.legacy');
 });
 
 Route::middleware('auth:web,admin,super_admin')->group(function () {

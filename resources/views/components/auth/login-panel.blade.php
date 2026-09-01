@@ -4,6 +4,7 @@
     'heading' => 'Sign in to HIMS',
     'description' => 'Access procurement, inventory, and hospital supply operations from one workspace.',
     'submitLabel' => 'Sign in',
+    'forgotPasswordUrl',
 ])
 
 <div class="space-y-8">
@@ -21,6 +22,8 @@
         class="animate-fade-up rounded-lg border border-success-100 bg-success-50 px-4 py-3 text-success-700 [animation-delay:380ms]"
         :status="session('status')"
     />
+
+    <x-auth.wrong-panel-alert />
 
     @if (session('session_timeout'))
         <x-ui.alert
@@ -56,14 +59,12 @@
             <div class="flex items-center justify-between gap-4">
                 <x-input-label for="password" :value="__('Password')" class="text-neutral-700" />
 
-                @if (Route::has('password.request'))
-                    <a
-                        class="rounded text-xs font-medium text-primary-600 transition-colors hover:text-primary-700"
-                        href="{{ asset('email-verification/email-verify.html') }}"
-                    >
-                        {{ __('Forgot password?') }}
-                    </a>
-                @endif
+                <a
+                    class="rounded text-xs font-medium text-primary-600 transition-colors hover:text-primary-700"
+                    href="{{ $forgotPasswordUrl }}"
+                >
+                    {{ __('Forgot password?') }}
+                </a>
             </div>
 
             <div class="relative mt-2">

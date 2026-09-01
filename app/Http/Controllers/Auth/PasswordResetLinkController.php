@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Support\AuthenticationPanel;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
@@ -14,9 +18,11 @@ class PasswordResetLinkController extends Controller
     /**
      * Display the password reset link request view.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
-        return view('auth.forgot-password');
+        return view('auth.forgot-password', [
+            'panel' => $this->panel($request),
+        ]);
     }
 
     /**
@@ -30,16 +36,41 @@ class PasswordResetLinkController extends Controller
             'email' => ['required', 'email'],
         ]);
 
-        // We will send the password reset link to this user. Once we have attempted
-        // to send the link, we will examine the response then see the message we
-        // need to show to the user. Finally, we'll send out a proper response.
-        $status = Password::sendResetLink(
-            $request->only('email')
-        );
+        $panel = $this->panel($request);
+        $account = User::query()
+            ->active()
+            ->where('email', $request->string('email'))
+            ->first();
 
-        return $status == Password::RESET_LINK_SENT
-                    ? back()->with('status', __($status))
-                    : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
+        if ($account !== null && ! $panel->accepts($account->role)) {
+            $correctPanel = AuthenticationPanel::forRole($account->role);
+
+            return back()
+                ->withInput($request->only('email'))
+                ->with('wrong_panel', $panel->wrongPanelAlert($correctPanel));
+        }
+
+        $status = Password::sendResetLink([
+            'email' => $request->string('email')->toString(),
+            'status' => UserStatus::Active->value,
+            fn (Builder $query) => $query->whereIn('role', $panel->roleValues()),
+        ]);
+
+        // Unknown and inactive accounts deliberately receive the same response
+        // as a valid request. Only the owner of a matching inbox can continue.
+        if (in_array($status, [Password::RESET_LINK_SENT, Password::INVALID_USER], true)) {
+            return back()->with('status', 'If an eligible account matches that email, a password reset link has been sent.');
+        }
+
+        return back()
+            ->withInput($request->only('email'))
+            ->withErrors(['email' => __($status)]);
+    }
+
+    private function panel(Request $request): AuthenticationPanel
+    {
+        return AuthenticationPanel::from(
+            (string) $request->route('auth_panel', AuthenticationPanel::Staff->value)
+        );
     }
 }
