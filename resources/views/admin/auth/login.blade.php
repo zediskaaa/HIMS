@@ -1,10 +1,11 @@
-<x-guest-layout title="Admin Sign in">
+<x-guest-layout title="Admin Login" portal="admin">
     <x-auth.login-panel
         :action="route('admin.login.store')"
         :forgot-password-url="route('admin.password.request')"
-        badge="Restricted administration portal"
-        heading="Admin Sign in"
-        description="Authenticate to manage authorized HIMS administration and operations modules."
+        variant="admin"
+        badge="Administrative access"
+        heading="Admin Login"
+        description="Sign in to manage authorized HIMS operations, users, and inventory workflows."
         submit-label="Sign in as Admin"
     />
 </x-guest-layout>

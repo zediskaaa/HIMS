@@ -28,16 +28,22 @@ class SuperAdminAuthenticationTest extends TestCase
         ])->assertRedirect(route('super-admin.dashboard', absolute: false));
     }
 
-    public function test_super_admin_login_page_matches_the_existing_login_ui(): void
+    public function test_super_admin_login_page_has_a_distinct_privileged_identity(): void
     {
         $this->get(route('super-admin.login'))
             ->assertOk()
-            ->assertSee('Super Admin Sign in')
-            ->assertSee('Restricted administration portal')
+            ->assertSee('Super Admin Login')
+            ->assertSee('Privileged system access')
+            ->assertSee('System-wide governance, secured at the highest level.')
+            ->assertSee('Highest privilege tier')
+            ->assertSee('Access governance')
+            ->assertSee('Security control')
+            ->assertSee('Audit oversight')
             ->assertSee('Email address')
             ->assertSee('Password')
             ->assertSee('Keep me signed in')
-            ->assertSee('Sign in as Super Admin');
+            ->assertSee('Sign in as Super Admin')
+            ->assertDontSee('Access is limited to the administration modules assigned to your account.');
     }
 
     public function test_valid_super_admin_credentials_use_the_dedicated_guard(): void

@@ -29,16 +29,33 @@ class AdminAuthenticationTest extends TestCase
         ])->assertRedirect(route('dashboard', absolute: false));
     }
 
-    public function test_admin_login_page_matches_the_super_admin_design(): void
+    public function test_admin_login_page_has_a_distinct_administration_identity(): void
     {
         $this->get(route('admin.login'))
             ->assertOk()
-            ->assertSee('Admin Sign in')
-            ->assertSee('Restricted administration portal')
+            ->assertSee('Admin Login')
+            ->assertSee('Administrative access')
+            ->assertSee('Keep hospital operations organized and accountable.')
+            ->assertSee('Access is limited to the administration modules assigned to your account.')
+            ->assertSee('User access')
+            ->assertSee('Operations')
+            ->assertSee('Audit records')
             ->assertSee('Email address')
             ->assertSee('Password')
             ->assertSee('Keep me signed in')
-            ->assertSee('Sign in as Admin');
+            ->assertSee('Sign in as Admin')
+            ->assertDontSee('Highest privilege tier')
+            ->assertDontSee('Privileged system access');
+    }
+
+    public function test_staff_login_keeps_its_existing_visual_identity(): void
+    {
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertSee('Staff Sign in')
+            ->assertSee('Secure staff portal')
+            ->assertDontSee('Administrative access')
+            ->assertDontSee('Privileged system access');
     }
 
     public function test_admin_can_login_only_through_the_dedicated_admin_guard(): void
