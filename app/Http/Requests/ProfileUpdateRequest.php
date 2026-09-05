@@ -30,7 +30,9 @@ class ProfileUpdateRequest extends FormRequest
         }
 
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'surname' => ['required', 'string', 'max:80'],
+            'first_name' => ['required', 'string', 'max:80'],
+            'middle_name' => ['nullable', 'string', 'max:80'],
             'email' => $emailRules,
         ];
     }
@@ -42,6 +44,18 @@ class ProfileUpdateRequest extends FormRequest
     {
         return [
             'email.in' => 'The protected Super Administrator email cannot be changed.',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'surname' => 'last name',
+            'first_name' => 'first name',
+            'middle_name' => 'middle name',
         ];
     }
 }

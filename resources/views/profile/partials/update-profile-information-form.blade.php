@@ -1,4 +1,9 @@
 <section>
+    @php
+        $nameComponents = $user->nameComponents();
+        $profileSuccess = session()->pull('profile_success');
+    @endphp
+
     <header>
         <h2 class="text-lg font-medium text-gray-900">
             {{ __('Profile Information') }}
@@ -9,6 +14,12 @@
         </p>
     </header>
 
+    @if ($profileSuccess)
+        <x-ui.alert variant="success" title="Profile updated" dismissible class="mt-6">
+            {{ $profileSuccess }}
+        </x-ui.alert>
+    @endif
+
     <form id="send-verification" method="post" action="{{ route('verification.send') }}">
         @csrf
     </form>
@@ -17,10 +28,54 @@
         @csrf
         @method('patch')
 
-        <div>
-            <x-input-label for="name" :value="__('Name')" />
-            <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" :value="old('name', $user->name)" required autofocus autocomplete="name" />
-            <x-input-error class="mt-2" :messages="$errors->get('name')" />
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+                <x-input-label for="surname" :value="__('Last Name')" />
+                <x-text-input
+                    id="surname"
+                    name="surname"
+                    type="text"
+                    class="mt-1 block w-full"
+                    :value="old('surname', $nameComponents['surname'])"
+                    placeholder="e.g. Dela Cruz"
+                    maxlength="80"
+                    required
+                    autofocus
+                    autocomplete="family-name"
+                />
+                <x-input-error class="mt-2" :messages="$errors->get('surname')" />
+            </div>
+
+            <div>
+                <x-input-label for="first_name" :value="__('First Name')" />
+                <x-text-input
+                    id="first_name"
+                    name="first_name"
+                    type="text"
+                    class="mt-1 block w-full"
+                    :value="old('first_name', $nameComponents['first_name'])"
+                    placeholder="e.g. Juan"
+                    maxlength="80"
+                    required
+                    autocomplete="given-name"
+                />
+                <x-input-error class="mt-2" :messages="$errors->get('first_name')" />
+            </div>
+
+            <div class="sm:col-span-2 lg:col-span-1">
+                <x-input-label for="middle_name" :value="__('Middle Name')" />
+                <x-text-input
+                    id="middle_name"
+                    name="middle_name"
+                    type="text"
+                    class="mt-1 block w-full"
+                    :value="old('middle_name', $nameComponents['middle_name'])"
+                    placeholder="e.g. Santos (optional)"
+                    maxlength="80"
+                    autocomplete="additional-name"
+                />
+                <x-input-error class="mt-2" :messages="$errors->get('middle_name')" />
+            </div>
         </div>
 
         <div>
@@ -55,18 +110,8 @@
             @endif
         </div>
 
-        <div class="flex items-center gap-4">
+        <div class="flex items-center">
             <x-primary-button>{{ __('Save') }}</x-primary-button>
-
-            @if (session('status') === 'profile-updated')
-                <p
-                    x-data="{ show: true }"
-                    x-show="show"
-                    x-transition
-                    x-init="setTimeout(() => show = false, 2000)"
-                    class="text-sm text-gray-600"
-                >{{ __('Saved.') }}</p>
-            @endif
         </div>
     </form>
 </section>
