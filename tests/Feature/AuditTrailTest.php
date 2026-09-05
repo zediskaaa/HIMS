@@ -43,6 +43,20 @@ class AuditTrailTest extends TestCase
         ], $overrides);
     }
 
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function auditLog(array $overrides = []): AuditLog
+    {
+        return AuditLog::create(array_replace([
+            'actor_name' => 'Audit Operator',
+            'action' => AuditAction::LoggedIn,
+            'target_name' => 'Account',
+            'description' => 'Recorded audit activity.',
+            'ip_address' => '127.0.0.1',
+        ], $overrides));
+    }
+
     public function test_creating_a_user_records_actor_target_context_and_no_password(): void
     {
         $admin = $this->admin();
@@ -207,6 +221,221 @@ class AuditTrailTest extends TestCase
         $this->app['auth']->guard(AuthenticationContext::WEB_GUARD)->logout();
 
         $this->get('/admin/audit-trail')->assertRedirect('/super-admin/login');
+    }
+
+    public function test_only_super_administrators_can_access_audit_suggestions(): void
+    {
+        $superAdmin = User::factory()->superAdministrator()->create();
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->getJson(route('admin.audit-logs.suggestions', ['query' => 'Audit']))
+            ->assertOk();
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        $this->actingAs($this->admin(), AuthenticationContext::ADMIN_GUARD)
+            ->getJson(route('admin.audit-logs.suggestions', ['query' => 'Audit']))
+            ->assertForbidden();
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        $this->actingAs(User::factory()->warehouseStaff()->create(), AuthenticationContext::WEB_GUARD)
+            ->getJson(route('admin.audit-logs.suggestions', ['query' => 'Audit']))
+            ->assertForbidden();
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        $this->getJson(route('admin.audit-logs.suggestions', ['query' => 'Audit']))
+            ->assertUnauthorized();
+    }
+
+    public function test_audit_suggestions_come_from_matching_stored_data(): void
+    {
+        $this->auditLog([
+            'actor_name' => 'Zediska Administrator',
+            'actor_employee_id' => 'ZED-001',
+            'action' => AuditAction::UpdatedUser,
+            'target_name' => 'Zedrick Santos',
+            'description' => 'Updated the matching account.',
+            'new_values' => ['email' => 'zediskaaa@gmail.com'],
+            'ip_address' => '203.0.113.20',
+        ]);
+        $this->auditLog([
+            'actor_name' => 'Unrelated Operator',
+            'target_name' => 'Different Account',
+            'description' => 'This row must not be suggested.',
+        ]);
+
+        $superAdmin = User::factory()->superAdministrator()->create();
+        $response = $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->getJson(route('admin.audit-logs.suggestions', ['query' => 'zed']));
+
+        $response->assertOk();
+
+        $suggestions = collect($response->json('data'));
+
+        $this->assertContains('Zediska Administrator', $suggestions->pluck('value'));
+        $this->assertContains('Zedrick Santos', $suggestions->pluck('value'));
+        $this->assertContains('ZED-001', $suggestions->pluck('value'));
+        $this->assertContains('zediskaaa@gmail.com', $suggestions->pluck('value'));
+        $this->assertNotContains('Unrelated Operator', $suggestions->pluck('value'));
+        $this->assertContains('Email', $suggestions->pluck('category'));
+    }
+
+    public function test_suggestions_collapse_historical_values_for_the_same_account(): void
+    {
+        $person = User::factory()->create();
+        $otherPerson = User::factory()->create();
+
+        $this->auditLog([
+            'user_id' => $person->id,
+            'actor_name' => 'Zedrick Old Name',
+        ]);
+        $this->auditLog([
+            'user_id' => $person->id,
+            'actor_name' => 'Zedrick Current Name',
+        ]);
+        $this->auditLog([
+            'user_id' => $otherPerson->id,
+            'actor_name' => 'Zedrick Other Account',
+        ]);
+        $this->auditLog([
+            'target_type' => User::class,
+            'target_id' => (string) $person->id,
+            'target_name' => 'Zedrick Target Snapshot',
+            'old_values' => ['email' => 'zedrick.old@example.test'],
+            'new_values' => ['email' => 'unrelated@example.test'],
+        ]);
+        $this->auditLog([
+            'target_type' => User::class,
+            'target_id' => (string) $person->id,
+            'old_values' => ['email' => 'another-unrelated@example.test'],
+            'new_values' => ['email' => 'zedrick.current@example.test'],
+        ]);
+
+        $superAdmin = User::factory()->superAdministrator()->create();
+        $response = $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->getJson(route('admin.audit-logs.suggestions', ['query' => 'zedrick']))
+            ->assertOk();
+
+        $suggestions = collect($response->json('data'));
+        $performedBy = $suggestions->where('category', 'Performed by')->pluck('value');
+        $emails = $suggestions->where('category', 'Email')->pluck('value');
+
+        $this->assertEqualsCanonicalizing(
+            ['Zedrick Current Name', 'Zedrick Other Account'],
+            $performedBy->all(),
+        );
+        $this->assertNotContains('Zedrick Old Name', $performedBy);
+        $this->assertNotContains('Zedrick Target Snapshot', $suggestions->pluck('value'));
+        $this->assertSame(['zedrick.current@example.test'], $emails->values()->all());
+        $this->assertNotContains('unrelated@example.test', $suggestions->pluck('value'));
+    }
+
+    public function test_action_suggestions_are_backed_by_existing_logs_and_remain_searchable(): void
+    {
+        $this->auditLog([
+            'action' => AuditAction::UpdatedUser,
+            'description' => 'Only the updated action should match.',
+        ]);
+        $this->auditLog([
+            'action' => AuditAction::LoggedIn,
+            'description' => 'Unrelated login activity.',
+        ]);
+        $superAdmin = User::factory()->superAdministrator()->create();
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->getJson(route('admin.audit-logs.suggestions', ['query' => 'Updated']))
+            ->assertOk()
+            ->assertJsonFragment([
+                'value' => 'Updated User',
+                'category' => 'Action',
+            ])
+            ->assertJsonMissing(['value' => 'Created User']);
+
+        $this->get(route('admin.audit-logs.index', ['search' => 'Updated User']))
+            ->assertOk()
+            ->assertSee('Only the updated action should match.')
+            ->assertDontSee('Unrelated login activity.');
+    }
+
+    public function test_email_values_in_recorded_details_are_searchable(): void
+    {
+        $this->auditLog([
+            'description' => 'Matched email activity.',
+            'new_values' => ['email' => 'zediskaaa@gmail.com'],
+        ]);
+        $this->auditLog([
+            'description' => 'Unrelated email activity.',
+            'new_values' => ['email' => 'someone@example.com'],
+        ]);
+        $superAdmin = User::factory()->superAdministrator()->create();
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get(route('admin.audit-logs.index', ['search' => 'zediskaaa@gmail.com']))
+            ->assertOk()
+            ->assertSee('Matched email activity.')
+            ->assertDontSee('Unrelated email activity.');
+    }
+
+    public function test_suggestions_are_limited_and_handle_empty_invalid_and_no_match_queries(): void
+    {
+        foreach (range(1, 12) as $number) {
+            $this->auditLog([
+                'actor_name' => 'Test Operator '.str_pad((string) $number, 2, '0', STR_PAD_LEFT),
+                'description' => "Suggestion row {$number}.",
+            ]);
+        }
+
+        $superAdmin = User::factory()->superAdministrator()->create();
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD);
+
+        $limited = $this->getJson(route('admin.audit-logs.suggestions', ['query' => 'Test']));
+
+        $limited->assertOk();
+        $this->assertLessThanOrEqual(8, count($limited->json('data')));
+        $this->assertLessThan(12, count($limited->json('data')));
+
+        $this->getJson(route('admin.audit-logs.suggestions', ['query' => '']))
+            ->assertOk()
+            ->assertExactJson(['data' => []]);
+
+        $this->getJson(route('admin.audit-logs.suggestions', ['query' => 'NoSuchAuditValue']))
+            ->assertOk()
+            ->assertExactJson(['data' => []]);
+
+        $this->getJson(route('admin.audit-logs.suggestions', ['query' => str_repeat('a', 101)]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('query');
+    }
+
+    public function test_audit_search_renders_the_autocomplete_interaction_contract(): void
+    {
+        $superAdmin = User::factory()->superAdministrator()->create();
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get(route('admin.audit-logs.index'))
+            ->assertOk()
+            ->assertSee('auditSearchAutocomplete', false)
+            ->assertSee('admin\\/audit-trail\\/suggestions', false)
+            ->assertSee('!overflow-visible', false)
+            ->assertSee('x-on:click.outside="close()"', false)
+            ->assertSee('x-on:keydown.down.prevent="move(1)"', false)
+            ->assertSee('x-on:keydown.up.prevent="move(-1)"', false)
+            ->assertSee('x-on:keydown.enter="selectActive($event)"', false)
+            ->assertSee('x-on:keydown.escape.stop="close()"', false)
+            ->assertSee('role="combobox"', false)
+            ->assertSee('role="listbox"', false)
+            ->assertSee('No matching audit data.');
+
+        $script = file_get_contents(resource_path('js/app.js'));
+
+        $this->assertIsString($script);
+        $this->assertStringContainsString('debounceDelay: 300', $script);
+        $this->assertStringContainsString('new AbortController()', $script);
     }
 
     public function test_audit_page_displays_philippine_time_and_supports_filters(): void

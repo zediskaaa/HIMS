@@ -296,4 +296,128 @@ Alpine.data('dashboardLive', (endpoint) => ({
     }
 }));
 
+/**
+ * Server-backed autocomplete for the append-only Audit Trail.
+ *
+ * Only the current query is sent after the user pauses typing. Previous
+ * requests are cancelled so a slower response cannot replace newer results.
+ */
+Alpine.data('auditSearchAutocomplete', ({ endpoint, formId, initialQuery = '' }) => ({
+    query: initialQuery,
+    suggestions: [],
+    activeIndex: -1,
+    open: false,
+    loading: false,
+    loaded: false,
+    failed: false,
+    debounceTimer: null,
+    request: null,
+    debounceDelay: 300,
+
+    queue(value) {
+        this.query = value;
+        window.clearTimeout(this.debounceTimer);
+        this.request?.abort();
+        this.request = null;
+        this.activeIndex = -1;
+        this.failed = false;
+
+        if (value.trim() === '') {
+            this.reset();
+            return;
+        }
+
+        this.open = true;
+        this.loading = true;
+        this.loaded = false;
+        this.debounceTimer = window.setTimeout(
+            () => this.fetchSuggestions(value.trim()),
+            this.debounceDelay,
+        );
+    },
+
+    async fetchSuggestions(term) {
+        const controller = new AbortController();
+        this.request = controller;
+
+        try {
+            const url = new URL(endpoint, window.location.origin);
+            url.searchParams.set('query', term);
+
+            const response = await fetch(url, {
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-Session-Activity': 'passive',
+                },
+                signal: controller.signal,
+            });
+
+            if (!response.ok) throw new Error(`Suggestion request failed with ${response.status}`);
+
+            const payload = await response.json();
+
+            if (this.query.trim() !== term) return;
+
+            this.suggestions = Array.isArray(payload.data) ? payload.data : [];
+            this.loaded = true;
+        } catch (error) {
+            if (error.name === 'AbortError') return;
+
+            this.suggestions = [];
+            this.loaded = true;
+            this.failed = true;
+        } finally {
+            if (this.request === controller) {
+                this.request = null;
+                this.loading = false;
+            }
+        }
+    },
+
+    move(direction) {
+        if (this.suggestions.length === 0) return;
+
+        this.open = true;
+        this.activeIndex = (
+            this.activeIndex + direction + this.suggestions.length
+        ) % this.suggestions.length;
+    },
+
+    selectActive(event) {
+        if (!this.open || this.activeIndex < 0) return;
+
+        event.preventDefault();
+        this.select(this.suggestions[this.activeIndex]);
+    },
+
+    select(suggestion) {
+        this.query = suggestion.value;
+        this.close();
+
+        this.$nextTick(() => document.getElementById(formId)?.requestSubmit());
+    },
+
+    close() {
+        this.open = false;
+        this.activeIndex = -1;
+    },
+
+    reset() {
+        window.clearTimeout(this.debounceTimer);
+        this.request?.abort();
+        this.request = null;
+        this.suggestions = [];
+        this.loading = false;
+        this.loaded = false;
+        this.failed = false;
+        this.close();
+    },
+
+    destroy() {
+        this.reset();
+    },
+}));
+
 Alpine.start();

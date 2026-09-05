@@ -4,14 +4,79 @@
         subtitle="Append-only history of user administration and authentication activity."
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Audit Trail' => null]" />
 
-    <x-ui.card title="Find Activity" subtitle="Search by actor, employee ID, target, description, or IP address.">
-        <form method="GET" action="{{ route('admin.audit-logs.index') }}"
+    <x-ui.card
+        title="Find Activity"
+        subtitle="Search by actor, employee ID, target, email, action, description, or IP address."
+        class="relative z-20 !overflow-visible">
+        <form id="audit-log-filters" method="GET" action="{{ route('admin.audit-logs.index') }}"
               class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5 xl:items-end">
-            <x-ui.field
-                name="search"
-                label="Search"
-                :value="$filters['search'] ?? null"
-                placeholder="e.g. Juan, EMP-0144, 127.0.0.1" />
+            <div
+                class="relative space-y-1.5"
+                x-data="auditSearchAutocomplete({
+                    endpoint: @js(route('admin.audit-logs.suggestions')),
+                    formId: 'audit-log-filters',
+                    initialQuery: @js($filters['search'] ?? ''),
+                })"
+                x-on:click.outside="close()"
+            >
+                <label for="audit-search" class="block text-sm font-medium text-neutral-700">Search</label>
+                <input
+                    id="audit-search"
+                    name="search"
+                    type="search"
+                    placeholder="e.g. Juan, EMP-0144, 127.0.0.1"
+                    autocomplete="off"
+                    class="block w-full rounded-md border border-neutral-300 text-sm text-neutral-900 shadow-sm transition-colors placeholder:text-neutral-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 focus:ring-offset-0"
+                    x-model="query"
+                    x-on:input="queue($event.target.value)"
+                    x-on:focus="if (query.trim() && loaded) open = true"
+                    x-on:keydown.down.prevent="move(1)"
+                    x-on:keydown.up.prevent="move(-1)"
+                    x-on:keydown.enter="selectActive($event)"
+                    x-on:keydown.escape.stop="close()"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-controls="audit-search-suggestions"
+                    x-bind:aria-expanded="open"
+                    x-bind:aria-activedescendant="activeIndex >= 0 ? `audit-suggestion-${activeIndex}` : null"
+                />
+
+                <div
+                    id="audit-search-suggestions"
+                    x-show="open"
+                    x-cloak
+                    x-transition.opacity
+                    class="absolute left-0 right-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg"
+                    role="listbox"
+                >
+                    <p x-show="loading" class="px-3 py-2 text-sm text-neutral-500">Finding suggestions...</p>
+                    <p x-show="!loading && failed" class="px-3 py-2 text-sm text-danger-600">
+                        Suggestions could not be loaded. You can still submit the search normally.
+                    </p>
+                    <p
+                        x-show="!loading && !failed && loaded && suggestions.length === 0"
+                        class="px-3 py-2 text-sm text-neutral-500"
+                    >
+                        No matching audit data.
+                    </p>
+
+                    <template x-for="(suggestion, index) in suggestions" :key="`${suggestion.category}:${suggestion.value}`">
+                        <button
+                            type="button"
+                            class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-neutral-700 hover:bg-primary-50 hover:text-primary-900"
+                            x-bind:id="`audit-suggestion-${index}`"
+                            x-bind:class="activeIndex === index ? 'bg-primary-50 text-primary-900' : ''"
+                            x-bind:aria-selected="activeIndex === index"
+                            x-on:mouseenter="activeIndex = index"
+                            x-on:click="select(suggestion)"
+                            role="option"
+                        >
+                            <span class="min-w-0 truncate" x-text="suggestion.value"></span>
+                            <span class="shrink-0 text-xs text-neutral-400" x-text="suggestion.category"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
 
             <x-ui.field
                 name="action"

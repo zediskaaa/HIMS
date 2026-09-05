@@ -74,6 +74,7 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
  * out from behind it.
  */
 Route::prefix('admin')->name('admin.')->group(function () {
+    Route::get('/audit-trail/suggestions', [AuditLogController::class, 'suggestions'])->name('audit-logs.suggestions');
     Route::get('/audit-trail', [AuditLogController::class, 'index'])->name('audit-logs.index');
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
