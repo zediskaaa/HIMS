@@ -80,11 +80,11 @@ class UserController extends Controller implements HasMiddleware
 
     public function store(StoreUserRequest $request): RedirectResponse
     {
-        $user = $this->accounts->create($request->validated(), $request->user());
+        $this->accounts->create($request->validated(), $request->user());
+        $request->session()->put('account_created_success', 'Account created successfully.');
 
         return redirect()
-            ->route('admin.users.index')
-            ->with('success', sprintf('%s was added as %s.', $user->name, $user->role->label()));
+            ->route('admin.users.index');
     }
 
     public function show(User $user): View

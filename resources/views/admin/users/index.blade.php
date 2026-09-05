@@ -1,4 +1,6 @@
 <x-app-layout>
+    @php($accountCreatedSuccess = session()->pull('account_created_success'))
+
     <x-ui.page-header
         title="User Management"
         subtitle="Staff accounts and what each role is allowed to do."
@@ -7,6 +9,12 @@
             <x-ui.button :href="route('admin.users.create')" icon="plus">Add User</x-ui.button>
         </x-slot:actions>
     </x-ui.page-header>
+
+    @if ($accountCreatedSuccess)
+        <x-ui.alert variant="success" title="Account created" dismissible>
+            {{ $accountCreatedSuccess }}
+        </x-ui.alert>
+    @endif
 
     @if ($errors->any())
         <x-ui.alert variant="danger" title="That change was not applied">

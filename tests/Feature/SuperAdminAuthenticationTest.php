@@ -161,22 +161,49 @@ class SuperAdminAuthenticationTest extends TestCase
     {
         $superAdmin = $this->superAdmin();
         $this->login($superAdmin);
+        $this->app['auth']->forgetGuards();
+
+        $this->get(route('admin.users.create'))
+            ->assertOk()
+            ->assertSee('Create Account')
+            ->assertSee('value="administrator"', false)
+            ->assertDontSee('value="super_administrator"', false);
 
         $this->post(route('admin.users.store'), [
-            'surname' => 'Viewer',
+            'surname' => 'Administrator',
             'first_name' => 'Vera',
-            'email' => 'vera.viewer@example.com',
+            'email' => 'vera.administrator@example.com',
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
-            'role' => UserRole::Viewer->value,
-            'department' => 'Internal Audit',
+            'role' => UserRole::Administrator->value,
+            'department' => 'Administration',
             'phone' => '09179876543',
-        ])->assertRedirect(route('admin.users.index'));
+        ])->assertSessionHasNoErrors()
+            ->assertSessionHas('account_created_success', 'Account created successfully.')
+            ->assertRedirect(route('admin.users.index'));
 
         $this->assertDatabaseHas('users', [
-            'email' => 'vera.viewer@example.com',
-            'role' => UserRole::Viewer->value,
+            'email' => 'vera.administrator@example.com',
+            'role' => UserRole::Administrator->value,
         ]);
+
+        $created = User::query()->where('email', 'vera.administrator@example.com')->firstOrFail();
+
+        $this->assertNotSame('Password123!', $created->password);
+        $this->assertTrue(password_verify('Password123!', $created->password));
+
+        $this->postJson(route('super-admin.session.activity'))->assertNoContent();
+        $this->app['auth']->forgetGuards();
+
+        $this->get(route('admin.users.index', ['search' => $created->email]))
+            ->assertOk()
+            ->assertSee('Account created successfully.')
+            ->assertSee($created->name)
+            ->assertSessionMissing('account_created_success');
+
+        $this->get(route('admin.users.index', ['search' => $created->email]))
+            ->assertOk()
+            ->assertDontSee('Account created successfully.');
     }
 
     public function test_super_admin_session_can_use_stateful_browser_api_routes(): void

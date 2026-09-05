@@ -73,7 +73,8 @@ class UserManagementTest extends TestCase
                 'password_confirmation' => 'Password123!',
                 'role' => UserRole::Administrator->value,
                 'phone' => '09171234567',
-            ])->assertForbidden();
+            ])->assertForbidden()
+                ->assertSessionMissing('account_created_success');
         }
 
         // Not one of those attempts created anything.
@@ -131,7 +132,7 @@ class UserManagementTest extends TestCase
     {
         $admin = $this->admin();
 
-        $this->actingAs($admin)->post('/admin/users', [
+        $response = $this->actingAs($admin)->post('/admin/users', [
             'surname' => 'Dela Cruz',
             'first_name' => 'Juan',
             'middle_name' => 'Santos',
@@ -142,7 +143,12 @@ class UserManagementTest extends TestCase
             'employee_id' => 'EMP-9999', // A forged value must be ignored.
             'department' => 'Central Supply',
             'phone' => '09171234567',
-        ])->assertRedirect('/admin/users');
+        ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('account_created_success', 'Account created successfully.')
+            ->assertRedirect('/admin/users');
 
         $created = User::where('email', 'juan.delacruz@djnrmhs.test')->firstOrFail();
 
@@ -162,11 +168,15 @@ class UserManagementTest extends TestCase
         $this->assertNotNull($created->email_verified_at);
 
         $this->actingAs($admin)->get('/admin/users')
+            ->assertSee('Account created successfully.')
             ->assertSee('Juan Santos Dela Cruz')
             ->assertSee('09171234567')
             ->assertSeeInOrder([
                 'Employee ID', 'Surname', 'First Name', 'Middle Name', 'Department', 'Contact Number', 'Role',
             ]);
+
+        $this->actingAs($admin)->get('/admin/users')
+            ->assertDontSee('Account created successfully.');
     }
 
     public function test_a_new_account_gets_exactly_its_role_permissions(): void
@@ -217,6 +227,7 @@ class UserManagementTest extends TestCase
             'department' => 'Warehouse',
             'phone' => '09171234567',
         ])->assertSessionHasErrors('email')
+            ->assertSessionMissing('account_created_success')
             ->assertSessionDoesntHaveErrors('employee_id');
     }
 
@@ -231,9 +242,40 @@ class UserManagementTest extends TestCase
             'role' => UserRole::Viewer->value,
             'department' => 'Warehouse',
             'phone' => '09171234567',
-        ])->assertSessionHasErrors('password');
+        ])->assertSessionHasErrors('password')
+            ->assertSessionMissing('account_created_success');
 
         $this->assertDatabaseMissing('users', ['email' => 'typo@djnrmhs.test']);
+    }
+
+    public function test_a_database_failure_does_not_create_an_account_or_show_success(): void
+    {
+        $admin = $this->admin();
+        $nextEmployeeNumber = DB::table('employee_id_sequences')->value('next_value');
+
+        User::creating(function (): void {
+            throw new \RuntimeException('Simulated database failure.');
+        });
+
+        $response = $this->actingAs($admin)->post('/admin/users', [
+            'surname' => 'Failed',
+            'first_name' => 'Creation',
+            'email' => 'failed.creation@djnrmhs.test',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'role' => UserRole::Viewer->value,
+            'department' => 'Internal Audit',
+            'phone' => '09171234567',
+        ]);
+
+        $response
+            ->assertServerError()
+            ->assertSessionMissing('account_created_success');
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'failed.creation@djnrmhs.test',
+        ]);
+        $this->assertSame($nextEmployeeNumber, DB::table('employee_id_sequences')->value('next_value'));
     }
 
     public function test_an_unknown_role_is_rejected(): void
