@@ -11,7 +11,15 @@
 @php
     $isAdmin = $variant === 'admin';
     $isSuperAdmin = $variant === 'super-admin';
-    $hasSessionTimeout = session()->has('session_timeout');
+    $panelGuard = $isSuperAdmin ? 'super_admin' : ($isAdmin ? 'admin' : 'web');
+    $timeoutContext = session('session_timeout_context');
+    $hasSessionTimeout = session()->has('session_timeout')
+        && (!$timeoutContext || $timeoutContext['guard'] === $panelGuard);
+    if ($hasSessionTimeout && !request()->ajax()
+        && !request()->expectsJson()
+        && in_array(request()->header('Sec-Fetch-Mode'), [null, 'navigate'], true)) {
+        session()->forget(['session_timeout', 'session_timeout_context']);
+    }
 @endphp
 
 <div class="space-y-8">

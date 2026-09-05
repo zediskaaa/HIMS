@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsureAuthenticationPanelRole;
 use App\Http\Middleware\EnsureSuperAdministrator;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Support\AuthenticationContext;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -47,6 +48,11 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureUserIsActive::class,
             EnsureAuthenticationPanelRole::class,
         ]);
+
+        $middleware->prependToPriorityList(
+            AuthenticatesRequests::class,
+            EnforceSessionInactivity::class,
+        );
 
         // Stateful browser calls to /api/v1 use the same web session and must
         // obey the same inactivity cutoff. Bearer-token requests are unchanged

@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -24,12 +25,41 @@ class EnforceSessionInactivity
 
     public const PASSIVE_ACTIVITY_HEADER = 'X-Session-Activity';
 
+    public const CONTEXT_COOKIE = 'hims_inactivity';
+
     public function handle(Request $request, Closure $next): Response
     {
-        $guardName = AuthenticationContext::authenticatedGuard();
-
-        if (! $request->hasSession() || $guardName === null) {
+        if (! $request->hasSession()) {
             return $next($request);
+        }
+
+        $guardName = AuthenticationContext::authenticatedGuard();
+        $manualLogout = $request->isMethod('POST')
+            && $request->routeIs('logout', 'admin.logout', 'super-admin.logout');
+        $notice = $request->session()->get('session_timeout_context');
+
+        if ($manualLogout || ($notice && $notice['expires_at'] <= now()->getTimestamp())) {
+            $request->session()->forget(['session_timeout', 'session_timeout_context']);
+        }
+
+        if ($manualLogout) {
+            Cookie::queue(Cookie::forget(self::CONTEXT_COOKIE));
+
+            return $next($request);
+        }
+
+        if ($guardName === null) {
+            // EncryptCookies authenticates this evidence independently of the
+            // short-lived session. It grants no authentication or module access.
+            $context = json_decode($request->cookie(self::CONTEXT_COOKIE, ''), true);
+            if (is_array($context)
+                && in_array($context['guard'] ?? null, AuthenticationContext::sessionGuards(), true)
+                && is_int($context['deadline'] ?? null)
+                && $context['deadline'] <= now()->getTimestamp()) {
+                return $this->timeout($request, $context['guard']);
+            }
+
+            return $this->finish($request, $next($request));
         }
 
         $guard = Auth::guard($guardName);
@@ -52,7 +82,30 @@ class EnforceSessionInactivity
             $request->session()->put($lastActivityKey, $now);
         }
 
-        return $next($request);
+        return $this->finish($request, $next($request));
+    }
+
+    private function finish(Request $request, Response $response): Response
+    {
+        $guard = AuthenticationContext::authenticatedGuard();
+
+        if ($guard !== null) {
+            $request->session()->forget(['session_timeout', 'session_timeout_context']);
+            $lastActivity = $request->session()->get(self::lastActivityKey($guard));
+            if (is_numeric($lastActivity)) {
+                // A browser-session cookie survives storage/cookie expiry at
+                // the inactivity deadline, but is cleared on logout/consumption.
+                Cookie::queue(Cookie::make(self::CONTEXT_COOKIE, json_encode([
+                    'guard' => $guard,
+                    'deadline' => (int) $lastActivity + max(1, (int) config('session.lifetime')) * 60,
+                ]), 0, config('session.path'), config('session.domain'), config('session.secure'), true,
+                    false, config('session.same_site')));
+            }
+        } else {
+            Cookie::queue(Cookie::forget(self::CONTEXT_COOKIE));
+        }
+
+        return $response;
     }
 
     public static function lastActivityKey(string $guard): string
@@ -80,6 +133,17 @@ class EnforceSessionInactivity
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+        Cookie::queue(Cookie::forget(self::CONTEXT_COOKIE));
+
+        // Keep the notice across API responses and the browser's intermediate
+        // /session/expired redirect; the matching login view consumes it.
+        $request->session()->put([
+            'session_timeout' => true,
+            'session_timeout_context' => [
+                'guard' => $guardName,
+                'expires_at' => now()->getTimestamp() + max(1, (int) config('session.lifetime')) * 60,
+            ],
+        ]);
 
         if ($request->expectsJson() || $request->is('api/*')) {
             return response()
@@ -91,7 +155,6 @@ class EnforceSessionInactivity
         }
 
         return redirect()
-            ->route(AuthenticationContext::loginRoute($guardName))
-            ->with('session_timeout', true);
+            ->route(AuthenticationContext::loginRoute($guardName));
     }
 }
