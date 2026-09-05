@@ -11,6 +11,7 @@
 @php
     $isAdmin = $variant === 'admin';
     $isSuperAdmin = $variant === 'super-admin';
+    $hasSessionTimeout = session()->has('session_timeout');
 @endphp
 
 <div class="space-y-8">
@@ -43,9 +44,11 @@
                     <p class="mt-3 max-w-sm text-sm leading-6 text-neutral-500">{{ $description }}</p>
                 </div>
             </div>
-            <div class="mt-5 rounded-lg border border-primary-100 bg-primary-50/70 px-3.5 py-3 text-xs leading-5 text-primary-900">
-                Access is limited to the administration modules assigned to your account.
-            </div>
+            @unless ($hasSessionTimeout)
+                <div class="mt-5 rounded-lg border border-primary-100 bg-primary-50/70 px-3.5 py-3 text-xs leading-5 text-primary-900">
+                    Access is limited to the administration modules assigned to your account.
+                </div>
+            @endunless
         </header>
     @else
         <header class="animate-fade-up [animation-delay:320ms]">
@@ -66,7 +69,7 @@
 
     <x-auth.wrong-panel-alert />
 
-    @if (session('session_timeout'))
+    @if ($hasSessionTimeout)
         <x-ui.alert
             variant="warning"
             title="Session Timeout"
