@@ -35,7 +35,10 @@
                 <p class="mt-1 text-sm text-[var(--muted)]">
                     Adjustments are recorded as stock movements, so the balance and the audit trail stay in step.
                 </p>
-                <form method="POST" action="{{ route('inventory.adjustments.store') }}" class="mt-4 grid gap-4 md:grid-cols-2">
+                <form method="POST" action="{{ route('inventory.adjustments.store') }}" class="mt-4 grid gap-4 md:grid-cols-2"
+                      data-confirm-title="Confirm stock adjustment"
+                      data-confirm-message="Are you sure you want to apply this stock adjustment?"
+                      data-confirm-label="Apply Adjustment">
                     @csrf
                     <div>
                         <label class="block text-sm font-medium text-[var(--muted)]">Item</label>

@@ -30,7 +30,10 @@
     @endif
 
     <x-ui.card title="Account Details" subtitle="Leave the password fields blank to keep the current password.">
-        <form method="POST" action="{{ route('admin.users.update', $user) }}" class="space-y-5">
+        <form method="POST" action="{{ route('admin.users.update', $user) }}" class="space-y-5"
+              data-confirm-title="Confirm account changes"
+              data-confirm-message="Are you sure you want to save these account changes?"
+              data-confirm-label="Save Changes">
             @csrf
             @method('PUT')
 

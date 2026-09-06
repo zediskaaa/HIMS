@@ -334,7 +334,10 @@
 
             return `
                 <form method="POST" action="/inventory/purchases/requests/${request.id}/approve"
-                      class="mt-3 grid gap-3 border-t border-[var(--border)] pt-3 md:grid-cols-3">
+                      class="mt-3 grid gap-3 border-t border-[var(--border)] pt-3 md:grid-cols-3"
+                      data-confirm-title="Confirm request approval"
+                      data-confirm-message="Are you sure you want to approve this procurement request?"
+                      data-confirm-label="Approve Request">
                     <input type="hidden" name="_token" value="${csrfToken()}">
                     <div>
                         <label class="mb-1 block text-xs font-medium text-[var(--muted)]">Approved by</label>
@@ -402,7 +405,10 @@
 
             @can(\App\Enums\Permission::RecordMovements->value)
                 return `
-                    <form method="POST" action="/inventory/purchases/${order.id}/receive">
+                    <form method="POST" action="/inventory/purchases/${order.id}/receive"
+                          data-confirm-title="Confirm purchase receipt"
+                          data-confirm-message="Are you sure you want to receive this purchase order? This will add the ordered stock to inventory."
+                          data-confirm-label="Receive Order">
                         <input type="hidden" name="_token" value="${csrfToken()}">
                         <button type="submit" class="rounded-lg bg-[var(--primary)] px-3 py-1.5 text-xs font-semibold text-white">
                             Receive

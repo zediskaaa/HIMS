@@ -25,7 +25,9 @@
         </x-ui.alert>
     @endif
 
-    <form method="post" action="{{ route('profile.mfa.update') }}" class="mt-6 space-y-5">
+    <form method="post" action="{{ route('profile.mfa.update') }}" class="mt-6 space-y-5"
+          data-confirm-mfa
+          data-original-mfa="{{ $user->mfa_enabled ? '1' : '0' }}">
         @csrf
         @method('patch')
         <input type="hidden" name="mfa_enabled" value="0">

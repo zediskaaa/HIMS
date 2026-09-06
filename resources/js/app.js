@@ -457,7 +457,7 @@ const startSessionMonitor = () => {
     });
 
     document.addEventListener('submit', (event) => {
-        if (!(event.target instanceof HTMLFormElement)) return;
+        if (!(event.target instanceof HTMLFormElement) || event.defaultPrevented) return;
 
         // Stop pending heartbeats before a form navigation. Otherwise a slow
         // validation redirect can race the heartbeat's session write and lose
@@ -522,6 +522,189 @@ const startSessionMonitor = () => {
     );
 };
 
+/**
+ * One confirmation gate for consequential native form submissions.
+ *
+ * Forms opt in with data attributes. The first submit is cancelled before the
+ * session monitor or loading indicator sees it; only an explicit confirmation
+ * re-submits the form and starts the existing loading flow.
+ */
+const startDecisionConfirmations = () => {
+    const dialog = document.querySelector('[data-decision-confirmation]');
+    const title = dialog?.querySelector('[data-decision-title]');
+    const message = dialog?.querySelector('[data-decision-message]');
+    const cancelButton = dialog?.querySelector('[data-decision-cancel]');
+    const confirmButton = dialog?.querySelector('[data-decision-confirm]');
+
+    if (typeof HTMLDialogElement === 'undefined'
+        || !(dialog instanceof HTMLDialogElement)
+        || !(title instanceof HTMLElement)
+        || !(message instanceof HTMLElement)
+        || !(cancelButton instanceof HTMLButtonElement)
+        || !(confirmButton instanceof HTMLButtonElement)) {
+        return;
+    }
+
+    const confirmedForms = new WeakSet();
+    let pending = null;
+    let processing = false;
+
+    const decisionFor = (form) => {
+        if (form.matches('[data-confirm-mfa]')) {
+            const enabled = form.querySelector('input[name="mfa_enabled"][type="checkbox"]')?.checked ?? false;
+            const originallyEnabled = form.dataset.originalMfa === '1';
+
+            if (enabled === originallyEnabled) return null;
+
+            return {
+                title: 'Confirm security change',
+                message: enabled
+                    ? 'Are you sure you want to turn on MFA?'
+                    : 'Are you sure you want to turn off MFA?',
+                label: enabled ? 'Turn On MFA' : 'Turn Off MFA',
+            };
+        }
+
+        if (form.matches('[data-confirm-email-change]')) {
+            const email = form.querySelector('input[name="email"]');
+            const originalEmail = form.dataset.originalEmail?.trim().toLowerCase() ?? '';
+            const nextEmail = email instanceof HTMLInputElement ? email.value.trim().toLowerCase() : '';
+
+            if (nextEmail === originalEmail) return null;
+
+            return {
+                title: 'Confirm account change',
+                message: 'Are you sure you want to change your sign-in email address?',
+                label: 'Change Email',
+            };
+        }
+
+        const confirmationMessage = form.dataset.confirmMessage?.trim();
+        if (!confirmationMessage) return null;
+
+        return {
+            title: form.dataset.confirmTitle?.trim() || 'Confirm action',
+            message: confirmationMessage,
+            label: form.dataset.confirmLabel?.trim() || 'Confirm',
+        };
+    };
+
+    const resetDialog = () => {
+        processing = false;
+        cancelButton.disabled = false;
+        confirmButton.disabled = false;
+        confirmButton.removeAttribute('aria-busy');
+    };
+
+    const closeDialog = ({ restoreFocus = true } = {}) => {
+        const focusedBeforeOpen = pending?.focusedBeforeOpen;
+
+        if (dialog.open) dialog.close();
+        pending = null;
+        resetDialog();
+
+        if (restoreFocus && focusedBeforeOpen instanceof HTMLElement
+            && document.contains(focusedBeforeOpen)) {
+            focusedBeforeOpen.focus();
+        }
+    };
+
+    const cancel = () => {
+        if (processing) return;
+
+        const form = pending?.form;
+        if (form instanceof HTMLFormElement && form.matches('[data-confirm-mfa]')) {
+            const checkbox = form.querySelector('input[name="mfa_enabled"][type="checkbox"]');
+
+            if (checkbox instanceof HTMLInputElement) {
+                checkbox.checked = form.dataset.originalMfa === '1';
+                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        closeDialog();
+    };
+
+    const confirm = () => {
+        if (processing || !pending) return;
+
+        processing = true;
+        cancelButton.disabled = true;
+        confirmButton.disabled = true;
+        confirmButton.setAttribute('aria-busy', 'true');
+
+        const { form, submitter } = pending;
+        confirmedForms.add(form);
+        dialog.close();
+        pending = null;
+
+        window.queueMicrotask(() => {
+            if (!form.isConnected) {
+                confirmedForms.delete(form);
+                resetDialog();
+                return;
+            }
+
+            try {
+                form.requestSubmit(submitter ?? undefined);
+            } catch {
+                try {
+                    form.requestSubmit();
+                } catch {
+                    confirmedForms.delete(form);
+                    resetDialog();
+                }
+            }
+        });
+    };
+
+    // This listener is registered before the session and loading listeners so
+    // Cancel has no side effects and no loading UI can appear prematurely.
+    document.addEventListener('submit', (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement)) return;
+
+        if (confirmedForms.has(form)) {
+            confirmedForms.delete(form);
+            return;
+        }
+
+        const decision = decisionFor(form);
+        if (!decision) return;
+
+        event.preventDefault();
+
+        if (dialog.open || processing) return;
+
+        pending = {
+            form,
+            submitter: event.submitter instanceof HTMLButtonElement
+                || event.submitter instanceof HTMLInputElement
+                ? event.submitter
+                : null,
+            focusedBeforeOpen: document.activeElement,
+        };
+
+        title.textContent = decision.title;
+        message.textContent = decision.message;
+        confirmButton.textContent = decision.label;
+        dialog.showModal();
+        window.requestAnimationFrame(() => cancelButton.focus());
+    });
+
+    cancelButton.addEventListener('click', cancel);
+    confirmButton.addEventListener('click', confirm);
+    dialog.addEventListener('cancel', (event) => {
+        event.preventDefault();
+        cancel();
+    });
+    dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) cancel();
+    });
+    window.addEventListener('pageshow', () => closeDialog({ restoreFocus: false }));
+};
+
+startDecisionConfirmations();
 startSessionMonitor();
 
 /**

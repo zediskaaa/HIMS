@@ -73,7 +73,11 @@
                 {{ Auth::user()?->isAdministrator() ? 'Account settings' : 'Profile settings' }}
             </a>
 
-            <form method="POST" action="{{ route(\App\Support\AuthenticationContext::logoutRoute()) }}" data-manual-logout>
+            <form method="POST" action="{{ route(\App\Support\AuthenticationContext::logoutRoute()) }}"
+                  data-manual-logout
+                  data-confirm-title="Confirm logout"
+                  data-confirm-message="Are you sure you want to log out?"
+                  data-confirm-label="Log Out">
                 @csrf
                 <button type="submit" role="menuitem"
                         class="flex items-center gap-2 w-full px-3 py-2 text-sm text-left text-neutral-700 hover:bg-neutral-50">

@@ -16,6 +16,9 @@
             action="{{ route($panel->expiredPasswordUpdateRoute()) }}"
             class="space-y-5"
             x-data="{ password: '', passwordConfirmation: '' }"
+            data-confirm-title="Confirm security change"
+            data-confirm-message="Are you sure you want to change your password?"
+            data-confirm-label="Change Password"
         >
             @csrf
             @method('PUT')
@@ -59,7 +62,10 @@
             </x-ui.button>
         </form>
 
-        <form method="POST" action="{{ route($panel->expiredPasswordCancelRoute()) }}" class="text-center">
+        <form method="POST" action="{{ route($panel->expiredPasswordCancelRoute()) }}" class="text-center"
+              data-confirm-title="Confirm logout"
+              data-confirm-message="Are you sure you want to log out?"
+              data-confirm-label="Log Out">
             @csrf
             <button type="submit" data-loading-text="Returning to login..." class="text-sm font-medium text-primary-600 hover:text-primary-700">
                 Return to {{ $panel->label() }} Login

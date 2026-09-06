@@ -151,7 +151,10 @@
                                     {{-- Deactivating yourself is refused by the service;
                                          hide the impossible action here as well. --}}
                                     @unless ($account->is(auth()->user()))
-                                        <form method="POST" action="{{ route('admin.users.toggle-status', $account) }}">
+                                        <form method="POST" action="{{ route('admin.users.toggle-status', $account) }}"
+                                              data-confirm-title="Confirm account status change"
+                                              data-confirm-message="Are you sure you want to {{ $account->isActive() ? 'deactivate' : 'reactivate' }} this user?"
+                                              data-confirm-label="{{ $account->isActive() ? 'Deactivate' : 'Reactivate' }}">
                                             @csrf
                                             @method('PATCH')
                                             <x-ui.button

@@ -29,7 +29,9 @@
         @csrf
     </form>
 
-    <form method="post" action="{{ route('profile.update') }}" class="mt-6 space-y-6">
+    <form method="post" action="{{ route('profile.update') }}" class="mt-6 space-y-6"
+          data-confirm-email-change
+          data-original-email="{{ $user->email }}">
         @csrf
         @method('patch')
 

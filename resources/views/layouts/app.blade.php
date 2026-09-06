@@ -77,6 +77,7 @@
     </div>
 
     @include('layouts.partials.loading-overlay')
+    @include('layouts.partials.decision-confirmation')
 
     <dialog
         data-session-warning

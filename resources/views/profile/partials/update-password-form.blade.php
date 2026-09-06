@@ -17,7 +17,11 @@
         </x-ui.alert>
     @endif
 
-    <form method="post" action="{{ route('password.update') }}" class="mt-6 space-y-6" x-data="{ password: '', passwordConfirmation: '' }">
+    <form method="post" action="{{ route('password.update') }}" class="mt-6 space-y-6"
+          x-data="{ password: '', passwordConfirmation: '' }"
+          data-confirm-title="Confirm security change"
+          data-confirm-message="Are you sure you want to change your password?"
+          data-confirm-label="Change Password">
         @csrf
         @method('put')
 
