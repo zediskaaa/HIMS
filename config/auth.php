@@ -124,6 +124,10 @@ return [
         'days' => (int) env('AUTH_PASSWORD_EXPIRATION_DAYS', 90),
     ],
 
+    'password_history' => [
+        'key' => env('AUTH_PASSWORD_HISTORY_KEY') ?: env('APP_KEY'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Password Confirmation Timeout

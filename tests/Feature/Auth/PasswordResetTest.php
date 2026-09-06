@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\PasswordHistory;
 use App\Models\User;
 use App\Notifications\PasswordResetOtp;
 use Illuminate\Contracts\Notifications\Dispatcher;
@@ -158,6 +159,7 @@ class PasswordResetTest extends TestCase
 
         $this->assertTrue(Hash::check('NewPassword1!', $user->refresh()->password));
         $this->assertTrue($user->password_changed_at->isToday());
+        $this->assertSame(1, PasswordHistory::query()->whereBelongsTo($user)->count());
         $this->assertDatabaseMissing('password_reset_tokens', ['email' => $user->email]);
     }
 

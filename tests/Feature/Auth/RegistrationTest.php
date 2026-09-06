@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\PasswordHistory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -29,5 +30,6 @@ class RegistrationTest extends TestCase
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
         $this->assertTrue(User::where('email', 'test@example.com')->firstOrFail()->password_changed_at->isToday());
+        $this->assertSame(1, PasswordHistory::query()->count());
     }
 }

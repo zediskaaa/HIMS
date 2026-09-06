@@ -7,6 +7,7 @@ use App\Enums\MovementType;
 use App\Enums\UserRole;
 use App\Models\InventoryItem;
 use App\Models\ItemStockLevel;
+use App\Models\PasswordHistory;
 use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\User;
@@ -51,13 +52,14 @@ class DemoSeedTest extends TestCase
         $this->assertTrue($admin->isActive());
         $this->assertSame(1, User::superAdministrators()->count());
         $this->assertTrue(User::superAdministrators()->firstOrFail()->isProtected());
+        $this->assertSame(User::query()->count(), PasswordHistory::query()->count());
     }
 
     public function test_the_seeded_admin_can_sign_in_with_the_documented_password(): void
     {
         $this->post('/admin/login', [
             'email' => 'test@example.com',
-            'password' => 'Password123!',
+            'password' => 'DemoAdmin1!',
         ])->assertRedirect('/dashboard');
 
         $this->assertAuthenticated(AuthenticationContext::ADMIN_GUARD);

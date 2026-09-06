@@ -6,7 +6,6 @@ use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -20,6 +19,8 @@ use Illuminate\Validation\ValidationException;
  */
 class UserAccountService
 {
+    public function __construct(private readonly PasswordHistoryService $passwords) {}
+
     /**
      * Roles the actor may assign. Super Admin may manage Administrator
      * accounts, while the protected Super Administrator role is never exposed
@@ -75,14 +76,14 @@ class UserAccountService
      */
     public function create(array $attributes, User $actor): User
     {
-        return DB::transaction(function () use ($attributes, $actor): User {
+        return $this->passwords->usePassword($attributes['password'], function (string $passwordHash) use ($attributes, $actor): User {
             $role = UserRole::from($attributes['role']);
             $this->assertCanAssignRole($actor, $role);
 
             $user = new User([
                 ...$this->nameAttributes($attributes),
                 'email' => $attributes['email'],
-                'password' => $attributes['password'],
+                'password' => $passwordHash,
                 'role' => $role,
                 'status' => $attributes['status'] ?? UserStatus::Active->value,
                 'employee_id' => $this->nextEmployeeId(),
@@ -99,7 +100,7 @@ class UserAccountService
             $user->save();
 
             return $user;
-        }, 5);
+        });
     }
 
     /**
@@ -144,7 +145,15 @@ class UserAccountService
             // existing password back, so an empty field is not a request to
             // clear it.
             if (! empty($attributes['password'])) {
-                $user->password = $attributes['password'];
+                return $this->passwords->usePassword(
+                    $attributes['password'],
+                    function (string $passwordHash) use ($user): User {
+                        $user->password = $passwordHash;
+                        $user->save();
+
+                        return $user;
+                    },
+                );
             }
 
             $user->save();
@@ -181,10 +190,15 @@ class UserAccountService
 
     public function resetPassword(User $user, string $password): User
     {
-        $user->password = Hash::make($password);
-        $user->save();
+        return $this->passwords->usePassword(
+            $password,
+            function (string $passwordHash) use ($user): User {
+                $user->password = $passwordHash;
+                $user->save();
 
-        return $user;
+                return $user;
+            },
+        );
     }
 
     /**

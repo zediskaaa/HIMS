@@ -407,13 +407,14 @@ class UserManagementTest extends TestCase
 
         foreach (['09123456789', '09987654321', '09051234567'] as $index => $phone) {
             $email = "valid-phone-{$index}@djnrmhs.test";
+            $password = "ValidPhone{$index}!";
 
             $this->actingAs($admin)->post('/admin/users', [
                 'surname' => 'Valid Phone',
                 'first_name' => 'User',
                 'email' => $email,
-                'password' => 'Password123!',
-                'password_confirmation' => 'Password123!',
+                'password' => $password,
+                'password_confirmation' => $password,
                 'role' => UserRole::Viewer->value,
                 'department' => 'Administration',
                 'phone' => $phone,
@@ -431,12 +432,14 @@ class UserManagementTest extends TestCase
         $admin = $this->admin();
 
         foreach ([1 => 'first', 2 => 'second'] as $number => $emailPrefix) {
+            $password = "EmployeePassword{$number}!";
+
             $this->actingAs($admin)->post('/admin/users', [
                 'surname' => 'Employee',
                 'first_name' => ucfirst($emailPrefix),
                 'email' => $emailPrefix.'@djnrmhs.test',
-                'password' => 'Password123!',
-                'password_confirmation' => 'Password123!',
+                'password' => $password,
+                'password_confirmation' => $password,
                 'role' => UserRole::Viewer->value,
                 'department' => 'Records Management',
                 'employee_id' => 'EMP-9001',

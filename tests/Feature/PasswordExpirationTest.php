@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\EnforceSessionInactivity;
+use App\Models\PasswordHistory;
 use App\Models\User;
 use App\Notifications\LoginMfaOtp;
 use App\Services\PasswordExpirationService;
+use App\Services\PasswordHistoryService;
 use App\Support\AuthenticationContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -155,6 +157,11 @@ class PasswordExpirationTest extends TestCase
     public function test_invalid_or_reused_passwords_do_not_complete_the_expired_flow(): void
     {
         $user = $this->expiredUser('staff');
+        PasswordHistory::query()->create([
+            'user_id' => $user->getKey(),
+            'password_hash' => $user->password,
+            'used_at' => now()->subDays(90),
+        ]);
         $this->post(route('login'), $this->credentials($user));
 
         $this->from(route('password.expired'))->put(route('password.expired.update'), [
@@ -169,7 +176,9 @@ class PasswordExpirationTest extends TestCase
             'password' => self::CURRENT_PASSWORD,
             'password_confirmation' => self::CURRENT_PASSWORD,
         ])->assertRedirect(route('password.expired'))
-            ->assertSessionHasErrors('password');
+            ->assertSessionHasErrors([
+                'password' => PasswordHistoryService::REJECTION_MESSAGE,
+            ]);
 
         $this->assertGuest(AuthenticationContext::WEB_GUARD);
         $this->assertTrue(Hash::check(self::CURRENT_PASSWORD, $user->fresh()->password));

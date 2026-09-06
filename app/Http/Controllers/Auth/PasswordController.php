@@ -3,21 +3,24 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Rules\NotCurrentPassword;
+use App\Models\User;
 use App\Rules\PasswordStandard;
+use App\Services\PasswordHistoryService;
 use App\Support\AuthenticationContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 
 class PasswordController extends Controller
 {
     /**
      * Update the user's password.
      */
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request, PasswordHistoryService $passwords): RedirectResponse
     {
         $guard = AuthenticationContext::authenticatedGuard() ?? AuthenticationContext::WEB_GUARD;
+        $user = $request->user($guard);
+
+        abort_unless($user instanceof User, 401);
 
         $validated = $request->validateWithBag('updatePassword', [
             'current_password' => ['required', 'current_password:'.$guard],
@@ -25,7 +28,6 @@ class PasswordController extends Controller
                 'required',
                 new PasswordStandard,
                 'confirmed',
-                new NotCurrentPassword($request->user()),
             ],
         ], [
             'current_password.required' => 'Current password is required.',
@@ -33,9 +35,15 @@ class PasswordController extends Controller
             'password.confirmed' => PasswordStandard::CONFIRMATION_MESSAGE,
         ]);
 
-        $request->user()->update([
-            'password' => Hash::make($validated['password']),
-        ]);
+        $passwords->usePassword(
+            $validated['password'],
+            function (string $passwordHash) use ($user): User {
+                $user->forceFill(['password' => $passwordHash])->save();
+
+                return $user;
+            },
+            'updatePassword',
+        );
 
         $request->session()->put('password_success', 'Password updated successfully.');
 

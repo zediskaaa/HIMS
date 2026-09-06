@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\PasswordHistory;
 use App\Models\User;
+use App\Services\PasswordHistoryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -54,20 +56,28 @@ class PasswordUpdateTest extends TestCase
 
     public function test_current_password_cannot_be_reused_as_the_new_password(): void
     {
-        $user = User::factory()->create();
+        $currentPassword = 'CurrentPassword1!';
+        $user = User::factory()->create(['password' => $currentPassword]);
+        PasswordHistory::query()->create([
+            'user_id' => $user->getKey(),
+            'password_hash' => $user->password,
+            'used_at' => now(),
+        ]);
         $originalPasswordHash = $user->password;
 
         $response = $this
             ->actingAs($user)
             ->from('/profile')
             ->put('/password', [
-                'current_password' => 'password',
-                'password' => 'password',
-                'password_confirmation' => 'password',
+                'current_password' => $currentPassword,
+                'password' => $currentPassword,
+                'password_confirmation' => $currentPassword,
             ]);
 
         $response
-            ->assertSessionHasErrorsIn('updatePassword', 'password')
+            ->assertSessionHasErrorsIn('updatePassword', [
+                'password' => PasswordHistoryService::REJECTION_MESSAGE,
+            ])
             ->assertRedirect('/profile');
 
         $this->assertSame($originalPasswordHash, $user->refresh()->password);

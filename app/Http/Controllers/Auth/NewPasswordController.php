@@ -4,16 +4,14 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Rules\NotCurrentPassword;
 use App\Rules\PasswordStandard;
+use App\Services\PasswordHistoryService;
 use App\Support\AuthenticationPanel;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -43,7 +41,7 @@ class NewPasswordController extends Controller
      *
      * @throws ValidationException
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, PasswordHistoryService $passwords): RedirectResponse
     {
         $request->validate([
             'token' => ['required'],
@@ -68,16 +66,18 @@ class NewPasswordController extends Controller
                 ...$request->only('email', 'password', 'password_confirmation', 'token'),
                 fn (Builder $query) => $query->whereIn('role', $panel->roleValues()),
             ],
-            function (User $user) use ($request) {
-                Validator::make(
-                    ['password' => $request->password],
-                    ['password' => [new NotCurrentPassword($user)]]
-                )->validate();
+            function (User $user) use ($request, $passwords) {
+                $passwords->usePassword(
+                    $request->string('password')->toString(),
+                    function (string $passwordHash) use ($user): User {
+                        $user->forceFill([
+                            'password' => $passwordHash,
+                            'remember_token' => Str::random(60),
+                        ])->save();
 
-                $user->forceFill([
-                    'password' => Hash::make($request->password),
-                    'remember_token' => Str::random(60),
-                ])->save();
+                        return $user;
+                    },
+                );
 
                 event(new PasswordReset($user));
             }

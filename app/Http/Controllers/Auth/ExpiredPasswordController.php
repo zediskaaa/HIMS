@@ -4,14 +4,14 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnforceSessionInactivity;
-use App\Rules\NotCurrentPassword;
+use App\Models\User;
 use App\Rules\PasswordStandard;
 use App\Services\PasswordExpirationService;
+use App\Services\PasswordHistoryService;
 use App\Support\AuthenticationPanel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -28,8 +28,11 @@ class ExpiredPasswordController extends Controller
         return view('auth.password-expired', ['panel' => $panel]);
     }
 
-    public function update(Request $request, PasswordExpirationService $expiration): RedirectResponse
-    {
+    public function update(
+        Request $request,
+        PasswordExpirationService $expiration,
+        PasswordHistoryService $passwords,
+    ): RedirectResponse {
         $panel = $this->panel($request);
         $attempt = $expiration->pendingAttempt($request, $panel->guard());
 
@@ -43,16 +46,22 @@ class ExpiredPasswordController extends Controller
                 'string',
                 'confirmed',
                 new PasswordStandard,
-                new NotCurrentPassword($attempt['user']),
             ],
         ], [
             'password.confirmed' => PasswordStandard::CONFIRMATION_MESSAGE,
         ]);
 
-        $attempt['user']->forceFill([
-            'password' => Hash::make($validated['password']),
-            'remember_token' => Str::random(60),
-        ])->save();
+        $passwords->usePassword(
+            $validated['password'],
+            function (string $passwordHash) use ($attempt): User {
+                $attempt['user']->forceFill([
+                    'password' => $passwordHash,
+                    'remember_token' => Str::random(60),
+                ])->save();
+
+                return $attempt['user'];
+            },
+        );
 
         $expiration->clear($request);
         Auth::guard($panel->guard())->login($attempt['user'], $attempt['remember']);

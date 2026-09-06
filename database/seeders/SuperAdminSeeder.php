@@ -5,8 +5,8 @@ namespace Database\Seeders;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\User;
+use App\Services\PasswordHistoryService;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class SuperAdminSeeder extends Seeder
 {
@@ -20,7 +20,9 @@ class SuperAdminSeeder extends Seeder
 
     public function run(): void
     {
-        User::withoutEvents(function (): void {
+        $passwords = app(PasswordHistoryService::class);
+
+        User::withoutEvents(function () use ($passwords): void {
             $user = User::query()
                 ->where('is_protected', true)
                 ->where('role', UserRole::SuperAdministrator->value)
@@ -45,8 +47,20 @@ class SuperAdminSeeder extends Seeder
             // provisioned (or an existing same-email account is promoted), but
             // never undo a password the Super Administrator changes later.
             if ($shouldSetInitialPassword) {
-                $attributes['password'] = Hash::make(self::INITIAL_PASSWORD);
-                $attributes['password_changed_at'] = now();
+                $passwords->usePassword(
+                    self::INITIAL_PASSWORD,
+                    function (string $passwordHash) use ($user, $attributes): User {
+                        $user->forceFill([
+                            ...$attributes,
+                            'password' => $passwordHash,
+                            'password_changed_at' => now(),
+                        ])->save();
+
+                        return $user;
+                    },
+                );
+
+                return;
             }
 
             $user->forceFill($attributes)->save();
