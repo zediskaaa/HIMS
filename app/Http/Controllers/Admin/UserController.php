@@ -67,6 +67,9 @@ class UserController extends Controller implements HasMiddleware
             'manageableAccountIds' => $users->getCollection()
                 ->filter(fn (User $user) => $this->accounts->canManage($request->user(), $user))
                 ->modelKeys(),
+            'unlockableAccountIds' => $users->getCollection()
+                ->filter(fn (User $user) => $this->accounts->canUnlock($request->user(), $user))
+                ->modelKeys(),
         ]);
     }
 
@@ -92,6 +95,7 @@ class UserController extends Controller implements HasMiddleware
         return view('admin.users.show', [
             'user' => $user,
             'canManage' => $this->accounts->canManage(request()->user(), $user),
+            'canUnlock' => $this->accounts->canUnlock(request()->user(), $user),
             'recentMovements' => $user->stockMovements()
                 ->with(['item', 'fromLocation', 'toLocation'])
                 ->latest('moved_at')
@@ -139,5 +143,14 @@ class UserController extends Controller implements HasMiddleware
                 $updated->name,
                 $updated->status->label()
             ));
+    }
+
+    public function unlock(Request $request, User $user): RedirectResponse
+    {
+        $unlocked = $this->accounts->unlock($user, $request->user());
+
+        return redirect()
+            ->back()
+            ->with('success', sprintf('%s can now attempt to sign in again.', $unlocked->name));
     }
 }

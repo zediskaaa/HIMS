@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnforceSessionInactivity;
 use App\Http\Requests\Auth\SuperAdminLoginRequest;
 use App\Notifications\LoginMfaOtp;
+use App\Services\LoginLockoutService;
 use App\Services\LoginMfaService;
 use App\Services\PasswordExpirationService;
 use App\Support\AuthenticationContext;
@@ -19,9 +20,11 @@ use Throwable;
 
 class AuthenticatedSessionController extends Controller
 {
-    public function create(): View
+    public function create(Request $request, LoginLockoutService $lockouts): View
     {
-        return view('super-admin.auth.login');
+        return view('super-admin.auth.login', [
+            'loginRestriction' => $lockouts->sessionRestriction($request, AuthenticationContext::SUPER_ADMIN_GUARD),
+        ]);
     }
 
     public function store(
@@ -45,6 +48,7 @@ class AuthenticatedSessionController extends Controller
                 $user,
                 AuthenticationContext::SUPER_ADMIN_GUARD,
                 $request->boolean('remember'),
+                $request->progressiveThrottleKey(),
             );
 
             try {
@@ -72,6 +76,7 @@ class AuthenticatedSessionController extends Controller
                 $user,
                 AuthenticationContext::SUPER_ADMIN_GUARD,
                 $request->boolean('remember'),
+                $request->progressiveThrottleKey(),
             );
 
             return redirect()->route(AuthenticationPanel::SuperAdmin->expiredPasswordRoute());

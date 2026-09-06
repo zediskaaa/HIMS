@@ -140,7 +140,9 @@ class UserManagementTest extends TestCase
         $this->post(route('login'), [
             'email' => $staff->email,
             'password' => 'password',
-        ])->assertSessionHasErrors(['email' => trans('auth.failed')]);
+        ])->assertSessionHasErrors([
+            'email' => 'Incorrect email or password. You have 4 attempts remaining.',
+        ]);
 
         $this->assertGuest(AuthenticationContext::WEB_GUARD);
     }

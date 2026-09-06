@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Enums\AuditAction;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -19,7 +21,10 @@ use Illuminate\Validation\ValidationException;
  */
 class UserAccountService
 {
-    public function __construct(private readonly PasswordHistoryService $passwords) {}
+    public function __construct(
+        private readonly PasswordHistoryService $passwords,
+        private readonly AuditLogger $audit,
+    ) {}
 
     /**
      * Roles the actor may assign. Super Admin may manage Administrator
@@ -69,6 +74,20 @@ class UserAccountService
         }
 
         return ! $target->isAdministrator();
+    }
+
+    public function canUnlock(User $actor, User $target): bool
+    {
+        return $this->mayUnlock($actor, $target)
+            && $target->isTemporarilyLocked();
+    }
+
+    private function mayUnlock(User $actor, User $target): bool
+    {
+        return $actor->isSuperAdministrator()
+            && ! $actor->is($target)
+            && ! $target->isSuperAdministrator()
+            && $this->canManage($actor, $target);
     }
 
     /**
@@ -185,6 +204,52 @@ class UserAccountService
             $user->save();
 
             return $user;
+        });
+    }
+
+    public function unlock(User $user, User $actor): User
+    {
+        return DB::transaction(function () use ($user, $actor): User {
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->getKey());
+
+            if (! $this->mayUnlock($actor, $lockedUser)) {
+                throw new AuthorizationException('Only a Super Administrator may unlock accounts.');
+            }
+
+            if (! $lockedUser->isTemporarilyLocked()) {
+                throw ValidationException::withMessages([
+                    'account' => ['This account is not currently temporarily locked.'],
+                ]);
+            }
+
+            $oldValues = [
+                'failed_login_attempts' => (int) $lockedUser->failed_login_attempts,
+                'login_locked_until' => $lockedUser->login_locked_until?->toIso8601String(),
+                'login_lockout_count' => (int) $lockedUser->login_lockout_count,
+            ];
+
+            $lockedUser->forceFill([
+                'failed_login_attempts' => 0,
+                'last_failed_login_at' => null,
+                'login_retry_at' => null,
+                'login_locked_until' => null,
+            ])->saveQuietly();
+
+            $this->audit->log(
+                AuditAction::UnlockedUser,
+                $actor,
+                "Manually unlocked the user account for {$lockedUser->name}.",
+                $lockedUser,
+                $lockedUser->name,
+                $oldValues,
+                [
+                    'failed_login_attempts' => 0,
+                    'login_locked_until' => null,
+                    'login_lockout_count' => (int) $lockedUser->login_lockout_count,
+                ],
+            );
+
+            return $lockedUser;
         });
     }
 

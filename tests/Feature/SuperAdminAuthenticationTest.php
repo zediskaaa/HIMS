@@ -67,7 +67,9 @@ class SuperAdminAuthenticationTest extends TestCase
             'email' => $superAdmin->email,
             'password' => 'wrong-password',
         ])->assertRedirect(route('super-admin.login'))
-            ->assertSessionHasErrors(['email' => 'Incorrect email or password.']);
+            ->assertSessionHasErrors([
+                'email' => 'Incorrect email or password. You have 4 attempts remaining.',
+            ]);
 
         $this->assertGuest(AuthenticationContext::SUPER_ADMIN_GUARD);
     }

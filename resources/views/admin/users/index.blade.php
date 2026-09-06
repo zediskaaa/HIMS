@@ -134,6 +134,12 @@
                             <x-ui.badge :status="$account->status->value" dot>
                                 {{ $account->status->label() }}
                             </x-ui.badge>
+                            @if ($account->isTemporarilyLocked())
+                                <x-ui.badge variant="warning" class="mt-1">Temporarily Locked</x-ui.badge>
+                                <span class="mt-1 block whitespace-nowrap text-xs text-neutral-500">
+                                    Until {{ $account->login_locked_until->timezone(config('app.timezone'))->format('M d, Y g:i A') }}
+                                </span>
+                            @endif
                         </x-ui.table.td>
 
                         <x-ui.table.td muted>
@@ -147,6 +153,22 @@
                                                  :href="route('admin.users.edit', $account)">
                                         Edit
                                     </x-ui.button>
+
+                                    @if (in_array($account->getKey(), $unlockableAccountIds, true))
+                                        <form method="POST" action="{{ route('admin.users.unlock', $account) }}"
+                                              data-confirm-title="Confirm account unlock"
+                                              data-confirm-message="Are you sure you want to unlock this account?"
+                                              data-confirm-label="Unlock Account">
+                                            @csrf
+                                            @method('PATCH')
+                                            <x-ui.button
+                                                type="submit"
+                                                size="sm"
+                                                data-loading-text="Unlocking account...">
+                                                Unlock
+                                            </x-ui.button>
+                                        </form>
+                                    @endif
 
                                     {{-- Deactivating yourself is refused by the service;
                                          hide the impossible action here as well. --}}

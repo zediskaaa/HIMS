@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnforceSessionInactivity;
 use App\Models\User;
 use App\Rules\PasswordStandard;
+use App\Services\LoginLockoutService;
 use App\Services\PasswordExpirationService;
 use App\Services\PasswordHistoryService;
 use App\Support\AuthenticationPanel;
@@ -17,12 +18,26 @@ use Illuminate\View\View;
 
 class ExpiredPasswordController extends Controller
 {
-    public function show(Request $request, PasswordExpirationService $expiration): View|RedirectResponse
-    {
+    public function show(
+        Request $request,
+        PasswordExpirationService $expiration,
+        LoginLockoutService $lockouts,
+    ): View|RedirectResponse {
         $panel = $this->panel($request);
 
-        if ($expiration->pendingAttempt($request, $panel->guard()) === null) {
+        $attempt = $expiration->pendingAttempt($request, $panel->guard());
+
+        if ($attempt === null) {
             return $this->invalidAttempt($panel);
+        }
+
+        $throttleKey = $this->throttleKey($request, $panel, $attempt, $lockouts);
+        if ($restriction = $lockouts->activeRestriction($attempt['user'], $throttleKey)) {
+            $lockouts->rememberRestriction($request, $panel->guard(), $attempt['user']->email, $restriction);
+            $expiration->clear($request);
+
+            return redirect()->route($panel->loginRoute())
+                ->withErrors(['email' => $lockouts->message($restriction)]);
         }
 
         return view('auth.password-expired', ['panel' => $panel]);
@@ -32,12 +47,22 @@ class ExpiredPasswordController extends Controller
         Request $request,
         PasswordExpirationService $expiration,
         PasswordHistoryService $passwords,
+        LoginLockoutService $lockouts,
     ): RedirectResponse {
         $panel = $this->panel($request);
         $attempt = $expiration->pendingAttempt($request, $panel->guard());
 
         if ($attempt === null) {
             return $this->invalidAttempt($panel);
+        }
+
+        $throttleKey = $this->throttleKey($request, $panel, $attempt, $lockouts);
+        if ($restriction = $lockouts->activeRestriction($attempt['user'], $throttleKey)) {
+            $lockouts->rememberRestriction($request, $panel->guard(), $attempt['user']->email, $restriction);
+            $expiration->clear($request);
+
+            return redirect()->route($panel->loginRoute())
+                ->withErrors(['email' => $lockouts->message($restriction)]);
         }
 
         $validated = $request->validate([
@@ -64,6 +89,15 @@ class ExpiredPasswordController extends Controller
         );
 
         $expiration->clear($request);
+
+        if ($restriction = $lockouts->completeSuccessfulLogin($attempt['user'], $throttleKey)) {
+            $lockouts->rememberRestriction($request, $panel->guard(), $attempt['user']->email, $restriction);
+
+            return redirect()->route($panel->loginRoute())
+                ->withErrors(['email' => $lockouts->message($restriction)]);
+        }
+
+        $lockouts->clearRestriction($request);
         Auth::guard($panel->guard())->login($attempt['user'], $attempt['remember']);
         $request->session()->regenerate();
         $request->session()->put(
@@ -89,6 +123,19 @@ class ExpiredPasswordController extends Controller
     private function panel(Request $request): AuthenticationPanel
     {
         return AuthenticationPanel::from((string) $request->route('auth_panel'));
+    }
+
+    /**
+     * @param  array{user: User, remember: bool, login_throttle_key: ?string}  $attempt
+     */
+    private function throttleKey(
+        Request $request,
+        AuthenticationPanel $panel,
+        array $attempt,
+        LoginLockoutService $lockouts,
+    ): string {
+        return $attempt['login_throttle_key']
+            ?? $lockouts->throttleKey($panel->value, $attempt['user']->email, $request->ip());
     }
 
     private function invalidAttempt(AuthenticationPanel $panel): RedirectResponse

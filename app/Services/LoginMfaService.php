@@ -19,8 +19,13 @@ class LoginMfaService
 
     public const MISSING = 'missing';
 
-    public function issue(Request $request, User $user, string $guard, bool $remember): string
-    {
+    public function issue(
+        Request $request,
+        User $user,
+        string $guard,
+        bool $remember,
+        ?string $loginThrottleKey = null,
+    ): string {
         $previousState = $this->state($request, $guard);
 
         do {
@@ -37,6 +42,7 @@ class LoginMfaService
             'attempts_remaining' => $this->maxAttempts(),
             'resend_available_at' => $now + $this->resendCooldownSeconds(),
             'remember' => $remember,
+            'login_throttle_key' => $loginThrottleKey,
         ]);
 
         return $otp;
@@ -63,7 +69,7 @@ class LoginMfaService
     }
 
     /**
-     * @return array{status: string, user?: User, remember?: bool, attempts_remaining?: int}
+     * @return array{status: string, user?: User, remember?: bool, login_throttle_key?: ?string, attempts_remaining?: int}
      */
     public function verify(Request $request, string $guard, #[\SensitiveParameter] string $otp): array
     {
@@ -94,6 +100,7 @@ class LoginMfaService
             'status' => self::SUCCESS,
             'user' => $user,
             'remember' => $state['remember'],
+            'login_throttle_key' => $state['login_throttle_key'],
         ];
     }
 
@@ -117,7 +124,13 @@ class LoginMfaService
 
         return [
             'status' => self::SUCCESS,
-            'otp' => $this->issue($request, $user, $guard, $state['remember']),
+            'otp' => $this->issue(
+                $request,
+                $user,
+                $guard,
+                $state['remember'],
+                $state['login_throttle_key'],
+            ),
             'user' => $user,
         ];
     }
@@ -157,7 +170,7 @@ class LoginMfaService
     }
 
     /**
-     * @return array{user_id: int, guard: string, otp_hash: string, expires_at: int, attempts_remaining: int, resend_available_at: int, remember: bool}|null
+     * @return array{user_id: int, guard: string, otp_hash: string, expires_at: int, attempts_remaining: int, resend_available_at: int, remember: bool, login_throttle_key: ?string}|null
      */
     private function state(Request $request, string $guard): ?array
     {
@@ -184,6 +197,9 @@ class LoginMfaService
             'attempts_remaining' => (int) $state['attempts_remaining'],
             'resend_available_at' => (int) $state['resend_available_at'],
             'remember' => $state['remember'],
+            'login_throttle_key' => is_string($state['login_throttle_key'] ?? null)
+                ? $state['login_throttle_key']
+                : null,
         ];
     }
 

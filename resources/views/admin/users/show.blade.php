@@ -10,6 +10,18 @@
         ]">
         @if ($canManage)
             <x-slot:actions>
+                @if ($canUnlock)
+                    <form method="POST" action="{{ route('admin.users.unlock', $user) }}"
+                          data-confirm-title="Confirm account unlock"
+                          data-confirm-message="Are you sure you want to unlock this account?"
+                          data-confirm-label="Unlock Account">
+                        @csrf
+                        @method('PATCH')
+                        <x-ui.button type="submit" data-loading-text="Unlocking account...">
+                            Unlock Account
+                        </x-ui.button>
+                    </form>
+                @endif
                 <x-ui.button variant="secondary" :href="route('admin.users.edit', $user)" icon="pencil-square">
                     Edit
                 </x-ui.button>
@@ -59,6 +71,12 @@
                         <dt class="text-neutral-500">Status</dt>
                         <dd>
                             <x-ui.badge :status="$user->status->value" dot>{{ $user->status->label() }}</x-ui.badge>
+                            @if ($user->isTemporarilyLocked())
+                                <x-ui.badge variant="warning" class="mt-1">Temporarily Locked</x-ui.badge>
+                                <span class="mt-1 block text-right text-xs text-neutral-500">
+                                    Until {{ $user->login_locked_until->timezone(config('app.timezone'))->format('M d, Y g:i A') }}
+                                </span>
+                            @endif
                         </dd>
                     </div>
                     <div class="flex items-start justify-between gap-3">

@@ -12,18 +12,24 @@ class PasswordExpirationService
 
     private const CHANGE_WINDOW_MINUTES = 15;
 
-    public function begin(Request $request, User $user, string $guard, bool $remember): void
-    {
+    public function begin(
+        Request $request,
+        User $user,
+        string $guard,
+        bool $remember,
+        ?string $loginThrottleKey = null,
+    ): void {
         $request->session()->put(self::SESSION_KEY, [
             'user_id' => $user->getKey(),
             'guard' => $guard,
             'remember' => $remember,
             'expires_at' => now()->addMinutes(self::CHANGE_WINDOW_MINUTES)->getTimestamp(),
+            'login_throttle_key' => $loginThrottleKey,
         ]);
     }
 
     /**
-     * @return array{user: User, remember: bool}|null
+     * @return array{user: User, remember: bool, login_throttle_key: ?string}|null
      */
     public function pendingAttempt(Request $request, string $guard): ?array
     {
@@ -52,7 +58,13 @@ class PasswordExpirationService
             return null;
         }
 
-        return ['user' => $user, 'remember' => $state['remember']];
+        return [
+            'user' => $user,
+            'remember' => $state['remember'],
+            'login_throttle_key' => is_string($state['login_throttle_key'] ?? null)
+                ? $state['login_throttle_key']
+                : null,
+        ];
     }
 
     public function clear(Request $request): void

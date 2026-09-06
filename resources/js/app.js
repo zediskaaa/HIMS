@@ -708,6 +708,90 @@ startDecisionConfirmations();
 startSessionMonitor();
 
 /**
+ * Display a server-issued login cooldown without making the browser a security
+ * boundary. The next submission is always revalidated by Laravel.
+ */
+const startLoginCooldown = () => {
+    const notice = document.querySelector('[data-login-cooldown]');
+    const form = document.querySelector('[data-login-form]');
+    const email = form?.querySelector('input[name="email"]');
+    const submit = form?.querySelector('button[type="submit"]');
+    const countdown = notice?.querySelector('[data-login-cooldown-value]');
+    const liveRegion = notice?.querySelector('[data-login-cooldown-live]');
+    const expiresAt = Number(notice?.dataset.loginCooldownExpiresAt);
+    const serverNow = Number(notice?.dataset.loginCooldownServerNow);
+    const restrictedEmail = notice?.dataset.loginCooldownEmail?.trim().toLowerCase() ?? '';
+
+    if (!(notice instanceof HTMLElement)
+        || !(form instanceof HTMLFormElement)
+        || !(email instanceof HTMLInputElement)
+        || !(submit instanceof HTMLButtonElement)
+        || !(countdown instanceof HTMLElement)
+        || !(liveRegion instanceof HTMLElement)
+        || !Number.isFinite(expiresAt)
+        || !Number.isFinite(serverNow)
+        || restrictedEmail === '') {
+        return;
+    }
+
+    const startedAt = performance.now();
+    let timer = null;
+    let lastAnnouncement = null;
+    let cooldownActive = false;
+
+    const remainingSeconds = () => Math.max(
+        0,
+        Math.ceil(expiresAt - (serverNow + ((performance.now() - startedAt) / 1000))),
+    );
+    const formatCountdown = (seconds) => {
+        const minutes = Math.floor(seconds / 60);
+        const remainder = seconds % 60;
+
+        return String(minutes).padStart(2, '0') + ':' + String(remainder).padStart(2, '0');
+    };
+    const emailMatches = () => email.value.trim().toLowerCase() === restrictedEmail;
+
+    const update = () => {
+        const remaining = remainingSeconds();
+        const active = remaining > 0 && emailMatches();
+
+        cooldownActive = active;
+        notice.hidden = !active;
+        submit.disabled = active;
+        submit.setAttribute('aria-disabled', String(active));
+        countdown.textContent = formatCountdown(remaining);
+
+        const announce = remaining === 0
+            || remaining <= 10
+            || remaining % 60 === 0;
+
+        if (active && announce && remaining !== lastAnnouncement) {
+            liveRegion.textContent = 'Sign-in is available in ' + remaining + ' seconds.';
+            lastAnnouncement = remaining;
+        }
+
+        if (remaining === 0) {
+            window.clearInterval(timer);
+            timer = null;
+            liveRegion.textContent = 'The waiting period has ended. Submit again to let the server confirm access.';
+        }
+    };
+
+    email.addEventListener('input', update);
+    form.addEventListener('submit', (event) => {
+        if (cooldownActive) event.preventDefault();
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) update();
+    });
+
+    update();
+    if (remainingSeconds() > 0) timer = window.setInterval(update, 1000);
+};
+
+startLoginCooldown();
+
+/**
  * Shared visual feedback for native page submissions, internal navigation,
  * and foreground API requests. Passive polling and session heartbeats stay
  * quiet.

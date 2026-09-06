@@ -10,6 +10,8 @@ enum AuditAction: string
     case LoggedIn = 'logged_in';
     case LoggedOut = 'logged_out';
     case ChangedPassword = 'changed_password';
+    case TemporarilyLockedUser = 'temporarily_locked_user';
+    case UnlockedUser = 'unlocked_user';
 
     public function label(): string
     {
@@ -20,6 +22,8 @@ enum AuditAction: string
             self::LoggedIn => 'Logged In',
             self::LoggedOut => 'Logged Out',
             self::ChangedPassword => 'Changed Password',
+            self::TemporarilyLockedUser => 'Temporarily Locked User',
+            self::UnlockedUser => 'Unlocked User',
         };
     }
 

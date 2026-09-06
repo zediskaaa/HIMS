@@ -7,5 +7,6 @@
         heading="Admin Login"
         description="Sign in to manage authorized HIMS operations, users, and inventory workflows."
         submit-label="Sign in as Admin"
+        :login-restriction="$loginRestriction"
     />
 </x-guest-layout>

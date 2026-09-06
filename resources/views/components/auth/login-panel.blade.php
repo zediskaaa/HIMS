@@ -6,6 +6,7 @@
     'submitLabel' => 'Sign in',
     'forgotPasswordUrl',
     'variant' => 'staff',
+    'loginRestriction' => null,
 ])
 
 @php
@@ -15,6 +16,10 @@
     $timeoutContext = session('session_timeout_context');
     $hasSessionTimeout = session()->has('session_timeout')
         && (!$timeoutContext || $timeoutContext['guard'] === $panelGuard);
+    $loginEmail = old('email', $loginRestriction['email'] ?? null);
+    $restrictionSeconds = $loginRestriction
+        ? max(0, (int) $loginRestriction['expires_at'] - now()->getTimestamp())
+        : 0;
     if ($hasSessionTimeout && !request()->ajax()
         && !request()->expectsJson()
         && in_array(request()->header('Sec-Fetch-Mode'), [null, 'navigate'], true)) {
@@ -77,6 +82,30 @@
 
     <x-auth.wrong-panel-alert />
 
+    @if ($loginRestriction)
+        <x-ui.alert
+            :variant="$loginRestriction['status'] === \App\Services\LoginLockoutService::LOCKED ? 'danger' : 'warning'"
+            :title="$loginRestriction['status'] === \App\Services\LoginLockoutService::LOCKED ? 'Account temporarily locked' : 'Sign-in temporarily paused'"
+            class="animate-fade-up [animation-delay:400ms]"
+            data-login-cooldown
+            data-login-cooldown-email="{{ $loginRestriction['email'] }}"
+            data-login-cooldown-expires-at="{{ $loginRestriction['expires_at'] }}"
+            data-login-cooldown-server-now="{{ now()->getTimestamp() }}"
+        >
+            @if ($loginRestriction['status'] === \App\Services\LoginLockoutService::WAITING
+                && $loginRestriction['attempts_remaining'] !== null)
+                <p>You have {{ $loginRestriction['attempts_remaining'] }} {{ str('attempt')->plural($loginRestriction['attempts_remaining']) }} remaining.</p>
+            @endif
+            <p>
+                Try again in
+                <span class="font-mono font-semibold tabular-nums" data-login-cooldown-value aria-hidden="true">
+                    {{ sprintf('%02d:%02d', intdiv($restrictionSeconds, 60), $restrictionSeconds % 60) }}
+                </span>
+            </p>
+            <p class="sr-only" data-login-cooldown-live aria-live="polite" aria-atomic="true"></p>
+        </x-ui.alert>
+    @endif
+
     @if ($hasSessionTimeout)
         <x-ui.alert
             variant="warning"
@@ -88,7 +117,7 @@
         </x-ui.alert>
     @endif
 
-    <form method="POST" action="{{ $action }}" class="animate-fade-up space-y-5 [animation-delay:440ms]" x-data="{ showPassword: false }">
+    <form method="POST" action="{{ $action }}" class="animate-fade-up space-y-5 [animation-delay:440ms]" x-data="{ showPassword: false }" data-login-form>
         @csrf
 
         <div>
@@ -98,7 +127,7 @@
                 class="mt-2 block h-11 w-full rounded-lg bg-white px-3.5 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:ring-primary-500 {{ $errors->has('email') ? '!border-danger-500 focus:!border-danger-500' : 'border-neutral-300 focus:border-primary-500' }}"
                 type="email"
                 name="email"
-                :value="old('email')"
+                :value="$loginEmail"
                 placeholder="name@hospital.org"
                 required
                 autofocus

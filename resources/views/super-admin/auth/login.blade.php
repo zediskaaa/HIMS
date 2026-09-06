@@ -7,5 +7,6 @@
         heading="Super Admin Login"
         description="Authenticate to govern system-wide access, security, and administrative controls."
         submit-label="Sign in as Super Admin"
+        :login-restriction="$loginRestriction"
     />
 </x-guest-layout>

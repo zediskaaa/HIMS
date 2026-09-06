@@ -52,6 +52,8 @@ class PanelPasswordResetTest extends TestCase
             ->assertSessionMissing('wrong_panel.url')
             ->assertSessionMissing('wrong_panel.label');
         $this->assertGuest('web');
+        $this->assertSame(0, $admin->refresh()->failed_login_attempts);
+        $this->assertNull($admin->last_failed_login_at);
 
         $this->get(route('login'))
             ->assertOk()
@@ -78,6 +80,10 @@ class PanelPasswordResetTest extends TestCase
             ->assertSessionMissing('wrong_panel.url')
             ->assertSessionMissing('wrong_panel.label');
         $this->assertGuest('web');
+        $superAdmin->refresh();
+        $this->assertSame(0, $superAdmin->failed_login_attempts);
+        $this->assertNull($superAdmin->last_failed_login_at);
+        $this->assertNull($superAdmin->login_locked_until);
 
         $this->get(route('login'))
             ->assertOk()
@@ -104,7 +110,33 @@ class PanelPasswordResetTest extends TestCase
                 ->assertSessionHas('wrong_panel.message', "You're using the {$currentPanel} Login Panel. Please use the {$correctPanel} Login Panel.")
                 ->assertSessionMissing('wrong_panel.url')
                 ->assertSessionMissing('wrong_panel.label');
+
+            $account->refresh();
+            $this->assertSame(0, $account->failed_login_attempts);
+            $this->assertNull($account->last_failed_login_at);
+            $this->assertNull($account->login_retry_at);
+            $this->assertNull($account->login_locked_until);
         }
+    }
+
+    public function test_repeated_valid_wrong_panel_submissions_never_throttle_or_lock_the_account(): void
+    {
+        $staff = User::factory()->warehouseStaff()->create(['password' => 'password']);
+
+        for ($attempt = 0; $attempt < 8; $attempt++) {
+            $this->from(route('super-admin.login'))->post(route('super-admin.login.store'), [
+                'email' => $staff->email,
+                'password' => 'password',
+            ])->assertRedirect(route('super-admin.login'))
+                ->assertSessionHas('wrong_panel.message');
+        }
+
+        $staff->refresh();
+        $this->assertSame(0, $staff->failed_login_attempts);
+        $this->assertNull($staff->last_failed_login_at);
+        $this->assertNull($staff->login_retry_at);
+        $this->assertNull($staff->login_locked_until);
+        $this->assertGuest('super_admin');
     }
 
     public function test_invalid_password_does_not_disclose_an_accounts_panel(): void

@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnforceSessionInactivity;
+use App\Models\User;
 use App\Notifications\LoginMfaOtp;
+use App\Services\LoginLockoutService;
 use App\Services\LoginMfaService;
 use App\Services\PasswordExpirationService;
 use App\Support\AuthenticationPanel;
@@ -17,14 +19,26 @@ use Throwable;
 
 class LoginMfaController extends Controller
 {
-    public function show(Request $request, LoginMfaService $mfa): View|RedirectResponse
-    {
+    public function show(
+        Request $request,
+        LoginMfaService $mfa,
+        LoginLockoutService $lockouts,
+    ): View|RedirectResponse {
         $panel = $this->panel($request);
         $user = $mfa->pendingUser($request, $panel->guard());
 
         if ($user === null) {
             return redirect()->route($panel->loginRoute())
                 ->withErrors(['email' => 'Your verification session is no longer valid. Please sign in again.']);
+        }
+
+        $throttleKey = $this->throttleKey($request, $panel, $user, $lockouts);
+        if ($restriction = $lockouts->activeRestriction($user, $throttleKey)) {
+            $lockouts->rememberRestriction($request, $panel->guard(), $user->email, $restriction);
+            $mfa->clear($request);
+
+            return redirect()->route($panel->loginRoute())
+                ->withErrors(['email' => $lockouts->message($restriction)]);
         }
 
         return view('auth.login-mfa', [
@@ -39,6 +53,7 @@ class LoginMfaController extends Controller
     public function verify(
         Request $request,
         LoginMfaService $mfa,
+        LoginLockoutService $lockouts,
         PasswordExpirationService $expiration,
     ): RedirectResponse {
         $validated = $request->validate([
@@ -66,13 +81,37 @@ class LoginMfaController extends Controller
             return back()->withErrors(['otp' => $message]);
         }
 
+        $throttleKey = $result['login_throttle_key']
+            ?? $lockouts->throttleKey($panel->value, $result['user']->email, $request->ip());
+
+        if ($restriction = $lockouts->activeRestriction($result['user'], $throttleKey)) {
+            $lockouts->rememberRestriction($request, $panel->guard(), $result['user']->email, $restriction);
+
+            return redirect()->route($panel->loginRoute())
+                ->withErrors(['email' => $lockouts->message($restriction)]);
+        }
+
         if ($result['user']->passwordHasExpired()) {
             $request->session()->regenerate();
-            $expiration->begin($request, $result['user'], $panel->guard(), $result['remember']);
+            $expiration->begin(
+                $request,
+                $result['user'],
+                $panel->guard(),
+                $result['remember'],
+                $throttleKey,
+            );
 
             return redirect()->route($panel->expiredPasswordRoute());
         }
 
+        if ($restriction = $lockouts->completeSuccessfulLogin($result['user'], $throttleKey)) {
+            $lockouts->rememberRestriction($request, $panel->guard(), $result['user']->email, $restriction);
+
+            return redirect()->route($panel->loginRoute())
+                ->withErrors(['email' => $lockouts->message($restriction)]);
+        }
+
+        $lockouts->clearRestriction($request);
         Auth::guard($panel->guard())->login($result['user'], $result['remember']);
         $request->session()->regenerate();
         $request->session()->put(
@@ -119,6 +158,19 @@ class LoginMfaController extends Controller
     private function panel(Request $request): AuthenticationPanel
     {
         return AuthenticationPanel::from((string) $request->route('auth_panel'));
+    }
+
+    private function throttleKey(
+        Request $request,
+        AuthenticationPanel $panel,
+        User $user,
+        LoginLockoutService $lockouts,
+    ): string {
+        $state = $request->session()->get(LoginMfaService::SESSION_KEY);
+
+        return is_string($state['login_throttle_key'] ?? null)
+            ? $state['login_throttle_key']
+            : $lockouts->throttleKey($panel->value, $user->email, $request->ip());
     }
 
     private function maskEmail(string $email): string

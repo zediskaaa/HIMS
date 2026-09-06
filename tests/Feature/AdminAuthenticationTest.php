@@ -86,7 +86,9 @@ class AdminAuthenticationTest extends TestCase
         $this->post(route('admin.login.store'), [
             'email' => $admin->email,
             'password' => 'password',
-        ])->assertSessionHasErrors(['email' => trans('auth.failed')]);
+        ])->assertSessionHasErrors([
+            'email' => 'Incorrect email or password. You have 4 attempts remaining.',
+        ]);
 
         $this->assertGuest(AuthenticationContext::ADMIN_GUARD);
     }

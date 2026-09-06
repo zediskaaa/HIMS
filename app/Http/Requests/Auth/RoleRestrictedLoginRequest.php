@@ -4,6 +4,7 @@ namespace App\Http\Requests\Auth;
 
 use App\Enums\UserStatus;
 use App\Models\User;
+use App\Services\LoginLockoutService;
 use App\Support\AuthenticationPanel;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -11,7 +12,6 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 abstract class RoleRestrictedLoginRequest extends FormRequest
@@ -40,20 +40,40 @@ abstract class RoleRestrictedLoginRequest extends FormRequest
      */
     public function validateCredentials(): User
     {
-        $this->ensureIsNotRateLimited();
+        if ($this->usesProgressiveLockout()) {
+            return $this->validateProgressiveCredentials();
+        }
 
         $user = User::query()
             ->where('email', $this->string('email')->toString())
             ->where('status', UserStatus::Active->value)
-            ->whereIn('role', $this->allowedRoles())
             ->first();
+        $credentialsValid = $user !== null
+            && Hash::check($this->string('password')->toString(), $user->password);
 
-        if ($user === null || ! Hash::check($this->string('password')->toString(), $user->password)) {
-            $this->flashWrongPanelAlertForValidCredentials();
-            RateLimiter::hit($this->throttleKey());
+        if ($credentialsValid && ! in_array($user->role->value, $this->allowedRoles(), true)) {
+            app(LoginLockoutService::class)->clearRestriction($this);
+            $this->flashWrongPanelAlert($user);
 
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
+            ]);
+        }
+
+        $this->ensureIsNotRateLimited();
+
+        if (! $credentialsValid || ! in_array($user->role->value, $this->allowedRoles(), true)) {
+            if ($user === null) {
+                Hash::make($this->string('password')->toString());
+            }
+
+            $attempt = RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => app(LoginLockoutService::class)->message([
+                    'status' => LoginLockoutService::INVALID,
+                    'attempt' => $attempt,
+                ]),
             ]);
         }
 
@@ -64,7 +84,24 @@ abstract class RoleRestrictedLoginRequest extends FormRequest
 
     public function login(User $user): void
     {
+        if ($this->usesProgressiveLockout()) {
+            $restriction = app(LoginLockoutService::class)->completeSuccessfulLogin(
+                $user,
+                $this->progressiveThrottleKey(),
+            );
+
+            if ($restriction !== null) {
+                $this->throwRestriction($restriction);
+            }
+        }
+
+        app(LoginLockoutService::class)->clearRestriction($this);
         Auth::guard($this->guard())->login($user, $this->boolean('remember'));
+    }
+
+    public function progressiveThrottleKey(): string
+    {
+        return $this->throttleKey();
     }
 
     /**
@@ -72,25 +109,56 @@ abstract class RoleRestrictedLoginRequest extends FormRequest
      * authentication error. Verifying the password first avoids disclosing
      * another account's role to somebody who only knows its email address.
      */
-    private function flashWrongPanelAlertForValidCredentials(): void
+    private function flashWrongPanelAlert(User $account): void
     {
-        $account = User::query()
-            ->active()
-            ->where('email', $this->string('email')->toString())
-            ->first();
-
-        if ($account === null || ! Hash::check($this->string('password')->toString(), $account->password)) {
-            return;
-        }
-
         $currentPanel = AuthenticationPanel::forGuard($this->guard());
-
-        if ($currentPanel->accepts($account->role)) {
-            return;
-        }
-
         $correctPanel = AuthenticationPanel::forRole($account->role);
         $this->session()->flash('wrong_panel', $currentPanel->wrongPanelAlert($correctPanel));
+    }
+
+    private function validateProgressiveCredentials(): User
+    {
+        $lockouts = app(LoginLockoutService::class);
+        $result = $lockouts->attempt(
+            $this->string('email')->toString(),
+            $this->string('password')->toString(),
+            $this->allowedRoles(),
+        );
+
+        if ($result['status'] === LoginLockoutService::SUCCESS) {
+            return $result['user'];
+        }
+
+        if ($result['status'] === LoginLockoutService::INVALID) {
+            $lockouts->clearRestriction($this);
+
+            if (($result['other_panel_credentials_valid'] ?? false)
+                && ($result['user'] ?? null) instanceof User) {
+                $this->flashWrongPanelAlert($result['user']);
+            }
+
+            throw ValidationException::withMessages([
+                'email' => $lockouts->message($result),
+            ]);
+        }
+
+        $this->throwRestriction($result);
+    }
+
+    /** @param array{status: string, seconds: int} $restriction */
+    private function throwRestriction(array $restriction): never
+    {
+        event(new Lockout($this));
+        app(LoginLockoutService::class)->rememberRestriction(
+            $this,
+            $this->guard(),
+            $this->string('email')->toString(),
+            $restriction,
+        );
+
+        throw ValidationException::withMessages([
+            'email' => app(LoginLockoutService::class)->message($restriction),
+        ]);
     }
 
     /**
@@ -105,20 +173,36 @@ abstract class RoleRestrictedLoginRequest extends FormRequest
         event(new Lockout($this));
 
         $seconds = RateLimiter::availableIn($this->throttleKey());
+        $restriction = [
+            'status' => LoginLockoutService::WAITING,
+            'seconds' => $seconds,
+            'expires_at' => now()->addSeconds($seconds)->getTimestamp(),
+            'attempt' => RateLimiter::attempts($this->throttleKey()),
+        ];
+        app(LoginLockoutService::class)->rememberRestriction(
+            $this,
+            $this->guard(),
+            $this->string('email')->toString(),
+            $restriction,
+        );
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
+            'email' => app(LoginLockoutService::class)->message($restriction),
         ]);
     }
 
     private function throttleKey(): string
     {
-        return $this->throttlePrefix().'|'.Str::transliterate(
-            Str::lower($this->string('email')).'|'.$this->ip()
+        return app(LoginLockoutService::class)->throttleKey(
+            $this->throttlePrefix(),
+            $this->string('email')->toString(),
+            $this->ip(),
         );
+    }
+
+    protected function usesProgressiveLockout(): bool
+    {
+        return true;
     }
 
     abstract protected function guard(): string;

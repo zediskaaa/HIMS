@@ -16,7 +16,7 @@ class AuditLogger
      */
     public function log(
         AuditAction $action,
-        User $actor,
+        ?User $actor,
         string $description,
         ?Model $target = null,
         ?string $targetName = null,
@@ -28,9 +28,9 @@ class AuditLogger
         return AuditLog::create([
             // A just-deleted user can still trigger Laravel's Logout event.
             // Preserve their snapshot, but do not write a dangling foreign key.
-            'user_id' => $actor->exists ? $actor->getKey() : null,
-            'actor_name' => $actor->name,
-            'actor_employee_id' => $actor->employee_id,
+            'user_id' => $actor?->exists === true ? $actor->getKey() : null,
+            'actor_name' => $actor?->name ?? 'System',
+            'actor_employee_id' => $actor?->employee_id,
             'action' => $action,
             'target_type' => $target?->getMorphClass(),
             'target_id' => $target?->getKey() === null ? null : (string) $target->getKey(),

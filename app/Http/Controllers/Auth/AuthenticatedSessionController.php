@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnforceSessionInactivity;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Services\LoginLockoutService;
 use App\Services\PasswordExpirationService;
 use App\Support\AuthenticationContext;
 use App\Support\AuthenticationPanel;
@@ -18,9 +19,11 @@ class AuthenticatedSessionController extends Controller
     /**
      * Display the login view.
      */
-    public function create(): View
+    public function create(Request $request, LoginLockoutService $lockouts): View
     {
-        return view('auth.login');
+        return view('auth.login', [
+            'loginRestriction' => $lockouts->sessionRestriction($request, AuthenticationContext::WEB_GUARD),
+        ]);
     }
 
     /**
@@ -37,6 +40,7 @@ class AuthenticatedSessionController extends Controller
                 $user,
                 AuthenticationContext::WEB_GUARD,
                 $request->boolean('remember'),
+                $request->progressiveThrottleKey(),
             );
 
             return redirect()->route(AuthenticationPanel::Staff->expiredPasswordRoute());

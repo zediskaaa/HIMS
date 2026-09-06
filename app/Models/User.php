@@ -47,6 +47,11 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'failed_login_attempts',
+        'last_failed_login_at',
+        'login_retry_at',
+        'login_locked_until',
+        'login_lockout_count',
     ];
 
     /**
@@ -60,6 +65,9 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password_changed_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'last_failed_login_at' => 'datetime',
+            'login_retry_at' => 'datetime',
+            'login_locked_until' => 'datetime',
             'is_protected' => 'boolean',
             'mfa_enabled' => 'boolean',
             'password' => 'hashed',
@@ -255,6 +263,13 @@ class User extends Authenticatable
         $expiresAt = $this->passwordExpiresAt();
 
         return $expiresAt !== null && $expiresAt->lessThanOrEqualTo(now());
+    }
+
+    public function isTemporarilyLocked(): bool
+    {
+        return ! $this->isSuperAdministrator()
+            && $this->login_locked_until !== null
+            && $this->login_locked_until->isFuture();
     }
 
     /**

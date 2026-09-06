@@ -25,7 +25,47 @@
             }
           }
         },
-        "responses": {"200": {"description": "OK"}}
+        "responses": {
+          "200": {"description": "Token issued"},
+          "401": {
+            "description": "Invalid credentials with server-derived attempts remaining",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {"type": "string"},
+                    "attempts_remaining": {"type": "integer", "minimum": 0}
+                  }
+                }
+              }
+            }
+          },
+          "428": {"description": "MFA verification or password renewal is required through the matching web login panel"},
+          "429": {
+            "description": "Progressive login wait or temporary account lock is active",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until another login attempt is allowed",
+                "schema": {"type": "integer"}
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {"type": "string"},
+                    "code": {"type": "string", "enum": ["LOGIN_THROTTLED", "LOGIN_LOCKED"]},
+                    "retry_after": {"type": "integer", "minimum": 1},
+                    "retry_at": {"type": "integer"},
+                    "attempts_remaining": {"type": "integer", "nullable": true, "minimum": 0}
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/inventory-items": {

@@ -131,6 +131,8 @@
                             \App\Enums\AuditAction::LoggedIn => 'primary',
                             \App\Enums\AuditAction::LoggedOut => 'neutral',
                             \App\Enums\AuditAction::ChangedPassword => 'warning',
+                            \App\Enums\AuditAction::TemporarilyLockedUser => 'danger',
+                            \App\Enums\AuditAction::UnlockedUser => 'success',
                             default => 'neutral',
                         };
                     @endphp

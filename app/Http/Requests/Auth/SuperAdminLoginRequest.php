@@ -21,4 +21,9 @@ class SuperAdminLoginRequest extends RoleRestrictedLoginRequest
     {
         return 'super-admin';
     }
+
+    protected function usesProgressiveLockout(): bool
+    {
+        return false;
+    }
 }

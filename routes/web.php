@@ -83,6 +83,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
     Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
     Route::patch('/users/{user}/status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+    Route::patch('/users/{user}/unlock', [UserController::class, 'unlock'])->name('users.unlock');
 
     // The role-versus-module matrix, generated from the same enum the gates are
     // registered from, so it cannot drift from what is actually enforced.
