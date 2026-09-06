@@ -45,7 +45,7 @@
                 <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2 text-danger-600" />
             </div>
 
-            <x-ui.button type="submit" size="lg" class="w-full">
+            <x-ui.button type="submit" size="lg" data-loading-text="Updating password..." class="w-full">
                 {{ __('Reset password') }}
             </x-ui.button>
         </form>

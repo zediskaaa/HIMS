@@ -33,7 +33,7 @@
                 <div id="demand-plans-list" class="mt-4 space-y-2">
                     <p class="rounded-lg border border-dashed border-[var(--border)] bg-[var(--background)] px-3 py-4 text-sm text-[var(--muted)]">Loading demand plans from API...</p>
                 </div>
-                <div id="demand-plans-api-status" class="mt-3 text-sm text-[var(--muted)]">Loading demand plans from API...</div>
+                <x-ui.loader id="demand-plans-api-status" size="sm" label="Loading demand plans from API..." class="mt-3 text-sm text-[var(--muted)]" />
             </div>
 
             <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
@@ -109,7 +109,7 @@
                 <div id="procurement-requests-list" class="mt-4 space-y-3">
                     <p class="rounded-lg border border-dashed border-[var(--border)] bg-[var(--background)] px-3 py-4 text-sm text-[var(--muted)]">Loading procurement requests from API...</p>
                 </div>
-                <div id="procurement-requests-api-status" class="mt-3 text-sm text-[var(--muted)]">Loading procurement requests from API...</div>
+                <x-ui.loader id="procurement-requests-api-status" size="sm" label="Loading procurement requests from API..." class="mt-3 text-sm text-[var(--muted)]" />
             </div>
 
             {{--
@@ -180,7 +180,7 @@
                 <div id="supplier-quotes-list" class="mt-4 space-y-2">
                     <p class="rounded-lg border border-dashed border-[var(--border)] bg-[var(--background)] px-3 py-4 text-sm text-[var(--muted)]">Loading supplier quotes from API...</p>
                 </div>
-                <div id="supplier-quotes-api-status" class="mt-3 text-sm text-[var(--muted)]">Loading supplier quotes from API...</div>
+                <x-ui.loader id="supplier-quotes-api-status" size="sm" label="Loading supplier quotes from API..." class="mt-3 text-sm text-[var(--muted)]" />
             </div>
 
             <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
@@ -245,7 +245,7 @@
                         </tbody>
                     </table>
                 </div>
-                <div id="purchase-orders-api-status" class="mt-3 text-sm text-[var(--muted)]">Loading purchase orders from API...</div>
+                <x-ui.loader id="purchase-orders-api-status" size="sm" label="Loading purchase orders from API..." class="mt-3 text-sm text-[var(--muted)]" />
             </div>
         </div>
     </div>

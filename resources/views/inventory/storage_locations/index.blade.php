@@ -91,7 +91,7 @@
                             @endforelse
                         </tbody>
                     </table>
-                    <div id="locations-api-status" class="mt-3 text-sm text-[var(--muted)]">Loading storage locations from API...</div>
+                    <x-ui.loader id="locations-api-status" size="sm" label="Loading storage locations from API..." class="mt-3 text-sm text-[var(--muted)]" />
                 </div>
             </div>
         </div>

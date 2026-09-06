@@ -41,7 +41,7 @@
                 <x-input-error :messages="$errors->get('otp')" class="mt-2 text-danger-600" />
             </div>
 
-            <x-ui.button type="submit" size="lg" icon="shield-check" class="w-full">
+            <x-ui.button type="submit" size="lg" icon="shield-check" data-loading-text="Verifying..." class="w-full">
                 {{ __('Verify code') }}
             </x-ui.button>
         </form>
@@ -49,7 +49,7 @@
         <form method="POST" action="{{ route($panel->passwordEmailRoute()) }}" class="text-center">
             @csrf
             <input type="hidden" name="email" value="{{ $email }}">
-            <button type="submit" class="text-sm font-medium text-primary-600 hover:text-primary-700">
+            <button type="submit" data-loading-text="Sending..." class="inline-flex items-center justify-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700">
                 Send a new code
             </button>
         </form>

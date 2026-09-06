@@ -49,7 +49,9 @@
                     class="absolute left-0 right-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg"
                     role="listbox"
                 >
-                    <p x-show="loading" class="px-3 py-2 text-sm text-neutral-500">Finding suggestions...</p>
+                    <p x-show="loading" class="px-3 py-2 text-sm text-neutral-500">
+                        <x-ui.loader size="sm" label="Finding suggestions..." />
+                    </p>
                     <p x-show="!loading && failed" class="px-3 py-2 text-sm text-danger-600">
                         Suggestions could not be loaded. You can still submit the search normally.
                     </p>
@@ -99,7 +101,7 @@
                 :value="$filters['date_to'] ?? null" />
 
             <div class="flex items-center gap-2">
-                <x-ui.button type="submit" icon="magnifying-glass">Filter</x-ui.button>
+                <x-ui.button type="submit" icon="magnifying-glass" data-loading-text="Loading activity...">Filter</x-ui.button>
                 @if (array_filter($filters))
                     <x-ui.button variant="secondary" :href="route('admin.audit-logs.index')">Clear</x-ui.button>
                 @endif

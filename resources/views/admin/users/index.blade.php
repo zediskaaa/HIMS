@@ -60,7 +60,7 @@
                 :options="$statuses" />
 
             <div class="flex items-center gap-2">
-                <x-ui.button type="submit" icon="magnifying-glass">Search</x-ui.button>
+                <x-ui.button type="submit" icon="magnifying-glass" data-loading-text="Loading accounts...">Search</x-ui.button>
                 @if (array_filter($filters))
                     <x-ui.button variant="secondary" :href="route('admin.users.index')">Clear</x-ui.button>
                 @endif
@@ -157,6 +157,7 @@
                                             <x-ui.button
                                                 type="submit"
                                                 size="sm"
+                                                data-loading-text="Updating account..."
                                                 :variant="$account->isActive() ? 'secondary' : 'primary'">
                                                 {{ $account->isActive() ? 'Deactivate' : 'Reactivate' }}
                                             </x-ui.button>

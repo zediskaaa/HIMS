@@ -36,7 +36,7 @@
                 <x-input-error :messages="$errors->get('email')" class="mt-2 text-danger-600" />
             </div>
 
-            <x-ui.button type="submit" size="lg" class="w-full">
+            <x-ui.button type="submit" size="lg" data-loading-text="Sending..." class="w-full">
                 {{ __('Email password reset code') }}
             </x-ui.button>
         </form>

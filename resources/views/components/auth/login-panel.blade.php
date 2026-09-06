@@ -158,6 +158,7 @@
             type="submit"
             size="lg"
             icon="arrow-right-on-rectangle"
+            data-loading-text="Signing in..."
             class="w-full {{ $isSuperAdmin ? '!border-neutral-900 !bg-neutral-900 hover:!border-primary-950 hover:!bg-primary-950 focus-visible:!ring-warning-500' : '' }}"
         >
             {{ $submitLabel }}

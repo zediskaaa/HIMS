@@ -163,5 +163,7 @@
                 </footer>
             </div>
         </div>
+
+        @include('layouts.partials.loading-overlay')
     </body>
 </html>

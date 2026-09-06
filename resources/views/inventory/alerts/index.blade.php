@@ -13,7 +13,7 @@
                         <h3 class="text-lg font-semibold text-[var(--text)]">Reorder Alerts & Inventory Notices</h3>
                         <p class="text-sm text-[var(--muted)]">Live warnings for low stock, out of stock, and near-expiry inventory items.</p>
                     </div>
-                    <div id="alerts-api-status" class="text-sm text-[var(--muted)]">Loading alerts from API...</div>
+                    <x-ui.loader id="alerts-api-status" size="sm" label="Loading alerts from API..." class="text-sm text-[var(--muted)]" />
                 </div>
                 <div id="alerts-list" class="mt-6 grid gap-4 lg:grid-cols-2"></div>
             </div>

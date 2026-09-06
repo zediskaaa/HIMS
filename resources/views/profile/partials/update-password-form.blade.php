@@ -40,7 +40,7 @@
         </div>
 
         <div class="flex items-center">
-            <x-primary-button>{{ __('Save') }}</x-primary-button>
+            <x-primary-button data-loading-text="Updating password...">{{ __('Save') }}</x-primary-button>
         </div>
     </form>
 </section>

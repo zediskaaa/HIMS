@@ -95,7 +95,7 @@
                         </tbody>
                     </table>
                 </div>
-                <div id="inventory-api-status" class="mt-3 text-sm text-[var(--muted)]">Loading inventory from API...</div>
+                <x-ui.loader id="inventory-api-status" size="sm" label="Loading inventory from API..." class="mt-3 text-sm text-[var(--muted)]" />
             </div>
         </div>
     </div>

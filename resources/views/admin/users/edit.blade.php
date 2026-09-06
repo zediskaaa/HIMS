@@ -38,7 +38,7 @@
 
             <div class="flex items-center justify-end gap-2 pt-1">
                 <x-ui.button variant="secondary" :href="route('admin.users.index')">Cancel</x-ui.button>
-                <x-ui.button type="submit">Save Changes</x-ui.button>
+                <x-ui.button type="submit" data-loading-text="Saving changes...">Save Changes</x-ui.button>
             </div>
         </form>
     </x-ui.card>

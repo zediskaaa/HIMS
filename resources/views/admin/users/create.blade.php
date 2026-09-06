@@ -26,7 +26,7 @@
 
             <div class="flex items-center justify-end gap-2 pt-1">
                 <x-ui.button variant="secondary" :href="route('admin.users.index')">Cancel</x-ui.button>
-                <x-ui.button type="submit" icon="plus">Create Account</x-ui.button>
+                <x-ui.button type="submit" icon="plus" data-loading-text="Creating account...">Create Account</x-ui.button>
             </div>
         </form>
     </x-ui.card>

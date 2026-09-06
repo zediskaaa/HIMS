@@ -4,6 +4,76 @@ import Alpine from 'alpinejs';
 
 window.Alpine = Alpine;
 
+const loadingButtons = new WeakMap();
+
+const loadingLabelFor = (button, form) => {
+    if (button?.dataset.loadingText) return button.dataset.loadingText;
+
+    const label = button?.textContent?.trim().toLowerCase() ?? '';
+    const action = form?.action?.toLowerCase() ?? '';
+
+    if (label.includes('sign in') || action.endsWith('/login')) return 'Signing in...';
+    if (label.includes('verify')) return 'Verifying...';
+    if (label.includes('send') || label.includes('resend')) return 'Sending...';
+    if (label.includes('search') || label.includes('filter') || form?.method === 'get') return 'Loading results...';
+    if (label.includes('delete')) return 'Deleting...';
+    if (label.includes('deactivate') || label.includes('reactivate')) return 'Updating account...';
+    if (label.includes('save') || label.includes('update')) return 'Saving...';
+    if (label.includes('create') || label.includes('add')) return 'Creating...';
+    if (label.includes('approve')) return 'Approving...';
+    if (label.includes('receive')) return 'Receiving...';
+    if (label.includes('log out') || label.includes('sign out')) return 'Signing out...';
+
+    return 'Processing...';
+};
+
+const setButtonLoading = (button, label) => {
+    if (!(button instanceof HTMLButtonElement || button instanceof HTMLInputElement)
+        || loadingButtons.has(button)) {
+        return;
+    }
+
+    loadingButtons.set(button, {
+        disabled: button.disabled,
+        html: button instanceof HTMLButtonElement ? button.innerHTML : null,
+        value: button instanceof HTMLInputElement ? button.value : null,
+    });
+
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    button.setAttribute('data-hims-loading-active', '');
+
+    if (button instanceof HTMLInputElement) {
+        button.value = label;
+        return;
+    }
+
+    const spinner = document.createElement('span');
+    spinner.className = 'loader loader--sm';
+    spinner.setAttribute('aria-hidden', 'true');
+
+    const text = document.createElement('span');
+    text.textContent = label;
+    button.replaceChildren(spinner, text);
+};
+
+const resetButtonLoading = (button) => {
+    const original = loadingButtons.get(button);
+    if (!original) return;
+
+    button.disabled = original.disabled;
+    button.removeAttribute('aria-busy');
+    button.removeAttribute('data-hims-loading-active');
+
+    if (button instanceof HTMLButtonElement) {
+        button.innerHTML = original.html;
+    } else {
+        button.value = original.value;
+    }
+
+    loadingButtons.delete(button);
+};
+
 /**
  * Browser-side companion to the server-enforced inactivity middleware.
  *
@@ -123,8 +193,7 @@ const startSessionMonitor = () => {
         warningError.textContent = '';
         warningError.classList.add('hidden');
         stopWarningSound();
-        continueButton.disabled = false;
-        continueButton.removeAttribute('aria-busy');
+        resetButtonLoading(continueButton);
 
         if (restoreFocus && previouslyFocusedElement instanceof HTMLElement
             && document.contains(previouslyFocusedElement)) {
@@ -307,8 +376,7 @@ const startSessionMonitor = () => {
         if (expirationStarted || continueButton.disabled) return;
 
         stopWarningSound();
-        continueButton.disabled = true;
-        continueButton.setAttribute('aria-busy', 'true');
+        setButtonLoading(continueButton, 'Continuing...');
         warningError.textContent = '';
         warningError.classList.add('hidden');
 
@@ -337,8 +405,7 @@ const startSessionMonitor = () => {
 
             warningError.classList.remove('hidden');
             warningError.textContent = 'Unable to continue your session. Check your connection and try again before the timer expires.';
-            continueButton.disabled = false;
-            continueButton.removeAttribute('aria-busy');
+            resetButtonLoading(continueButton);
             continueButton.focus();
         }
     };
@@ -446,6 +513,213 @@ const startSessionMonitor = () => {
 };
 
 startSessionMonitor();
+
+/**
+ * Shared visual feedback for native page submissions, internal navigation,
+ * and foreground API requests. Passive polling and session heartbeats stay
+ * quiet.
+ */
+const startLoadingIndicators = () => {
+    const overlay = document.querySelector('[data-hims-loading-overlay]');
+    const overlayMessage = overlay?.querySelector('[data-hims-loading-message]');
+    const processingForms = new WeakSet();
+    const nativeFetch = window.fetch.bind(window);
+    let activeApiRequests = 0;
+    let pageTransitionPending = false;
+
+    const showOverlay = (message) => {
+        if (!(overlay instanceof HTMLElement)) return;
+
+        if (overlayMessage) overlayMessage.textContent = message;
+        overlay.hidden = false;
+        overlay.setAttribute('aria-hidden', 'false');
+        document.body.setAttribute('aria-busy', 'true');
+    };
+
+    const hideOverlay = () => {
+        if (!(overlay instanceof HTMLElement)
+            || activeApiRequests > 0
+            || pageTransitionPending) {
+            return;
+        }
+
+        overlay.hidden = true;
+        overlay.setAttribute('aria-hidden', 'true');
+        document.body.removeAttribute('aria-busy');
+    };
+
+    const reset = () => {
+        activeApiRequests = 0;
+        pageTransitionPending = false;
+
+        document.querySelectorAll('[data-hims-loading-active]').forEach((button) => {
+            resetButtonLoading(button);
+        });
+        document.querySelectorAll('form[aria-busy="true"]').forEach((form) => {
+            form.removeAttribute('aria-busy');
+            processingForms.delete(form);
+        });
+        document.querySelectorAll('[data-hims-submitter-value]').forEach((input) => input.remove());
+        document.querySelectorAll('[data-hims-navigation-active]').forEach((link) => {
+            link.removeAttribute('aria-busy');
+            link.removeAttribute('data-hims-navigation-active');
+        });
+
+        if (overlay instanceof HTMLElement) {
+            overlay.hidden = true;
+            overlay.setAttribute('aria-hidden', 'true');
+        }
+        document.body.removeAttribute('aria-busy');
+    };
+
+    // Never inherit a visible or busy state from cached/restored page markup.
+    reset();
+
+    const continueAfterPaint = (callback) => {
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(callback);
+        });
+    };
+
+    const requestUsesVisibleLoader = (input, options = {}) => {
+        try {
+            const request = input instanceof Request ? input : null;
+            const url = new URL(request?.url ?? String(input), window.location.origin);
+            const headers = new Headers(request?.headers);
+            new Headers(options.headers).forEach((value, key) => headers.set(key, value));
+
+            return url.origin === window.location.origin
+                && url.pathname.startsWith('/api/v1/')
+                && headers.get('X-Session-Activity') !== 'passive';
+        } catch {
+            return false;
+        }
+    };
+
+    window.fetch = async (...args) => {
+        const visible = requestUsesVisibleLoader(args[0], args[1]);
+
+        if (visible) {
+            activeApiRequests += 1;
+            showOverlay('Loading data...');
+        }
+
+        try {
+            return await nativeFetch(...args);
+        } finally {
+            if (visible) {
+                activeApiRequests = Math.max(0, activeApiRequests - 1);
+                hideOverlay();
+            }
+        }
+    };
+
+    document.addEventListener('submit', (event) => {
+        const form = event.target;
+
+        if (!(form instanceof HTMLFormElement)
+            || event.defaultPrevented
+            || form.matches('[data-no-loading]')
+            || (form.target && form.target !== '_self')) {
+            return;
+        }
+
+        if (pageTransitionPending || processingForms.has(form)) {
+            event.preventDefault();
+            return;
+        }
+
+        event.preventDefault();
+        processingForms.add(form);
+        form.setAttribute('aria-busy', 'true');
+
+        const submitter = event.submitter instanceof HTMLButtonElement
+            || event.submitter instanceof HTMLInputElement
+            ? event.submitter
+            : form.querySelector('button[type="submit"], input[type="submit"]');
+
+        if (submitter?.name) {
+            const preservedValue = document.createElement('input');
+            preservedValue.type = 'hidden';
+            preservedValue.name = submitter.name;
+            preservedValue.value = submitter.value;
+            preservedValue.setAttribute('data-hims-submitter-value', '');
+            form.append(preservedValue);
+        }
+
+        if (submitter) {
+            const label = loadingLabelFor(submitter, form);
+            setButtonLoading(submitter, label);
+            showOverlay(label);
+        } else {
+            showOverlay('Processing request...');
+        }
+
+        pageTransitionPending = true;
+
+        continueAfterPaint(() => {
+            if (!form.isConnected) {
+                reset();
+                return;
+            }
+
+            try {
+                HTMLFormElement.prototype.submit.call(form);
+            } catch {
+                reset();
+            }
+        });
+    });
+
+    document.addEventListener('click', (event) => {
+        if (event.defaultPrevented || event.button !== 0
+            || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+            return;
+        }
+
+        const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+        if (!(link instanceof HTMLAnchorElement)
+            || link.matches('[data-no-loading], [download]')
+            || (link.target && link.target !== '_self')) {
+            return;
+        }
+
+        const url = new URL(link.href, window.location.href);
+        const isSamePageHash = url.pathname === window.location.pathname
+            && url.search === window.location.search
+            && url.hash !== '';
+
+        if (url.origin !== window.location.origin
+            || !['http:', 'https:'].includes(url.protocol)
+            || isSamePageHash) {
+            return;
+        }
+
+        event.preventDefault();
+        if (pageTransitionPending) return;
+
+        pageTransitionPending = true;
+        link.setAttribute('aria-busy', 'true');
+        link.setAttribute('data-hims-navigation-active', '');
+        showOverlay('Loading page...');
+
+        continueAfterPaint(() => {
+            try {
+                window.location.assign(url.href);
+            } catch {
+                reset();
+            }
+        });
+    });
+
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted) reset();
+    });
+
+    window.addEventListener('pagehide', reset);
+};
+
+startLoadingIndicators();
 
 /**
  * Dashboard live updates via 30s polling.

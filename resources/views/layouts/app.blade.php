@@ -76,6 +76,8 @@
         </div>
     </div>
 
+    @include('layouts.partials.loading-overlay')
+
     <dialog
         data-session-warning
         class="m-auto w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-lg border border-warning-200 bg-white p-0 text-neutral-800 shadow-xl backdrop:bg-neutral-900/50"
