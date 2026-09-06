@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\EnforceSessionInactivity;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\URL;
@@ -51,6 +52,33 @@ class SessionTimeoutNotificationTest extends TestCase
         }
         $response->assertSessionMissing('session_timeout');
         $this->get(route($login))->assertOk()->assertDontSee('Session Timeout');
+    }
+
+    #[DataProvider('panels')]
+    public function test_activity_endpoint_confirms_and_extends_each_panel_session(
+        string $guard,
+        string $login,
+        string $expired,
+        string $activity,
+        string $logout,
+    ): void {
+        config(['session.lifetime' => 4]);
+        $this->login($guard, $login);
+        $this->travel(3)->minutes();
+
+        $this->postJson(route($activity))
+            ->assertNoContent()
+            ->assertHeader(
+                EnforceSessionInactivity::LAST_ACTIVITY_RESPONSE_HEADER,
+                (string) now()->getTimestamp(),
+            );
+
+        // This second request is six minutes after login but only three
+        // minutes after continuation, proving the server deadline was renewed.
+        $this->app['auth']->forgetGuards();
+        $this->travel(3)->minutes();
+        $this->postJson(route($activity))->assertNoContent();
+        $this->assertAuthenticated($guard);
     }
 
     #[DataProvider('panels')]

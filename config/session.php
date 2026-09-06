@@ -34,6 +34,19 @@ return [
 
     'lifetime' => (int) env('SESSION_LIFETIME', 4),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Inactivity Warning
+    |--------------------------------------------------------------------------
+    |
+    | Authenticated pages warn shortly before the inactivity deadline. The
+    | warning never changes the lifetime. An explicit Continue Session action
+    | is accepted only after the server confirms that the session is active.
+    |
+    */
+
+    'warning_seconds' => (int) env('SESSION_WARNING_SECONDS', 60),
+
     'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
 
     /*

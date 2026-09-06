@@ -25,6 +25,8 @@ class EnforceSessionInactivity
 
     public const PASSIVE_ACTIVITY_HEADER = 'X-Session-Activity';
 
+    public const LAST_ACTIVITY_RESPONSE_HEADER = 'X-Session-Activity-At';
+
     public const CONTEXT_COOKIE = 'hims_inactivity';
 
     public function handle(Request $request, Closure $next): Response
@@ -97,6 +99,8 @@ class EnforceSessionInactivity
             $request->session()->forget(['session_timeout', 'session_timeout_context']);
             $lastActivity = $request->session()->get(self::lastActivityKey($guard));
             if (is_numeric($lastActivity)) {
+                $response->headers->set(self::LAST_ACTIVITY_RESPONSE_HEADER, (string) $lastActivity);
+
                 // A browser-session cookie survives storage/cookie expiry at
                 // the inactivity deadline, but is cleared on logout/consumption.
                 Cookie::queue(Cookie::make(self::CONTEXT_COOKIE, json_encode([

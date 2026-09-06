@@ -18,6 +18,37 @@ class SessionManagementTest extends TestCase
         parent::setUp();
 
         config()->set('session.lifetime', 4);
+        config()->set('session.warning_seconds', 60);
+    }
+
+    public function test_authenticated_layout_exposes_an_accessible_session_warning_from_central_config(): void
+    {
+        $user = User::factory()->create();
+
+        $this
+            ->actingAs($user)
+            ->get('/profile')
+            ->assertOk()
+            ->assertSee('data-session-timeout-seconds="240"', false)
+            ->assertSee('data-session-warning-seconds="60"', false)
+            ->assertSee('data-session-warning', false)
+            ->assertSee('aria-modal="true"', false)
+            ->assertSee('aria-live="polite"', false)
+            ->assertSee('data-session-warning-audio', false)
+            ->assertSee(asset('audio/session_sound.mp3'), false)
+            ->assertDontSee('Play alert sound')
+            ->assertSee('Your session is about to expire')
+            ->assertSee('Continue Session')
+            ->assertSee('Dismiss');
+    }
+
+    public function test_session_warning_sound_is_available_from_the_public_asset_directory(): void
+    {
+        $soundPath = public_path('audio/session_sound.mp3');
+
+        $this->assertFileExists($soundPath);
+        $this->assertGreaterThan(0, filesize($soundPath));
+        $this->assertSame('ID3', file_get_contents($soundPath, false, null, 0, 3));
     }
 
     public function test_login_starts_the_inactivity_clock(): void
@@ -223,6 +254,10 @@ class SessionManagementTest extends TestCase
             ->postJson(route('session.activity'));
 
         $response->assertNoContent();
+        $response->assertHeader(
+            EnforceSessionInactivity::LAST_ACTIVITY_RESPONSE_HEADER,
+            (string) session(EnforceSessionInactivity::LAST_ACTIVITY_AT),
+        );
         $this->assertAuthenticatedAs($user);
         $response->assertSessionHas(
             EnforceSessionInactivity::LAST_ACTIVITY_AT,
