@@ -152,26 +152,23 @@ class AuditTrailTest extends TestCase
         $this->assertSame('EMP-0042', $log->old_values['employee_id']);
     }
 
-    public function test_self_deletion_keeps_the_audit_snapshot_without_recreating_the_user(): void
+    public function test_rejected_self_deletion_keeps_the_user_and_creates_no_deletion_audit(): void
     {
         $user = User::factory()->create([
-            'name' => 'Self Deleting User',
+            'name' => 'Retained Employee',
             'employee_id' => 'EMP-0043',
         ]);
 
         $this->actingAs($user)
             ->delete('/profile', ['password' => 'password'])
-            ->assertSessionHasNoErrors()
-            ->assertRedirect('/');
+            ->assertStatus(405);
 
-        $this->assertGuest();
-        $this->assertDatabaseMissing('users', ['id' => $user->id]);
-
-        $log = AuditLog::where('action', AuditAction::DeletedUser->value)->firstOrFail();
-        $this->assertNull($log->user_id);
-        $this->assertSame('Self Deleting User', $log->actor_name);
-        $this->assertSame('Self Deleting User', $log->target_name);
-        $this->assertSame('EMP-0043', $log->old_values['employee_id']);
+        $this->assertAuthenticatedAs($user);
+        $this->assertDatabaseHas('users', ['id' => $user->id]);
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => AuditAction::DeletedUser->value,
+            'target_id' => (string) $user->id,
+        ]);
     }
 
     public function test_successful_login_and_logout_are_recorded(): void

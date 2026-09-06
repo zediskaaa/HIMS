@@ -529,40 +529,31 @@ class ProfileTest extends TestCase
         }
     }
 
-    public function test_user_can_delete_their_account(): void
+    public function test_profile_explains_account_retention_and_has_no_delete_control(): void
     {
         $user = User::factory()->create();
 
-        $response = $this
+        $this
+            ->actingAs($user)
+            ->get('/profile')
+            ->assertOk()
+            ->assertSee('Account Retention')
+            ->assertSee('Your account cannot be permanently deleted.')
+            ->assertDontSee('Delete Account');
+    }
+
+    public function test_direct_self_deletion_request_is_rejected_and_account_is_retained(): void
+    {
+        $user = User::factory()->create();
+
+        $this
             ->actingAs($user)
             ->delete('/profile', [
                 'password' => 'password',
-            ]);
+            ])->assertStatus(405);
 
-        $response
-            ->assertSessionHasNoErrors()
-            ->assertRedirect('/');
-
-        $this->assertGuest();
-        $this->assertNull($user->fresh());
-    }
-
-    public function test_correct_password_must_be_provided_to_delete_account(): void
-    {
-        $user = User::factory()->create();
-
-        $response = $this
-            ->actingAs($user)
-            ->from('/profile')
-            ->delete('/profile', [
-                'password' => 'wrong-password',
-            ]);
-
-        $response
-            ->assertSessionHasErrorsIn('userDeletion', 'password')
-            ->assertRedirect('/profile');
-
-        $this->assertNotNull($user->fresh());
+        $this->assertAuthenticatedAs($user);
+        $this->assertDatabaseHas('users', ['id' => $user->id]);
     }
 
     /**

@@ -2,9 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AuditAction;
+use App\Enums\MovementType;
 use App\Enums\Permission;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Models\AuditLog;
+use App\Models\InventoryItem;
+use App\Models\StockMovement;
 use App\Models\User;
 use App\Services\UserAccountService;
 use App\Support\AuthenticationContext;
@@ -124,6 +129,20 @@ class UserManagementTest extends TestCase
 
         $this->actingAs($staff->fresh())->get('/dashboard')->assertRedirect('/login');
         $this->assertGuest();
+    }
+
+    public function test_a_deactivated_employee_cannot_log_in(): void
+    {
+        $staff = User::factory()->warehouseStaff()->inactive()->create([
+            'password' => bcrypt('password'),
+        ]);
+
+        $this->post(route('login'), [
+            'email' => $staff->email,
+            'password' => 'password',
+        ])->assertSessionHasErrors(['email' => trans('auth.failed')]);
+
+        $this->assertGuest(AuthenticationContext::WEB_GUARD);
     }
 
     // ------------------------------------------------------------------ create
@@ -561,6 +580,47 @@ class UserManagementTest extends TestCase
             ->assertRedirect('/admin/users');
 
         $this->assertSame(UserStatus::Active, $staff->fresh()->status);
+    }
+
+    public function test_deactivation_preserves_employee_inventory_and_audit_ownership(): void
+    {
+        $admin = $this->admin();
+        $staff = User::factory()->warehouseStaff()->create();
+        $item = InventoryItem::create([
+            'name' => 'Retention Test Item',
+            'sku' => 'RETENTION-001',
+            'unit' => 'box',
+            'status' => 'active',
+        ]);
+        $movement = StockMovement::create([
+            'item_id' => $item->id,
+            'movement_type' => MovementType::StockOut,
+            'quantity' => 1,
+            'user_id' => $staff->id,
+            'moved_at' => now(),
+        ]);
+        $activity = AuditLog::create([
+            'user_id' => $staff->id,
+            'actor_name' => $staff->name,
+            'actor_employee_id' => $staff->employee_id,
+            'action' => AuditAction::LoggedIn,
+            'target_name' => 'Account',
+            'description' => 'Historical employee activity.',
+        ]);
+
+        $this->actingAs($admin)
+            ->from('/admin/users')
+            ->patch("/admin/users/{$staff->id}/status")
+            ->assertRedirect('/admin/users');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $staff->id,
+            'status' => UserStatus::Inactive->value,
+        ]);
+        $this->assertSame($staff->id, $movement->fresh()->user_id);
+        $this->assertTrue($movement->fresh()->user->is($staff));
+        $this->assertSame($staff->id, $activity->fresh()->user_id);
+        $this->assertTrue($activity->fresh()->actor->is($staff));
     }
 
     /**

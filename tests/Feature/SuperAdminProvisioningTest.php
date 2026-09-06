@@ -265,8 +265,8 @@ class SuperAdminProvisioningTest extends TestCase
         $this->assertSame('changed@example.com', $superAdmin->refresh()->email);
 
         $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
-            ->delete(route('profile.destroy'), ['password' => self::INITIAL_PASSWORD])
-            ->assertForbidden();
+            ->delete('/profile', ['password' => self::INITIAL_PASSWORD])
+            ->assertStatus(405);
 
         $this->seed(SuperAdminSeeder::class);
 
