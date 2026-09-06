@@ -38,6 +38,7 @@ class UserFactory extends Factory
             'remember_token' => Str::random(10),
             'role' => UserRole::Viewer,
             'status' => UserStatus::Active,
+            'mfa_enabled' => false,
             'employee_id' => 'EMP-'.fake()->unique()->numberBetween(1000, 9999),
             'department' => fake()->randomElement(['Pharmacy', 'Central Supply', 'Laboratory', 'Nursing']),
             'phone' => '09'.fake()->numerify('#########'),

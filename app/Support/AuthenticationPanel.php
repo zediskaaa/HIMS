@@ -66,6 +66,47 @@ enum AuthenticationPanel: string
         };
     }
 
+    public function guard(): string
+    {
+        return match ($this) {
+            self::Staff => AuthenticationContext::WEB_GUARD,
+            self::Admin => AuthenticationContext::ADMIN_GUARD,
+            self::SuperAdmin => AuthenticationContext::SUPER_ADMIN_GUARD,
+        };
+    }
+
+    public function dashboardRoute(): string
+    {
+        return $this === self::SuperAdmin ? 'super-admin.dashboard' : 'dashboard';
+    }
+
+    public function loginMfaRoute(): string
+    {
+        return match ($this) {
+            self::Staff => 'login',
+            self::Admin => 'admin.login.mfa',
+            self::SuperAdmin => 'super-admin.login.mfa',
+        };
+    }
+
+    public function loginMfaVerifyRoute(): string
+    {
+        return match ($this) {
+            self::Staff => 'login',
+            self::Admin => 'admin.login.mfa.verify',
+            self::SuperAdmin => 'super-admin.login.mfa.verify',
+        };
+    }
+
+    public function loginMfaResendRoute(): string
+    {
+        return match ($this) {
+            self::Staff => 'login',
+            self::Admin => 'admin.login.mfa.resend',
+            self::SuperAdmin => 'super-admin.login.mfa.resend',
+        };
+    }
+
     public function passwordRequestRoute(): string
     {
         return match ($this) {

@@ -114,6 +114,12 @@ return [
         ],
     ],
 
+    'login_mfa' => [
+        'expire' => (int) env('AUTH_LOGIN_MFA_OTP_EXPIRE', 5),
+        'max_attempts' => (int) env('AUTH_LOGIN_MFA_MAX_ATTEMPTS', 5),
+        'resend_cooldown' => (int) env('AUTH_LOGIN_MFA_RESEND_COOLDOWN', 60),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Password Confirmation Timeout

@@ -5,11 +5,15 @@ namespace App\Http\Controllers\Admin\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnforceSessionInactivity;
 use App\Http\Requests\Auth\AdminLoginRequest;
+use App\Notifications\LoginMfaOtp;
+use App\Services\LoginMfaService;
 use App\Support\AuthenticationContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
+use Throwable;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -18,9 +22,45 @@ class AuthenticatedSessionController extends Controller
         return view('admin.auth.login');
     }
 
-    public function store(AdminLoginRequest $request): RedirectResponse
+    public function store(AdminLoginRequest $request, LoginMfaService $mfa): RedirectResponse
     {
-        $request->authenticate();
+        $user = $request->validateCredentials();
+
+        if ($user->mfa_enabled) {
+            $pendingUser = $mfa->pendingUser($request, AuthenticationContext::ADMIN_GUARD);
+
+            if ($pendingUser?->is($user) && $mfa->resendAvailableIn($request, AuthenticationContext::ADMIN_GUARD) > 0) {
+                return redirect()->route('admin.login.mfa')
+                    ->with('status', 'A verification code was recently sent.');
+            }
+
+            $request->session()->regenerate();
+            $otp = $mfa->issue(
+                $request,
+                $user,
+                AuthenticationContext::ADMIN_GUARD,
+                $request->boolean('remember'),
+            );
+
+            try {
+                $user->notify(new LoginMfaOtp($otp, $mfa->expiresInMinutes()));
+            } catch (Throwable $exception) {
+                $mfa->clear($request);
+                Log::error('Login MFA email could not be sent.', [
+                    'user_id' => $user->getKey(),
+                    'guard' => AuthenticationContext::ADMIN_GUARD,
+                    'exception' => $exception::class,
+                ]);
+
+                return back()->withErrors([
+                    'email' => 'We could not send a verification code. Please try again.',
+                ])->onlyInput('email');
+            }
+
+            return redirect()->route('admin.login.mfa');
+        }
+
+        $request->login($user);
         $request->session()->regenerate();
         $request->session()->put(
             EnforceSessionInactivity::lastActivityKey(AuthenticationContext::ADMIN_GUARD),

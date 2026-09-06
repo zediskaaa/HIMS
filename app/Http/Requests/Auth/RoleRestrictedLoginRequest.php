@@ -7,7 +7,6 @@ use App\Models\User;
 use App\Support\AuthenticationPanel;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -40,18 +39,31 @@ abstract class RoleRestrictedLoginRequest extends FormRequest
      *
      * @throws ValidationException
      */
-    public function authenticate(): void
+    public function authenticate(): User
+    {
+        $user = $this->validateCredentials();
+        $this->login($user);
+
+        return $user;
+    }
+
+    /**
+     * Validate the password without creating an authenticated session. Admin
+     * panels use this first stage when an MFA challenge still has to pass.
+     *
+     * @throws ValidationException
+     */
+    public function validateCredentials(): User
     {
         $this->ensureIsNotRateLimited();
 
-        $authenticated = Auth::guard($this->guard())->attempt([
-            'email' => $this->string('email')->toString(),
-            'password' => $this->string('password')->toString(),
-            'status' => UserStatus::Active->value,
-            fn (Builder $query) => $query->whereIn('role', $this->allowedRoles()),
-        ], $this->boolean('remember'));
+        $user = User::query()
+            ->where('email', $this->string('email')->toString())
+            ->where('status', UserStatus::Active->value)
+            ->whereIn('role', $this->allowedRoles())
+            ->first();
 
-        if (! $authenticated) {
+        if ($user === null || ! Hash::check($this->string('password')->toString(), $user->password)) {
             $this->flashWrongPanelAlertForValidCredentials();
             RateLimiter::hit($this->throttleKey());
 
@@ -61,6 +73,13 @@ abstract class RoleRestrictedLoginRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
+
+        return $user;
+    }
+
+    public function login(User $user): void
+    {
+        Auth::guard($this->guard())->login($user, $this->boolean('remember'));
     }
 
     /**

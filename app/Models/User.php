@@ -59,6 +59,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'is_protected' => 'boolean',
+            'mfa_enabled' => 'boolean',
             'password' => 'hashed',
             'role' => UserRole::class,
             'status' => UserStatus::class,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
@@ -42,6 +43,28 @@ class ProfileController extends Controller
         $request->session()->put(
             'profile_success',
             $emailChanged ? 'Email updated successfully.' : 'Profile updated successfully.'
+        );
+
+        return Redirect::route('profile.edit');
+    }
+
+    public function updateMfa(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+
+        abort_unless($user instanceof User && $user->isAdministrator(), 403);
+
+        $validated = $request->validate([
+            'mfa_enabled' => ['required', 'boolean'],
+        ]);
+
+        $enabled = (bool) $validated['mfa_enabled'];
+        $user->forceFill(['mfa_enabled' => $enabled])->save();
+        $request->session()->put(
+            'mfa_success',
+            $enabled
+                ? 'Multi-factor authentication is now ON. A code will be required on your next login.'
+                : 'Multi-factor authentication is now OFF. Future logins will use your password only.',
         );
 
         return Redirect::route('profile.edit');
