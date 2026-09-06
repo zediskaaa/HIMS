@@ -6,6 +6,7 @@ namespace App\Models;
 use App\Enums\Permission;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use Carbon\CarbonInterface;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -57,6 +58,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'password_changed_at' => 'datetime',
             'last_login_at' => 'datetime',
             'is_protected' => 'boolean',
             'mfa_enabled' => 'boolean',
@@ -74,6 +76,10 @@ class User extends Authenticatable
     protected static function booted(): void
     {
         static::saving(function (User $user): void {
+            if ($user->isDirty('password') && ! $user->isDirty('password_changed_at')) {
+                $user->password_changed_at = now();
+            }
+
             if ($user->isDirty(['surname', 'first_name', 'middle_name'])) {
                 $user->name = self::composeName(
                     $user->first_name,
@@ -231,6 +237,24 @@ class User extends Authenticatable
     public function isActive(): bool
     {
         return $this->status->isActive();
+    }
+
+    public function passwordExpiresAt(): ?CarbonInterface
+    {
+        if ($this->password_changed_at === null) {
+            return null;
+        }
+
+        return $this->password_changed_at->copy()->addDays(
+            max(1, (int) config('auth.password_expiration.days', 90)),
+        );
+    }
+
+    public function passwordHasExpired(): bool
+    {
+        $expiresAt = $this->passwordExpiresAt();
+
+        return $expiresAt !== null && $expiresAt->lessThanOrEqualTo(now());
     }
 
     /**

@@ -33,21 +33,6 @@ abstract class RoleRestrictedLoginRequest extends FormRequest
     }
 
     /**
-     * Authenticate only an active account belonging to this login panel.
-     * Every failure deliberately uses the same message so the endpoint does
-     * not reveal whether an email exists, is inactive, or has another role.
-     *
-     * @throws ValidationException
-     */
-    public function authenticate(): User
-    {
-        $user = $this->validateCredentials();
-        $this->login($user);
-
-        return $user;
-    }
-
-    /**
      * Validate the password without creating an authenticated session. Admin
      * panels use this first stage when an MFA challenge still has to pass.
      *

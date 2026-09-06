@@ -6,10 +6,10 @@ use App\Enums\Permission;
 use App\Enums\UserDepartment;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Rules\PasswordStandard;
 use App\Services\UserAccountService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 
 class StoreUserRequest extends FormRequest
 {
@@ -28,7 +28,7 @@ class StoreUserRequest extends FormRequest
             'first_name' => ['required', 'string', 'max:80'],
             'middle_name' => ['nullable', 'string', 'max:80'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'confirmed', Password::defaults()],
+            'password' => ['required', 'string', 'confirmed', new PasswordStandard],
             'role' => [
                 'required',
                 Rule::enum(UserRole::class),
@@ -53,7 +53,7 @@ class StoreUserRequest extends FormRequest
             'phone.required' => 'Phone number is required.',
             'phone.digits' => 'Contact number must contain numbers only and exactly 11 digits.',
             'phone.regex' => 'Contact number must start with 09 and contain exactly 11 digits.',
-            'password.confirmed' => 'The two passwords do not match.',
+            'password.confirmed' => PasswordStandard::CONFIRMATION_MESSAGE,
         ];
     }
 

@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
+use App\Http\Controllers\Auth\ExpiredPasswordController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
@@ -30,6 +31,16 @@ Route::middleware(['guest:web', 'guest:admin', 'guest:super_admin'])->group(func
         ->name('login');
 
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
+
+    Route::get('password-expired', [ExpiredPasswordController::class, 'show'])
+        ->defaults('auth_panel', AuthenticationPanel::Staff->value)
+        ->name('password.expired');
+    Route::put('password-expired', [ExpiredPasswordController::class, 'update'])
+        ->defaults('auth_panel', AuthenticationPanel::Staff->value)
+        ->name('password.expired.update');
+    Route::post('password-expired/cancel', [ExpiredPasswordController::class, 'cancel'])
+        ->defaults('auth_panel', AuthenticationPanel::Staff->value)
+        ->name('password.expired.cancel');
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->defaults('auth_panel', AuthenticationPanel::Staff->value)

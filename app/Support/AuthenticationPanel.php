@@ -161,6 +161,33 @@ enum AuthenticationPanel: string
         };
     }
 
+    public function expiredPasswordRoute(): string
+    {
+        return match ($this) {
+            self::Staff => 'password.expired',
+            self::Admin => 'admin.password.expired',
+            self::SuperAdmin => 'super-admin.password.expired',
+        };
+    }
+
+    public function expiredPasswordUpdateRoute(): string
+    {
+        return match ($this) {
+            self::Staff => 'password.expired.update',
+            self::Admin => 'admin.password.expired.update',
+            self::SuperAdmin => 'super-admin.password.expired.update',
+        };
+    }
+
+    public function expiredPasswordCancelRoute(): string
+    {
+        return match ($this) {
+            self::Staff => 'password.expired.cancel',
+            self::Admin => 'admin.password.expired.cancel',
+            self::SuperAdmin => 'super-admin.password.expired.cancel',
+        };
+    }
+
     /** @return array{message: string} */
     public function wrongPanelAlert(self $correctPanel): array
     {

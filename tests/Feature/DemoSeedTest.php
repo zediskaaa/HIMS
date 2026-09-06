@@ -57,7 +57,7 @@ class DemoSeedTest extends TestCase
     {
         $this->post('/admin/login', [
             'email' => 'test@example.com',
-            'password' => 'password',
+            'password' => 'Password123!',
         ])->assertRedirect('/dashboard');
 
         $this->assertAuthenticated(AuthenticationContext::ADMIN_GUARD);

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\ExpiredPasswordController;
 use App\Http\Controllers\Auth\LoginMfaController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
@@ -13,6 +14,15 @@ Route::prefix('super-admin')->name('super-admin.')->group(function () {
     Route::middleware(['guest:web', 'guest:admin', 'guest:super_admin'])->group(function () {
         Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
         Route::post('login', [AuthenticatedSessionController::class, 'store'])->name('login.store');
+        Route::get('password-expired', [ExpiredPasswordController::class, 'show'])
+            ->defaults('auth_panel', AuthenticationPanel::SuperAdmin->value)
+            ->name('password.expired');
+        Route::put('password-expired', [ExpiredPasswordController::class, 'update'])
+            ->defaults('auth_panel', AuthenticationPanel::SuperAdmin->value)
+            ->name('password.expired.update');
+        Route::post('password-expired/cancel', [ExpiredPasswordController::class, 'cancel'])
+            ->defaults('auth_panel', AuthenticationPanel::SuperAdmin->value)
+            ->name('password.expired.cancel');
         Route::get('login/mfa', [LoginMfaController::class, 'show'])
             ->defaults('auth_panel', AuthenticationPanel::SuperAdmin->value)
             ->name('login.mfa');

@@ -16,7 +16,7 @@ class SuperAdminSeeder extends Seeder
      * Initial setup secret only. Authentication always uses Laravel's hashed
      * password verifier; this value is never written to logs or responses.
      */
-    private const INITIAL_PASSWORD = 'superadminzediskaaa123';
+    private const INITIAL_PASSWORD = 'SuperAdminZediskaaa123!';
 
     public function run(): void
     {
@@ -46,6 +46,7 @@ class SuperAdminSeeder extends Seeder
             // never undo a password the Super Administrator changes later.
             if ($shouldSetInitialPassword) {
                 $attributes['password'] = Hash::make(self::INITIAL_PASSWORD);
+                $attributes['password_changed_at'] = now();
             }
 
             $user->forceFill($attributes)->save();

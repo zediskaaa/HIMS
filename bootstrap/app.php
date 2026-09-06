@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnforceSessionInactivity;
 use App\Http\Middleware\EnsureAdministrator;
 use App\Http\Middleware\EnsureAuthenticationPanelRole;
+use App\Http\Middleware\EnsurePasswordIsCurrent;
 use App\Http\Middleware\EnsureSuperAdministrator;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Support\AuthenticationContext;
@@ -48,6 +49,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EnforceSessionInactivity::class,
             EnsureUserIsActive::class,
             EnsureAuthenticationPanelRole::class,
+            EnsurePasswordIsCurrent::class,
         ]);
 
         $middleware->prependToPriorityList(
@@ -61,6 +63,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(append: [
             EnforceSessionInactivity::class,
             EnsureAuthenticationPanelRole::class,
+            EnsurePasswordIsCurrent::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

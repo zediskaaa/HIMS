@@ -26,6 +26,8 @@
 <div x-data="{
     role: '{{ old('role', $user?->role?->value ?? \App\Enums\UserRole::Viewer->value) }}',
     roles: {{ \Illuminate\Support\Js::from($roleDescriptions) }},
+    password: '',
+    passwordConfirmation: '',
     get detail() { return this.roles[this.role] ?? null },
 }">
     <div class="grid gap-4 md:grid-cols-2">
@@ -128,14 +130,23 @@
             type="password"
             :required="! $isEdit"
             autocomplete="new-password"
-            hint="{{ $isEdit ? 'Leave blank to keep the current password.' : 'At least 8 characters.' }}" />
+            minlength="8"
+            pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,}"
+            title="{{ \App\Rules\PasswordStandard::REQUIREMENTS }}"
+            x-model="password"
+            hint="{{ $isEdit ? 'Leave blank to keep the current password. When changed, all requirements below apply.' : \App\Rules\PasswordStandard::REQUIREMENTS }}" />
 
         <x-ui.field
             name="password_confirmation"
             label="Confirm Password"
             type="password"
             :required="! $isEdit"
-            autocomplete="new-password" />
+            autocomplete="new-password"
+            x-model="passwordConfirmation" />
+    </div>
+
+    <div class="mt-4">
+        <x-auth.password-requirements />
     </div>
 
     {{-- Reflects the selection above so the effect of the choice is visible

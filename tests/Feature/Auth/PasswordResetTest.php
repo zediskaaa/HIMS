@@ -142,7 +142,9 @@ class PasswordResetTest extends TestCase
 
     public function test_password_can_be_reset_after_valid_otp_verification(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'password_changed_at' => now()->subDays(30),
+        ]);
         $notification = $this->requestOtp($user);
         $verification = $this->verifyOtp($user, $notification);
         $token = $this->tokenFromRedirect($verification);
@@ -150,11 +152,12 @@ class PasswordResetTest extends TestCase
         $this->post(route('password.store'), [
             'token' => $token,
             'email' => $user->email,
-            'password' => 'new-password',
-            'password_confirmation' => 'new-password',
+            'password' => 'NewPassword1!',
+            'password_confirmation' => 'NewPassword1!',
         ])->assertSessionHasNoErrors()->assertRedirect(route('login'));
 
-        $this->assertTrue(Hash::check('new-password', $user->refresh()->password));
+        $this->assertTrue(Hash::check('NewPassword1!', $user->refresh()->password));
+        $this->assertTrue($user->password_changed_at->isToday());
         $this->assertDatabaseMissing('password_reset_tokens', ['email' => $user->email]);
     }
 

@@ -7,7 +7,9 @@ use App\Http\Middleware\EnforceSessionInactivity;
 use App\Http\Requests\Auth\SuperAdminLoginRequest;
 use App\Notifications\LoginMfaOtp;
 use App\Services\LoginMfaService;
+use App\Services\PasswordExpirationService;
 use App\Support\AuthenticationContext;
+use App\Support\AuthenticationPanel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,8 +24,11 @@ class AuthenticatedSessionController extends Controller
         return view('super-admin.auth.login');
     }
 
-    public function store(SuperAdminLoginRequest $request, LoginMfaService $mfa): RedirectResponse
-    {
+    public function store(
+        SuperAdminLoginRequest $request,
+        LoginMfaService $mfa,
+        PasswordExpirationService $expiration,
+    ): RedirectResponse {
         $user = $request->validateCredentials();
 
         if ($user->mfa_enabled) {
@@ -58,6 +63,18 @@ class AuthenticatedSessionController extends Controller
             }
 
             return redirect()->route('super-admin.login.mfa');
+        }
+
+        if ($user->passwordHasExpired()) {
+            $request->session()->regenerate();
+            $expiration->begin(
+                $request,
+                $user,
+                AuthenticationContext::SUPER_ADMIN_GUARD,
+                $request->boolean('remember'),
+            );
+
+            return redirect()->route(AuthenticationPanel::SuperAdmin->expiredPasswordRoute());
         }
 
         $request->login($user);

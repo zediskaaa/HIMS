@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Rules\NotCurrentPassword;
+use App\Rules\PasswordStandard;
 use App\Support\AuthenticationContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
 
 class PasswordController extends Controller
 {
@@ -23,13 +23,14 @@ class PasswordController extends Controller
             'current_password' => ['required', 'current_password:'.$guard],
             'password' => [
                 'required',
-                Password::defaults(),
+                new PasswordStandard,
                 'confirmed',
                 new NotCurrentPassword($request->user()),
             ],
         ], [
             'current_password.required' => 'Current password is required.',
             'current_password.current_password' => 'Current password is incorrect.',
+            'password.confirmed' => PasswordStandard::CONFIRMATION_MESSAGE,
         ]);
 
         $request->user()->update([

@@ -7,6 +7,7 @@ use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Support\AuthenticationPanel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -32,6 +33,17 @@ class AuthController extends Controller
 
         /** @var User $user */
         $user = Auth::user();
+
+        if ($user->passwordHasExpired()) {
+            Auth::logout();
+            $loginUrl = route(AuthenticationPanel::forRole($user->role)->loginRoute());
+
+            return response()->json([
+                'message' => 'Your password has expired. Sign in through the HIMS login page to create a new password.',
+                'code' => 'PASSWORD_EXPIRED',
+                'redirect' => $loginUrl,
+            ], 428)->header('X-HIMS-Password-Expired', $loginUrl);
+        }
 
         $device = $request->input('device_name', 'api-token');
         $token = $user->createToken($device)->plainTextToken;

@@ -177,11 +177,11 @@ class PanelPasswordResetTest extends TestCase
         $this->post(route('admin.password.store'), [
             'token' => $this->tokenFromRedirect($verification),
             'email' => $admin->email,
-            'password' => 'new-admin-password',
-            'password_confirmation' => 'new-admin-password',
+            'password' => 'NewAdminPassword1!',
+            'password_confirmation' => 'NewAdminPassword1!',
         ])->assertSessionHasNoErrors()->assertRedirect(route('admin.login'));
 
-        $this->assertTrue(Hash::check('new-admin-password', $admin->refresh()->password));
+        $this->assertTrue(Hash::check('NewAdminPassword1!', $admin->refresh()->password));
     }
 
     public function test_super_admin_can_complete_only_the_super_admin_password_reset_flow(): void
@@ -206,11 +206,11 @@ class PanelPasswordResetTest extends TestCase
         $this->post(route('super-admin.password.store'), [
             'token' => $this->tokenFromRedirect($verification),
             'email' => $superAdmin->email,
-            'password' => 'new-super-password',
-            'password_confirmation' => 'new-super-password',
+            'password' => 'NewSuperPassword1!',
+            'password_confirmation' => 'NewSuperPassword1!',
         ])->assertSessionHasNoErrors()->assertRedirect(route('super-admin.login'));
 
-        $this->assertTrue(Hash::check('new-super-password', $superAdmin->refresh()->password));
+        $this->assertTrue(Hash::check('NewSuperPassword1!', $superAdmin->refresh()->password));
     }
 
     public function test_admin_cannot_redeem_a_valid_token_through_staff_reset_post(): void
@@ -230,8 +230,8 @@ class PanelPasswordResetTest extends TestCase
         $this->post(route('password.store'), [
             'token' => $this->tokenFromRedirect($verification),
             'email' => $admin->email,
-            'password' => 'bypass-password',
-            'password_confirmation' => 'bypass-password',
+            'password' => 'BypassPassword1!',
+            'password_confirmation' => 'BypassPassword1!',
         ])->assertRedirect(route('admin.password.request'))
             ->assertSessionMissing('wrong_panel.url')
             ->assertSessionMissing('wrong_panel.label');
@@ -272,8 +272,8 @@ class PanelPasswordResetTest extends TestCase
         $this->post(route('password.store'), [
             'token' => $token,
             'email' => $superAdmin->email,
-            'password' => 'bypass-password',
-            'password_confirmation' => 'bypass-password',
+            'password' => 'BypassPassword1!',
+            'password_confirmation' => 'BypassPassword1!',
         ])->assertRedirect(route('super-admin.password.request'));
 
         $this->assertSame($originalPassword, $superAdmin->refresh()->password);

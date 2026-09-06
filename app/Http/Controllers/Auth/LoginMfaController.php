@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnforceSessionInactivity;
 use App\Notifications\LoginMfaOtp;
 use App\Services\LoginMfaService;
+use App\Services\PasswordExpirationService;
 use App\Support\AuthenticationPanel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,8 +36,11 @@ class LoginMfaController extends Controller
         ]);
     }
 
-    public function verify(Request $request, LoginMfaService $mfa): RedirectResponse
-    {
+    public function verify(
+        Request $request,
+        LoginMfaService $mfa,
+        PasswordExpirationService $expiration,
+    ): RedirectResponse {
         $validated = $request->validate([
             'otp' => ['required', 'digits:6'],
         ], [
@@ -60,6 +64,13 @@ class LoginMfaController extends Controller
                 : 'Too many incorrect attempts. Request a new code.';
 
             return back()->withErrors(['otp' => $message]);
+        }
+
+        if ($result['user']->passwordHasExpired()) {
+            $request->session()->regenerate();
+            $expiration->begin($request, $result['user'], $panel->guard(), $result['remember']);
+
+            return redirect()->route($panel->expiredPasswordRoute());
         }
 
         Auth::guard($panel->guard())->login($result['user'], $result['remember']);

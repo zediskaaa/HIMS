@@ -7,7 +7,7 @@
         </h2>
 
         <p class="mt-1 text-sm text-gray-600">
-            {{ __('Ensure your account is using a long, random password to stay secure.') }}
+            {{ \App\Rules\PasswordStandard::REQUIREMENTS }}
         </p>
     </header>
 
@@ -17,7 +17,7 @@
         </x-ui.alert>
     @endif
 
-    <form method="post" action="{{ route('password.update') }}" class="mt-6 space-y-6">
+    <form method="post" action="{{ route('password.update') }}" class="mt-6 space-y-6" x-data="{ password: '', passwordConfirmation: '' }">
         @csrf
         @method('put')
 
@@ -29,15 +29,17 @@
 
         <div>
             <x-input-label for="update_password_password" :value="__('New Password')" />
-            <x-text-input id="update_password_password" name="password" type="password" class="mt-1 block w-full" autocomplete="new-password" />
+            <x-text-input id="update_password_password" name="password" type="password" class="mt-1 block w-full" required minlength="8" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,}" title="{{ \App\Rules\PasswordStandard::REQUIREMENTS }}" autocomplete="new-password" x-model="password" />
             <x-input-error :messages="$errors->updatePassword->get('password')" class="mt-2" />
         </div>
 
         <div>
             <x-input-label for="update_password_password_confirmation" :value="__('Confirm Password')" />
-            <x-text-input id="update_password_password_confirmation" name="password_confirmation" type="password" class="mt-1 block w-full" autocomplete="new-password" />
+            <x-text-input id="update_password_password_confirmation" name="password_confirmation" type="password" class="mt-1 block w-full" required autocomplete="new-password" x-model="passwordConfirmation" />
             <x-input-error :messages="$errors->updatePassword->get('password_confirmation')" class="mt-2" />
         </div>
+
+        <x-auth.password-requirements />
 
         <div class="flex items-center">
             <x-primary-button data-loading-text="Updating password...">{{ __('Save') }}</x-primary-button>

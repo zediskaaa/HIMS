@@ -13,7 +13,7 @@
 
         <x-auth.wrong-panel-alert />
 
-        <form method="POST" action="{{ route($panel->passwordStoreRoute()) }}" class="space-y-5">
+        <form method="POST" action="{{ route($panel->passwordStoreRoute()) }}" class="space-y-5" x-data="{ password: '', passwordConfirmation: '' }">
             @csrf
 
             <input type="hidden" name="token" value="{{ $request->route('token') }}">
@@ -35,15 +35,17 @@
 
             <div>
                 <x-input-label for="password" :value="__('New password')" class="text-neutral-700" />
-                <x-text-input id="password" class="mt-2 block h-11 w-full rounded-lg border-neutral-300 bg-white px-3.5 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500" type="password" name="password" required autocomplete="new-password" />
+                <x-text-input id="password" class="mt-2 block h-11 w-full rounded-lg border-neutral-300 bg-white px-3.5 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500" type="password" name="password" required minlength="8" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,}" title="{{ \App\Rules\PasswordStandard::REQUIREMENTS }}" autocomplete="new-password" x-model="password" />
                 <x-input-error :messages="$errors->get('password')" class="mt-2 text-danger-600" />
             </div>
 
             <div>
                 <x-input-label for="password_confirmation" :value="__('Confirm new password')" class="text-neutral-700" />
-                <x-text-input id="password_confirmation" class="mt-2 block h-11 w-full rounded-lg border-neutral-300 bg-white px-3.5 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500" type="password" name="password_confirmation" required autocomplete="new-password" />
+                <x-text-input id="password_confirmation" class="mt-2 block h-11 w-full rounded-lg border-neutral-300 bg-white px-3.5 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500" type="password" name="password_confirmation" required autocomplete="new-password" x-model="passwordConfirmation" />
                 <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2 text-danger-600" />
             </div>
+
+            <x-auth.password-requirements />
 
             <x-ui.button type="submit" size="lg" data-loading-text="Updating password..." class="w-full">
                 {{ __('Reset password') }}

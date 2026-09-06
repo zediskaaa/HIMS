@@ -477,10 +477,13 @@ const startSessionMonitor = () => {
     // Normalize expired fetch responses from all existing inline page scripts.
     window.fetch = async (...args) => {
         const response = await nativeFetch(...args);
+        const passwordExpiredLocation = response.headers.get('X-HIMS-Password-Expired');
         const redirectedToLogin = response.redirected
             && new URL(response.url, window.location.origin).pathname.endsWith('/login');
 
-        if (response.status === 401 || response.status === 419 || redirectedToLogin) {
+        if (passwordExpiredLocation) {
+            window.location.assign(passwordExpiredLocation);
+        } else if (response.status === 401 || response.status === 419 || redirectedToLogin) {
             expire();
         } else if (response.ok) {
             acceptServerActivity(response);
@@ -506,7 +509,14 @@ const startSessionMonitor = () => {
             return response;
         },
         (error) => {
-            if ([401, 419].includes(error.response?.status)) expire();
+            const passwordExpiredLocation = error.response?.headers?.['x-hims-password-expired'];
+
+            if (passwordExpiredLocation) {
+                window.location.assign(passwordExpiredLocation);
+            } else if ([401, 419].includes(error.response?.status)) {
+                expire();
+            }
+
             return Promise.reject(error);
         },
     );

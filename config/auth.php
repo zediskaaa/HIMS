@@ -120,6 +120,10 @@ return [
         'resend_cooldown' => (int) env('AUTH_LOGIN_MFA_RESEND_COOLDOWN', 60),
     ],
 
+    'password_expiration' => [
+        'days' => (int) env('AUTH_PASSWORD_EXPIRATION_DAYS', 90),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Password Confirmation Timeout

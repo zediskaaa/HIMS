@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnforceSessionInactivity;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Services\PasswordExpirationService;
 use App\Support\AuthenticationContext;
+use App\Support\AuthenticationPanel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,9 +26,23 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request): RedirectResponse
+    public function store(LoginRequest $request, PasswordExpirationService $expiration): RedirectResponse
     {
-        $request->authenticate();
+        $user = $request->validateCredentials();
+
+        if ($user->passwordHasExpired()) {
+            $request->session()->regenerate();
+            $expiration->begin(
+                $request,
+                $user,
+                AuthenticationContext::WEB_GUARD,
+                $request->boolean('remember'),
+            );
+
+            return redirect()->route(AuthenticationPanel::Staff->expiredPasswordRoute());
+        }
+
+        $request->login($user);
 
         $request->session()->regenerate();
         $request->session()->put(

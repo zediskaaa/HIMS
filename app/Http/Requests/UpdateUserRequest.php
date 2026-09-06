@@ -7,10 +7,10 @@ use App\Enums\UserDepartment;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\User;
+use App\Rules\PasswordStandard;
 use App\Services\UserAccountService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 
 class UpdateUserRequest extends FormRequest
 {
@@ -42,7 +42,7 @@ class UpdateUserRequest extends FormRequest
                 Rule::unique('users', 'email')->ignore($userId),
             ],
             // Left blank on the edit form when the password is not changing.
-            'password' => ['nullable', 'confirmed', Password::defaults()],
+            'password' => ['nullable', 'string', 'confirmed', new PasswordStandard],
             'role' => [
                 'required',
                 Rule::enum(UserRole::class),
@@ -67,7 +67,7 @@ class UpdateUserRequest extends FormRequest
             'phone.required' => 'Phone number is required.',
             'phone.digits' => 'Contact number must contain numbers only and exactly 11 digits.',
             'phone.regex' => 'Contact number must start with 09 and contain exactly 11 digits.',
-            'password.confirmed' => 'The two passwords do not match.',
+            'password.confirmed' => PasswordStandard::CONFIRMATION_MESSAGE,
         ];
     }
 

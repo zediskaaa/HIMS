@@ -17,7 +17,7 @@ class SuperAdminProvisioningTest extends TestCase
 
     private const EMAIL = 'zediskaaa@gmail.com';
 
-    private const INITIAL_PASSWORD = 'superadminzediskaaa123';
+    private const INITIAL_PASSWORD = 'SuperAdminZediskaaa123!';
 
     /**
      * @return array<string, string>

@@ -13,22 +13,25 @@ class PasswordUpdateTest extends TestCase
 
     public function test_password_can_be_updated(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'password_changed_at' => now()->subDays(30),
+        ]);
 
         $response = $this
             ->actingAs($user)
             ->from('/profile')
             ->put('/password', [
                 'current_password' => 'password',
-                'password' => 'new-password',
-                'password_confirmation' => 'new-password',
+                'password' => 'NewPassword1!',
+                'password_confirmation' => 'NewPassword1!',
             ]);
 
         $response
             ->assertSessionHasNoErrors()
             ->assertRedirect('/profile');
 
-        $this->assertTrue(Hash::check('new-password', $user->refresh()->password));
+        $this->assertTrue(Hash::check('NewPassword1!', $user->refresh()->password));
+        $this->assertTrue($user->password_changed_at->isToday());
     }
 
     public function test_correct_password_must_be_provided_to_update_password(): void
@@ -40,8 +43,8 @@ class PasswordUpdateTest extends TestCase
             ->from('/profile')
             ->put('/password', [
                 'current_password' => 'wrong-password',
-                'password' => 'new-password',
-                'password_confirmation' => 'new-password',
+                'password' => 'NewPassword1!',
+                'password_confirmation' => 'NewPassword1!',
             ]);
 
         $response
@@ -88,8 +91,8 @@ class PasswordUpdateTest extends TestCase
 
         $this->from('/profile')->put('/password', [
             'current_password' => 'wrong-password',
-            'password' => 'new-password',
-            'password_confirmation' => 'new-password',
+            'password' => 'NewPassword1!',
+            'password_confirmation' => 'NewPassword1!',
         ])->assertRedirect('/profile')
             ->assertSessionHasErrorsIn('updatePassword', [
                 'current_password' => 'Current password is incorrect.',
@@ -107,8 +110,8 @@ class PasswordUpdateTest extends TestCase
 
         $this->from('/profile')->put('/password', [
             'current_password' => '',
-            'password' => 'new-password',
-            'password_confirmation' => 'new-password',
+            'password' => 'NewPassword1!',
+            'password_confirmation' => 'NewPassword1!',
         ])->assertRedirect('/profile')
             ->assertSessionHasErrorsIn('updatePassword', [
                 'current_password' => 'Current password is required.',
@@ -135,13 +138,13 @@ class PasswordUpdateTest extends TestCase
 
         $this->from('/profile')->put('/password', [
             'current_password' => 'password',
-            'password' => 'new-password',
-            'password_confirmation' => 'new-password',
+            'password' => 'NewPassword1!',
+            'password_confirmation' => 'NewPassword1!',
         ])->assertSessionHasNoErrors()
             ->assertSessionHas('password_success', 'Password updated successfully.')
             ->assertRedirect('/profile');
 
-        $this->assertTrue(Hash::check('new-password', $user->refresh()->password));
+        $this->assertTrue(Hash::check('NewPassword1!', $user->refresh()->password));
 
         $this->postJson(route('super-admin.session.activity'))->assertNoContent();
 
