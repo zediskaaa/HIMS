@@ -69,4 +69,88 @@ class PasswordUpdateTest extends TestCase
 
         $this->assertSame($originalPasswordHash, $user->refresh()->password);
     }
+
+    public function test_super_admin_receives_current_password_validation_feedback(): void
+    {
+        $user = User::factory()->superAdministrator()->create([
+            'email' => 'super.admin@example.com',
+            'password' => 'password',
+        ]);
+        $originalPasswordHash = $user->password;
+
+        $this->post(route('super-admin.login.store'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ])->assertRedirect();
+
+        $this->app['auth']->forgetGuards();
+        $this->assertAuthenticatedAs($user, 'super_admin');
+
+        $this->from('/profile')->put('/password', [
+            'current_password' => 'wrong-password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ])->assertRedirect('/profile')
+            ->assertSessionHasErrorsIn('updatePassword', [
+                'current_password' => 'Current password is incorrect.',
+            ])
+            ->assertSessionMissing('password_success');
+
+        $this->assertSame($originalPasswordHash, $user->refresh()->password);
+
+        $this->postJson(route('super-admin.session.activity'))->assertNoContent();
+
+        $this->get('/profile')
+            ->assertOk()
+            ->assertSee('Current password is incorrect.')
+            ->assertDontSee('Password updated successfully.');
+
+        $this->from('/profile')->put('/password', [
+            'current_password' => '',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ])->assertRedirect('/profile')
+            ->assertSessionHasErrorsIn('updatePassword', [
+                'current_password' => 'Current password is required.',
+            ])
+            ->assertSessionMissing('password_success');
+
+        $this->assertSame($originalPasswordHash, $user->refresh()->password);
+    }
+
+    public function test_super_admin_can_update_password_with_their_current_password(): void
+    {
+        $user = User::factory()->superAdministrator()->create([
+            'email' => 'super.admin@example.com',
+            'password' => 'password',
+        ]);
+
+        $this->post(route('super-admin.login.store'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ])->assertRedirect();
+
+        $this->app['auth']->forgetGuards();
+        $this->assertAuthenticatedAs($user, 'super_admin');
+
+        $this->from('/profile')->put('/password', [
+            'current_password' => 'password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ])->assertSessionHasNoErrors()
+            ->assertSessionHas('password_success', 'Password updated successfully.')
+            ->assertRedirect('/profile');
+
+        $this->assertTrue(Hash::check('new-password', $user->refresh()->password));
+
+        $this->postJson(route('super-admin.session.activity'))->assertNoContent();
+
+        $this->get('/profile')
+            ->assertOk()
+            ->assertSee('Password updated successfully.');
+
+        $this->get('/profile')
+            ->assertOk()
+            ->assertDontSee('Password updated successfully.');
+    }
 }

@@ -15,7 +15,12 @@
     </header>
 
     @if ($profileSuccess)
-        <x-ui.alert variant="success" title="Profile updated" dismissible class="mt-6">
+        <x-ui.alert
+            variant="success"
+            :title="$profileSuccess === 'Email updated successfully.' ? 'Email updated' : 'Profile updated'"
+            dismissible
+            class="mt-6"
+        >
             {{ $profileSuccess }}
         </x-ui.alert>
     @endif
@@ -81,15 +86,9 @@
         <div>
             <x-input-label for="email" :value="__('Email')" />
             <x-text-input id="email" name="email" type="email" class="mt-1 block w-full"
-                          :value="old('email', $user->email)" :readonly="$user->isProtected()"
+                          :value="old('email', $user->email)"
                           required autocomplete="username" />
             <x-input-error class="mt-2" :messages="$errors->get('email')" />
-
-            @if ($user->isProtected())
-                <p class="mt-2 text-sm text-gray-600">
-                    This system-owned sign-in address is protected. You can still change your password securely below.
-                </p>
-            @endif
 
             @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
                 <div>
@@ -108,6 +107,21 @@
                     @endif
                 </div>
             @endif
+        </div>
+
+        <div>
+            <x-input-label for="profile_current_password" :value="__('Current Password')" />
+            <x-text-input
+                id="profile_current_password"
+                name="current_password"
+                type="password"
+                class="mt-1 block w-full {{ $errors->has('current_password') ? '!border-danger-500 focus:!border-danger-500 focus:!ring-danger-500' : '' }}"
+                autocomplete="current-password"
+            />
+            <p class="mt-2 text-sm text-gray-600">
+                {{ __('Required only when changing your email address.') }}
+            </p>
+            <x-input-error class="mt-2" :messages="$errors->get('current_password')" />
         </div>
 
         <div class="flex items-center">

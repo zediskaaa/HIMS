@@ -87,6 +87,10 @@ class EnforceSessionInactivity
 
     private function finish(Request $request, Response $response): Response
     {
+        if ($request->routeIs('session.activity', 'admin.session.activity', 'super-admin.session.activity')) {
+            $request->session()->reflash();
+        }
+
         $guard = AuthenticationContext::authenticatedGuard();
 
         if ($guard !== null) {

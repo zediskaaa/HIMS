@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class ProfileTest extends TestCase
@@ -28,6 +29,8 @@ class ProfileTest extends TestCase
             ->assertSee('name="surname"', false)
             ->assertSee('name="first_name"', false)
             ->assertSee('name="middle_name"', false)
+            ->assertSee('name="current_password"', false)
+            ->assertSee('Required only when changing your email address.')
             ->assertDontSee('name="name"', false);
     }
 
@@ -42,11 +45,12 @@ class ProfileTest extends TestCase
                 'first_name' => 'Juan',
                 'middle_name' => 'Santos',
                 'email' => 'test@example.com',
+                'current_password' => 'password',
             ]);
 
         $response
             ->assertSessionHasNoErrors()
-            ->assertSessionHas('profile_success', 'Profile updated successfully.')
+            ->assertSessionHas('profile_success', 'Email updated successfully.')
             ->assertSessionMissing('success')
             ->assertRedirect('/profile');
 
@@ -69,15 +73,266 @@ class ProfileTest extends TestCase
             ->assertSee('value="Juan"', false)
             ->assertSee('value="Santos"', false)
             ->assertSee('Juan Santos Dela Cruz')
-            ->assertSee('Profile updated successfully.');
+            ->assertSee('Email updated')
+            ->assertSee('Email updated successfully.');
 
-        $this->assertSame(1, substr_count($profilePage->getContent(), 'Profile updated successfully.'));
+        $this->assertSame(1, substr_count($profilePage->getContent(), 'Email updated successfully.'));
 
         $this
             ->actingAs($user)
             ->get('/profile')
             ->assertOk()
+            ->assertDontSee('Email updated successfully.');
+    }
+
+    public function test_current_password_is_required_to_change_email(): void
+    {
+        $user = User::factory()->create(['email' => 'original@example.com']);
+
+        $response = $this
+            ->actingAs($user)
+            ->from('/profile')
+            ->patch('/profile', [
+                'surname' => $user->surname,
+                'first_name' => $user->first_name,
+                'middle_name' => $user->middle_name,
+                'email' => 'changed@example.com',
+            ]);
+
+        $response
+            ->assertRedirect('/profile')
+            ->assertSessionHasErrors([
+                'current_password' => 'Current password is required to change your email address.',
+            ])
+            ->assertSessionMissing('profile_success');
+
+        $this
+            ->actingAs($user)
+            ->get('/profile')
+            ->assertOk()
+            ->assertSee('Current password is required to change your email address.')
+            ->assertSee('!border-danger-500', false);
+
+        $this->assertSame('original@example.com', $user->refresh()->email);
+    }
+
+    public function test_current_password_must_be_correct_to_change_email(): void
+    {
+        $user = User::factory()->create(['email' => 'original@example.com']);
+
+        $response = $this
+            ->actingAs($user)
+            ->from('/profile')
+            ->patch('/profile', [
+                'surname' => $user->surname,
+                'first_name' => $user->first_name,
+                'middle_name' => $user->middle_name,
+                'email' => 'changed@example.com',
+                'current_password' => 'wrong-password',
+            ]);
+
+        $response
+            ->assertRedirect('/profile')
+            ->assertSessionHasErrors([
+                'current_password' => 'Current password is incorrect.',
+            ])
+            ->assertSessionMissing('profile_success');
+
+        $this
+            ->actingAs($user)
+            ->get('/profile')
+            ->assertOk()
+            ->assertSee('Current password is incorrect.')
+            ->assertSee('!border-danger-500', false);
+
+        $this->assertSame('original@example.com', $user->refresh()->email);
+    }
+
+    public function test_an_incorrect_supplied_password_is_never_accepted_as_a_profile_update(): void
+    {
+        $user = User::factory()->create(['email' => 'original@example.com']);
+
+        $response = $this
+            ->actingAs($user)
+            ->from('/profile')
+            ->patch('/profile', [
+                'surname' => $user->surname,
+                'first_name' => $user->first_name,
+                'middle_name' => $user->middle_name,
+                'email' => $user->email,
+                'current_password' => 'wrong-password',
+            ]);
+
+        $response
+            ->assertRedirect('/profile')
+            ->assertSessionHasErrors([
+                'current_password' => 'Current password is incorrect.',
+            ])
+            ->assertSessionMissing('profile_success');
+
+        $this->get('/profile')
+            ->assertOk()
+            ->assertSee('Current password is incorrect.')
             ->assertDontSee('Profile updated successfully.');
+    }
+
+    public function test_duplicate_email_is_rejected_even_with_the_correct_password(): void
+    {
+        $user = User::factory()->create(['email' => 'original@example.com']);
+        User::factory()->create(['email' => 'taken@example.com']);
+
+        $response = $this
+            ->actingAs($user)
+            ->from('/profile')
+            ->patch('/profile', [
+                'surname' => $user->surname,
+                'first_name' => $user->first_name,
+                'middle_name' => $user->middle_name,
+                'email' => 'taken@example.com',
+                'current_password' => 'password',
+            ]);
+
+        $response
+            ->assertRedirect('/profile')
+            ->assertSessionHasErrors('email')
+            ->assertSessionMissing('profile_success');
+
+        $this->assertSame('original@example.com', $user->refresh()->email);
+    }
+
+    public function test_invalid_email_is_rejected_even_with_the_correct_password(): void
+    {
+        $user = User::factory()->create(['email' => 'original@example.com']);
+
+        $response = $this
+            ->actingAs($user)
+            ->from('/profile')
+            ->patch('/profile', [
+                'surname' => $user->surname,
+                'first_name' => $user->first_name,
+                'middle_name' => $user->middle_name,
+                'email' => 'not-an-email',
+                'current_password' => 'password',
+            ]);
+
+        $response
+            ->assertRedirect('/profile')
+            ->assertSessionHasErrors('email')
+            ->assertSessionMissing('profile_success');
+
+        $this->assertSame('original@example.com', $user->refresh()->email);
+    }
+
+    #[DataProvider('authenticationPanels')]
+    public function test_email_change_validation_and_feedback_work_for_every_authentication_panel(
+        string $guard,
+        UserRole $role,
+        string $loginRoute,
+        string $activityRoute,
+    ): void {
+        $user = User::factory()->role($role)->create([
+            'email' => $guard.'.original@example.com',
+            'password' => 'password',
+        ]);
+        User::factory()->create(['email' => 'taken@example.com']);
+
+        $this->post(route($loginRoute), [
+            'email' => $user->email,
+            'password' => 'password',
+        ])->assertRedirect();
+
+        $this->app['auth']->forgetGuards();
+        $this->assertAuthenticatedAs($user, $guard);
+
+        $profile = [
+            'surname' => $user->surname,
+            'first_name' => $user->first_name,
+            'middle_name' => $user->middle_name,
+        ];
+
+        $this->from('/profile')->patch('/profile', [
+            ...$profile,
+            'email' => $guard.'.wrong-password@example.com',
+            'current_password' => 'wrong-password',
+        ])->assertRedirect('/profile')
+            ->assertSessionHasErrors([
+                'current_password' => 'Current password is incorrect.',
+            ])
+            ->assertSessionMissing('profile_success');
+
+        $this->assertSame($guard.'.original@example.com', $user->refresh()->email);
+
+        // A heartbeat can race the redirect in a real browser. It must not
+        // consume the flashed validation error before Profile Settings renders.
+        $this->postJson(route($activityRoute))->assertNoContent();
+
+        $this->get('/profile')
+            ->assertOk()
+            ->assertSee('Current password is incorrect.')
+            ->assertDontSee('Email updated successfully.');
+
+        $this->get('/profile')
+            ->assertOk()
+            ->assertDontSee('Current password is incorrect.');
+
+        $this->from('/profile')->patch('/profile', [
+            ...$profile,
+            'email' => $guard.'.missing-password@example.com',
+        ])->assertRedirect('/profile')
+            ->assertSessionHasErrors([
+                'current_password' => 'Current password is required to change your email address.',
+            ])
+            ->assertSessionMissing('profile_success');
+
+        $this->assertSame($guard.'.original@example.com', $user->refresh()->email);
+
+        $this->get('/profile')
+            ->assertOk()
+            ->assertSee('Current password is required to change your email address.');
+
+        $this->from('/profile')->patch('/profile', [
+            ...$profile,
+            'email' => 'not-an-email',
+            'current_password' => 'password',
+        ])->assertRedirect('/profile')
+            ->assertSessionHasErrors('email')
+            ->assertSessionMissing('profile_success');
+
+        $this->assertSame($guard.'.original@example.com', $user->refresh()->email);
+        $this->get('/profile')->assertOk();
+
+        $this->from('/profile')->patch('/profile', [
+            ...$profile,
+            'email' => 'taken@example.com',
+            'current_password' => 'password',
+        ])->assertRedirect('/profile')
+            ->assertSessionHasErrors('email')
+            ->assertSessionMissing('profile_success');
+
+        $this->assertSame($guard.'.original@example.com', $user->refresh()->email);
+        $this->get('/profile')->assertOk();
+
+        $newEmail = $guard.'.updated@example.com';
+
+        $this->patch('/profile', [
+            ...$profile,
+            'email' => $newEmail,
+            'current_password' => 'password',
+        ])->assertSessionHasNoErrors()
+            ->assertSessionHas('profile_success', 'Email updated successfully.')
+            ->assertRedirect('/profile');
+
+        $this->assertSame($newEmail, $user->refresh()->email);
+
+        $this->get('/profile')
+            ->assertOk()
+            ->assertSee('Email updated successfully.')
+            ->assertSee('value="'.$newEmail.'"', false);
+
+        $this->get('/profile')
+            ->assertOk()
+            ->assertDontSee('Email updated successfully.')
+            ->assertSee('value="'.$newEmail.'"', false);
     }
 
     public function test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged(): void
@@ -167,6 +422,7 @@ class ProfileTest extends TestCase
                 'first_name' => 'Profile',
                 'middle_name' => null,
                 'email' => 'changed@example.com',
+                'current_password' => 'password',
             ]);
 
         $response
@@ -307,5 +563,22 @@ class ProfileTest extends TestCase
             ->assertRedirect('/profile');
 
         $this->assertNotNull($user->fresh());
+    }
+
+    /**
+     * @return array<string, array{string, UserRole, string, string}>
+     */
+    public static function authenticationPanels(): array
+    {
+        return [
+            'staff' => ['web', UserRole::WarehouseStaff, 'login', 'session.activity'],
+            'admin' => ['admin', UserRole::Administrator, 'admin.login.store', 'admin.session.activity'],
+            'super admin' => [
+                'super_admin',
+                UserRole::SuperAdministrator,
+                'super-admin.login.store',
+                'super-admin.session.activity',
+            ],
+        ];
     }
 }

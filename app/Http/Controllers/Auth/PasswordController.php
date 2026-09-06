@@ -27,12 +27,17 @@ class PasswordController extends Controller
                 'confirmed',
                 new NotCurrentPassword($request->user()),
             ],
+        ], [
+            'current_password.required' => 'Current password is required.',
+            'current_password.current_password' => 'Current password is incorrect.',
         ]);
 
         $request->user()->update([
             'password' => Hash::make($validated['password']),
         ]);
 
-        return back()->with('status', 'password-updated');
+        $request->session()->put('password_success', 'Password updated successfully.');
+
+        return back();
     }
 }

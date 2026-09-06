@@ -228,24 +228,53 @@ class SuperAdminProvisioningTest extends TestCase
         $this->assertSame(1, User::superAdministrators()->count());
     }
 
-    public function test_protected_super_admin_cannot_change_its_email_or_delete_itself(): void
+    public function test_protected_super_admin_can_confirm_an_email_change_but_cannot_delete_itself(): void
     {
         $superAdmin = $this->provisionedSuperAdmin();
+        $originalId = $superAdmin->getKey();
+        $profile = $superAdmin->nameComponents();
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('id="profile_current_password"', false)
+            ->assertDontSee('This system-owned sign-in address is protected.');
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->from(route('profile.edit'))
+            ->patch(route('profile.update'), [
+                ...$profile,
+                'email' => 'changed@example.com',
+                'current_password' => 'wrong-password',
+            ])->assertSessionHasErrors([
+                'current_password' => 'Current password is incorrect.',
+            ])
+            ->assertSessionMissing('profile_success');
+
+        $this->assertSame(self::EMAIL, $superAdmin->refresh()->email);
 
         $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
             ->patch(route('profile.update'), [
-                'name' => $superAdmin->name,
+                ...$profile,
                 'email' => 'changed@example.com',
-            ])->assertSessionHasErrors('email');
+                'current_password' => self::INITIAL_PASSWORD,
+            ])->assertSessionHasNoErrors()
+            ->assertSessionHas('profile_success', 'Email updated successfully.')
+            ->assertRedirect(route('profile.edit'));
+
+        $this->assertSame('changed@example.com', $superAdmin->refresh()->email);
 
         $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
             ->delete(route('profile.destroy'), ['password' => self::INITIAL_PASSWORD])
             ->assertForbidden();
 
+        $this->seed(SuperAdminSeeder::class);
+
         $this->assertDatabaseHas('users', [
-            'id' => $superAdmin->getKey(),
-            'email' => self::EMAIL,
+            'id' => $originalId,
+            'email' => 'changed@example.com',
             'is_protected' => true,
         ]);
+        $this->assertSame(1, User::query()->where('is_protected', true)->count());
     }
 }

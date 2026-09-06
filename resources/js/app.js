@@ -168,13 +168,16 @@ const startSessionMonitor = () => {
     });
 
     document.addEventListener('submit', (event) => {
-        if (!(event.target instanceof HTMLFormElement)
-            || !event.target.matches('[data-manual-logout]')) return;
+        if (!(event.target instanceof HTMLFormElement)) return;
 
-        // Stop this tab before the POST navigation and notify every other tab.
-        // The server still validates elapsed inactivity independently.
+        // Stop pending heartbeats before a form navigation. Otherwise a slow
+        // validation redirect can race the heartbeat's session write and lose
+        // the flashed validation errors before the next page renders them.
         stopSessionMonitor();
 
+        if (!event.target.matches('[data-manual-logout]')) return;
+
+        // Manual logout also tells every other tab to stop its monitor.
         try {
             window.localStorage.setItem(manualLogoutKey, String(Date.now()));
         } catch {

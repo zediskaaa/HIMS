@@ -21,7 +21,11 @@ class SuperAdminSeeder extends Seeder
     public function run(): void
     {
         User::withoutEvents(function (): void {
-            $user = User::query()->firstOrNew(['email' => self::EMAIL]);
+            $user = User::query()
+                ->where('is_protected', true)
+                ->where('role', UserRole::SuperAdministrator->value)
+                ->first()
+                ?? User::query()->firstOrNew(['email' => self::EMAIL]);
             $shouldSetInitialPassword = ! $user->exists || ! $user->isProtected();
             $employeeId = $user->employee_id ?: $this->availableEmployeeId($user);
 

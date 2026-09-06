@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\User;
+use App\Support\AuthenticationContext;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -16,6 +17,7 @@ class ProfileUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
+        $guard = AuthenticationContext::authenticatedGuard() ?? AuthenticationContext::WEB_GUARD;
         $emailRules = [
             'required',
             'string',
@@ -25,8 +27,10 @@ class ProfileUpdateRequest extends FormRequest
             Rule::unique(User::class)->ignore($this->user()->id),
         ];
 
-        if ($this->user()->isProtected()) {
-            $emailRules[] = Rule::in([$this->user()->email]);
+        $currentPasswordRules = ['nullable', 'current_password:'.$guard];
+
+        if (is_string($this->input('email')) && $this->input('email') !== $this->user()->email) {
+            $currentPasswordRules = ['required', 'current_password:'.$guard];
         }
 
         return [
@@ -34,6 +38,7 @@ class ProfileUpdateRequest extends FormRequest
             'first_name' => ['required', 'string', 'max:80'],
             'middle_name' => ['nullable', 'string', 'max:80'],
             'email' => $emailRules,
+            'current_password' => $currentPasswordRules,
         ];
     }
 
@@ -43,7 +48,8 @@ class ProfileUpdateRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'email.in' => 'The protected Super Administrator email cannot be changed.',
+            'current_password.required' => 'Current password is required to change your email address.',
+            'current_password.current_password' => 'Current password is incorrect.',
         ];
     }
 
