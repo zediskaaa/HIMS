@@ -34,6 +34,26 @@ class AuthenticatedSessionController extends Controller
     ): RedirectResponse {
         $user = $request->validateCredentials();
 
+        if ($user->authenticatorMfaEnabled()) {
+            $pendingUser = $mfa->pendingUser($request, AuthenticationContext::SUPER_ADMIN_GUARD);
+
+            if ($pendingUser?->is($user)
+                && $mfa->challengeMethod($request, AuthenticationContext::SUPER_ADMIN_GUARD) === LoginMfaService::METHOD_AUTHENTICATOR) {
+                return redirect()->route('super-admin.login.mfa');
+            }
+
+            $request->session()->regenerate();
+            $mfa->issueAuthenticator(
+                $request,
+                $user,
+                AuthenticationContext::SUPER_ADMIN_GUARD,
+                $request->boolean('remember'),
+                $request->progressiveThrottleKey(),
+            );
+
+            return redirect()->route('super-admin.login.mfa');
+        }
+
         if ($user->mfa_enabled) {
             $pendingUser = $mfa->pendingUser($request, AuthenticationContext::SUPER_ADMIN_GUARD);
 

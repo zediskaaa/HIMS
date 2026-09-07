@@ -83,7 +83,7 @@ enum AuthenticationPanel: string
     public function loginMfaRoute(): string
     {
         return match ($this) {
-            self::Staff => 'login',
+            self::Staff => 'login.mfa',
             self::Admin => 'admin.login.mfa',
             self::SuperAdmin => 'super-admin.login.mfa',
         };
@@ -92,7 +92,7 @@ enum AuthenticationPanel: string
     public function loginMfaVerifyRoute(): string
     {
         return match ($this) {
-            self::Staff => 'login',
+            self::Staff => 'login.mfa.verify',
             self::Admin => 'admin.login.mfa.verify',
             self::SuperAdmin => 'super-admin.login.mfa.verify',
         };
@@ -101,7 +101,7 @@ enum AuthenticationPanel: string
     public function loginMfaResendRoute(): string
     {
         return match ($this) {
-            self::Staff => 'login',
+            self::Staff => 'login.mfa.resend',
             self::Admin => 'admin.login.mfa.resend',
             self::SuperAdmin => 'super-admin.login.mfa.resend',
         };

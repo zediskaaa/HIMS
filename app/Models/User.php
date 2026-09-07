@@ -47,6 +47,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'authenticator_secret',
         'failed_login_attempts',
         'last_failed_login_at',
         'login_retry_at',
@@ -70,6 +71,8 @@ class User extends Authenticatable
             'login_locked_until' => 'datetime',
             'is_protected' => 'boolean',
             'mfa_enabled' => 'boolean',
+            'authenticator_secret' => 'encrypted',
+            'authenticator_enabled_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
             'status' => UserStatus::class,
@@ -245,6 +248,12 @@ class User extends Authenticatable
     public function isActive(): bool
     {
         return $this->status->isActive();
+    }
+
+    public function authenticatorMfaEnabled(): bool
+    {
+        return $this->authenticator_enabled_at !== null
+            && filled($this->authenticator_secret);
     }
 
     public function passwordExpiresAt(): ?CarbonInterface

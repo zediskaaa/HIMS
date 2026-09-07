@@ -5,7 +5,7 @@
         <div class="flex items-center justify-between gap-4">
             <div>
                 <h2 class="text-lg font-medium text-gray-900">
-                    {{ __('Multi-Factor Authentication') }}
+                    {{ __('Email Multi-Factor Authentication') }}
                 </h2>
                 <p class="mt-1 text-sm text-gray-600">
                     {{ __('Require a one-time email code after your password is accepted.') }}

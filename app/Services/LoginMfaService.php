@@ -11,6 +11,10 @@ class LoginMfaService
 {
     public const SESSION_KEY = 'auth.login_mfa';
 
+    public const METHOD_EMAIL = 'email';
+
+    public const METHOD_AUTHENTICATOR = 'authenticator';
+
     public const SUCCESS = 'success';
 
     public const INVALID = 'invalid';
@@ -18,6 +22,8 @@ class LoginMfaService
     public const EXPIRED = 'expired';
 
     public const MISSING = 'missing';
+
+    public function __construct(private readonly AuthenticatorService $authenticator) {}
 
     public function issue(
         Request $request,
@@ -30,22 +36,38 @@ class LoginMfaService
 
         do {
             $otp = $this->generateOtp();
-        } while ($previousState !== null && Hash::check($otp, $previousState['otp_hash']));
+        } while ($previousState !== null
+            && is_string($previousState['otp_hash'])
+            && Hash::check($otp, $previousState['otp_hash']));
 
-        $now = now()->getTimestamp();
-
-        $request->session()->put(self::SESSION_KEY, [
-            'user_id' => $user->getKey(),
-            'guard' => $guard,
-            'otp_hash' => Hash::make($otp),
-            'expires_at' => $now + ($this->expiresInMinutes() * 60),
-            'attempts_remaining' => $this->maxAttempts(),
-            'resend_available_at' => $now + $this->resendCooldownSeconds(),
-            'remember' => $remember,
-            'login_throttle_key' => $loginThrottleKey,
-        ]);
+        $this->putState(
+            $request,
+            $user,
+            $guard,
+            $remember,
+            $loginThrottleKey,
+            self::METHOD_EMAIL,
+            Hash::make($otp),
+        );
 
         return $otp;
+    }
+
+    public function issueAuthenticator(
+        Request $request,
+        User $user,
+        string $guard,
+        bool $remember,
+        ?string $loginThrottleKey = null,
+    ): void {
+        $this->putState(
+            $request,
+            $user,
+            $guard,
+            $remember,
+            $loginThrottleKey,
+            self::METHOD_AUTHENTICATOR,
+        );
     }
 
     public function pendingUser(Request $request, string $guard): ?User
@@ -58,8 +80,12 @@ class LoginMfaService
 
         $user = User::query()->find($state['user_id']);
         $panel = AuthenticationPanel::forGuard($guard);
+        $methodStillEnabled = $user !== null && match ($state['method']) {
+            self::METHOD_AUTHENTICATOR => $user->authenticatorMfaEnabled(),
+            self::METHOD_EMAIL => (bool) $user->mfa_enabled,
+        };
 
-        if ($user === null || ! $user->isActive() || ! $user->mfa_enabled || ! $panel->accepts($user->role)) {
+        if ($user === null || ! $user->isActive() || ! $methodStillEnabled || ! $panel->accepts($user->role)) {
             $this->clear($request);
 
             return null;
@@ -68,9 +94,7 @@ class LoginMfaService
         return $user;
     }
 
-    /**
-     * @return array{status: string, user?: User, remember?: bool, login_throttle_key?: ?string, attempts_remaining?: int}
-     */
+    /** @return array{status: string, user?: User, remember?: bool, login_throttle_key?: ?string, attempts_remaining?: int, method?: string} */
     public function verify(Request $request, string $guard, #[\SensitiveParameter] string $otp): array
     {
         $state = $this->state($request, $guard);
@@ -81,16 +105,24 @@ class LoginMfaService
         }
 
         if ($state['expires_at'] <= now()->getTimestamp()) {
-            return ['status' => self::EXPIRED];
+            return ['status' => self::EXPIRED, 'method' => $state['method']];
         }
 
-        if ($state['attempts_remaining'] < 1 || ! Hash::check($otp, $state['otp_hash'])) {
+        $valid = match ($state['method']) {
+            self::METHOD_AUTHENTICATOR => is_string($user->authenticator_secret)
+                && $this->authenticator->verify($user->authenticator_secret, $otp),
+            self::METHOD_EMAIL => is_string($state['otp_hash'])
+                && Hash::check($otp, $state['otp_hash']),
+        };
+
+        if ($state['attempts_remaining'] < 1 || ! $valid) {
             $state['attempts_remaining'] = max(0, $state['attempts_remaining'] - 1);
             $request->session()->put(self::SESSION_KEY, $state);
 
             return [
                 'status' => self::INVALID,
                 'attempts_remaining' => $state['attempts_remaining'],
+                'method' => $state['method'],
             ];
         }
 
@@ -101,12 +133,11 @@ class LoginMfaService
             'user' => $user,
             'remember' => $state['remember'],
             'login_throttle_key' => $state['login_throttle_key'],
+            'method' => $state['method'],
         ];
     }
 
-    /**
-     * @return array{status: string, otp?: string, user?: User, retry_after?: int}
-     */
+    /** @return array{status: string, otp?: string, user?: User, retry_after?: int} */
     public function resend(Request $request, string $guard): array
     {
         $state = $this->state($request, $guard);
@@ -114,6 +145,10 @@ class LoginMfaService
 
         if ($state === null || $user === null) {
             return ['status' => self::MISSING];
+        }
+
+        if ($state['method'] !== self::METHOD_EMAIL) {
+            return ['status' => 'unsupported'];
         }
 
         $retryAfter = max(0, $state['resend_available_at'] - now()->getTimestamp());
@@ -135,6 +170,11 @@ class LoginMfaService
         ];
     }
 
+    public function challengeMethod(Request $request, string $guard): ?string
+    {
+        return $this->state($request, $guard)['method'] ?? null;
+    }
+
     public function isExpired(Request $request, string $guard): bool
     {
         $state = $this->state($request, $guard);
@@ -146,7 +186,7 @@ class LoginMfaService
     {
         $state = $this->state($request, $guard);
 
-        return $state === null
+        return $state === null || $state['method'] !== self::METHOD_EMAIL
             ? 0
             : max(0, $state['resend_available_at'] - now()->getTimestamp());
     }
@@ -169,17 +209,40 @@ class LoginMfaService
         return max(1, (int) config('auth.login_mfa.resend_cooldown', 60));
     }
 
-    /**
-     * @return array{user_id: int, guard: string, otp_hash: string, expires_at: int, attempts_remaining: int, resend_available_at: int, remember: bool, login_throttle_key: ?string}|null
-     */
+    private function putState(
+        Request $request,
+        User $user,
+        string $guard,
+        bool $remember,
+        ?string $loginThrottleKey,
+        string $method,
+        ?string $otpHash = null,
+    ): void {
+        $now = now()->getTimestamp();
+
+        $request->session()->put(self::SESSION_KEY, [
+            'user_id' => $user->getKey(),
+            'guard' => $guard,
+            'method' => $method,
+            'otp_hash' => $otpHash,
+            'expires_at' => $now + ($this->expiresInMinutes() * 60),
+            'attempts_remaining' => $this->maxAttempts(),
+            'resend_available_at' => $now + $this->resendCooldownSeconds(),
+            'remember' => $remember,
+            'login_throttle_key' => $loginThrottleKey,
+        ]);
+    }
+
+    /** @return array{user_id: int, guard: string, method: string, otp_hash: ?string, expires_at: int, attempts_remaining: int, resend_available_at: int, remember: bool, login_throttle_key: ?string}|null */
     private function state(Request $request, string $guard): ?array
     {
         $state = $request->session()->get(self::SESSION_KEY);
 
         if (! is_array($state)
             || ($state['guard'] ?? null) !== $guard
+            || ! in_array($state['method'] ?? null, [self::METHOD_EMAIL, self::METHOD_AUTHENTICATOR], true)
             || ! is_numeric($state['user_id'] ?? null)
-            || ! is_string($state['otp_hash'] ?? null)
+            || (! is_null($state['otp_hash'] ?? null) && ! is_string($state['otp_hash']))
             || ! is_numeric($state['expires_at'] ?? null)
             || ! is_numeric($state['attempts_remaining'] ?? null)
             || ! is_numeric($state['resend_available_at'] ?? null)
@@ -192,7 +255,8 @@ class LoginMfaService
         return [
             'user_id' => (int) $state['user_id'],
             'guard' => $state['guard'],
-            'otp_hash' => $state['otp_hash'],
+            'method' => $state['method'],
+            'otp_hash' => is_string($state['otp_hash'] ?? null) ? $state['otp_hash'] : null,
             'expires_at' => (int) $state['expires_at'],
             'attempts_remaining' => (int) $state['attempts_remaining'],
             'resend_available_at' => (int) $state['resend_available_at'],

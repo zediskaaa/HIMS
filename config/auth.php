@@ -120,6 +120,12 @@ return [
         'resend_cooldown' => (int) env('AUTH_LOGIN_MFA_RESEND_COOLDOWN', 60),
     ],
 
+    'authenticator' => [
+        'issuer' => env('AUTH_AUTHENTICATOR_ISSUER', 'HIMS'),
+        'window' => (int) env('AUTH_AUTHENTICATOR_WINDOW', 1),
+        'setup_expire' => (int) env('AUTH_AUTHENTICATOR_SETUP_EXPIRE', 10),
+    ],
+
     'password_expiration' => [
         'days' => (int) env('AUTH_PASSWORD_EXPIRATION_DAYS', 90),
     ],

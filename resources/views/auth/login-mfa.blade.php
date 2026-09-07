@@ -8,10 +8,16 @@
                 <x-ui.icon name="shield-check" class="h-3.5 w-3.5" />
                 {{ $panel->label() }} login security
             </div>
-            <h1 class="text-3xl font-semibold tracking-tight text-neutral-900">Verify your sign-in</h1>
+            <h1 class="text-3xl font-semibold tracking-tight text-neutral-900">
+                {{ $method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR ? 'Authenticator Verification' : 'Verify your sign-in' }}
+            </h1>
             <p class="mt-3 text-sm leading-6 text-neutral-500">
-                Enter the 6-digit code sent to <span class="font-medium text-neutral-700">{{ $maskedEmail }}</span>.
-                Each code expires in {{ $expiresInMinutes }} {{ Str::plural('minute', $expiresInMinutes) }}.
+                @if ($method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR)
+                    Enter the 6-digit code from your authenticator app.
+                @else
+                    Enter the 6-digit code sent to <span class="font-medium text-neutral-700">{{ $maskedEmail }}</span>.
+                    Each code expires in {{ $expiresInMinutes }} {{ Str::plural('minute', $expiresInMinutes) }}.
+                @endif
             </p>
         </header>
 
@@ -51,17 +57,19 @@
             </x-ui.button>
         </form>
 
-        <form method="POST" action="{{ route($panel->loginMfaResendRoute()) }}" class="text-center">
-            @csrf
-            <button type="submit" data-loading-text="Sending..." class="inline-flex items-center justify-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700">
-                Send a new code
-            </button>
-            @if ($resendAvailableIn > 0)
-                <p class="mt-1 text-xs text-neutral-500">
-                    A new code can be requested after the {{ $resendAvailableIn }}-second cooldown.
-                </p>
-            @endif
-        </form>
+        @if ($method === \App\Services\LoginMfaService::METHOD_EMAIL)
+            <form method="POST" action="{{ route($panel->loginMfaResendRoute()) }}" class="text-center">
+                @csrf
+                <button type="submit" data-loading-text="Sending..." class="inline-flex items-center justify-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700">
+                    Send a new code
+                </button>
+                @if ($resendAvailableIn > 0)
+                    <p class="mt-1 text-xs text-neutral-500">
+                        A new code can be requested after the {{ $resendAvailableIn }}-second cooldown.
+                    </p>
+                @endif
+            </form>
+        @endif
 
         <p class="border-t border-neutral-200 pt-5 text-xs leading-5 text-neutral-500">
             Never share this code. HIMS support will not ask you for it.

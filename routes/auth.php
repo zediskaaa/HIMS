@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\ExpiredPasswordController;
+use App\Http\Controllers\Auth\LoginMfaController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
@@ -31,6 +32,18 @@ Route::middleware(['guest:web', 'guest:admin', 'guest:super_admin'])->group(func
         ->name('login');
 
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
+
+    Route::get('login/mfa', [LoginMfaController::class, 'show'])
+        ->defaults('auth_panel', AuthenticationPanel::Staff->value)
+        ->name('login.mfa');
+    Route::post('login/mfa', [LoginMfaController::class, 'verify'])
+        ->defaults('auth_panel', AuthenticationPanel::Staff->value)
+        ->middleware('throttle:6,1')
+        ->name('login.mfa.verify');
+    Route::post('login/mfa/resend', [LoginMfaController::class, 'resend'])
+        ->defaults('auth_panel', AuthenticationPanel::Staff->value)
+        ->middleware('throttle:3,1')
+        ->name('login.mfa.resend');
 
     Route::get('password-expired', [ExpiredPasswordController::class, 'show'])
         ->defaults('auth_panel', AuthenticationPanel::Staff->value)

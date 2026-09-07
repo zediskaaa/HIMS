@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\User;
+use App\Services\AuthenticatorSetupService;
+use App\Support\AuthenticationContext;
+use App\Support\MfaSession;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
@@ -14,10 +17,15 @@ class ProfileController extends Controller
     /**
      * Display the user's profile form.
      */
-    public function edit(Request $request): View
+    public function edit(Request $request, AuthenticatorSetupService $setup): View
     {
+        $user = $request->user();
+
         return view('profile.edit', [
-            'user' => $request->user(),
+            'user' => $user,
+            'authenticatorSetup' => $user instanceof User && ! $user->authenticatorMfaEnabled()
+                ? $setup->details($request, $user)
+                : null,
         ]);
     }
 
@@ -60,6 +68,10 @@ class ProfileController extends Controller
 
         $enabled = (bool) $validated['mfa_enabled'];
         $user->forceFill(['mfa_enabled' => $enabled])->save();
+        if ($enabled) {
+            $guard = AuthenticationContext::authenticatedGuard() ?? AuthenticationContext::WEB_GUARD;
+            MfaSession::mark($request, $user, $guard);
+        }
         $request->session()->put(
             'mfa_success',
             $enabled

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\PermissionMatrixController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\AuthenticatorController;
 use App\Http\Controllers\Inventory\DemandForecastController;
 use App\Http\Controllers\Inventory\InventoryController;
 use App\Http\Controllers\Inventory\InventoryItemController;
@@ -66,6 +67,20 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::patch('/profile/mfa', [ProfileController::class, 'updateMfa'])->name('profile.mfa.update');
+    Route::post('/profile/authenticator/setup', [AuthenticatorController::class, 'setup'])
+        ->middleware('throttle:5,1')
+        ->name('profile.authenticator.setup');
+    // A stale error-page URL may be revisited as GET. Return to the setup UI;
+    // enabling the authenticator itself remains POST-only and CSRF-protected.
+    Route::get('/profile/authenticator/enable', fn () => redirect()->route('profile.edit'));
+    Route::post('/profile/authenticator/enable', [AuthenticatorController::class, 'enable'])
+        ->middleware('throttle:6,1')
+        ->name('profile.authenticator.enable');
+    Route::post('/profile/authenticator/cancel', [AuthenticatorController::class, 'cancel'])
+        ->name('profile.authenticator.cancel');
+    Route::delete('/profile/authenticator', [AuthenticatorController::class, 'disable'])
+        ->middleware('throttle:6,1')
+        ->name('profile.authenticator.disable');
 });
 
 /*
