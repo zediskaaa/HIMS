@@ -70,12 +70,18 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::post('/profile/authenticator/setup', [AuthenticatorController::class, 'setup'])
         ->middleware('throttle:5,1')
         ->name('profile.authenticator.setup');
+    Route::post('/profile/authenticator/setup-json', [AuthenticatorController::class, 'setupJson'])
+        ->middleware('throttle:5,1')
+        ->name('profile.authenticator.setup.json');
     // A stale error-page URL may be revisited as GET. Return to the setup UI;
     // enabling the authenticator itself remains POST-only and CSRF-protected.
     Route::get('/profile/authenticator/enable', fn () => redirect()->route('profile.edit'));
     Route::post('/profile/authenticator/enable', [AuthenticatorController::class, 'enable'])
         ->middleware('throttle:6,1')
         ->name('profile.authenticator.enable');
+    Route::post('/profile/authenticator/enable-json', [AuthenticatorController::class, 'enableJson'])
+        ->middleware('throttle:6,1')
+        ->name('profile.authenticator.enable.json');
     Route::post('/profile/authenticator/cancel', [AuthenticatorController::class, 'cancel'])
         ->name('profile.authenticator.cancel');
     Route::delete('/profile/authenticator', [AuthenticatorController::class, 'disable'])

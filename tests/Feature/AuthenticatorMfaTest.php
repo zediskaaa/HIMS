@@ -322,6 +322,57 @@ class AuthenticatorMfaTest extends TestCase
             ->assertJsonPath('code', 'MFA_REQUIRED');
     }
 
+    public function test_setup_json_requires_valid_password_and_returns_qr_and_secret(): void
+    {
+        $user = User::factory()->warehouseStaff()->create(['password' => 'password']);
+
+        // Wrong password -> 422 JSON validation error
+        $this->actingAs($user)
+            ->postJson(route('profile.authenticator.setup.json'), ['current_password' => 'wrong-pass'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['current_password']);
+
+        $this->assertNull(session(AuthenticatorSetupService::SESSION_KEY));
+
+        // Correct password -> 200 with qr_code and secret
+        $response = $this->postJson(route('profile.authenticator.setup.json'), ['current_password' => 'password'])
+            ->assertOk()
+            ->assertJsonStructure(['qr_code', 'secret']);
+
+        $secret = $response->json('secret');
+        $this->assertMatchesRegularExpression('/^[A-Z2-7]{32}$/', $secret);
+        $this->assertStringStartsWith('data:image/svg+xml;base64,', $response->json('qr_code'));
+        $this->assertFalse($user->fresh()->authenticatorMfaEnabled());
+    }
+
+    public function test_enable_json_validates_totp_code_and_enables_authenticator(): void
+    {
+        $user = User::factory()->warehouseStaff()->create(['password' => 'password']);
+
+        // Must initiate setup first
+        $this->actingAs($user)
+            ->postJson(route('profile.authenticator.setup.json'), ['current_password' => 'password'])
+            ->assertOk();
+
+        $secret = Crypt::decryptString(session(AuthenticatorSetupService::SESSION_KEY)['secret']);
+
+        // Invalid code -> 422
+        $this->postJson(route('profile.authenticator.enable.json'), ['code' => '000000'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['code']);
+        $this->assertFalse($user->fresh()->authenticatorMfaEnabled());
+
+        // Valid code -> 200 and enabled
+        $validCode = (new Google2FA)->getCurrentOtp($secret);
+        $this->postJson(route('profile.authenticator.enable.json'), ['code' => $validCode])
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertTrue($user->fresh()->authenticatorMfaEnabled());
+        $this->assertSame($secret, $user->fresh()->authenticator_secret);
+        $this->assertNull(session(AuthenticatorSetupService::SESSION_KEY));
+    }
+
     /** @return array<string, array{UserRole, string, string, string, string, string}> */
     public static function authenticationPanels(): array
     {
