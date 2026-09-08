@@ -104,7 +104,8 @@ class AdminAuthenticationTest extends TestCase
             $this->post(route('admin.login.store'), [
                 'email' => $user->email,
                 'password' => 'password',
-            ])->assertSessionHasErrors(['email' => trans('auth.failed')]);
+            ])->assertSessionHasNoErrors()
+                ->assertSessionHas('wrong_panel.message');
 
             $this->assertGuest(AuthenticationContext::ADMIN_GUARD);
         }
@@ -131,7 +132,8 @@ class AdminAuthenticationTest extends TestCase
             $this->post(route('login'), [
                 'email' => $user->email,
                 'password' => 'password',
-            ])->assertSessionHasErrors(['email' => trans('auth.failed')]);
+            ])->assertSessionHasNoErrors()
+                ->assertSessionHas('wrong_panel.message');
 
             $this->assertGuest(AuthenticationContext::WEB_GUARD);
         }
@@ -143,7 +145,8 @@ class AdminAuthenticationTest extends TestCase
             $this->post(route('super-admin.login.store'), [
                 'email' => $user->email,
                 'password' => 'password',
-            ])->assertSessionHasErrors(['email' => trans('auth.failed')]);
+            ])->assertSessionHasNoErrors()
+                ->assertSessionHas('wrong_panel.message');
 
             $this->assertGuest(AuthenticationContext::SUPER_ADMIN_GUARD);
         }

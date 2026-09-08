@@ -400,7 +400,9 @@ class LoginLockoutTest extends TestCase
         }
 
         for ($attempt = 3; $attempt <= 4; $attempt++) {
-            $message = 'Incorrect email or password. You have '.(5 - $attempt).' attempts remaining.';
+            $remaining = 5 - $attempt;
+            $message = "Incorrect email or password. You have {$remaining} "
+                .str('attempt')->plural($remaining).' remaining.';
             $this->failedLogin($user)->assertSessionHasErrors(['email' => $message]);
             $this->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$attempt}"])
                 ->post(route('login'), [
@@ -422,12 +424,14 @@ class LoginLockoutTest extends TestCase
     {
         $admin = User::factory()->administrator()->create();
 
-        $this->failedLogin($admin)->assertSessionHasErrors([
-            'email' => 'Incorrect email or password. You have 4 attempts remaining.',
-        ]);
-        $this->failedLogin($admin)->assertSessionHasErrors([
-            'email' => 'Incorrect email or password. You have 3 attempts remaining.',
-        ]);
+        $this->failedLogin($admin)
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('wrong_panel.message')
+            ->assertSessionMissing(LoginLockoutService::SESSION_KEY);
+        $this->failedLogin($admin)
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('wrong_panel.message')
+            ->assertSessionMissing(LoginLockoutService::SESSION_KEY);
         $this->assertSame(0, $admin->refresh()->failed_login_attempts);
         $this->assertNull($admin->last_failed_login_at);
 
@@ -465,7 +469,7 @@ class LoginLockoutTest extends TestCase
         $this->assertTrue($admin->last_failed_login_at->isAfter($lastFailure));
     }
 
-    public function test_valid_credentials_on_the_wrong_panel_do_not_bypass_an_active_lock(): void
+    public function test_wrong_panel_attempt_does_not_surface_or_change_an_active_lock(): void
     {
         $admin = User::factory()->administrator()->create([
             'login_locked_until' => now()->addMinutes(30),
@@ -474,15 +478,19 @@ class LoginLockoutTest extends TestCase
         $lockedUntil = $admin->login_locked_until;
 
         $this->post(route('login'), $this->credentials($admin))
-            ->assertSessionHasErrors([
-                'email' => 'Your account is temporarily locked. Please try again in 30 minutes.',
-            ])
-            ->assertSessionMissing('wrong_panel');
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('wrong_panel.message', "You're using the Staff Login Panel. Please use the Admin Login Panel.")
+            ->assertSessionMissing(LoginLockoutService::SESSION_KEY);
 
         $admin->refresh();
         $this->assertTrue($admin->login_locked_until->equalTo($lockedUntil));
         $this->assertSame(1, $admin->login_lockout_count);
         $this->assertGuest(AuthenticationContext::WEB_GUARD);
+
+        $this->post(route('admin.login.store'), $this->credentials($admin))
+            ->assertSessionHasErrors([
+                'email' => 'Your account is temporarily locked. Please try again in 30 minutes.',
+            ]);
     }
 
     public function test_login_countdown_uses_the_server_deadline_and_revalidates_on_submit(): void

@@ -19,6 +19,8 @@ class LoginLockoutService
 
     public const INVALID = 'invalid';
 
+    public const WRONG_PANEL = 'wrong_panel';
+
     public const WAITING = 'waiting';
 
     public const LOCKED = 'locked';
@@ -46,10 +48,11 @@ class LoginLockoutService
         string $email,
         #[\SensitiveParameter] string $password,
         array $allowedRoles,
+        bool $detectWrongPanel = false,
     ): array {
         $shadowKey = $this->identifierThrottleKey($email);
 
-        $result = DB::transaction(function () use ($email, $password, $allowedRoles): array {
+        $result = DB::transaction(function () use ($email, $password, $allowedRoles, $detectWrongPanel): array {
             $user = User::query()
                 ->where('email', $email)
                 ->where('status', UserStatus::Active->value)
@@ -58,6 +61,10 @@ class LoginLockoutService
 
             if ($user === null) {
                 return ['status' => self::INVALID];
+            }
+
+            if ($detectWrongPanel && ! in_array($user->role->value, $allowedRoles, true)) {
+                return ['status' => self::WRONG_PANEL, 'user' => $user];
             }
 
             if ($user->isSuperAdministrator()) {
@@ -95,7 +102,7 @@ class LoginLockoutService
             return $this->recordAccountFailure($user);
         }, 3);
 
-        if ($result['status'] === self::SUCCESS) {
+        if (in_array($result['status'], [self::SUCCESS, self::WRONG_PANEL], true)) {
             return $result;
         }
 

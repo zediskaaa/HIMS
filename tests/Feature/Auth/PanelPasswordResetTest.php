@@ -3,7 +3,11 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
+use App\Notifications\LoginMfaOtp;
 use App\Notifications\PasswordResetOtp;
+use App\Services\LoginLockoutService;
+use App\Services\LoginMfaService;
+use App\Services\PasswordExpirationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -40,17 +44,18 @@ class PanelPasswordResetTest extends TestCase
     {
         $admin = User::factory()->administrator()->create(['password' => 'password']);
 
-        $response = $this->from(route('login'))->post(route('login'), [
-            'email' => $admin->email,
-            'password' => 'password',
-        ]);
+        foreach (['password', 'incorrect-password'] as $password) {
+            $this->from(route('login'))->post(route('login'), [
+                'email' => $admin->email,
+                'password' => $password,
+            ])->assertRedirect(route('login'))
+                ->assertSessionHasNoErrors()
+                ->assertSessionHas('wrong_panel.message', "You're using the Staff Login Panel. Please use the Admin Login Panel.")
+                ->assertSessionMissing('wrong_panel.url')
+                ->assertSessionMissing('wrong_panel.label')
+                ->assertSessionMissing(LoginLockoutService::SESSION_KEY);
+        }
 
-        $response
-            ->assertRedirect(route('login'))
-            ->assertSessionHasErrors(['email' => trans('auth.failed')])
-            ->assertSessionHas('wrong_panel.message', "You're using the Staff Login Panel. Please use the Admin Login Panel.")
-            ->assertSessionMissing('wrong_panel.url')
-            ->assertSessionMissing('wrong_panel.label');
         $this->assertGuest('web');
         $this->assertSame(0, $admin->refresh()->failed_login_attempts);
         $this->assertNull($admin->last_failed_login_at);
@@ -68,17 +73,18 @@ class PanelPasswordResetTest extends TestCase
     {
         $superAdmin = User::factory()->superAdministrator()->create(['password' => 'password']);
 
-        $response = $this->from(route('login'))->post(route('login'), [
-            'email' => $superAdmin->email,
-            'password' => 'password',
-        ]);
+        foreach (['password', 'incorrect-password'] as $password) {
+            $this->from(route('login'))->post(route('login'), [
+                'email' => $superAdmin->email,
+                'password' => $password,
+            ])->assertRedirect(route('login'))
+                ->assertSessionHasNoErrors()
+                ->assertSessionHas('wrong_panel.message', "You're using the Staff Login Panel. Please use the Super Admin Login Panel.")
+                ->assertSessionMissing('wrong_panel.url')
+                ->assertSessionMissing('wrong_panel.label')
+                ->assertSessionMissing(LoginLockoutService::SESSION_KEY);
+        }
 
-        $response
-            ->assertRedirect(route('login'))
-            ->assertSessionHasErrors(['email' => trans('auth.failed')])
-            ->assertSessionHas('wrong_panel.message', "You're using the Staff Login Panel. Please use the Super Admin Login Panel.")
-            ->assertSessionMissing('wrong_panel.url')
-            ->assertSessionMissing('wrong_panel.label');
         $this->assertGuest('web');
         $superAdmin->refresh();
         $this->assertSame(0, $superAdmin->failed_login_attempts);
@@ -102,14 +108,17 @@ class PanelPasswordResetTest extends TestCase
         ];
 
         foreach ($attempts as [$account, $loginRoute, $storeRoute, $currentPanel, $correctPanel]) {
-            $this->from(route($loginRoute))->post(route($storeRoute), [
-                'email' => $account->email,
-                'password' => 'password',
-            ])->assertRedirect(route($loginRoute))
-                ->assertSessionHasErrors(['email' => trans('auth.failed')])
-                ->assertSessionHas('wrong_panel.message', "You're using the {$currentPanel} Login Panel. Please use the {$correctPanel} Login Panel.")
-                ->assertSessionMissing('wrong_panel.url')
-                ->assertSessionMissing('wrong_panel.label');
+            foreach (['password', 'incorrect-password'] as $password) {
+                $this->from(route($loginRoute))->post(route($storeRoute), [
+                    'email' => $account->email,
+                    'password' => $password,
+                ])->assertRedirect(route($loginRoute))
+                    ->assertSessionHasNoErrors()
+                    ->assertSessionHas('wrong_panel.message', "You're using the {$currentPanel} Login Panel. Please use the {$correctPanel} Login Panel.")
+                    ->assertSessionMissing('wrong_panel.url')
+                    ->assertSessionMissing('wrong_panel.label')
+                    ->assertSessionMissing(LoginLockoutService::SESSION_KEY);
+            }
 
             $account->refresh();
             $this->assertSame(0, $account->failed_login_attempts);
@@ -119,16 +128,18 @@ class PanelPasswordResetTest extends TestCase
         }
     }
 
-    public function test_repeated_valid_wrong_panel_submissions_never_throttle_or_lock_the_account(): void
+    public function test_repeated_wrong_panel_submissions_never_throttle_or_lock_the_account(): void
     {
         $staff = User::factory()->warehouseStaff()->create(['password' => 'password']);
 
         for ($attempt = 0; $attempt < 8; $attempt++) {
             $this->from(route('super-admin.login'))->post(route('super-admin.login.store'), [
                 'email' => $staff->email,
-                'password' => 'password',
+                'password' => "incorrect-password-{$attempt}",
             ])->assertRedirect(route('super-admin.login'))
-                ->assertSessionHas('wrong_panel.message');
+                ->assertSessionHasNoErrors()
+                ->assertSessionHas('wrong_panel.message')
+                ->assertSessionMissing(LoginLockoutService::SESSION_KEY);
         }
 
         $staff->refresh();
@@ -137,16 +148,40 @@ class PanelPasswordResetTest extends TestCase
         $this->assertNull($staff->login_retry_at);
         $this->assertNull($staff->login_locked_until);
         $this->assertGuest('super_admin');
-    }
-
-    public function test_invalid_password_does_not_disclose_an_accounts_panel(): void
-    {
-        $admin = User::factory()->administrator()->create(['password' => 'password']);
 
         $this->post(route('login'), [
+            'email' => $staff->email,
+            'password' => 'incorrect-password',
+        ])->assertSessionHasErrors([
+            'email' => 'Incorrect email or password. You have 4 attempts remaining.',
+        ])->assertSessionMissing('wrong_panel');
+
+        $this->assertSame(1, $staff->refresh()->failed_login_attempts);
+    }
+
+    public function test_wrong_panel_attempt_does_not_start_mfa_or_password_expiration(): void
+    {
+        Notification::fake();
+        $admin = User::factory()->administrator()->create([
+            'password' => 'password',
+            'mfa_enabled' => true,
+            'password_changed_at' => now()->subDays(91),
+        ]);
+
+        $this->from(route('login'))->post(route('login'), [
             'email' => $admin->email,
             'password' => 'incorrect-password',
-        ])->assertSessionMissing('wrong_panel');
+        ])->assertRedirect(route('login'))
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('wrong_panel.message', "You're using the Staff Login Panel. Please use the Admin Login Panel.")
+            ->assertSessionMissing(LoginMfaService::SESSION_KEY)
+            ->assertSessionMissing(PasswordExpirationService::SESSION_KEY)
+            ->assertSessionMissing(LoginLockoutService::SESSION_KEY);
+
+        Notification::assertNotSentTo($admin, LoginMfaOtp::class);
+        $this->assertGuest('web');
+        $this->assertGuest('admin');
+        $this->assertSame(0, $admin->refresh()->failed_login_attempts);
     }
 
     public function test_staff_forgot_password_rejects_admin_and_super_admin_accounts(): void

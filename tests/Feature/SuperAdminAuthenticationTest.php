@@ -83,7 +83,8 @@ class SuperAdminAuthenticationTest extends TestCase
         $this->post(route('super-admin.login'), [
             'email' => $administrator->email,
             'password' => 'password',
-        ])->assertSessionHasErrors('email');
+        ])->assertSessionHasNoErrors()
+            ->assertSessionHas('wrong_panel.message');
 
         $this->assertGuest(AuthenticationContext::SUPER_ADMIN_GUARD);
     }
@@ -109,7 +110,8 @@ class SuperAdminAuthenticationTest extends TestCase
         $this->post(route('login'), [
             'email' => $superAdmin->email,
             'password' => 'password',
-        ])->assertSessionHasErrors('email');
+        ])->assertSessionHasNoErrors()
+            ->assertSessionHas('wrong_panel.message');
 
         $this->assertGuest(AuthenticationContext::WEB_GUARD);
     }
