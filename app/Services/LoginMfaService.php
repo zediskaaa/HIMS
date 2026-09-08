@@ -2,10 +2,14 @@
 
 namespace App\Services;
 
+use App\Enums\AuthenticatorSecretStatus;
+use App\Exceptions\InvalidAuthenticatorSecretException;
 use App\Models\User;
 use App\Support\AuthenticationPanel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class LoginMfaService
 {
@@ -15,6 +19,8 @@ class LoginMfaService
 
     public const METHOD_AUTHENTICATOR = 'authenticator';
 
+    public const METHOD_AUTHENTICATOR_RECOVERY = 'authenticator_recovery';
+
     public const SUCCESS = 'success';
 
     public const INVALID = 'invalid';
@@ -23,7 +29,11 @@ class LoginMfaService
 
     public const MISSING = 'missing';
 
-    public function __construct(private readonly AuthenticatorService $authenticator) {}
+    public function __construct(
+        private readonly AuthenticatorService $authenticator,
+        private readonly AuthenticatorSecretService $authenticatorSecrets,
+        private readonly AuthenticatorSetupService $authenticatorSetup,
+    ) {}
 
     public function issue(
         Request $request,
@@ -60,13 +70,30 @@ class LoginMfaService
         bool $remember,
         ?string $loginThrottleKey = null,
     ): void {
+        $method = self::METHOD_AUTHENTICATOR;
+        $fingerprint = null;
+
+        try {
+            $this->authenticatorSecrets->decrypt($user);
+        } catch (InvalidAuthenticatorSecretException) {
+            $method = self::METHOD_AUTHENTICATOR_RECOVERY;
+            $fingerprint = $this->authenticatorSecrets->fingerprint($user);
+            $this->authenticatorSetup->begin($request, $user);
+
+            Log::warning('Authenticator recovery required because the stored secret failed validation.', [
+                'user_id' => $user->getKey(),
+                'guard' => $guard,
+            ]);
+        }
+
         $this->putState(
             $request,
             $user,
             $guard,
             $remember,
             $loginThrottleKey,
-            self::METHOD_AUTHENTICATOR,
+            $method,
+            authenticatorFingerprint: $fingerprint,
         );
     }
 
@@ -81,7 +108,16 @@ class LoginMfaService
         $user = User::query()->find($state['user_id']);
         $panel = AuthenticationPanel::forGuard($guard);
         $methodStillEnabled = $user !== null && match ($state['method']) {
-            self::METHOD_AUTHENTICATOR => $user->authenticatorMfaEnabled(),
+            self::METHOD_AUTHENTICATOR => $this->authenticatorSecrets->status($user)
+                === AuthenticatorSecretStatus::Valid,
+            self::METHOD_AUTHENTICATOR_RECOVERY => $this->authenticatorSecrets->status($user)
+                === AuthenticatorSecretStatus::Invalid
+                && is_string($state['authenticator_fingerprint'])
+                && hash_equals(
+                    $state['authenticator_fingerprint'],
+                    (string) $this->authenticatorSecrets->fingerprint($user),
+                )
+                && $this->authenticatorSetup->secret($request, $user) !== null,
             self::METHOD_EMAIL => (bool) $user->mfa_enabled,
         };
 
@@ -108,12 +144,25 @@ class LoginMfaService
             return ['status' => self::EXPIRED, 'method' => $state['method']];
         }
 
-        $valid = match ($state['method']) {
-            self::METHOD_AUTHENTICATOR => is_string($user->authenticator_secret)
-                && $this->authenticator->verify($user->authenticator_secret, $otp),
-            self::METHOD_EMAIL => is_string($state['otp_hash'])
-                && Hash::check($otp, $state['otp_hash']),
-        };
+        $recoverySecret = null;
+
+        try {
+            $valid = match ($state['method']) {
+                self::METHOD_AUTHENTICATOR => $this->authenticator->verify(
+                    $this->authenticatorSecrets->decrypt($user),
+                    $otp,
+                ),
+                self::METHOD_AUTHENTICATOR_RECOVERY => is_string(
+                    $recoverySecret = $this->authenticatorSetup->secret($request, $user),
+                ) && $this->authenticator->verify($recoverySecret, $otp),
+                self::METHOD_EMAIL => is_string($state['otp_hash'])
+                    && Hash::check($otp, $state['otp_hash']),
+            };
+        } catch (InvalidAuthenticatorSecretException) {
+            $this->clear($request);
+
+            return ['status' => self::MISSING];
+        }
 
         if ($state['attempts_remaining'] < 1 || ! $valid) {
             $state['attempts_remaining'] = max(0, $state['attempts_remaining'] - 1);
@@ -124,6 +173,21 @@ class LoginMfaService
                 'attempts_remaining' => $state['attempts_remaining'],
                 'method' => $state['method'],
             ];
+        }
+
+        if ($state['method'] === self::METHOD_AUTHENTICATOR_RECOVERY) {
+            $user = $this->replaceInvalidAuthenticatorSecret($user, $state, $recoverySecret);
+
+            if ($user === null) {
+                $this->clear($request);
+
+                return ['status' => self::MISSING];
+            }
+
+            Log::notice('Invalid authenticator secret was securely reconfigured.', [
+                'user_id' => $user->getKey(),
+                'guard' => $guard,
+            ]);
         }
 
         $this->clear($request);
@@ -175,6 +239,14 @@ class LoginMfaService
         return $this->state($request, $guard)['method'] ?? null;
     }
 
+    public function challengeUsesAuthenticator(Request $request, string $guard): bool
+    {
+        return in_array($this->challengeMethod($request, $guard), [
+            self::METHOD_AUTHENTICATOR,
+            self::METHOD_AUTHENTICATOR_RECOVERY,
+        ], true);
+    }
+
     public function isExpired(Request $request, string $guard): bool
     {
         $state = $this->state($request, $guard);
@@ -193,6 +265,12 @@ class LoginMfaService
 
     public function clear(Request $request): void
     {
+        $state = $request->session()->get(self::SESSION_KEY);
+
+        if (is_array($state) && ($state['method'] ?? null) === self::METHOD_AUTHENTICATOR_RECOVERY) {
+            $this->authenticatorSetup->clear($request);
+        }
+
         $request->session()->forget(self::SESSION_KEY);
     }
 
@@ -217,6 +295,7 @@ class LoginMfaService
         ?string $loginThrottleKey,
         string $method,
         ?string $otpHash = null,
+        ?string $authenticatorFingerprint = null,
     ): void {
         $now = now()->getTimestamp();
 
@@ -225,6 +304,7 @@ class LoginMfaService
             'guard' => $guard,
             'method' => $method,
             'otp_hash' => $otpHash,
+            'authenticator_fingerprint' => $authenticatorFingerprint,
             'expires_at' => $now + ($this->expiresInMinutes() * 60),
             'attempts_remaining' => $this->maxAttempts(),
             'resend_available_at' => $now + $this->resendCooldownSeconds(),
@@ -233,16 +313,22 @@ class LoginMfaService
         ]);
     }
 
-    /** @return array{user_id: int, guard: string, method: string, otp_hash: ?string, expires_at: int, attempts_remaining: int, resend_available_at: int, remember: bool, login_throttle_key: ?string}|null */
+    /** @return array{user_id: int, guard: string, method: string, otp_hash: ?string, authenticator_fingerprint: ?string, expires_at: int, attempts_remaining: int, resend_available_at: int, remember: bool, login_throttle_key: ?string}|null */
     private function state(Request $request, string $guard): ?array
     {
         $state = $request->session()->get(self::SESSION_KEY);
 
         if (! is_array($state)
             || ($state['guard'] ?? null) !== $guard
-            || ! in_array($state['method'] ?? null, [self::METHOD_EMAIL, self::METHOD_AUTHENTICATOR], true)
+            || ! in_array($state['method'] ?? null, [
+                self::METHOD_EMAIL,
+                self::METHOD_AUTHENTICATOR,
+                self::METHOD_AUTHENTICATOR_RECOVERY,
+            ], true)
             || ! is_numeric($state['user_id'] ?? null)
             || (! is_null($state['otp_hash'] ?? null) && ! is_string($state['otp_hash']))
+            || (! is_null($state['authenticator_fingerprint'] ?? null)
+                && ! is_string($state['authenticator_fingerprint']))
             || ! is_numeric($state['expires_at'] ?? null)
             || ! is_numeric($state['attempts_remaining'] ?? null)
             || ! is_numeric($state['resend_available_at'] ?? null)
@@ -257,6 +343,9 @@ class LoginMfaService
             'guard' => $state['guard'],
             'method' => $state['method'],
             'otp_hash' => is_string($state['otp_hash'] ?? null) ? $state['otp_hash'] : null,
+            'authenticator_fingerprint' => is_string($state['authenticator_fingerprint'] ?? null)
+                ? $state['authenticator_fingerprint']
+                : null,
             'expires_at' => (int) $state['expires_at'],
             'attempts_remaining' => (int) $state['attempts_remaining'],
             'resend_available_at' => (int) $state['resend_available_at'],
@@ -275,5 +364,37 @@ class LoginMfaService
     private function generateOtp(): string
     {
         return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * @param  array{authenticator_fingerprint: ?string}  $state
+     */
+    private function replaceInvalidAuthenticatorSecret(
+        User $user,
+        array $state,
+        ?string $replacementSecret,
+    ): ?User {
+        if (! is_string($replacementSecret) || ! is_string($state['authenticator_fingerprint'])) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($user, $state, $replacementSecret): ?User {
+            $current = User::query()->lockForUpdate()->find($user->getKey());
+
+            if (! $current instanceof User
+                || ! hash_equals(
+                    $state['authenticator_fingerprint'],
+                    (string) $this->authenticatorSecrets->fingerprint($current),
+                )) {
+                return null;
+            }
+
+            $current->forceFill([
+                'authenticator_secret' => $replacementSecret,
+                'authenticator_enabled_at' => now(),
+            ])->save();
+
+            return $current;
+        });
     }
 }

@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\AuthenticatorSecretStatus;
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\User;
+use App\Services\AuthenticatorSecretService;
 use App\Services\AuthenticatorSetupService;
 use App\Support\AuthenticationContext;
 use App\Support\MfaSession;
@@ -17,13 +19,22 @@ class ProfileController extends Controller
     /**
      * Display the user's profile form.
      */
-    public function edit(Request $request, AuthenticatorSetupService $setup): View
-    {
+    public function edit(
+        Request $request,
+        AuthenticatorSetupService $setup,
+        AuthenticatorSecretService $authenticatorSecrets,
+    ): View {
         $user = $request->user();
+        $authenticatorStatus = $user instanceof User
+            ? $authenticatorSecrets->status($user)
+            : AuthenticatorSecretStatus::Missing;
+        $recoveryRequired = $authenticatorStatus === AuthenticatorSecretStatus::Invalid;
 
         return view('profile.edit', [
             'user' => $user,
-            'authenticatorSetup' => $user instanceof User && ! $user->authenticatorMfaEnabled()
+            'authenticatorRecoveryRequired' => $recoveryRequired,
+            'authenticatorSetup' => $user instanceof User
+                && (! $user->authenticatorMfaEnabled() || $recoveryRequired)
                 ? $setup->details($request, $user)
                 : null,
         ]);

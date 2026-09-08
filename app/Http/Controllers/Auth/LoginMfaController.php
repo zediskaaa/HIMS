@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnforceSessionInactivity;
 use App\Models\User;
 use App\Notifications\LoginMfaOtp;
+use App\Services\AuthenticatorSetupService;
 use App\Services\LoginLockoutService;
 use App\Services\LoginMfaService;
 use App\Services\PasswordExpirationService;
@@ -24,6 +25,7 @@ class LoginMfaController extends Controller
         Request $request,
         LoginMfaService $mfa,
         LoginLockoutService $lockouts,
+        AuthenticatorSetupService $authenticatorSetup,
     ): View|RedirectResponse {
         $panel = $this->panel($request);
         $user = $mfa->pendingUser($request, $panel->guard());
@@ -31,6 +33,18 @@ class LoginMfaController extends Controller
         if ($user === null) {
             return redirect()->route($panel->loginRoute())
                 ->withErrors(['email' => 'Your verification session is no longer valid. Please sign in again.']);
+        }
+
+        $method = $mfa->challengeMethod($request, $panel->guard());
+        $recoverySetup = $method === LoginMfaService::METHOD_AUTHENTICATOR_RECOVERY
+            ? $authenticatorSetup->details($request, $user)
+            : null;
+
+        if ($method === LoginMfaService::METHOD_AUTHENTICATOR_RECOVERY && $recoverySetup === null) {
+            $mfa->clear($request);
+
+            return redirect()->route($panel->loginRoute())
+                ->withErrors(['email' => 'Your authenticator recovery session has expired. Please sign in again.']);
         }
 
         $throttleKey = $this->throttleKey($request, $panel, $user, $lockouts);
@@ -44,7 +58,8 @@ class LoginMfaController extends Controller
 
         return view('auth.login-mfa', [
             'panel' => $panel,
-            'method' => $mfa->challengeMethod($request, $panel->guard()),
+            'method' => $method,
+            'authenticatorSetup' => $recoverySetup,
             'maskedEmail' => $this->maskEmail($user->email),
             'expiresInMinutes' => $mfa->expiresInMinutes(),
             'expired' => $mfa->isExpired($request, $panel->guard()),
@@ -72,7 +87,7 @@ class LoginMfaController extends Controller
         }
 
         if ($result['status'] === LoginMfaService::EXPIRED) {
-            $message = ($result['method'] ?? null) === LoginMfaService::METHOD_AUTHENTICATOR
+            $message = ($result['method'] ?? null) !== LoginMfaService::METHOD_EMAIL
                 ? 'Your authenticator verification session has expired. Please sign in again.'
                 : 'This verification code has expired. Request a new code.';
 
@@ -80,7 +95,10 @@ class LoginMfaController extends Controller
         }
 
         if ($result['status'] === LoginMfaService::INVALID) {
-            $authenticator = ($result['method'] ?? null) === LoginMfaService::METHOD_AUTHENTICATOR;
+            $authenticator = in_array($result['method'] ?? null, [
+                LoginMfaService::METHOD_AUTHENTICATOR,
+                LoginMfaService::METHOD_AUTHENTICATOR_RECOVERY,
+            ], true);
             $message = ($result['attempts_remaining'] ?? 0) > 0
                 ? ($authenticator
                     ? 'Invalid authenticator code. Please try again.'

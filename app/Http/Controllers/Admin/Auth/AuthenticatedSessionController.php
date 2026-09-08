@@ -38,7 +38,7 @@ class AuthenticatedSessionController extends Controller
             $pendingUser = $mfa->pendingUser($request, AuthenticationContext::ADMIN_GUARD);
 
             if ($pendingUser?->is($user)
-                && $mfa->challengeMethod($request, AuthenticationContext::ADMIN_GUARD) === LoginMfaService::METHOD_AUTHENTICATOR) {
+                && $mfa->challengeUsesAuthenticator($request, AuthenticationContext::ADMIN_GUARD)) {
                 return redirect()->route('admin.login.mfa');
             }
 

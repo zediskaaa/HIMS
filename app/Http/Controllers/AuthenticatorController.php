@@ -2,25 +2,33 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\AuthenticatorSecretStatus;
+use App\Exceptions\InvalidAuthenticatorSecretException;
 use App\Models\User;
+use App\Services\AuthenticatorSecretService;
 use App\Services\AuthenticatorService;
 use App\Services\AuthenticatorSetupService;
 use App\Support\AuthenticationContext;
 use App\Support\MfaSession;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class AuthenticatorController extends Controller
 {
-    public function setup(Request $request, AuthenticatorSetupService $setup): RedirectResponse
-    {
+    public function setup(
+        Request $request,
+        AuthenticatorSetupService $setup,
+        AuthenticatorSecretService $authenticatorSecrets,
+    ): RedirectResponse {
         $guard = AuthenticationContext::authenticatedGuard() ?? AuthenticationContext::WEB_GUARD;
         $user = $request->user($guard);
 
         abort_unless($user instanceof User, 401);
 
-        if ($user->authenticatorMfaEnabled()) {
+        if ($user->authenticatorMfaEnabled()
+            && $authenticatorSecrets->status($user) !== AuthenticatorSecretStatus::Invalid) {
             return redirect()->route('profile.edit')->withErrors([
                 'authenticator' => 'Authenticator app is already enabled.',
             ]);
@@ -50,13 +58,15 @@ class AuthenticatorController extends Controller
     public function setupJson(
         Request $request,
         AuthenticatorSetupService $setup,
-    ): \Illuminate\Http\JsonResponse {
+        AuthenticatorSecretService $authenticatorSecrets,
+    ): JsonResponse {
         $guard = AuthenticationContext::authenticatedGuard() ?? AuthenticationContext::WEB_GUARD;
         $user = $request->user($guard);
 
         abort_unless($user instanceof User, 401);
 
-        if ($user->authenticatorMfaEnabled()) {
+        if ($user->authenticatorMfaEnabled()
+            && $authenticatorSecrets->status($user) !== AuthenticatorSecretStatus::Invalid) {
             return response()->json(['errors' => ['authenticator' => ['Authenticator app is already enabled.']]], 422);
         }
 
@@ -141,7 +151,7 @@ class AuthenticatorController extends Controller
         Request $request,
         AuthenticatorSetupService $setup,
         AuthenticatorService $authenticator,
-    ): \Illuminate\Http\JsonResponse {
+    ): JsonResponse {
         $guard = AuthenticationContext::authenticatedGuard() ?? AuthenticationContext::WEB_GUARD;
         $user = $request->user($guard);
 
@@ -190,6 +200,7 @@ class AuthenticatorController extends Controller
         Request $request,
         AuthenticatorService $authenticator,
         AuthenticatorSetupService $setup,
+        AuthenticatorSecretService $authenticatorSecrets,
     ): RedirectResponse {
         $guard = AuthenticationContext::authenticatedGuard() ?? AuthenticationContext::WEB_GUARD;
         $user = $request->user($guard);
@@ -213,11 +224,17 @@ class AuthenticatorController extends Controller
 
         $validated = $validator->validated();
 
-        $secret = $user->authenticator_secret;
-
-        if (! $user->authenticatorMfaEnabled() || ! is_string($secret)) {
+        if (! $user->authenticatorMfaEnabled()) {
             return redirect()->route('profile.edit')->withErrors([
                 'authenticator' => 'Authenticator app is not enabled.',
+            ], 'authenticatorDisable');
+        }
+
+        try {
+            $secret = $authenticatorSecrets->decrypt($user);
+        } catch (InvalidAuthenticatorSecretException) {
+            return redirect()->route('profile.edit')->withErrors([
+                'authenticator' => 'Your saved authenticator setup cannot be verified. Reconfigure it before making other authenticator changes.',
             ], 'authenticatorDisable');
         }
 

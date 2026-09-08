@@ -2,6 +2,7 @@
     x-data="{
         {{-- State --}}
         enabled: {{ $user->authenticatorMfaEnabled() ? 'true' : 'false' }},
+        recoveryRequired: {{ $authenticatorRecoveryRequired ? 'true' : 'false' }},
         successMessage: '',
 
         {{-- Password Confirmation Modal --}}
@@ -113,6 +114,7 @@
                 {{-- Verification succeeded: enable MFA and close setup modal --}}
                 this.showSetup = false;
                 this.enabled = true;
+                this.recoveryRequired = false;
                 this.successMessage = data.message || 'Authenticator app enabled successfully.';
                 this.code = '';
                 this.qrCode = '';
@@ -164,9 +166,9 @@
             </div>
             <span
                 class="rounded-full px-3 py-1 text-xs font-semibold"
-                :class="enabled ? 'bg-success-50 text-success-700' : 'bg-neutral-100 text-neutral-600'"
-                x-text="enabled ? 'ON' : 'OFF'"
-            >{{ $user->authenticatorMfaEnabled() ? 'ON' : 'OFF' }}</span>
+                :class="recoveryRequired ? 'bg-warning-50 text-warning-800' : (enabled ? 'bg-success-50 text-success-700' : 'bg-neutral-100 text-neutral-600')"
+                x-text="recoveryRequired ? 'REPAIR REQUIRED' : (enabled ? 'ON' : 'OFF')"
+            >{{ $authenticatorRecoveryRequired ? 'REPAIR REQUIRED' : ($user->authenticatorMfaEnabled() ? 'ON' : 'OFF') }}</span>
         </div>
     </header>
 
@@ -194,7 +196,7 @@
     @endif
 
     {{-- ── Enabled state: Turn OFF form ────────────────────────────────── --}}
-    <template x-if="enabled">
+    <template x-if="enabled && !recoveryRequired">
         <div>
             <div class="mt-6 rounded-lg border border-success-200 bg-success-50 p-4 text-sm leading-6 text-success-800">
                 Authenticator verification is active. A current 6-digit code is required after your password is accepted.
@@ -227,6 +229,20 @@
                     {{ __('Turn OFF Authenticator App') }}
                 </x-ui.button>
             </form>
+        </div>
+    </template>
+
+    <template x-if="recoveryRequired">
+        <div>
+            <div class="mt-6 rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm leading-6 text-warning-900">
+                Your saved authenticator setup failed its encryption integrity check. It is still enforced for account safety. Confirm your password, scan a replacement QR code, and verify its current code to repair the setup.
+            </div>
+
+            <div class="mt-5">
+                <x-ui.button type="button" icon="shield-check" @click="openPasswordModal()">
+                    {{ __('Reconfigure Authenticator App') }}
+                </x-ui.button>
+            </div>
         </div>
     </template>
 
@@ -276,7 +292,7 @@
         >
             <header class="flex items-start justify-between gap-4 px-5 py-4 border-b border-neutral-200">
                 <div>
-                    <h2 class="text-base font-semibold text-neutral-900">Confirm Current Password</h2>
+                    <h2 class="text-base font-semibold text-neutral-900" x-text="recoveryRequired ? 'Confirm Password to Reconfigure' : 'Confirm Current Password'">Confirm Current Password</h2>
                     <p class="mt-0.5 text-xs text-neutral-500">Please verify your identity to continue.</p>
                 </div>
                 <button
@@ -353,7 +369,7 @@
         >
             {{-- Header --}}
             <header class="flex items-start justify-between gap-4 px-5 py-4 border-b border-neutral-200">
-                <h2 class="text-base font-semibold text-neutral-900">Authenticator App Setup</h2>
+                <h2 class="text-base font-semibold text-neutral-900" x-text="recoveryRequired ? 'Authenticator App Reconfiguration' : 'Authenticator App Setup'">Authenticator App Setup</h2>
                 <button
                     type="button"
                     @click="cancelSetup()"
@@ -427,7 +443,7 @@
                             icon="shield-check"
                             ::disabled="verifyLoading"
                         >
-                            <span x-show="!verifyLoading">{{ __('Verify & Enable') }}</span>
+                            <span x-show="!verifyLoading" x-text="recoveryRequired ? 'Verify & Reconfigure' : 'Verify & Enable'">{{ __('Verify & Enable') }}</span>
                             <span x-show="verifyLoading" x-cloak>Verifying…</span>
                         </x-ui.button>
                     </div>

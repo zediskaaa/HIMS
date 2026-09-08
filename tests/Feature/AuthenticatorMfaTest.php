@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AuthenticatorSecretStatus;
 use App\Enums\UserRole;
 use App\Models\User;
+use App\Services\AuthenticatorSecretService;
 use App\Services\AuthenticatorService;
 use App\Services\AuthenticatorSetupService;
 use App\Services\LoginMfaService;
@@ -373,6 +375,146 @@ class AuthenticatorMfaTest extends TestCase
         $this->assertNull(session(AuthenticatorSetupService::SESSION_KEY));
     }
 
+    public function test_invalid_ciphertext_stays_mfa_enforced_and_profile_offers_safe_reconfiguration(): void
+    {
+        $user = User::factory()->warehouseStaff()->create(['password' => 'password']);
+        $invalidCiphertext = $this->storeInvalidAuthenticatorSecret($user);
+
+        $user->refresh();
+        $this->assertTrue($user->authenticatorMfaEnabled());
+        $this->assertSame(
+            AuthenticatorSecretStatus::Invalid,
+            app(AuthenticatorSecretService::class)->status($user),
+        );
+
+        $user->forceFill(['department' => 'Inventory Control'])->save();
+        $this->assertSame(
+            $invalidCiphertext,
+            DB::table('users')->where('id', $user->id)->value('authenticator_secret'),
+        );
+
+        $this->actingAs($user)->withSession([
+            MfaSession::key(AuthenticationContext::WEB_GUARD) => $user->getKey(),
+        ]);
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('REPAIR REQUIRED')
+            ->assertSee('Reconfigure Authenticator App');
+
+        $this->delete(route('profile.authenticator.disable'), [
+            'current_password' => 'password',
+            'code' => '000000',
+        ])->assertSessionHasErrors('authenticator', errorBag: 'authenticatorDisable');
+        $this->assertSame(
+            $invalidCiphertext,
+            DB::table('users')->where('id', $user->id)->value('authenticator_secret'),
+        );
+
+        $this->postJson(route('profile.authenticator.setup.json'), [
+            'current_password' => 'wrong-password',
+        ])->assertUnprocessable()->assertJsonValidationErrors('current_password');
+
+        $this->postJson(route('profile.authenticator.setup.json'), [
+            'current_password' => 'password',
+        ])->assertOk()->assertJsonStructure(['qr_code', 'secret']);
+
+        $replacementSecret = Crypt::decryptString(
+            session(AuthenticatorSetupService::SESSION_KEY)['secret'],
+        );
+
+        $this->postJson(route('profile.authenticator.enable.json'), ['code' => '000000'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('code');
+        $this->assertSame(
+            $invalidCiphertext,
+            DB::table('users')->where('id', $user->id)->value('authenticator_secret'),
+        );
+
+        $this->postJson(route('profile.authenticator.enable.json'), [
+            'code' => (new Google2FA)->getCurrentOtp($replacementSecret),
+        ])->assertOk()->assertJson(['success' => true]);
+
+        $user->refresh();
+        $this->assertSame($replacementSecret, $user->authenticator_secret);
+        $this->assertNotSame(
+            $invalidCiphertext,
+            DB::table('users')->where('id', $user->id)->value('authenticator_secret'),
+        );
+    }
+
+    #[DataProvider('authenticationPanels')]
+    public function test_invalid_ciphertext_is_reconfigured_before_login_for_every_panel(
+        UserRole $role,
+        string $guard,
+        string $loginRoute,
+        string $mfaRoute,
+        string $verifyRoute,
+        string $dashboardRoute,
+    ): void {
+        $user = User::factory()->role($role)->create(['password' => 'password']);
+        $invalidCiphertext = $this->storeInvalidAuthenticatorSecret($user);
+
+        $this->post(route($loginRoute), $this->credentials($user))
+            ->assertRedirect(route($mfaRoute));
+        $this->assertGuest($guard);
+        $this->assertSame(
+            LoginMfaService::METHOD_AUTHENTICATOR_RECOVERY,
+            session(LoginMfaService::SESSION_KEY)['method'],
+        );
+
+        $replacementSecret = Crypt::decryptString(
+            session(AuthenticatorSetupService::SESSION_KEY)['secret'],
+        );
+
+        $this->get(route($mfaRoute))
+            ->assertOk()
+            ->assertSee('Reconfigure Authenticator App')
+            ->assertSee('Replacement authenticator app setup QR code')
+            ->assertSee($replacementSecret)
+            ->assertSee('Reconfigure and sign in');
+
+        $this->post(route($verifyRoute), ['otp' => '000000'])
+            ->assertSessionHasErrors('otp');
+        $this->assertGuest($guard);
+        $this->assertSame(
+            $invalidCiphertext,
+            DB::table('users')->where('id', $user->id)->value('authenticator_secret'),
+        );
+
+        $this->post(route($verifyRoute), [
+            'otp' => (new Google2FA)->getCurrentOtp($replacementSecret),
+        ])->assertRedirect(route($dashboardRoute, absolute: false));
+
+        $this->assertAuthenticatedAs($user, $guard);
+        $user->refresh();
+        $this->assertSame($replacementSecret, $user->authenticator_secret);
+        $this->assertNotSame(
+            $invalidCiphertext,
+            DB::table('users')->where('id', $user->id)->value('authenticator_secret'),
+        );
+    }
+
+    public function test_invalid_ciphertext_cannot_bypass_dashboard_or_api_token_mfa(): void
+    {
+        $user = User::factory()->warehouseStaff()->create(['password' => 'password']);
+        $this->storeInvalidAuthenticatorSecret($user);
+        $user->refresh();
+
+        $this->actingAs($user);
+        $this->get(route('dashboard'))
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors('email');
+        $this->assertGuest(AuthenticationContext::WEB_GUARD);
+
+        $this->postJson('/api/v1/auth/token', [
+            ...$this->credentials($user),
+            'device_name' => 'test-device',
+        ])->assertStatus(428)
+            ->assertJsonPath('code', 'MFA_REQUIRED');
+        $this->assertSame(0, $user->tokens()->count());
+    }
+
     /** @return array<string, array{UserRole, string, string, string, string, string}> */
     public static function authenticationPanels(): array
     {
@@ -419,5 +561,23 @@ class AuthenticatorMfaTest extends TestCase
     private function credentials(User $user): array
     {
         return ['email' => $user->email, 'password' => 'password'];
+    }
+
+    private function storeInvalidAuthenticatorSecret(User $user): string
+    {
+        $ciphertext = Crypt::encryptString((new Google2FA)->generateSecretKey());
+        $payload = json_decode((string) base64_decode($ciphertext, true), true, flags: JSON_THROW_ON_ERROR);
+        $payload['mac'] = str_repeat('0', 64);
+        $invalidCiphertext = base64_encode(json_encode(
+            $payload,
+            JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+        ));
+
+        DB::table('users')->where('id', $user->id)->update([
+            'authenticator_secret' => $invalidCiphertext,
+            'authenticator_enabled_at' => now(),
+        ]);
+
+        return $invalidCiphertext;
     }
 }

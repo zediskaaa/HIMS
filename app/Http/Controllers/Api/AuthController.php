@@ -56,7 +56,7 @@ class AuthController extends Controller
         /** @var User $user */
         $user = $result['user'];
 
-        if ($user->mfa_enabled) {
+        if ($user->authenticatorMfaEnabled() || $user->mfa_enabled) {
             $loginUrl = route(AuthenticationPanel::forRole($user->role)->loginRoute());
 
             return response()->json([

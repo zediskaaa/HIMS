@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Casts\EncryptedAuthenticatorSecret;
 use App\Enums\Permission;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
@@ -71,7 +72,7 @@ class User extends Authenticatable
             'login_locked_until' => 'datetime',
             'is_protected' => 'boolean',
             'mfa_enabled' => 'boolean',
-            'authenticator_secret' => 'encrypted',
+            'authenticator_secret' => EncryptedAuthenticatorSecret::class,
             'authenticator_enabled_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
@@ -253,7 +254,7 @@ class User extends Authenticatable
     public function authenticatorMfaEnabled(): bool
     {
         return $this->authenticator_enabled_at !== null
-            && filled($this->authenticator_secret);
+            && filled($this->getRawOriginal('authenticator_secret'));
     }
 
     public function passwordExpiresAt(): ?CarbonInterface

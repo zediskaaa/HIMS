@@ -9,10 +9,18 @@
                 {{ $panel->label() }} login security
             </div>
             <h1 class="text-3xl font-semibold tracking-tight text-neutral-900">
-                {{ $method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR ? 'Authenticator Verification' : 'Verify your sign-in' }}
+                @if ($method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR_RECOVERY)
+                    Reconfigure Authenticator App
+                @elseif ($method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR)
+                    Authenticator Verification
+                @else
+                    Verify your sign-in
+                @endif
             </h1>
             <p class="mt-3 text-sm leading-6 text-neutral-500">
-                @if ($method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR)
+                @if ($method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR_RECOVERY)
+                    Your saved authenticator setup can no longer be verified. Scan the new setup code below, then enter its current 6-digit code. Your existing setup remains enforced until verification succeeds.
+                @elseif ($method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR)
                     Enter the 6-digit code from your authenticator app.
                 @else
                     Enter the 6-digit code sent to <span class="font-medium text-neutral-700">{{ $maskedEmail }}</span>.
@@ -23,7 +31,9 @@
 
         @if ($expired)
             <x-ui.alert variant="warning" title="Code expired">
-                This code has expired. Request a new code to continue this sign-in.
+                {{ $method === \App\Services\LoginMfaService::METHOD_EMAIL
+                    ? 'This code has expired. Request a new code to continue this sign-in.'
+                    : 'This authenticator verification session has expired. Return to login and sign in again.' }}
             </x-ui.alert>
         @endif
 
@@ -31,6 +41,33 @@
             class="rounded-lg border border-success-100 bg-success-50 px-4 py-3 text-success-700"
             :status="session('status')"
         />
+
+        @if ($method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR_RECOVERY && $authenticatorSetup)
+            <div class="space-y-4 rounded-lg border border-warning-200 bg-warning-50 p-4">
+                <div>
+                    <h2 class="text-sm font-semibold text-neutral-900">Set up a replacement authenticator</h2>
+                    <p class="mt-1 text-xs leading-5 text-neutral-600">
+                        In Google Authenticator, add an account and scan this QR code. You can enter the setup key manually if scanning is unavailable.
+                    </p>
+                </div>
+
+                <div class="flex justify-center rounded-lg border border-neutral-200 bg-white p-3">
+                    <img
+                        src="{{ $authenticatorSetup['qr_code'] }}"
+                        alt="Replacement authenticator app setup QR code"
+                        width="220"
+                        height="220"
+                        class="h-[220px] w-[220px] max-w-full object-contain"
+                    />
+                </div>
+
+                <div>
+                    <p class="text-xs font-medium text-neutral-800">Manual setup key</p>
+                    <code class="mt-1.5 block break-all rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-center font-mono text-sm font-semibold tracking-[0.18em] text-neutral-900">{{ $authenticatorSetup['secret'] }}</code>
+                    <p class="mt-1 text-[11px] text-neutral-500">Type: Time based &middot; Digits: 6 &middot; Period: 30 seconds</p>
+                </div>
+            </div>
+        @endif
 
         <form method="POST" action="{{ route($panel->loginMfaVerifyRoute()) }}" class="space-y-5">
             @csrf
@@ -53,7 +90,9 @@
             </div>
 
             <x-ui.button type="submit" size="lg" icon="shield-check" data-loading-text="Verifying..." class="w-full">
-                {{ __('Verify and sign in') }}
+                {{ $method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR_RECOVERY
+                    ? __('Reconfigure and sign in')
+                    : __('Verify and sign in') }}
             </x-ui.button>
         </form>
 
