@@ -24,7 +24,7 @@ class InventoryModuleTest extends TestCase
         $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertStatus(200);
-        $response->assertSee('Operations Dashboard');
+        $response->assertSee('Staff Dashboard');
         $response->assertSee('Monitor inventory health');
     }
 
@@ -68,7 +68,7 @@ class InventoryModuleTest extends TestCase
         $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertStatus(200);
-        $response->assertSee('Operations Dashboard');
+        $response->assertSee('Staff Dashboard');
         $response->assertSee('PO-DASH-001');
         $response->assertSee('Surgical Gloves (Large)');
         // Alert sweep flags the gloves; the badge renders the enum label.

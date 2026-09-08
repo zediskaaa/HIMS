@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\PermissionMatrixController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\AuthenticatorController;
 use App\Http\Controllers\Inventory\DemandForecastController;
 use App\Http\Controllers\Inventory\InventoryController;
 use App\Http\Controllers\Inventory\InventoryItemController;
@@ -19,11 +21,11 @@ Route::get('/', function () {
     return view('landing');
 });
 
-Route::get('/dashboard', [InventoryController::class, 'index'])->middleware('auth')->name('dashboard');
+Route::get('/dashboard', [InventoryController::class, 'index'])->middleware('auth:web,admin,super_admin')->name('dashboard');
 
 // Polled by the dashboard's alert panel every 30s. Sits on the web routes so
 // it authenticates with the session cookie the page already has.
-Route::get('/dashboard/live', [InventoryController::class, 'live'])->middleware('auth')->name('dashboard.live');
+Route::get('/dashboard/live', [InventoryController::class, 'live'])->middleware('auth:web,admin,super_admin')->name('dashboard.live');
 
 /*
  * The inventory surface. `auth` here only establishes that somebody is signed
@@ -32,7 +34,7 @@ Route::get('/dashboard/live', [InventoryController::class, 'live'])->middleware(
  * by being forgotten in this file. See App\Enums\UserRole::permissions() for
  * who holds what, and /admin/permissions for the matrix that renders it.
  */
-Route::middleware('auth')->group(function () {
+Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::get('/inventory', function () {
         return redirect()->route('dashboard');
     })->name('inventory');
@@ -64,7 +66,27 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::patch('/profile/mfa', [ProfileController::class, 'updateMfa'])->name('profile.mfa.update');
+    Route::post('/profile/authenticator/setup', [AuthenticatorController::class, 'setup'])
+        ->middleware('throttle:5,1')
+        ->name('profile.authenticator.setup');
+    Route::post('/profile/authenticator/setup-json', [AuthenticatorController::class, 'setupJson'])
+        ->middleware('throttle:5,1')
+        ->name('profile.authenticator.setup.json');
+    // A stale error-page URL may be revisited as GET. Return to the setup UI;
+    // enabling the authenticator itself remains POST-only and CSRF-protected.
+    Route::get('/profile/authenticator/enable', fn () => redirect()->route('profile.edit'));
+    Route::post('/profile/authenticator/enable', [AuthenticatorController::class, 'enable'])
+        ->middleware('throttle:6,1')
+        ->name('profile.authenticator.enable');
+    Route::post('/profile/authenticator/enable-json', [AuthenticatorController::class, 'enableJson'])
+        ->middleware('throttle:6,1')
+        ->name('profile.authenticator.enable.json');
+    Route::post('/profile/authenticator/cancel', [AuthenticatorController::class, 'cancel'])
+        ->name('profile.authenticator.cancel');
+    Route::delete('/profile/authenticator', [AuthenticatorController::class, 'disable'])
+        ->middleware('throttle:6,1')
+        ->name('profile.authenticator.disable');
 });
 
 /*
@@ -73,6 +95,8 @@ Route::middleware('auth')->group(function () {
  * out from behind it.
  */
 Route::prefix('admin')->name('admin.')->group(function () {
+    Route::get('/audit-trail/suggestions', [AuditLogController::class, 'suggestions'])->name('audit-logs.suggestions');
+    Route::get('/audit-trail', [AuditLogController::class, 'index'])->name('audit-logs.index');
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
     Route::post('/users', [UserController::class, 'store'])->name('users.store');
@@ -80,6 +104,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
     Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
     Route::patch('/users/{user}/status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+    Route::patch('/users/{user}/unlock', [UserController::class, 'unlock'])->name('users.unlock');
 
     // The role-versus-module matrix, generated from the same enum the gates are
     // registered from, so it cannot drift from what is actually enforced.
@@ -87,3 +112,5 @@ Route::prefix('admin')->name('admin.')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+require __DIR__.'/admin_auth.php';
+require __DIR__.'/super_admin.php';

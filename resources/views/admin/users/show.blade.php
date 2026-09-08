@@ -1,17 +1,32 @@
 <x-app-layout>
+    @php($nameComponents = $user->nameComponents())
     <x-ui.page-header
         :title="$user->name"
         :subtitle="$user->role->label().' · '.$user->status->label()"
         :breadcrumbs="[
-            'Home' => route('dashboard'),
+            'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
             'User Management' => route('admin.users.index'),
             $user->name => null,
         ]">
-        <x-slot:actions>
-            <x-ui.button variant="secondary" :href="route('admin.users.edit', $user)" icon="pencil-square">
-                Edit
-            </x-ui.button>
-        </x-slot:actions>
+        @if ($canManage)
+            <x-slot:actions>
+                @if ($canUnlock)
+                    <form method="POST" action="{{ route('admin.users.unlock', $user) }}"
+                          data-confirm-title="Confirm account unlock"
+                          data-confirm-message="Are you sure you want to unlock this account?"
+                          data-confirm-label="Unlock Account">
+                        @csrf
+                        @method('PATCH')
+                        <x-ui.button type="submit" data-loading-text="Unlocking account...">
+                            Unlock Account
+                        </x-ui.button>
+                    </form>
+                @endif
+                <x-ui.button variant="secondary" :href="route('admin.users.edit', $user)" icon="pencil-square">
+                    Edit
+                </x-ui.button>
+            </x-slot:actions>
+        @endif
     </x-ui.page-header>
 
     <div class="grid gap-6 lg:grid-cols-3">
@@ -30,17 +45,38 @@
 
                 <dl class="mt-5 space-y-3 text-sm">
                     <div class="flex items-start justify-between gap-3">
+                        <dt class="text-neutral-500">Surname</dt>
+                        <dd class="text-neutral-800">{{ $nameComponents['surname'] ?? '—' }}</dd>
+                    </div>
+                    <div class="flex items-start justify-between gap-3">
+                        <dt class="text-neutral-500">First Name</dt>
+                        <dd class="text-neutral-800">{{ $nameComponents['first_name'] ?? '—' }}</dd>
+                    </div>
+                    <div class="flex items-start justify-between gap-3">
+                        <dt class="text-neutral-500">Middle Name</dt>
+                        <dd class="text-neutral-800">{{ $nameComponents['middle_name'] ?? '—' }}</dd>
+                    </div>
+                    <div class="flex items-start justify-between gap-3">
                         <dt class="text-neutral-500">Role</dt>
                         <dd>
                             <x-ui.badge :variant="$user->isAdministrator() ? 'primary' : 'neutral'">
                                 {{ $user->role->label() }}
                             </x-ui.badge>
+                            @if ($user->isProtected())
+                                <x-ui.badge variant="warning">Protected</x-ui.badge>
+                            @endif
                         </dd>
                     </div>
                     <div class="flex items-start justify-between gap-3">
                         <dt class="text-neutral-500">Status</dt>
                         <dd>
                             <x-ui.badge :status="$user->status->value" dot>{{ $user->status->label() }}</x-ui.badge>
+                            @if ($user->isTemporarilyLocked())
+                                <x-ui.badge variant="warning" class="mt-1">Temporarily Locked</x-ui.badge>
+                                <span class="mt-1 block text-right text-xs text-neutral-500">
+                                    Until {{ $user->login_locked_until->timezone(config('app.timezone'))->format('M d, Y g:i A') }}
+                                </span>
+                            @endif
                         </dd>
                     </div>
                     <div class="flex items-start justify-between gap-3">

@@ -41,12 +41,136 @@
     [x-cloak] {
         display: none !important;
     }
+
+    /*
+     * Respect the OS "reduce motion" preference. Entrance animations run out
+     * in ~1ms and ambient loops stop, so nothing moves and nothing is left
+     * invisible behind a stagger delay.
+     */
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-delay: 0ms !important;
+            animation-duration: 1ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 1ms !important;
+            scroll-behavior: auto !important;
+        }
+
+        /* Keep processing feedback perceptible without using continuous rotation. */
+        .loader {
+            animation-name: hims-loader-pulse !important;
+            animation-duration: 1.5s !important;
+            animation-timing-function: ease-in-out !important;
+            animation-iteration-count: infinite !important;
+        }
+
+        .loader::before {
+            animation: none !important;
+        }
+    }
 }
 
 @layer components {
+    .loader {
+        --color-1: currentColor;
+        --size: 1.25px;
+
+        display: inline-block;
+        width: calc(48 * var(--size));
+        height: calc(48 * var(--size));
+        flex: none;
+        border-radius: 50%;
+        position: relative;
+        animation: hims-loader-rotate 1s linear infinite;
+    }
+
+    .loader::before {
+        content: '';
+        box-sizing: border-box;
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: calc(5 * var(--size)) solid var(--color-1);
+        animation: hims-loader-clip 2s linear infinite;
+    }
+
+    .loader--sm {
+        --size: 0.34px;
+    }
+
+    .loader--md {
+        --size: 0.5px;
+    }
+
+    .loader--lg {
+        --size: 0.9px;
+    }
+
+    .hims-loading-overlay {
+        @apply fixed inset-0 z-[100] flex items-center justify-center p-4;
+    }
+
+    /* The flex display above must never override the overlay's hidden state. */
+    .hims-loading-overlay[hidden] {
+        display: none !important;
+    }
+
+    .hims-loading-overlay__backdrop {
+        @apply absolute inset-0 bg-neutral-950/35 backdrop-blur-[2px];
+    }
+
+    .hims-loading-overlay__panel {
+        @apply relative flex min-w-56 flex-col items-center gap-2 rounded-xl border border-neutral-200 bg-white px-7 py-6 text-center shadow-2xl;
+    }
+
+    [data-hims-loading-active] {
+        cursor: wait;
+    }
+
     /* Legacy sidebar links in layouts/navigation.blade.php. */
     .menu-link.active {
         @apply bg-primary-600 text-white rounded-md;
         margin: 0 2px;
+    }
+}
+
+@keyframes hims-loader-rotate {
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes hims-loader-clip {
+    0% {
+        clip-path: polygon(50% 50%, 0 0, 0 0, 0 0, 0 0, 0 0);
+    }
+
+    25% {
+        clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 0, 100% 0, 100% 0);
+    }
+
+    50% {
+        clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 100% 100%, 100% 100%);
+    }
+
+    75% {
+        clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 0 100%, 0 100%);
+    }
+
+    100% {
+        clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 0 100%, 0 0);
+    }
+}
+
+@keyframes hims-loader-pulse {
+    0%,
+    100% {
+        opacity: 0.45;
+    }
+
+    50% {
+        opacity: 1;
     }
 }

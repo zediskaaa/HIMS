@@ -5,11 +5,16 @@
 >
     {{-- Brand --}}
     <div class="flex items-center gap-2.5 h-16 px-5 border-b border-neutral-200 shrink-0">
-        <span class="flex items-center justify-center w-9 h-9 rounded-md bg-primary-600 text-white
-                     text-sm font-bold tracking-tight shrink-0">DJ</span>
+        <img src="{{ asset('img/hims-logo.png') }}" alt="" class="h-9 w-9 shrink-0 rounded-md bg-white object-cover ring-1 ring-inset ring-neutral-200" />
         <div class="min-w-0">
             <p class="text-sm font-semibold text-neutral-900 leading-tight truncate">DJNRMHS</p>
-            <p class="text-[11px] text-neutral-500 leading-tight truncate">Supply Chain &amp; Inventory</p>
+            <p class="text-[11px] text-neutral-500 leading-tight truncate">
+                {{ match (\App\Support\AuthenticationContext::authenticatedGuard()) {
+                    \App\Support\AuthenticationContext::SUPER_ADMIN_GUARD => 'Super Admin Panel',
+                    \App\Support\AuthenticationContext::ADMIN_GUARD => 'Admin Panel',
+                    default => 'Staff Panel',
+                } }}
+            </p>
         </div>
     </div>
 
@@ -27,7 +32,11 @@
     --}}
     <nav class="flex-1 px-3 py-4 space-y-6 overflow-y-auto" aria-label="Main navigation">
         <div class="space-y-0.5">
-            <x-ui.nav-item :href="route('dashboard')" icon="home" :active="request()->routeIs('dashboard')">
+            <x-ui.nav-item
+                :href="route(\App\Support\AuthenticationContext::dashboardRoute())"
+                icon="home"
+                :active="request()->routeIs('dashboard', 'super-admin.dashboard')"
+            >
                 Dashboard
             </x-ui.nav-item>
         </div>
@@ -129,23 +138,31 @@
 
         {{-- Only administrators hold manage_users, so the section is hidden
              rather than shown-and-refused for everyone else. --}}
-        @can(\App\Enums\Permission::ManageUsers->value)
+        @canany([\App\Enums\Permission::ManageUsers->value, \App\Enums\Permission::ViewAuditTrail->value])
             <div>
                 <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                     Administration
                 </p>
                 <div class="space-y-0.5">
-                    <x-ui.nav-item :href="route('admin.users.index')" icon="users"
-                                   :active="request()->routeIs('admin.users.*')">
-                        User Management
-                    </x-ui.nav-item>
-                    <x-ui.nav-item :href="route('admin.permissions')" icon="shield-check"
-                                   :active="request()->routeIs('admin.permissions')">
-                        Access Control
-                    </x-ui.nav-item>
+                    @can(\App\Enums\Permission::ManageUsers->value)
+                        <x-ui.nav-item :href="route('admin.users.index')" icon="users"
+                                       :active="request()->routeIs('admin.users.*')">
+                            User Management
+                        </x-ui.nav-item>
+                        <x-ui.nav-item :href="route('admin.permissions')" icon="shield-check"
+                                       :active="request()->routeIs('admin.permissions')">
+                            Access Control
+                        </x-ui.nav-item>
+                    @endcan
+                    @can(\App\Enums\Permission::ViewAuditTrail->value)
+                        <x-ui.nav-item :href="route('admin.audit-logs.index')" icon="clipboard-document-list"
+                                       :active="request()->routeIs('admin.audit-logs.*')">
+                            Audit Trail
+                        </x-ui.nav-item>
+                    @endcan
                 </div>
             </div>
-        @endcan
+        @endcanany
     </nav>
 
     {{-- Footer --}}

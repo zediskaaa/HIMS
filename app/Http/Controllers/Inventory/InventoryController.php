@@ -32,7 +32,7 @@ class InventoryController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            'auth',
+            'auth:web,admin,super_admin',
             new Middleware('can:'.Permission::ViewInventory->value, only: ['stock', 'alerts']),
             new Middleware('can:'.Permission::ViewReports->value, only: ['logistics']),
             new Middleware('can:'.Permission::ManageSuppliers->value, only: ['suppliers']),

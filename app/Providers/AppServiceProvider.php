@@ -2,9 +2,15 @@
 
 namespace App\Providers;
 
+use App\Enums\AuditAction;
 use App\Enums\Permission;
 use App\Models\User;
+use App\Observers\UserObserver;
+use App\Services\AuditLogger;
+use App\Support\AuthenticationPanel;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -25,7 +31,23 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerPermissionGates();
-        $this->trackSuccessfulLogins();
+        $this->registerAuditLogging();
+        $this->registerPasswordResetUrls();
+    }
+
+    /**
+     * Every reset email returns to the panel assigned to the account's role.
+     */
+    private function registerPasswordResetUrls(): void
+    {
+        ResetPassword::createUrlUsing(function (User $user, string $token): string {
+            $panel = AuthenticationPanel::forRole($user->role);
+
+            return route($panel->passwordResetRoute(), [
+                'token' => $token,
+                'email' => $user->email,
+            ]);
+        });
     }
 
     /**
@@ -43,21 +65,38 @@ class AppServiceProvider extends ServiceProvider
                 fn (User $user) => $user->hasPermission($permission)
             );
         }
-
-        // An administrator passes every check without each role having to
-        // enumerate the full list. Returning null rather than false lets the
-        // individual gates decide for everyone else.
-        Gate::before(fn (User $user) => $user->isAdministrator() && $user->isActive() ? true : null);
     }
 
     /**
      * Stamp `last_login_at` so the user list can show dormant accounts.
      */
-    private function trackSuccessfulLogins(): void
+    private function registerAuditLogging(): void
     {
-        Event::listen(function (Login $event) {
+        User::observe(UserObserver::class);
+
+        Event::listen(function (Login $event): void {
             if ($event->user instanceof User) {
                 $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
+
+                app(AuditLogger::class)->log(
+                    AuditAction::LoggedIn,
+                    $event->user,
+                    "{$event->user->name} logged in.",
+                    $event->user,
+                    'Account',
+                );
+            }
+        });
+
+        Event::listen(function (Logout $event): void {
+            if ($event->user instanceof User) {
+                app(AuditLogger::class)->log(
+                    AuditAction::LoggedOut,
+                    $event->user,
+                    "{$event->user->name} logged out.",
+                    $event->user,
+                    'Account',
+                );
             }
         });
     }

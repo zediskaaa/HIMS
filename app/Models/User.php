@@ -3,9 +3,11 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Casts\EncryptedAuthenticatorSecret;
 use App\Enums\Permission;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use Carbon\CarbonInterface;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -26,6 +28,9 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'surname',
+        'first_name',
+        'middle_name',
         'email',
         'password',
         'role',
@@ -43,6 +48,12 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'authenticator_secret',
+        'failed_login_attempts',
+        'last_failed_login_at',
+        'login_retry_at',
+        'login_locked_until',
+        'login_lockout_count',
     ];
 
     /**
@@ -54,11 +65,115 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'password_changed_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'last_failed_login_at' => 'datetime',
+            'login_retry_at' => 'datetime',
+            'login_locked_until' => 'datetime',
+            'is_protected' => 'boolean',
+            'mfa_enabled' => 'boolean',
+            'authenticator_secret' => EncryptedAuthenticatorSecret::class,
+            'authenticator_enabled_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
             'status' => UserStatus::class,
         ];
+    }
+
+    /**
+     * Keep the legacy display name and the structured fields synchronized.
+     * This also protects existing registration/profile flows that still write
+     * only `name`.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $user): void {
+            if ($user->isDirty('password') && ! $user->isDirty('password_changed_at')) {
+                $user->password_changed_at = now();
+            }
+
+            if ($user->isDirty(['surname', 'first_name', 'middle_name'])) {
+                $user->name = self::composeName(
+                    $user->first_name,
+                    $user->middle_name,
+                    $user->surname,
+                );
+
+                return;
+            }
+
+            if ($user->isDirty('name')) {
+                [$firstName, $middleName, $surname] = self::splitName($user->name);
+
+                $user->first_name = $firstName;
+                $user->middle_name = $middleName;
+                $user->surname = $surname;
+            }
+        });
+    }
+
+    public static function composeName(?string $firstName, ?string $middleName, ?string $surname): string
+    {
+        return collect([$firstName, $middleName, $surname])
+            ->map(fn (?string $part) => preg_replace('/\s+/u', ' ', trim((string) $part)))
+            ->filter(fn (?string $part) => filled($part))
+            ->implode(' ');
+    }
+
+    /**
+     * @return array{first_name: ?string, middle_name: ?string, surname: ?string}
+     */
+    public function nameComponents(): array
+    {
+        if (filled($this->first_name) || filled($this->middle_name) || filled($this->surname)) {
+            return [
+                'first_name' => $this->first_name,
+                'middle_name' => $this->middle_name,
+                'surname' => $this->surname,
+            ];
+        }
+
+        [$firstName, $middleName, $surname] = self::splitName($this->name);
+
+        return [
+            'first_name' => $firstName,
+            'middle_name' => $middleName,
+            'surname' => $surname,
+        ];
+    }
+
+    /**
+     * Split legacy full names without changing their stored display value.
+     * A comma-delimited "Surname, Given Names" value is also supported.
+     *
+     * @return array{0: ?string, 1: ?string, 2: ?string}
+     */
+    public static function splitName(?string $name): array
+    {
+        $name = trim((string) $name);
+
+        if ($name === '') {
+            return [null, null, null];
+        }
+
+        if (str_contains($name, ',')) {
+            [$surname, $givenNames] = array_map('trim', explode(',', $name, 2));
+            $parts = preg_split('/\s+/u', $givenNames, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $firstName = array_shift($parts);
+
+            return [$firstName ?: null, $parts === [] ? null : implode(' ', $parts), $surname ?: null];
+        }
+
+        $parts = preg_split('/\s+/u', $name, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        if (count($parts) === 1) {
+            return [$parts[0], null, null];
+        }
+
+        $firstName = array_shift($parts);
+        $surname = array_pop($parts);
+
+        return [$firstName, $parts === [] ? null : implode(' ', $parts), $surname];
     }
 
     /**
@@ -78,6 +193,15 @@ class User extends Authenticatable
     public function demandPlans(): HasMany
     {
         return $this->hasMany(DemandPlan::class, 'generated_by');
+    }
+
+    /**
+     * Activities this user performed. The relation becomes empty after a hard
+     * delete, while each AuditLog retains the actor snapshot permanently.
+     */
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(AuditLog::class);
     }
 
     /**
@@ -112,9 +236,50 @@ class User extends Authenticatable
         return $this->role->isAdministrator();
     }
 
+    public function isSuperAdministrator(): bool
+    {
+        return $this->role->isSuperAdministrator();
+    }
+
+    public function isProtected(): bool
+    {
+        return (bool) $this->is_protected;
+    }
+
     public function isActive(): bool
     {
         return $this->status->isActive();
+    }
+
+    public function authenticatorMfaEnabled(): bool
+    {
+        return $this->authenticator_enabled_at !== null
+            && filled($this->getRawOriginal('authenticator_secret'));
+    }
+
+    public function passwordExpiresAt(): ?CarbonInterface
+    {
+        if ($this->password_changed_at === null) {
+            return null;
+        }
+
+        return $this->password_changed_at->copy()->addDays(
+            max(1, (int) config('auth.password_expiration.days', 90)),
+        );
+    }
+
+    public function passwordHasExpired(): bool
+    {
+        $expiresAt = $this->passwordExpiresAt();
+
+        return $expiresAt !== null && $expiresAt->lessThanOrEqualTo(now());
+    }
+
+    public function isTemporarilyLocked(): bool
+    {
+        return ! $this->isSuperAdministrator()
+            && $this->login_locked_until !== null
+            && $this->login_locked_until->isFuture();
     }
 
     /**
@@ -146,6 +311,14 @@ class User extends Authenticatable
 
     public function scopeAdministrators(Builder $query): Builder
     {
-        return $query->role(UserRole::Administrator);
+        return $query->whereIn('role', [
+            UserRole::SuperAdministrator->value,
+            UserRole::Administrator->value,
+        ]);
+    }
+
+    public function scopeSuperAdministrators(Builder $query): Builder
+    {
+        return $query->role(UserRole::SuperAdministrator);
     }
 }

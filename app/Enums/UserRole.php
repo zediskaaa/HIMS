@@ -16,6 +16,7 @@ namespace App\Enums;
  */
 enum UserRole: string
 {
+    case SuperAdministrator = 'super_administrator';
     case Administrator = 'administrator';
     case InventoryManager = 'inventory_manager';
     case WarehouseStaff = 'warehouse_staff';
@@ -25,6 +26,7 @@ enum UserRole: string
     public function label(): string
     {
         return match ($this) {
+            self::SuperAdministrator => 'Super Administrator',
             self::Administrator => 'Administrator',
             self::InventoryManager => 'Inventory Manager',
             self::WarehouseStaff => 'Warehouse Staff',
@@ -36,6 +38,7 @@ enum UserRole: string
     public function description(): string
     {
         return match ($this) {
+            self::SuperAdministrator => 'Full administrative access through the dedicated Super Admin panel.',
             self::Administrator => 'Full access, including user accounts.',
             self::InventoryManager => 'Runs the storeroom: items, procurement, forecasts.',
             self::WarehouseStaff => 'Receives and moves stock; clears alerts.',
@@ -56,7 +59,13 @@ enum UserRole: string
     public function permissions(): array
     {
         return match ($this) {
-            self::Administrator => Permission::cases(),
+            // Kept as its own match arm so its permissions can be narrowed or
+            // expanded later without changing the Administrator role.
+            self::SuperAdministrator => Permission::cases(),
+            self::Administrator => array_values(array_filter(
+                Permission::cases(),
+                fn (Permission $permission) => $permission !== Permission::ViewAuditTrail,
+            )),
 
             // Owns the storeroom records: the item master, supplier directory,
             // procurement, forecasting, and the balance corrections that follow
@@ -119,7 +128,12 @@ enum UserRole: string
      */
     public function isAdministrator(): bool
     {
-        return $this === self::Administrator;
+        return in_array($this, [self::SuperAdministrator, self::Administrator], true);
+    }
+
+    public function isSuperAdministrator(): bool
+    {
+        return $this === self::SuperAdministrator;
     }
 
     /**

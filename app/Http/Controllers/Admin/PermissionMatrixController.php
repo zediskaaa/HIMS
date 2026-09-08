@@ -28,7 +28,7 @@ class PermissionMatrixController extends Controller implements HasMiddleware
      */
     public static function middleware(): array
     {
-        return ['auth', 'can:'.Permission::ManageUsers->value];
+        return ['auth:web,admin,super_admin', 'can:'.Permission::ManageUsers->value];
     }
 
     public function index(): View

@@ -5,7 +5,6 @@ import forms from '@tailwindcss/forms';
 export default {
     content: [
         './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
-        './storage/framework/views/*.php',
         './resources/views/**/*.blade.php',
     ],
 
@@ -85,9 +84,59 @@ export default {
                 'md': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
                 'lg': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
             },
+            // Motion for the public pages (landing + sign in). Entrance
+            // animations use `backwards` fill mode so a staggered
+            // [animation-delay:...] holds the "from" state instead of
+            // flashing unstyled content, and so hover transforms still work
+            // once the animation has finished. app.css disables all of these
+            // under prefers-reduced-motion.
+            keyframes: {
+                'fade-up': {
+                    from: { opacity: '0', transform: 'translateY(1.5rem)' },
+                    to: { opacity: '1', transform: 'translateY(0)' },
+                },
+                'fade-in': {
+                    from: { opacity: '0' },
+                    to: { opacity: '1' },
+                },
+                'fade-in-scale': {
+                    from: { opacity: '0', transform: 'translateY(1rem) scale(0.98)' },
+                    to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+                },
+                'slow-zoom': {
+                    from: { transform: 'scale(1)' },
+                    to: { transform: 'scale(1.08)' },
+                },
+                'float-slow': {
+                    '0%, 100%': { transform: 'translate3d(0, 0, 0) scale(1)' },
+                    '50%': { transform: 'translate3d(1.5rem, -2rem, 0) scale(1.12)' },
+                },
+                'drift-slow': {
+                    '0%, 100%': { transform: 'translate3d(0, 0, 0) scale(1)' },
+                    '50%': { transform: 'translate3d(-2rem, 1.5rem, 0) scale(1.08)' },
+                },
+                'ping-dot': {
+                    '0%': { boxShadow: '0 0 0 0 rgb(89 180 255 / 0.5)' },
+                    '70%': { boxShadow: '0 0 0 0.5rem rgb(89 180 255 / 0)' },
+                    '100%': { boxShadow: '0 0 0 0 rgb(89 180 255 / 0)' },
+                },
+                'sheen': {
+                    from: { transform: 'translateX(-100%)' },
+                    to: { transform: 'translateX(100%)' },
+                },
+            },
+            animation: {
+                'fade-up': 'fade-up 0.75s cubic-bezier(0.16, 1, 0.3, 1) backwards',
+                'fade-in': 'fade-in 0.9s ease-out backwards',
+                'fade-in-scale': 'fade-in-scale 0.8s cubic-bezier(0.16, 1, 0.3, 1) backwards',
+                'slow-zoom': 'slow-zoom 28s ease-in-out infinite alternate',
+                'float-slow': 'float-slow 16s ease-in-out infinite',
+                'drift-slow': 'drift-slow 22s ease-in-out infinite',
+                'ping-dot': 'ping-dot 2.8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                'sheen': 'sheen 7s ease-in-out infinite',
+            },
         },
     },
 
     plugins: [forms],
 };
-

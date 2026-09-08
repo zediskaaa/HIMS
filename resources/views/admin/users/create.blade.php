@@ -3,7 +3,7 @@
         title="Add User"
         subtitle="New accounts are active immediately and can sign in with the password you set."
         :breadcrumbs="[
-            'Home' => route('dashboard'),
+            'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
             'User Management' => route('admin.users.index'),
             'Add User' => null,
         ]" />
@@ -26,7 +26,7 @@
 
             <div class="flex items-center justify-end gap-2 pt-1">
                 <x-ui.button variant="secondary" :href="route('admin.users.index')">Cancel</x-ui.button>
-                <x-ui.button type="submit" icon="plus">Create Account</x-ui.button>
+                <x-ui.button type="submit" icon="plus" data-loading-text="Creating account...">Create Account</x-ui.button>
             </div>
         </form>
     </x-ui.card>

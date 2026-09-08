@@ -1,4 +1,9 @@
 <section>
+    @php
+        $nameComponents = $user->nameComponents();
+        $profileSuccess = session()->pull('profile_success');
+    @endphp
+
     <header>
         <h2 class="text-lg font-medium text-gray-900">
             {{ __('Profile Information') }}
@@ -9,23 +14,82 @@
         </p>
     </header>
 
+    @if ($profileSuccess)
+        <x-ui.alert
+            variant="success"
+            :title="$profileSuccess === 'Email updated successfully.' ? 'Email updated' : 'Profile updated'"
+            dismissible
+            class="mt-6"
+        >
+            {{ $profileSuccess }}
+        </x-ui.alert>
+    @endif
+
     <form id="send-verification" method="post" action="{{ route('verification.send') }}">
         @csrf
     </form>
 
-    <form method="post" action="{{ route('profile.update') }}" class="mt-6 space-y-6">
+    <form method="post" action="{{ route('profile.update') }}" class="mt-6 space-y-6"
+          data-confirm-email-change
+          data-original-email="{{ $user->email }}">
         @csrf
         @method('patch')
 
-        <div>
-            <x-input-label for="name" :value="__('Name')" />
-            <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" :value="old('name', $user->name)" required autofocus autocomplete="name" />
-            <x-input-error class="mt-2" :messages="$errors->get('name')" />
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+                <x-input-label for="surname" :value="__('Last Name')" />
+                <x-text-input
+                    id="surname"
+                    name="surname"
+                    type="text"
+                    class="mt-1 block w-full"
+                    :value="old('surname', $nameComponents['surname'])"
+                    placeholder="e.g. Dela Cruz"
+                    maxlength="80"
+                    required
+                    autofocus
+                    autocomplete="family-name"
+                />
+                <x-input-error class="mt-2" :messages="$errors->get('surname')" />
+            </div>
+
+            <div>
+                <x-input-label for="first_name" :value="__('First Name')" />
+                <x-text-input
+                    id="first_name"
+                    name="first_name"
+                    type="text"
+                    class="mt-1 block w-full"
+                    :value="old('first_name', $nameComponents['first_name'])"
+                    placeholder="e.g. Juan"
+                    maxlength="80"
+                    required
+                    autocomplete="given-name"
+                />
+                <x-input-error class="mt-2" :messages="$errors->get('first_name')" />
+            </div>
+
+            <div class="sm:col-span-2 lg:col-span-1">
+                <x-input-label for="middle_name" :value="__('Middle Name')" />
+                <x-text-input
+                    id="middle_name"
+                    name="middle_name"
+                    type="text"
+                    class="mt-1 block w-full"
+                    :value="old('middle_name', $nameComponents['middle_name'])"
+                    placeholder="e.g. Santos (optional)"
+                    maxlength="80"
+                    autocomplete="additional-name"
+                />
+                <x-input-error class="mt-2" :messages="$errors->get('middle_name')" />
+            </div>
         </div>
 
         <div>
             <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" name="email" type="email" class="mt-1 block w-full" :value="old('email', $user->email)" required autocomplete="username" />
+            <x-text-input id="email" name="email" type="email" class="mt-1 block w-full"
+                          :value="old('email', $user->email)"
+                          required autocomplete="username" />
             <x-input-error class="mt-2" :messages="$errors->get('email')" />
 
             @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
@@ -47,18 +111,23 @@
             @endif
         </div>
 
-        <div class="flex items-center gap-4">
-            <x-primary-button>{{ __('Save') }}</x-primary-button>
+        <div>
+            <x-input-label for="profile_current_password" :value="__('Current Password')" />
+            <x-text-input
+                id="profile_current_password"
+                name="current_password"
+                type="password"
+                class="mt-1 block w-full {{ $errors->has('current_password') ? '!border-danger-500 focus:!border-danger-500 focus:!ring-danger-500' : '' }}"
+                autocomplete="current-password"
+            />
+            <p class="mt-2 text-sm text-gray-600">
+                {{ __('Required only when changing your email address.') }}
+            </p>
+            <x-input-error class="mt-2" :messages="$errors->get('current_password')" />
+        </div>
 
-            @if (session('status') === 'profile-updated')
-                <p
-                    x-data="{ show: true }"
-                    x-show="show"
-                    x-transition
-                    x-init="setTimeout(() => show = false, 2000)"
-                    class="text-sm text-gray-600"
-                >{{ __('Saved.') }}</p>
-            @endif
+        <div class="flex items-center">
+            <x-primary-button data-loading-text="Saving profile...">{{ __('Save') }}</x-primary-button>
         </div>
     </form>
 </section>

@@ -35,9 +35,11 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'password_changed_at' => now(),
             'remember_token' => Str::random(10),
             'role' => UserRole::Viewer,
             'status' => UserStatus::Active,
+            'mfa_enabled' => false,
             'employee_id' => 'EMP-'.fake()->unique()->numberBetween(1000, 9999),
             'department' => fake()->randomElement(['Pharmacy', 'Central Supply', 'Laboratory', 'Nursing']),
             'phone' => '09'.fake()->numerify('#########'),
@@ -62,6 +64,11 @@ class UserFactory extends Factory
     public function administrator(): static
     {
         return $this->role(UserRole::Administrator);
+    }
+
+    public function superAdministrator(): static
+    {
+        return $this->role(UserRole::SuperAdministrator);
     }
 
     public function inventoryManager(): static

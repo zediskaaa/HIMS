@@ -7,10 +7,12 @@ use App\Enums\MovementType;
 use App\Enums\UserRole;
 use App\Models\InventoryItem;
 use App\Models\ItemStockLevel;
+use App\Models\PasswordHistory;
 use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\User;
 use App\Services\DemandForecastService;
+use App\Support\AuthenticationContext;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -33,7 +35,7 @@ class DemoSeedTest extends TestCase
         $this->seed(DatabaseSeeder::class);
     }
 
-    public function test_it_seeds_one_account_per_role(): void
+    public function test_it_seeds_demo_staff_and_the_protected_super_admin(): void
     {
         foreach (UserRole::cases() as $role) {
             $this->assertGreaterThan(
@@ -48,16 +50,19 @@ class DemoSeedTest extends TestCase
         $admin = User::where('email', 'test@example.com')->firstOrFail();
         $this->assertTrue($admin->isAdministrator());
         $this->assertTrue($admin->isActive());
+        $this->assertSame(1, User::superAdministrators()->count());
+        $this->assertTrue(User::superAdministrators()->firstOrFail()->isProtected());
+        $this->assertSame(User::query()->count(), PasswordHistory::query()->count());
     }
 
     public function test_the_seeded_admin_can_sign_in_with_the_documented_password(): void
     {
-        $this->post('/login', [
+        $this->post('/admin/login', [
             'email' => 'test@example.com',
-            'password' => 'password',
+            'password' => 'DemoAdmin1!',
         ])->assertRedirect('/dashboard');
 
-        $this->assertAuthenticated();
+        $this->assertAuthenticated(AuthenticationContext::ADMIN_GUARD);
     }
 
     public function test_every_seeded_item_has_consumption_history(): void

@@ -11,7 +11,7 @@ class AuthLoginPageTest extends TestCase
         $response = $this->get('/login');
 
         $response->assertStatus(200);
-        $response->assertSee('Sign in to HIMS');
+        $response->assertSee('Staff Sign in');
         $response->assertSee('Email');
         $response->assertSee('Password');
     }

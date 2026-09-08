@@ -85,7 +85,7 @@
                             @endforelse
                             </tbody>
                         </table>
-                        <div id="suppliers-api-status" class="mt-3 text-sm text-[var(--muted)]">Loading suppliers from API...</div>
+                        <x-ui.loader id="suppliers-api-status" size="sm" label="Loading suppliers from API..." class="mt-3 text-sm text-[var(--muted)]" />
                     </div>
                 </div>
             </div>

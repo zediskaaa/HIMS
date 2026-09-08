@@ -29,7 +29,7 @@ class DemandForecastController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            'auth',
+            'auth:web,admin,super_admin',
             // Reading the forecast is a reporting activity; saving a plan
             // commits a reorder decision and needs the planning permission.
             new Middleware('can:'.Permission::ViewReports->value, only: ['index']),

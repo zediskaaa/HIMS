@@ -3,7 +3,7 @@
         title="Edit {{ $user->name }}"
         subtitle="Changes take effect the next time this person loads a page."
         :breadcrumbs="[
-            'Home' => route('dashboard'),
+            'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
             'User Management' => route('admin.users.index'),
             $user->name => null,
         ]">
@@ -30,7 +30,10 @@
     @endif
 
     <x-ui.card title="Account Details" subtitle="Leave the password fields blank to keep the current password.">
-        <form method="POST" action="{{ route('admin.users.update', $user) }}" class="space-y-5">
+        <form method="POST" action="{{ route('admin.users.update', $user) }}" class="space-y-5"
+              data-confirm-title="Confirm account changes"
+              data-confirm-message="Are you sure you want to save these account changes?"
+              data-confirm-label="Save Changes">
             @csrf
             @method('PUT')
 
@@ -38,7 +41,7 @@
 
             <div class="flex items-center justify-end gap-2 pt-1">
                 <x-ui.button variant="secondary" :href="route('admin.users.index')">Cancel</x-ui.button>
-                <x-ui.button type="submit">Save Changes</x-ui.button>
+                <x-ui.button type="submit" data-loading-text="Saving changes...">Save Changes</x-ui.button>
             </div>
         </form>
     </x-ui.card>

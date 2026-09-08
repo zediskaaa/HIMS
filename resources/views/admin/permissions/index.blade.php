@@ -2,7 +2,7 @@
     <x-ui.page-header
         title="Access Control"
         subtitle="Which role may reach which module. Generated from the permission definitions the system enforces."
-        :breadcrumbs="['Home' => route('dashboard'), 'Access Control' => null]" />
+        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Access Control' => null]" />
 
     <x-ui.alert variant="info" title="How to read this">
         A tick means accounts with that role hold the ability, and the routes and

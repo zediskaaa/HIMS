@@ -42,6 +42,18 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        'admin' => [
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
+
+        // Uses the same user records but a distinct session key and login
+        // flow. Role middleware still decides who may enter this guard.
+        'super_admin' => [
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
     ],
 
     /*
@@ -97,8 +109,29 @@ return [
             'provider' => 'users',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
+            'otp_expire' => env('AUTH_PASSWORD_RESET_OTP_EXPIRE', 5),
             'throttle' => 60,
         ],
+    ],
+
+    'login_mfa' => [
+        'expire' => (int) env('AUTH_LOGIN_MFA_OTP_EXPIRE', 5),
+        'max_attempts' => (int) env('AUTH_LOGIN_MFA_MAX_ATTEMPTS', 5),
+        'resend_cooldown' => (int) env('AUTH_LOGIN_MFA_RESEND_COOLDOWN', 60),
+    ],
+
+    'authenticator' => [
+        'issuer' => env('AUTH_AUTHENTICATOR_ISSUER', 'HIMS'),
+        'window' => (int) env('AUTH_AUTHENTICATOR_WINDOW', 1),
+        'setup_expire' => (int) env('AUTH_AUTHENTICATOR_SETUP_EXPIRE', 10),
+    ],
+
+    'password_expiration' => [
+        'days' => (int) env('AUTH_PASSWORD_EXPIRATION_DAYS', 90),
+    ],
+
+    'password_history' => [
+        'key' => env('AUTH_PASSWORD_HISTORY_KEY') ?: env('APP_KEY'),
     ],
 
     /*

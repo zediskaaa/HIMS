@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\Permission;
+use App\Enums\UserDepartment;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
@@ -29,7 +30,7 @@ class UserController extends Controller implements HasMiddleware
      */
     public static function middleware(): array
     {
-        return ['auth', 'can:'.Permission::ManageUsers->value];
+        return ['auth:web,admin,super_admin', 'can:'.Permission::ManageUsers->value];
     }
 
     public function index(Request $request): View
@@ -40,6 +41,9 @@ class UserController extends Controller implements HasMiddleware
 
                 $query->where(fn ($q) => $q
                     ->where('name', 'like', $term)
+                    ->orWhere('surname', 'like', $term)
+                    ->orWhere('first_name', 'like', $term)
+                    ->orWhere('middle_name', 'like', $term)
                     ->orWhere('email', 'like', $term)
                     ->orWhere('employee_id', 'like', $term)
                     ->orWhere('department', 'like', $term));
@@ -60,29 +64,38 @@ class UserController extends Controller implements HasMiddleware
                 'active' => User::active()->count(),
                 'administrators' => User::administrators()->active()->count(),
             ],
+            'manageableAccountIds' => $users->getCollection()
+                ->filter(fn (User $user) => $this->accounts->canManage($request->user(), $user))
+                ->modelKeys(),
+            'unlockableAccountIds' => $users->getCollection()
+                ->filter(fn (User $user) => $this->accounts->canUnlock($request->user(), $user))
+                ->modelKeys(),
         ]);
     }
 
     public function create(): View
     {
         return view('admin.users.create', [
-            'roles' => UserRole::cases(),
+            'roles' => $this->accounts->assignableRoles(request()->user()),
+            'departments' => UserDepartment::options(),
         ]);
     }
 
     public function store(StoreUserRequest $request): RedirectResponse
     {
-        $user = $this->accounts->create($request->validated());
+        $this->accounts->create($request->validated(), $request->user());
+        $request->session()->put('account_created_success', 'Account created successfully.');
 
         return redirect()
-            ->route('admin.users.index')
-            ->with('success', sprintf('%s was added as %s.', $user->name, $user->role->label()));
+            ->route('admin.users.index');
     }
 
     public function show(User $user): View
     {
         return view('admin.users.show', [
             'user' => $user,
+            'canManage' => $this->accounts->canManage(request()->user(), $user),
+            'canUnlock' => $this->accounts->canUnlock(request()->user(), $user),
             'recentMovements' => $user->stockMovements()
                 ->with(['item', 'fromLocation', 'toLocation'])
                 ->latest('moved_at')
@@ -94,10 +107,13 @@ class UserController extends Controller implements HasMiddleware
 
     public function edit(User $user): View
     {
+        abort_unless($this->accounts->canManage(request()->user(), $user), 403);
+
         return view('admin.users.edit', [
             'user' => $user,
-            'roles' => UserRole::cases(),
+            'roles' => $this->accounts->assignableRoles(request()->user(), $user),
             'statuses' => UserStatus::options(),
+            'departments' => UserDepartment::optionsIncluding($user->department),
         ]);
     }
 
@@ -116,6 +132,8 @@ class UserController extends Controller implements HasMiddleware
 
     public function toggleStatus(Request $request, User $user): RedirectResponse
     {
+        abort_unless($this->accounts->canManage($request->user(), $user), 403);
+
         $updated = $this->accounts->toggleStatus($user, $request->user());
 
         return redirect()
@@ -125,5 +143,14 @@ class UserController extends Controller implements HasMiddleware
                 $updated->name,
                 $updated->status->label()
             ));
+    }
+
+    public function unlock(Request $request, User $user): RedirectResponse
+    {
+        $unlocked = $this->accounts->unlock($user, $request->user());
+
+        return redirect()
+            ->back()
+            ->with('success', sprintf('%s can now attempt to sign in again.', $unlocked->name));
     }
 }

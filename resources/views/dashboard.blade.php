@@ -1,10 +1,25 @@
+@php
+    $isSuperAdminPanel = $superAdminPanel ?? false;
+    $isAdminPanel = \App\Support\AuthenticationContext::isAdmin();
+    $dashboardTitle = match (true) {
+        $isSuperAdminPanel => 'Super Admin Dashboard',
+        $isAdminPanel => 'Admin Dashboard',
+        default => 'Staff Dashboard',
+    };
+    $dashboardSubtitle = match (true) {
+        $isSuperAdminPanel => 'Full administrative oversight of HIMS inventory, users, procurement, and records.',
+        $isAdminPanel => 'Manage HIMS operations and user access within the Administrator role.',
+        default => 'Monitor inventory health and complete the operations authorized for your staff role.',
+    };
+@endphp
+
 <x-app-layout>
-    <x-slot:title>Operations Dashboard</x-slot:title>
+    <x-slot:title>{{ $dashboardTitle }}</x-slot:title>
 
     <x-ui.page-header
-        title="Operations Dashboard"
-        subtitle="Monitor inventory health, stock movement activity, and warehouse readiness from one place."
-        :breadcrumbs="['Home' => route('dashboard'), 'Operations Dashboard' => null]"
+        :title="$dashboardTitle"
+        :subtitle="$dashboardSubtitle"
+        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), $dashboardTitle => null]"
     >
         <x-slot:actions>
             <x-ui.button variant="secondary" icon="arrows-right-left" :href="route('inventory.stock-movements')">

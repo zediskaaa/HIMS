@@ -10,6 +10,11 @@
 @php
     $user = $user ?? null;
     $isEdit = $user !== null;
+    $nameComponents = $user?->nameComponents() ?? [
+        'surname' => null,
+        'first_name' => null,
+        'middle_name' => null,
+    ];
     $roleDescriptions = collect($roles)->mapWithKeys(fn ($role) => [
         $role->value => [
             'description' => $role->description(),
@@ -21,15 +26,36 @@
 <div x-data="{
     role: '{{ old('role', $user?->role?->value ?? \App\Enums\UserRole::Viewer->value) }}',
     roles: {{ \Illuminate\Support\Js::from($roleDescriptions) }},
+    password: '',
+    passwordConfirmation: '',
     get detail() { return this.roles[this.role] ?? null },
 }">
     <div class="grid gap-4 md:grid-cols-2">
-        <x-ui.field
-            name="name"
-            label="Full Name"
-            :value="$user?->name"
-            required
-            placeholder="e.g. Maria Cruz" />
+        <div class="grid gap-4 sm:grid-cols-2 md:col-span-2 lg:grid-cols-3">
+            <x-ui.field
+                name="surname"
+                label="Surname"
+                :value="$nameComponents['surname']"
+                required
+                autocomplete="family-name"
+                placeholder="e.g. Dela Cruz" />
+
+            <x-ui.field
+                name="first_name"
+                label="First Name"
+                :value="$nameComponents['first_name']"
+                required
+                autocomplete="given-name"
+                placeholder="e.g. Juan" />
+
+            <x-ui.field
+                name="middle_name"
+                label="Middle Name"
+                :value="$nameComponents['middle_name']"
+                autocomplete="additional-name"
+                placeholder="e.g. Santos"
+                hint="Optional." />
+        </div>
 
         <x-ui.field
             name="email"
@@ -43,21 +69,34 @@
         <x-ui.field
             name="employee_id"
             label="Employee ID"
-            :value="$user?->employee_id"
-            placeholder="e.g. EMP-0142"
-            hint="Optional, but makes the audit trail easier to read." />
+            :value="$user?->employee_id ?? 'Generated automatically after creation'"
+            disabled
+            hint="Assigned automatically by the system and cannot be changed." />
 
         <x-ui.field
             name="department"
             label="Department"
+            type="select"
             :value="$user?->department"
-            placeholder="e.g. Pharmacy, Central Supply" />
+            :options="$departments"
+            placeholder="Select a department"
+            required />
 
         <x-ui.field
             name="phone"
             label="Contact Number"
+            type="tel"
             :value="$user?->phone"
-            placeholder="e.g. 0917 000 0000" />
+            required
+            inputmode="numeric"
+            autocomplete="tel"
+            minlength="11"
+            maxlength="11"
+            pattern="09[0-9]{9}"
+            title="Enter exactly 11 digits beginning with 09."
+            x-on:input="$el.value = $el.value.replace(/[^0-9]/g, '').slice(0, 11)"
+            placeholder="09XXXXXXXXX"
+            hint="Exactly 11 digits beginning with 09." />
 
         <x-ui.field
             name="role"
@@ -91,14 +130,23 @@
             type="password"
             :required="! $isEdit"
             autocomplete="new-password"
-            hint="{{ $isEdit ? 'Leave blank to keep the current password.' : 'At least 8 characters.' }}" />
+            minlength="8"
+            pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,}"
+            title="{{ \App\Rules\PasswordStandard::REQUIREMENTS }}"
+            x-model="password"
+            hint="{{ $isEdit ? 'Leave blank to keep the current password. When changed, all requirements below apply.' : \App\Rules\PasswordStandard::REQUIREMENTS }}" />
 
         <x-ui.field
             name="password_confirmation"
             label="Confirm Password"
             type="password"
             :required="! $isEdit"
-            autocomplete="new-password" />
+            autocomplete="new-password"
+            x-model="passwordConfirmation" />
+    </div>
+
+    <div class="mt-4">
+        <x-auth.password-requirements />
     </div>
 
     {{-- Reflects the selection above so the effect of the choice is visible

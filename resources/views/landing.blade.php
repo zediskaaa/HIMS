@@ -3,140 +3,134 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>HIMS | Supply Chain & Inventory Management</title>
+        <meta name="description" content="HIMS keeps hospital procurement, stock levels, and replenishment on one record — from warehouse to ward.">
+        <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+        <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32x32.png') }}">
+        <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('favicon-16x16.png') }}">
+        <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
+        <title>HIMS | Supply Chain &amp; Inventory Management</title>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="min-h-screen bg-slate-950 text-slate-100">
+    <body class="bg-neutral-950 text-neutral-100 antialiased">
         <div class="relative min-h-screen overflow-hidden">
-            <div class="absolute inset-0 z-0">
-                <img src="{{ asset('img/landingpage.jpg') }}" alt="Hospital background" class="h-full w-full object-cover" />
-                <div class="absolute inset-0 bg-[linear-gradient(135deg,rgba(2,6,23,0.95)_0%,rgba(2,6,23,0.7)_45%,rgba(15,23,42,0.85)_100%)]"></div>
+            {{-- Decorative backdrop. Content and contrast remain intact without it. --}}
+            <div class="absolute inset-0 z-0" aria-hidden="true">
+                <img src="{{ asset('img/landingpage.jpg') }}" alt="" class="h-full w-full animate-slow-zoom object-cover object-center will-change-transform" />
+                <div class="absolute inset-0 bg-neutral-950/65"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-neutral-950 via-neutral-950/90 via-50% to-neutral-950/45"></div>
+                <div class="absolute inset-0 bg-gradient-to-b from-neutral-950/70 via-transparent to-neutral-950"></div>
+                <div class="absolute -left-24 top-24 h-80 w-80 animate-float-slow rounded-full bg-primary-600/20 blur-3xl will-change-transform"></div>
+                <div class="absolute right-0 top-1/3 h-96 w-96 animate-drift-slow rounded-full bg-primary-500/10 blur-3xl will-change-transform"></div>
             </div>
 
-            <div class="relative z-10 mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-4 sm:px-6 lg:px-8">
-                <header class="flex items-center justify-between rounded-full border border-white/10 bg-white/10 px-4 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.25)] backdrop-blur-xl sm:px-6">
-                    <a href="{{ url('/') }}" class="flex items-center gap-3 text-lg font-semibold tracking-wide text-white">
-                        <span class="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-400/30">H</span>
-                        <span>HIMS</span>
+            <div class="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 lg:px-8">
+                <header class="flex animate-fade-in items-center justify-between border-b border-white/10 py-5">
+                    <a href="{{ url('/') }}" class="group flex items-center gap-3 rounded-lg focus-visible:ring-offset-neutral-950">
+                        <img src="{{ asset('img/hims-logo.png') }}" alt="" class="h-10 w-10 rounded-lg bg-white object-cover ring-1 ring-inset ring-white/20 transition duration-300 group-hover:scale-105 group-hover:ring-primary-300/40" />
+                        <span>
+                            <span class="block text-base font-semibold tracking-tight text-white">HIMS</span>
+                            <span class="hidden text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-400 sm:block">Hospital operations</span>
+                        </span>
                     </a>
-                    <nav class="flex items-center gap-2 text-sm text-slate-300 sm:gap-3">
-                        @if (Route::has('login'))
-                            @auth
-                                <a href="{{ url('/dashboard') }}" class="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 font-medium text-cyan-300 transition hover:bg-cyan-500/20">
+
+                    @if (Route::has('login'))
+                        <nav aria-label="Account navigation">
+                            @if (\App\Support\AuthenticationContext::authenticatedGuard() !== null)
+                                <a href="{{ route(\App\Support\AuthenticationContext::dashboardRoute()) }}" class="group inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition duration-300 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/15 focus-visible:ring-offset-neutral-950">
                                     Dashboard
+                                    <x-ui.icon name="chevron-right" class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
                                 </a>
                             @else
-                                <a href="{{ route('login') }}" class="rounded-full px-4 py-2 transition hover:bg-white/10 hover:text-white">
-                                    Log in
+                                <a href="{{ route('login') }}" class="group inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition duration-300 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/15 focus-visible:ring-offset-neutral-950">
+                                    Staff log in
+                                    <x-ui.icon name="chevron-right" class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
                                 </a>
-                                @if (Route::has('register'))
-                                    <a href="{{ route('register') }}" class="rounded-full bg-white px-4 py-2 font-medium text-slate-900 transition hover:bg-slate-200">
-                                        Request access
-                                    </a>
-                                @endif
-                            @endauth
-                        @endif
-                    </nav>
+                            @endif
+                        </nav>
+                    @endif
                 </header>
 
-                <main class="flex-1 py-10 sm:py-14 lg:py-20">
-                    <section class="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-                        <div>
-                            <div class="mb-6 inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-sm font-medium text-cyan-300">
-                                Intelligent operations for modern teams
-                            </div>
-                            <h1 class="max-w-3xl text-4xl font-semibold leading-tight text-white sm:text-5xl lg:text-6xl">
-                                Supply Chain & Inventory Management
-                            </h1>
-                            <p class="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
-                                Track suppliers, monitor stock movement, automate replenishment, and keep every department aligned with real-time visibility.
+                <main class="flex flex-1 flex-col justify-center py-14 sm:py-16 lg:py-20">
+                    <div class="max-w-3xl">
+                        <section>
+                            {{-- The hero reveals top-to-bottom; each delay is one beat after the last. --}}
+                            <p class="inline-flex w-fit max-w-full animate-fade-up items-center gap-2 rounded-full border border-primary-300/20 bg-primary-400/10 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-primary-200 [animation-delay:120ms] sm:text-xs sm:tracking-widest">
+                                <span class="h-1.5 w-1.5 shrink-0 animate-ping-dot rounded-full bg-primary-400"></span>
+                                <span>Hospital Inventory Management System</span>
                             </p>
-                            <div class="mt-8 flex flex-wrap gap-4">
-                                @if (Route::has('login'))
-                                    <a href="{{ route('login') }}" class="rounded-full bg-cyan-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400">
-                                        Open the dashboard
-                                    </a>
-                                @endif
-                                @if (Route::has('register'))
-                                    <a href="{{ route('register') }}" class="rounded-full border border-white/15 bg-white/10 px-6 py-3 font-semibold text-white transition hover:bg-white/20">
-                                        Request access
-                                    </a>
-                                @endif
-                            </div>
 
-                            <div class="mt-10 grid gap-4 sm:grid-cols-3">
-                                <div class="rounded-2xl border border-white/10 bg-white/10 p-4 shadow-lg shadow-black/20 backdrop-blur">
-                                    <p class="text-2xl font-semibold text-white">24/7</p>
-                                    <p class="mt-1 text-sm text-slate-300">Live stock visibility</p>
-                                </div>
-                                <div class="rounded-2xl border border-white/10 bg-white/10 p-4 shadow-lg shadow-black/20 backdrop-blur">
-                                    <p class="text-2xl font-semibold text-white">99.2%</p>
-                                    <p class="mt-1 text-sm text-slate-300">Order accuracy</p>
-                                </div>
-                                <div class="rounded-2xl border border-white/10 bg-white/10 p-4 shadow-lg shadow-black/20 backdrop-blur">
-                                    <p class="text-2xl font-semibold text-white">3x</p>
-                                    <p class="mt-1 text-sm text-slate-300">Faster approvals</p>
-                                </div>
-                            </div>
-                        </div>
+                            {{-- Keep both phrases as plain text for the landing-page contract. --}}
+                            <h1 class="mt-6 max-w-2xl animate-fade-up text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-white [animation-delay:240ms] sm:text-5xl lg:text-6xl">
+                                Supply Chain &amp; Inventory Management that keeps care moving.
+                            </h1>
 
-                        <div class="rounded-[28px] border border-white/10 bg-slate-900/70 p-6 shadow-[0_25px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-                            <div class="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
-                                <div>
-                                    <p class="text-sm text-slate-400">Warehouse health</p>
-                                    <p class="text-xl font-semibold text-white">Stock aligned</p>
-                                </div>
-                                <span class="rounded-full bg-emerald-500/15 px-3 py-1 text-sm font-medium text-emerald-300">Stable</span>
-                            </div>
+                            <p class="mt-6 max-w-xl animate-fade-up text-pretty text-base leading-7 text-neutral-300 [animation-delay:360ms] sm:text-lg sm:leading-8">
+                                Connect procurement, stock visibility, and replenishment in one dependable workspace—from the central warehouse to every ward.
+                            </p>
 
-                            <div class="mt-6 space-y-4">
-                                <div class="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
-                                    <div class="flex items-center justify-between">
-                                        <p class="font-medium text-white">Procurement requests</p>
-                                        <span class="text-sm text-cyan-300">12 pending</span>
-                                    </div>
-                                    <div class="mt-3 h-2 rounded-full bg-slate-800">
-                                        <div class="h-2 w-3/4 rounded-full bg-cyan-500"></div>
-                                    </div>
-                                </div>
-                                <div class="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
-                                    <div class="flex items-center justify-between">
-                                        <p class="font-medium text-white">Low stock alerts</p>
-                                        <span class="text-sm text-amber-300">4 urgent</span>
-                                    </div>
-                                    <div class="mt-3 h-2 rounded-full bg-slate-800">
-                                        <div class="h-2 w-2/3 rounded-full bg-amber-500"></div>
-                                    </div>
-                                </div>
-                                <div class="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
-                                    <div class="flex items-center justify-between">
-                                        <p class="font-medium text-white">Supplier performance</p>
-                                        <span class="text-sm text-emerald-300">+14%</span>
-                                    </div>
-                                    <div class="mt-3 h-2 rounded-full bg-slate-800">
-                                        <div class="h-2 w-4/5 rounded-full bg-emerald-500"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
+                            @if (Route::has('login'))
+                                <div class="mt-9 flex animate-fade-up flex-col gap-4 [animation-delay:480ms] sm:flex-row sm:items-center">
+                                    @if (\App\Support\AuthenticationContext::authenticatedGuard() !== null)
+                                        <a href="{{ route(\App\Support\AuthenticationContext::dashboardRoute()) }}" class="group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary-950/30 transition duration-300 hover:-translate-y-0.5 hover:bg-primary-500 hover:shadow-xl hover:shadow-primary-950/40 focus-visible:ring-primary-400 focus-visible:ring-offset-neutral-950">
+                                            {{-- Light sweeps across the button on hover only, so nothing loops in the background. --}}
+                                            <span class="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-full" aria-hidden="true"></span>
+                                            <span class="relative">Open dashboard</span>
+                                            <x-ui.icon name="chevron-right" class="relative h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                                        </a>
+                                    @else
+                                        <a href="{{ route('login') }}" class="group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary-950/30 transition duration-300 hover:-translate-y-0.5 hover:bg-primary-500 hover:shadow-xl hover:shadow-primary-950/40 focus-visible:ring-primary-400 focus-visible:ring-offset-neutral-950">
+                                            <span class="pointer-events-none absolute inset-0 -translate-x-full animate-sheen bg-gradient-to-r from-transparent via-white/20 to-transparent" aria-hidden="true"></span>
+                                            <span class="relative">Log in to HIMS</span>
+                                            <x-ui.icon name="chevron-right" class="relative h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                                        </a>
+                                    @endif
 
-                    <section class="mt-16 grid gap-6 md:grid-cols-3">
-                        <div class="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-lg shadow-black/20 backdrop-blur">
-                            <h2 class="text-xl font-semibold text-white">Procurement control</h2>
-                            <p class="mt-3 text-sm leading-7 text-slate-300">Create purchase requests, review supplier quotes, and keep approvals moving without bottlenecks.</p>
-                        </div>
-                        <div class="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-lg shadow-black/20 backdrop-blur">
-                            <h2 class="text-xl font-semibold text-white">Inventory visibility</h2>
-                            <p class="mt-3 text-sm leading-7 text-slate-300">Monitor stock across locations, identify low units, and manage movement with accurate updates.</p>
-                        </div>
-                        <div class="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-lg shadow-black/20 backdrop-blur">
-                            <h2 class="text-xl font-semibold text-white">Operations reporting</h2>
-                            <p class="mt-3 text-sm leading-7 text-slate-300">Turn warehouse activity into concise dashboards for planning, audits, and executive review.</p>
-                        </div>
-                    </section>
+                                    <span class="inline-flex items-center justify-center gap-2 text-xs text-neutral-400 sm:justify-start">
+                                        <x-ui.icon name="shield-check" class="h-4 w-4 text-primary-300" />
+                                        Secure access for authorized staff
+                                    </span>
+                                </div>
+                            @endif
+
+                        </section>
+                    </div>
                 </main>
+
+                @php
+                    $features = [
+                        ['icon' => 'truck', 'title' => 'Procurement', 'body' => 'Move requests, supplier quotes, and purchase orders through one controlled process.'],
+                        ['icon' => 'cube', 'title' => 'Inventory control', 'body' => 'See batches, stock levels, and movement across warehouses, wards, and pharmacies.'],
+                        ['icon' => 'chart-bar', 'title' => 'Reporting', 'body' => 'Turn daily warehouse activity into clear planning and audit-ready reports.'],
+                    ];
+                @endphp
+
+                <section class="grid border-y border-white/10 sm:grid-cols-3" aria-label="HIMS core capabilities">
+                    @foreach ($features as $index => $feature)
+                        {{-- Cards land left-to-right, picking up where the hero stagger ended. --}}
+                        <article
+                            class="group animate-fade-up py-6 sm:px-6 sm:first:pl-0 sm:last:pr-0 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-white/10 sm:[&:not(:last-child)]:border-b-0 sm:[&:not(:last-child)]:border-r"
+                            style="animation-delay: {{ 620 + $index * 120 }}ms"
+                        >
+                            <div class="flex items-start gap-4">
+                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-primary-300 ring-1 ring-inset ring-white/10 transition duration-300 group-hover:-translate-y-0.5 group-hover:scale-110 group-hover:bg-primary-400/10 group-hover:ring-primary-300/20">
+                                    <x-ui.icon :name="$feature['icon']" class="h-4 w-4" />
+                                </span>
+                                <div>
+                                    <h2 class="text-sm font-semibold text-white transition-colors duration-300 group-hover:text-primary-200">{{ $feature['title'] }}</h2>
+                                    <p class="mt-1.5 text-xs leading-5 text-neutral-400">{{ $feature['body'] }}</p>
+                                </div>
+                            </div>
+                        </article>
+                    @endforeach
+                </section>
+
+                <footer class="flex animate-fade-in flex-col gap-2 py-6 text-xs text-neutral-500 [animation-delay:900ms] sm:flex-row sm:items-center sm:justify-between">
+                    <p>&copy; {{ date('Y') }} HIMS — hospital supply chain operations.</p>
+                    <p>From warehouse to ward, on one record.</p>
+                </footer>
             </div>
         </div>
+
+        @include('layouts.partials.loading-overlay')
     </body>
 </html>

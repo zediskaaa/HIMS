@@ -37,6 +37,7 @@ enum Permission: string
 
     // Administration.
     case ManageUsers = 'manage_users';
+    case ViewAuditTrail = 'view_audit_trail';
 
     public function label(): string
     {
@@ -53,6 +54,7 @@ enum Permission: string
             self::ManageProcurement => 'Manage procurement',
             self::GenerateForecasts => 'Generate demand forecasts',
             self::ManageUsers => 'Manage users',
+            self::ViewAuditTrail => 'View audit trail',
         };
     }
 
@@ -71,6 +73,7 @@ enum Permission: string
             self::ManageProcurement => 'Raise and approve requisitions and purchase orders.',
             self::GenerateForecasts => 'Run demand forecasts and save plans.',
             self::ManageUsers => 'Create staff accounts, change roles, deactivate access.',
+            self::ViewAuditTrail => 'Review append-only user and authentication activity.',
         };
     }
 
@@ -89,7 +92,7 @@ enum Permission: string
             self::ManageLocations, self::AcknowledgeAlerts => 'Warehousing',
             self::ManageSuppliers, self::ManageProcurement => 'Procurement',
             self::ViewReports, self::GenerateForecasts => 'Records & Analysis',
-            self::ManageUsers => 'Administration',
+            self::ManageUsers, self::ViewAuditTrail => 'Administration',
         };
     }
 

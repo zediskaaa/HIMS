@@ -2,11 +2,12 @@
 
 namespace App\Services;
 
+use App\Enums\AuditAction;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -20,31 +21,105 @@ use Illuminate\Validation\ValidationException;
  */
 class UserAccountService
 {
+    public function __construct(
+        private readonly PasswordHistoryService $passwords,
+        private readonly AuditLogger $audit,
+    ) {}
+
+    /**
+     * Roles the actor may assign. Super Admin may manage Administrator
+     * accounts, while the protected Super Administrator role is never exposed
+     * as a creatable role.
+     *
+     * @return array<int, UserRole>
+     */
+    public function assignableRoles(User $actor, ?User $target = null): array
+    {
+        $roles = collect(UserRole::cases())
+            ->filter(fn (UserRole $role) => $actor->isSuperAdministrator()
+                ? ! $role->isSuperAdministrator()
+                : ! $role->isAdministrator())
+            ->values()
+            ->all();
+
+        // The protected account may preserve its existing role while editing
+        // its own non-security profile fields. It still cannot assign that role
+        // to any other account.
+        if ($target?->isProtected() && $target->is($actor)) {
+            array_unshift($roles, UserRole::SuperAdministrator);
+        }
+
+        return $roles;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function assignableRoleValues(User $actor, ?User $target = null): array
+    {
+        return array_map(
+            fn (UserRole $role) => $role->value,
+            $this->assignableRoles($actor, $target),
+        );
+    }
+
+    public function canManage(User $actor, User $target): bool
+    {
+        if ($target->isProtected()) {
+            return $actor->isSuperAdministrator() && $actor->is($target);
+        }
+
+        if ($actor->isSuperAdministrator()) {
+            return true;
+        }
+
+        return ! $target->isAdministrator();
+    }
+
+    public function canUnlock(User $actor, User $target): bool
+    {
+        return $this->mayUnlock($actor, $target)
+            && $target->isTemporarilyLocked();
+    }
+
+    private function mayUnlock(User $actor, User $target): bool
+    {
+        return $actor->isSuperAdministrator()
+            && ! $actor->is($target)
+            && ! $target->isSuperAdministrator()
+            && $this->canManage($actor, $target);
+    }
+
     /**
      * @param  array<string, mixed>  $attributes
      */
-    public function create(array $attributes): User
+    public function create(array $attributes, User $actor): User
     {
-        $user = new User([
-            'name' => $attributes['name'],
-            'email' => $attributes['email'],
-            'password' => $attributes['password'],
-            'role' => $attributes['role'],
-            'status' => $attributes['status'] ?? UserStatus::Active->value,
-            'employee_id' => $attributes['employee_id'] ?? null,
-            'department' => $attributes['department'] ?? null,
-            'phone' => $attributes['phone'] ?? null,
-        ]);
+        return $this->passwords->usePassword($attributes['password'], function (string $passwordHash) use ($attributes, $actor): User {
+            $role = UserRole::from($attributes['role']);
+            $this->assertCanAssignRole($actor, $role);
 
-        // An administrator created this account in person, so there is nobody
-        // to send a confirmation link to. Set outside the fillable list on
-        // purpose: email_verified_at must never be mass-assignable from a
-        // request, so passing it to User::create() would be dropped silently.
-        $user->email_verified_at = now();
+            $user = new User([
+                ...$this->nameAttributes($attributes),
+                'email' => $attributes['email'],
+                'password' => $passwordHash,
+                'role' => $role,
+                'status' => $attributes['status'] ?? UserStatus::Active->value,
+                'employee_id' => $this->nextEmployeeId(),
+                'department' => $attributes['department'],
+                'phone' => $attributes['phone'] ?? null,
+            ]);
 
-        $user->save();
+            // An administrator created this account in person, so there is nobody
+            // to send a confirmation link to. Set outside the fillable list on
+            // purpose: email_verified_at must never be mass-assignable from a
+            // request, so passing it to User::create() would be dropped silently.
+            $user->email_verified_at = now();
 
-        return $user;
+            $user->save();
+
+            return $user;
+        });
     }
 
     /**
@@ -56,8 +131,17 @@ class UserAccountService
     public function update(User $user, array $attributes, User $actor): User
     {
         return DB::transaction(function () use ($user, $attributes, $actor): User {
+            $this->assertCanManage($actor, $user);
+
             $newRole = UserRole::from($attributes['role']);
             $newStatus = UserStatus::from($attributes['status']);
+            $this->assertCanAssignRole($actor, $newRole, $user);
+
+            if ($user->isProtected() && $attributes['email'] !== $user->email) {
+                throw ValidationException::withMessages([
+                    'email' => ['The protected Super Administrator email cannot be changed.'],
+                ]);
+            }
 
             $losesAdmin = $user->isAdministrator()
                 && (! $newRole->isAdministrator() || ! $newStatus->isActive());
@@ -68,12 +152,11 @@ class UserAccountService
             }
 
             $user->fill([
-                'name' => $attributes['name'],
+                ...$this->nameAttributes($attributes),
                 'email' => $attributes['email'],
                 'role' => $newRole,
                 'status' => $newStatus,
-                'employee_id' => $attributes['employee_id'] ?? null,
-                'department' => $attributes['department'] ?? null,
+                'department' => $attributes['department'],
                 'phone' => $attributes['phone'] ?? null,
             ]);
 
@@ -81,7 +164,15 @@ class UserAccountService
             // existing password back, so an empty field is not a request to
             // clear it.
             if (! empty($attributes['password'])) {
-                $user->password = $attributes['password'];
+                return $this->passwords->usePassword(
+                    $attributes['password'],
+                    function (string $passwordHash) use ($user): User {
+                        $user->password = $passwordHash;
+                        $user->save();
+
+                        return $user;
+                    },
+                );
             }
 
             $user->save();
@@ -96,6 +187,8 @@ class UserAccountService
     public function toggleStatus(User $user, User $actor): User
     {
         return DB::transaction(function () use ($user, $actor): User {
+            $this->assertCanManage($actor, $user);
+
             if ($user->isActive()) {
                 $this->assertNotSelf($user, $actor, 'You cannot deactivate your own account.');
 
@@ -114,12 +207,63 @@ class UserAccountService
         });
     }
 
+    public function unlock(User $user, User $actor): User
+    {
+        return DB::transaction(function () use ($user, $actor): User {
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->getKey());
+
+            if (! $this->mayUnlock($actor, $lockedUser)) {
+                throw new AuthorizationException('Only a Super Administrator may unlock accounts.');
+            }
+
+            if (! $lockedUser->isTemporarilyLocked()) {
+                throw ValidationException::withMessages([
+                    'account' => ['This account is not currently temporarily locked.'],
+                ]);
+            }
+
+            $oldValues = [
+                'failed_login_attempts' => (int) $lockedUser->failed_login_attempts,
+                'login_locked_until' => $lockedUser->login_locked_until?->toIso8601String(),
+                'login_lockout_count' => (int) $lockedUser->login_lockout_count,
+            ];
+
+            $lockedUser->forceFill([
+                'failed_login_attempts' => 0,
+                'last_failed_login_at' => null,
+                'login_retry_at' => null,
+                'login_locked_until' => null,
+            ])->saveQuietly();
+
+            $this->audit->log(
+                AuditAction::UnlockedUser,
+                $actor,
+                "Manually unlocked the user account for {$lockedUser->name}.",
+                $lockedUser,
+                $lockedUser->name,
+                $oldValues,
+                [
+                    'failed_login_attempts' => 0,
+                    'login_locked_until' => null,
+                    'login_lockout_count' => (int) $lockedUser->login_lockout_count,
+                ],
+            );
+
+            return $lockedUser;
+        });
+    }
+
     public function resetPassword(User $user, string $password): User
     {
-        $user->password = Hash::make($password);
-        $user->save();
+        return $this->passwords->usePassword(
+            $password,
+            function (string $passwordHash) use ($user): User {
+                $user->password = $passwordHash;
+                $user->save();
 
-        return $user;
+                return $user;
+            },
+        );
     }
 
     /**
@@ -128,6 +272,7 @@ class UserAccountService
      */
     public function deactivate(User $user, User $actor): User
     {
+        $this->assertCanManage($actor, $user);
         $this->assertNotSelf($user, $actor, 'You cannot deactivate your own account.');
 
         if ($user->isAdministrator()) {
@@ -145,6 +290,78 @@ class UserAccountService
         if ($user->is($actor)) {
             throw ValidationException::withMessages(['role' => [$message]]);
         }
+    }
+
+    private function assertCanManage(User $actor, User $target): void
+    {
+        if (! $this->canManage($actor, $target)) {
+            throw ValidationException::withMessages([
+                'role' => ['Only a Super Administrator may manage administrative accounts.'],
+            ]);
+        }
+    }
+
+    private function assertCanAssignRole(User $actor, UserRole $role, ?User $target = null): void
+    {
+        if (in_array($role, $this->assignableRoles($actor, $target), true)) {
+            return;
+        }
+
+        $message = $role->isSuperAdministrator()
+            ? 'The Super Administrator role is reserved for the protected system account.'
+            : 'Only a Super Administrator may assign the Administrator role.';
+
+        throw ValidationException::withMessages(['role' => [$message]]);
+    }
+
+    /**
+     * Structured fields are used by user management. Accepting `name` as a
+     * fallback keeps non-HTTP service callers backward compatible.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function nameAttributes(array $attributes): array
+    {
+        if (array_key_exists('first_name', $attributes) || array_key_exists('surname', $attributes)) {
+            return [
+                'first_name' => $attributes['first_name'] ?? null,
+                'middle_name' => $attributes['middle_name'] ?? null,
+                'surname' => $attributes['surname'] ?? null,
+            ];
+        }
+
+        return ['name' => $attributes['name']];
+    }
+
+    /**
+     * Reserve the next ID while holding a database row lock. All creators
+     * serialize through this single row, and users.employee_id has a unique
+     * index as the final database-level duplicate guard.
+     */
+    private function nextEmployeeId(): string
+    {
+        $sequence = DB::table('employee_id_sequences')
+            ->where('id', 1)
+            ->lockForUpdate()
+            ->first();
+
+        if ($sequence === null) {
+            throw new \RuntimeException('The employee ID sequence has not been initialized.');
+        }
+
+        $number = (int) $sequence->next_value;
+
+        do {
+            $employeeId = 'EMP-'.str_pad((string) $number, 4, '0', STR_PAD_LEFT);
+            $number++;
+        } while (User::query()->where('employee_id', $employeeId)->exists());
+
+        DB::table('employee_id_sequences')->where('id', 1)->update([
+            'next_value' => $number,
+        ]);
+
+        return $employeeId;
     }
 
     /**

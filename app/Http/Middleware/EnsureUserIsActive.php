@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Support\AuthenticationContext;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,15 +21,18 @@ class EnsureUserIsActive
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $user = Auth::user();
+        $guard = AuthenticationContext::authenticatedGuard();
+        $user = $guard === null ? null : Auth::guard($guard)->user();
 
         if ($user instanceof User && ! $user->isActive()) {
-            Auth::guard('web')->logout();
+            $guard ??= AuthenticationContext::WEB_GUARD;
+
+            Auth::guard($guard)->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
             return redirect()
-                ->route('login')
+                ->route(AuthenticationContext::loginRoute($guard))
                 ->withErrors(['email' => 'This account has been deactivated. Contact an administrator.']);
         }
 

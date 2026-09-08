@@ -2,7 +2,7 @@
     <x-ui.page-header
         title="Stock Movement & Transfer"
         subtitle="Record stock in, stock out and transfers between storage locations."
-        :breadcrumbs="['Home' => route('dashboard'), 'Stock Movements' => null]" />
+        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Stock Movements' => null]" />
 
     @if ($errors->any())
         <x-ui.alert variant="danger" title="This movement was not recorded">
@@ -43,7 +43,10 @@
             get needsSupplier() { return this.type === 'return_to_supplier' },
             get onHand() { return this.stock[this.itemId] ?? [] },
         }">
-        <form method="POST" action="{{ route('inventory.stock-movements.store') }}" class="space-y-5">
+        <form method="POST" action="{{ route('inventory.stock-movements.store') }}" class="space-y-5"
+              data-confirm-title="Confirm stock movement"
+              data-confirm-message="Are you sure you want to record this stock movement?"
+              data-confirm-label="Record Movement">
             @csrf
 
             <div class="grid gap-4 md:grid-cols-2">
