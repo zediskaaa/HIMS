@@ -22,7 +22,12 @@ Route::get('/', function () {
 });
 
 Route::view('/privacy-notice', 'legal.privacy-notice')->name('privacy.notice');
+Route::redirect('/privacy-policy', '/privacy-notice');
+Route::redirect('/privacy', '/privacy-notice');
+
 Route::view('/terms-of-use', 'legal.terms-of-use')->name('terms');
+Route::redirect('/terms-and-conditions', '/terms-of-use');
+Route::redirect('/terms', '/terms-of-use');
 
 Route::get('/dashboard', [InventoryController::class, 'index'])->middleware('auth:web,admin,super_admin')->name('dashboard');
 

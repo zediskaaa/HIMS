@@ -34,6 +34,14 @@ class LegalPagesTest extends TestCase
         $response->assertSee('Administrative and Legal Notice');
     }
 
+    public function test_privacy_and_terms_aliases_redirect_properly(): void
+    {
+        $this->get('/privacy-policy')->assertRedirect(route('privacy.notice'));
+        $this->get('/privacy')->assertRedirect(route('privacy.notice'));
+        $this->get('/terms-and-conditions')->assertRedirect(route('terms'));
+        $this->get('/terms')->assertRedirect(route('terms'));
+    }
+
     public function test_guest_login_page_renders_privacy_and_terms_links(): void
     {
         $response = $this->get(route('login'));
