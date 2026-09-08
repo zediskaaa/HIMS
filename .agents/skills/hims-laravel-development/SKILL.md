@@ -73,4 +73,3 @@ Use `hims-testing` to select proportional checks. At minimum:
 - Blade, components, layout, styling, or browser interaction: `hims-ui-ux`
 - Audit events or audit-trail behavior: `hims-audit-logging`
 - Test design or regression work: `hims-testing`
-- Any Git or repository-metadata request: `hims-git-safety`

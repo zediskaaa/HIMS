@@ -18,7 +18,6 @@ Read every applicable skill in full before task actions; combine skills for cros
 - Blade, Tailwind, Alpine.js, layouts, forms, tables, modals, navigation, frontend behavior, responsive design, or accessibility -> `hims-ui-ux`
 - Tests, defect reproduction, regression coverage, builds/checks, or verification scope -> `hims-testing`
 - Audit events/logs, attribution, snapshots, search, retention, redaction, or append-only behavior -> `hims-audit-logging`
-- Git state, staging, commits, branches, remotes, history, restore/reset/clean, hooks/configuration, locks, corruption, or `.git` -> `hims-git-safety`
 
 This file owns cross-cutting behavior; skills own detailed procedures and HIMS invariants. Follow their intentional cross-references instead of duplicating them here.
 
@@ -37,7 +36,6 @@ This file owns cross-cutting behavior; skills own detailed procedures and HIMS i
 
 Apply relevant concerns proportionally: correctness, validation, authorization, security, privacy, data integrity, transactions/concurrency, error handling, edge cases, compatibility, performance, accessibility, and maintainability. Do not overengineer trivial work or weaken protections to make code or checks pass. Security decisions remain server-side and least-privileged; use the domain skill for details.
 
-- Normal coding changes touch only necessary working-tree files. The user/GitHub Desktop owns ordinary Git work; each Git mutation requires an explicit request. Never use destructive Git as a coding shortcut. Follow `hims-git-safety`.
 - Never take destructive or irreversible file/data actions without clear authorization. Confirm exact targets and consequences, preserve data, and prefer reversible actions. Follow `hims-database-safety` for persistence.
 - Never expose credentials, tokens, keys, session material, `.env` values, sensitive personal/clinical data, or other secrets in commands, output, logs, screenshots, fixtures, or responses.
 - Use project workflows and purpose-built tools; search instead of guessing paths and use commands suitable for the detected OS and stack.
