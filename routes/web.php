@@ -21,6 +21,9 @@ Route::get('/', function () {
     return view('landing');
 });
 
+Route::view('/privacy-notice', 'legal.privacy-notice')->name('privacy.notice');
+Route::view('/terms-of-use', 'legal.terms-of-use')->name('terms');
+
 Route::get('/dashboard', [InventoryController::class, 'index'])->middleware('auth:web,admin,super_admin')->name('dashboard');
 
 // Polled by the dashboard's alert panel every 30s. Sits on the web routes so

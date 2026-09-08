@@ -153,13 +153,19 @@
                     </div>
                 </main>
 
-                <footer class="animate-fade-in border-t border-white/10 py-5 text-xs text-neutral-500 [animation-delay:700ms]">
-                    &copy; {{ date('Y') }} HIMS
-                    @if ($isSuperAdminPortal)
-                        <span class="ml-2 text-neutral-600">&middot; Privileged system access</span>
-                    @elseif ($isAdminPortal)
-                        <span class="ml-2 text-neutral-600">&middot; Administration access</span>
-                    @endif
+                <footer class="animate-fade-in flex flex-col gap-2 border-t border-white/10 py-5 text-xs text-neutral-500 [animation-delay:700ms] sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        &copy; {{ date('Y') }} HIMS
+                        @if ($isSuperAdminPortal)
+                            <span class="ml-2 text-neutral-600">&middot; Privileged system access</span>
+                        @elseif ($isAdminPortal)
+                            <span class="ml-2 text-neutral-600">&middot; Administration access</span>
+                        @endif
+                    </div>
+                    <div class="flex items-center gap-4 text-neutral-400">
+                        <a href="{{ route('privacy.notice') }}" class="hover:text-neutral-200 transition-colors">Privacy Notice</a>
+                        <a href="{{ route('terms') }}" class="hover:text-neutral-200 transition-colors">Terms of Use</a>
+                    </div>
                 </footer>
             </div>
         </div>

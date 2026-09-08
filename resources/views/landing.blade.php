@@ -126,7 +126,12 @@
 
                 <footer class="flex animate-fade-in flex-col gap-2 py-6 text-xs text-neutral-500 [animation-delay:900ms] sm:flex-row sm:items-center sm:justify-between">
                     <p>&copy; {{ date('Y') }} HIMS — hospital supply chain operations.</p>
-                    <p>From warehouse to ward, on one record.</p>
+                    <div class="flex items-center gap-4 text-neutral-400">
+                        <a href="{{ route('privacy.notice') }}" class="hover:text-neutral-200 transition-colors">Privacy Notice</a>
+                        <a href="{{ route('terms') }}" class="hover:text-neutral-200 transition-colors">Terms of Use</a>
+                        <span class="text-neutral-600 hidden sm:inline">&middot;</span>
+                        <p class="hidden sm:inline">From warehouse to ward, on one record.</p>
+                    </div>
                 </footer>
             </div>
         </div>
