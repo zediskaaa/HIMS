@@ -64,6 +64,25 @@
                 </div>
             @endif
 
+            <div class="rounded-xl border border-primary-200 bg-primary-50 p-4 text-sm text-primary-900 shadow-sm">
+                <div class="flex items-start gap-3">
+                    <svg class="mt-0.5 h-5 w-5 shrink-0 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+                    </svg>
+                    <div>
+                        <p class="font-semibold">Who can approve a Store Requisition?</p>
+                        <p class="mt-1 text-xs leading-5 text-primary-800">
+                            Users with any of these active roles may approve: {{ implode(', ', $approverRoleLabels) }}. They cannot approve a requisition they created. Approval is not pre-assigned to one person; authorized independent reviewers receive the Approve action for pending requests.
+                        </p>
+                        @can(\App\Enums\Permission::ApproveRequisition->value)
+                            <p class="mt-2 text-xs font-semibold text-emerald-700">Your current role has approval access. You can approve another user's pending requisition from the Registry or its Details page.</p>
+                        @else
+                            <p class="mt-2 text-xs font-semibold text-neutral-700">Your current role can view or submit requisitions, but it cannot approve them.</p>
+                        @endcan
+                    </div>
+                </div>
+            </div>
+
             @if($errors->any())
                 <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 shadow-sm">
                     <div class="flex items-center gap-2 font-semibold">
@@ -82,20 +101,20 @@
             <div class="grid gap-4 sm:grid-cols-4">
                 <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
                     <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">Total Requisitions</p>
-                    <p class="mt-2 text-2xl font-bold text-neutral-900">{{ $requisitions->total() }}</p>
+                    <p class="mt-2 text-2xl font-bold text-neutral-900">{{ $requisitionMetrics['total'] }}</p>
                     <p class="mt-1 text-xs text-neutral-500">Department orders tracked</p>
                 </div>
                 <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
                     <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">Pending Review</p>
                     <p class="mt-2 text-2xl font-bold text-amber-600">
-                        {{ $requisitions->filter(fn($r) => in_array($r->status, ['submitted', 'pending_approval'], true))->count() }}
+                        {{ $requisitionMetrics['pending'] }}
                     </p>
                     <p class="mt-1 text-xs text-neutral-500">Awaiting supervisor approval</p>
                 </div>
                 <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
                     <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">Approved / Reserved</p>
                     <p class="mt-2 text-2xl font-bold text-primary-600">
-                        {{ $requisitions->where('status', 'approved')->count() }}
+                        {{ $requisitionMetrics['approved'] }}
                     </p>
                     <p class="mt-1 text-xs text-neutral-500">ATP stock reserved, ready to pick</p>
                 </div>
@@ -121,6 +140,7 @@
                                 <th class="px-6 py-3 font-medium">Requisition #</th>
                                 <th class="px-6 py-3 font-medium">Department &amp; Cost Center</th>
                                 <th class="px-6 py-3 font-medium">Requester</th>
+                                <th class="px-6 py-3 font-medium">Approval / Decision</th>
                                 <th class="px-6 py-3 font-medium">Urgency</th>
                                 <th class="px-6 py-3 font-medium">Status</th>
                                 <th class="px-6 py-3 font-medium">Date</th>
@@ -143,6 +163,20 @@
                                     <td class="px-6 py-4 text-xs">
                                         <p class="font-medium text-neutral-800">{{ $req->requestingUser->name ?? 'System' }}</p>
                                         <p class="text-neutral-500">{{ $req->requestingUser->email ?? '' }}</p>
+                                    </td>
+                                    <td class="px-6 py-4 text-xs">
+                                        @if($req->status === 'approved' && $req->approvedBy)
+                                            <p class="font-medium text-emerald-700">Approved by {{ $req->approvedBy->name }}</p>
+                                            <p class="text-neutral-500">{{ $req->approvedBy->role->label() }}</p>
+                                        @elseif($req->status === 'rejected' && $req->approvedBy)
+                                            <p class="font-medium text-rose-700">Rejected by {{ $req->approvedBy->name }}</p>
+                                            <p class="text-neutral-500">{{ $req->approvedBy->role->label() }}</p>
+                                        @elseif(in_array($req->status, ['submitted', 'pending_approval'], true))
+                                            <p class="font-medium text-amber-700">Pending independent review</p>
+                                            <p class="text-neutral-500">Not assigned to one approver</p>
+                                        @else
+                                            <span class="text-neutral-400">No approval action pending</span>
+                                        @endif
                                     </td>
                                     <td class="px-6 py-4">
                                         @if($req->urgency === 'stat_emergency')
@@ -203,19 +237,26 @@
                                                 View Details
                                             </a>
                                             @if(in_array($req->status, ['submitted', 'pending_approval'], true) && auth()->user()->can(\App\Enums\Permission::ApproveRequisition->value) && auth()->id() !== $req->requesting_user_id)
-                                                <form action="{{ route('inventory.requisitions.approve', $req) }}" method="POST" class="inline" onsubmit="return confirm('Approve Requisition #{{ $req->requisition_number }} and place hard reservation on ATP stock?');">
+                                                <form action="{{ route('inventory.requisitions.approve', $req) }}" method="POST" class="inline"
+                                                      data-confirm-title="Approve Store Requisition"
+                                                      data-confirm-message="Approve Requisition #{{ $req->requisition_number }} and place a hard reservation on available stock?"
+                                                      data-confirm-label="Approve &amp; Reserve">
                                                     @csrf
                                                     <button type="submit" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition shadow-xs">
                                                         Approve
                                                     </button>
                                                 </form>
+                                            @elseif(in_array($req->status, ['submitted', 'pending_approval'], true) && auth()->id() === $req->requesting_user_id)
+                                                <span class="rounded-md bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800" title="A different authorized user must approve this requisition.">
+                                                    Self-approval blocked
+                                                </span>
                                             @endif
                                         </div>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="px-6 py-10 text-center text-sm text-neutral-500">
+                                    <td colspan="8" class="px-6 py-10 text-center text-sm text-neutral-500">
                                         <div class="max-w-md mx-auto space-y-3">
                                             <p class="text-neutral-700 font-medium">No material store requisitions found.</p>
                                             <p class="text-xs text-neutral-400">Initiate an internal stock request for your department from central inventory storage.</p>

@@ -46,6 +46,16 @@ class MaterialRequisition extends Model
         return $this->belongsTo(User::class, 'approved_by_id');
     }
 
+    public function issuedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'issued_by_id');
+    }
+
+    public function acknowledgedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'acknowledged_by_id');
+    }
+
     public function costCenter(): BelongsTo
     {
         return $this->belongsTo(CostCenter::class);

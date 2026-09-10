@@ -4,12 +4,11 @@ namespace App\Services\Inventory;
 
 use App\Enums\AuditAction;
 use App\Enums\MovementType;
+use App\Enums\Permission;
 use App\Models\InventoryItem;
-use App\Models\ItemBatch;
 use App\Models\ItemStockLevel;
 use App\Models\MaterialRequisition;
 use App\Models\MaterialRequisitionLine;
-use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -50,7 +49,7 @@ class IssuanceEngine
             $lines = $data['lines'] ?? [];
             if (empty($lines)) {
                 throw ValidationException::withMessages([
-                    'lines' => ['Requisition must contain at least one item line.']
+                    'lines' => ['Requisition must contain at least one item line.'],
                 ]);
             }
 
@@ -60,7 +59,7 @@ class IssuanceEngine
 
                 if ($qty <= 0) {
                     throw ValidationException::withMessages([
-                        'lines' => ["Requested quantity for {$item->name} must be greater than zero."]
+                        'lines' => ["Requested quantity for {$item->name} must be greater than zero."],
                     ]);
                 }
 
@@ -104,7 +103,7 @@ class IssuanceEngine
                 throw new DomainException('Segregation of Duties Violation: You cannot approve your own store requisition.');
             }
 
-            if ($req->status !== 'pending_approval') {
+            if (! in_array($req->status, ['submitted', 'pending_approval'], true)) {
                 throw new DomainException("Cannot approve requisition in status {$req->status}.");
             }
 
@@ -115,13 +114,13 @@ class IssuanceEngine
                 // Check Available-to-Promise (ATP)
                 if ($item->availableQuantity() < $requestedQty) {
                     throw ValidationException::withMessages([
-                        'inventory' => ["Insufficient ATP stock for {$item->name}. Available: {$item->availableQuantity()}, Requested: {$requestedQty}."]
+                        'inventory' => ["Insufficient ATP stock for {$item->name}. Available: {$item->availableQuantity()}, Requested: {$requestedQty}."],
                     ]);
                 }
 
                 // Place hard reservation on the primary stock location or default location
                 $locId = $item->default_location_id ?? StorageLocation::where('status', 'active')->value('id');
-                if (!$locId) {
+                if (! $locId) {
                     throw new DomainException("No active storage location found for item {$item->name}.");
                 }
 
@@ -158,11 +157,11 @@ class IssuanceEngine
      */
     public static function generateRequisitionNumber(): string
     {
-        $prefix = 'MR-' . now()->format('Ymd') . '-';
+        $prefix = 'MR-'.now()->format('Ymd').'-';
         $countToday = MaterialRequisition::where('requisition_number', 'like', "{$prefix}%")->count();
         $seq = $countToday + 1;
         do {
-            $candidate = $prefix . str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
             $seq++;
         } while (MaterialRequisition::where('requisition_number', $candidate)->exists());
 
@@ -182,7 +181,7 @@ class IssuanceEngine
                 throw new DomainException('Segregation of Duties Violation: You cannot review or reject your own store requisition.');
             }
 
-            if (!in_array($req->status, ['pending_approval', 'submitted'], true)) {
+            if (! in_array($req->status, ['pending_approval', 'submitted'], true)) {
                 throw new DomainException("Cannot reject requisition in status {$req->status}.");
             }
 
@@ -214,7 +213,11 @@ class IssuanceEngine
         return DB::transaction(function () use ($requisition, $actor, $reason) {
             $req = MaterialRequisition::lockForUpdate()->with('lines.item')->findOrFail($requisition->id);
 
-            if (in_array($req->status, ['issued', 'acknowledged', 'cancelled'], true)) {
+            if ($req->requesting_user_id !== $actor->id && ! $actor->hasPermission(Permission::ApproveRequisition)) {
+                throw new DomainException('Only the requester or an authorized requisition approver may cancel this requisition.');
+            }
+
+            if (! in_array($req->status, ['submitted', 'pending_approval', 'approved', 'rejected'], true)) {
                 throw new DomainException("Cannot cancel requisition already in status {$req->status}.");
             }
 
@@ -329,7 +332,7 @@ class IssuanceEngine
         return DB::transaction(function () use ($requisition, $issueData, $picker) {
             $req = MaterialRequisition::lockForUpdate()->with('lines.item')->findOrFail($requisition->id);
 
-            if (!in_array($req->status, ['approved', 'picking'], true)) {
+            if (! in_array($req->status, ['approved', 'picking'], true)) {
                 throw new DomainException("Cannot issue requisition in status {$req->status}.");
             }
 
@@ -338,9 +341,14 @@ class IssuanceEngine
             foreach ($req->lines as $line) {
                 $lineInput = collect($linesInput)->firstWhere('line_id', $line->id) ?? [];
                 $issueQty = isset($lineInput['quantity']) ? (int) $lineInput['quantity'] : ($line->requested_quantity - $line->issued_quantity);
+                $remainingQty = $line->requested_quantity - $line->issued_quantity;
 
                 if ($issueQty <= 0) {
                     continue;
+                }
+
+                if ($issueQty > $remainingQty) {
+                    throw new DomainException("Cannot issue more than the remaining requested quantity for {$line->item->name}.");
                 }
 
                 $item = InventoryItem::lockForUpdate()->findOrFail($line->item_id);
@@ -376,6 +384,8 @@ class IssuanceEngine
             // Determine if completely issued
             $allIssued = $req->lines->every(fn ($l) => $l->issued_quantity >= $l->requested_quantity);
             $req->status = $allIssued ? 'issued' : 'picking';
+            $req->issued_by_id = $picker->id;
+            $req->issued_at = now();
             $req->save();
 
             $this->auditLogger->record(
@@ -400,7 +410,17 @@ class IssuanceEngine
     {
         return DB::transaction(function () use ($requisition, $recipient, $notes) {
             $req = MaterialRequisition::lockForUpdate()->findOrFail($requisition->id);
+
+            if ($req->status !== 'issued') {
+                throw new DomainException("Cannot acknowledge requisition in status {$req->status}.");
+            }
+
+            if ($req->requesting_user_id !== $recipient->id) {
+                throw new DomainException('Only the original requester may acknowledge receipt of this requisition.');
+            }
+
             $req->status = 'acknowledged';
+            $req->acknowledged_by_id = $recipient->id;
             $req->acknowledged_at = now();
             $req->save();
 

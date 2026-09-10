@@ -33,7 +33,10 @@
                 <div class="flex items-center gap-3">
                     {{-- Approve & Reject Actions --}}
                     @if(in_array($requisition->status, ['submitted', 'pending_approval'], true) && auth()->user()->can(\App\Enums\Permission::ApproveRequisition->value) && auth()->id() !== $requisition->requesting_user_id)
-                        <form action="{{ route('inventory.requisitions.approve', $requisition) }}" method="POST" onsubmit="return confirm('Approve Requisition #{{ $requisition->requisition_number }} and place hard reservation on ATP stock?');">
+                        <form action="{{ route('inventory.requisitions.approve', $requisition) }}" method="POST"
+                              data-confirm-title="Approve Store Requisition"
+                              data-confirm-message="Approve Requisition #{{ $requisition->requisition_number }} and place a hard reservation on available stock?"
+                              data-confirm-label="Approve &amp; Reserve">
                             @csrf
                             <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -69,7 +72,7 @@
                     @endif
 
                     {{-- Acknowledge Action Button --}}
-                    @if($requisition->status === 'issued')
+                    @if($requisition->status === 'issued' && auth()->id() === $requisition->requesting_user_id)
                         <button type="button" @click="ackModalOpen = true" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -113,7 +116,7 @@
                     <div>
                         <p class="font-bold">Segregation of Duties Policy Active</p>
                         <p class="text-xs text-amber-700 mt-0.5">
-                            You are the original author of this requisition. Under hospital internal control protocols, self-approval of inventory requisitions is blocked. An independent authorized department head or inventory supervisor must review and approve this document.
+                            You are the original author of this requisition. Self-approval is blocked. Another user with one of these active roles must review it: {{ implode(', ', $approverRoleLabels) }}.
                         </p>
                     </div>
                 </div>
@@ -206,8 +209,20 @@
                         <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">Personnel &amp; Governance</p>
                         <p class="mt-1 text-sm font-semibold text-neutral-900">Requester: {{ $requisition->requestingUser->name ?? 'System' }}</p>
                         <p class="text-xs text-neutral-500">
-                            Approver: {{ $requisition->approvedBy ? $requisition->approvedBy->name : 'Pending independent sign-off' }}
+                            @if($requisition->status === 'rejected' && $requisition->approvedBy)
+                                Decision: Rejected by {{ $requisition->approvedBy->name }} ({{ $requisition->approvedBy->role->label() }})
+                            @elseif($requisition->approvedBy)
+                                Approver: {{ $requisition->approvedBy->name }} ({{ $requisition->approvedBy->role->label() }})
+                            @else
+                                Approver: Not assigned — pending an independent {{ implode(', ', $approverRoleLabels) }}
+                            @endif
                         </p>
+                        @if($requisition->issuedBy)
+                            <p class="text-xs text-neutral-500">Issued by: {{ $requisition->issuedBy->name }}</p>
+                        @endif
+                        @if($requisition->acknowledgedBy)
+                            <p class="text-xs text-neutral-500">Received by: {{ $requisition->acknowledgedBy->name }}</p>
+                        @endif
                     </div>
                     <div>
                         <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">Urgency &amp; Delivery</p>

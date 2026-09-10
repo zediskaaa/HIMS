@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Inventory;
 
 use App\Enums\Permission;
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\CostCenter;
 use App\Models\InventoryItem;
@@ -21,10 +22,10 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
     {
         return [
             'auth:web,admin,super_admin',
-            new Middleware('can:' . Permission::CreateRequisition->value, only: ['store', 'cancel']),
-            new Middleware('can:' . Permission::ApproveRequisition->value, only: ['approve', 'reject']),
-            new Middleware('can:' . Permission::IssueStock->value, only: ['issue']),
-            new Middleware('can:' . Permission::ViewInventory->value, only: ['index', 'show']),
+            new Middleware('can:'.Permission::CreateRequisition->value, only: ['store', 'cancel']),
+            new Middleware('can:'.Permission::ApproveRequisition->value, only: ['approve', 'reject']),
+            new Middleware('can:'.Permission::IssueStock->value, only: ['issue']),
+            new Middleware('can:'.Permission::ViewInventory->value, only: ['index', 'show']),
         ];
     }
 
@@ -55,15 +56,23 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
             ->unique()
             ->values();
 
-        return view('inventory.requisitions.index', compact('requisitions', 'items', 'costCenters', 'departments'));
+        $requisitionMetrics = [
+            'total' => MaterialRequisition::count(),
+            'pending' => MaterialRequisition::whereIn('status', ['submitted', 'pending_approval'])->count(),
+            'approved' => MaterialRequisition::where('status', 'approved')->count(),
+        ];
+        $approverRoleLabels = $this->approverRoleLabels();
+
+        return view('inventory.requisitions.index', compact('requisitions', 'items', 'costCenters', 'departments', 'requisitionMetrics', 'approverRoleLabels'));
     }
 
     public function show(MaterialRequisition $requisition): View
     {
-        $requisition->load(['requestingUser', 'approvedBy', 'costCenter', 'lines.item', 'lines.batch', 'lines.location']);
+        $requisition->load(['requestingUser', 'approvedBy', 'issuedBy', 'acknowledgedBy', 'costCenter', 'lines.item', 'lines.batch', 'lines.location']);
         $pickList = $this->issuanceEngine->generatePickList($requisition);
+        $approverRoleLabels = $this->approverRoleLabels();
 
-        return view('inventory.requisitions.show', compact('requisition', 'pickList'));
+        return view('inventory.requisitions.show', compact('requisition', 'pickList', 'approverRoleLabels'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -129,10 +138,14 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $this->issuanceEngine->acknowledgeHandover($requisition, $request->user(), $validated['notes'] ?? null);
+        try {
+            $this->issuanceEngine->acknowledgeHandover($requisition, $request->user(), $validated['notes'] ?? null);
 
-        return redirect()->route('inventory.requisitions.show', $requisition)
-            ->with('success', 'Handover acknowledgment recorded.');
+            return redirect()->route('inventory.requisitions.show', $requisition)
+                ->with('success', 'Handover acknowledgment recorded.');
+        } catch (DomainException $e) {
+            return redirect()->back()->withErrors(['acknowledge' => $e->getMessage()]);
+        }
     }
 
     public function reject(Request $request, MaterialRequisition $requisition): RedirectResponse
@@ -165,5 +178,17 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
         } catch (DomainException $e) {
             return redirect()->back()->withErrors(['cancel' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function approverRoleLabels(): array
+    {
+        return collect(UserRole::cases())
+            ->filter(fn (UserRole $role): bool => $role->grants(Permission::ApproveRequisition))
+            ->map(fn (UserRole $role): string => $role->label())
+            ->values()
+            ->all();
     }
 }

@@ -18,10 +18,10 @@ class RequisitionController extends Controller implements HasMiddleware
     {
         return [
             'auth:sanctum',
-            new Middleware('can:' . Permission::CreateRequisition->value, only: ['store']),
-            new Middleware('can:' . Permission::ApproveRequisition->value, only: ['approve']),
-            new Middleware('can:' . Permission::IssueStock->value, only: ['issue', 'picklist']),
-            new Middleware('can:' . Permission::ViewInventory->value, only: ['index', 'show']),
+            new Middleware('can:'.Permission::CreateRequisition->value, only: ['store']),
+            new Middleware('can:'.Permission::ApproveRequisition->value, only: ['approve', 'reject']),
+            new Middleware('can:'.Permission::IssueStock->value, only: ['issue', 'picklist']),
+            new Middleware('can:'.Permission::ViewInventory->value, only: ['index', 'show']),
         ];
     }
 
