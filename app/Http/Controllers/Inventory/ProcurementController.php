@@ -8,6 +8,7 @@ use App\Models\InventoryItem;
 use App\Models\ProcurementRequest;
 use App\Models\Supplier;
 use App\Models\SupplierQuote;
+use App\Rules\ProcurementEligibleSupplier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -33,7 +34,7 @@ class ProcurementController extends Controller implements HasMiddleware
     public function index(): View
     {
         $items = InventoryItem::all();
-        $suppliers = Supplier::where('status', 'active')->get();
+        $suppliers = Supplier::procurementEligible()->orderBy('name')->get();
 
         // The quote form needs to name a request to attach itself to. The list
         // below it is still fetched from the API; this is only the dropdown, so
@@ -53,7 +54,7 @@ class ProcurementController extends Controller implements HasMiddleware
             'item_id' => ['required', 'exists:inventory_items,id'],
             'requested_quantity' => ['required', 'integer', 'min:1'],
             'priority' => ['nullable', 'in:low,medium,high'],
-            'supplier_id' => ['nullable', 'exists:suppliers,id'],
+            'supplier_id' => ['nullable', new ProcurementEligibleSupplier],
             'approved_by' => ['nullable', 'string', 'max:255'],
             'approval_notes' => ['nullable', 'string', 'max:255'],
             'evaluation_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -72,7 +73,7 @@ class ProcurementController extends Controller implements HasMiddleware
     {
         $validated = $request->validate([
             'procurement_request_id' => ['required', 'exists:procurement_requests,id'],
-            'supplier_id' => ['required', 'exists:suppliers,id'],
+            'supplier_id' => ['required', new ProcurementEligibleSupplier],
             'quoted_price' => ['required', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:255'],
         ]);
@@ -89,7 +90,7 @@ class ProcurementController extends Controller implements HasMiddleware
             'approval_notes' => ['nullable', 'string', 'max:255'],
             'evaluation_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'evaluation_status' => ['nullable', 'in:pending,approved,rejected'],
-            'supplier_id' => ['nullable', 'exists:suppliers,id'],
+            'supplier_id' => ['nullable', new ProcurementEligibleSupplier],
         ]);
 
         $procurementRequest->fill($validated);

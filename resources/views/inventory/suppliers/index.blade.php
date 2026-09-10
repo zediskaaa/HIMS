@@ -1,139 +1,104 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="text-xl font-semibold leading-tight text-[var(--text)]">
-            Supplier & Vendor Management
-        </h2>
-    </x-slot>
+    <x-ui.page-header
+        title="Supplier Management"
+        subtitle="Qualify suppliers, maintain commercial records, and control procurement eligibility."
+        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Suppliers' => null]" />
 
-    <div class="py-6">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
-            @if (session('success'))
-                <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                    {{ session('success') }}
-                </div>
-            @endif
-
-            <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
-                <h3 class="text-lg font-semibold text-[var(--text)]">Create Supplier</h3>
-                <form method="POST" action="{{ route('inventory.suppliers.store') }}" class="mt-4 grid gap-4 md:grid-cols-2">
-                    @csrf
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">Name</label>
-                        <input type="text" name="name" required class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">Contact Person</label>
-                        <input type="text" name="contact_person" class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">Email</label>
-                        <input type="email" name="email" class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">Phone</label>
-                        <input type="text" name="phone" class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">Address</label>
-                        <input type="text" name="address" class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">Tax Number</label>
-                        <input type="text" name="tax_number" class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">Status</label>
-                        <select name="status" class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2">
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                        </select>
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-[var(--muted)]">Notes</label>
-                        <textarea name="notes" rows="3" class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2"></textarea>
-                    </div>
-                    <div class="md:col-span-2">
-                        <button type="submit" class="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--primary-dark)]">Save Supplier</button>
-                    </div>
-                </form>
-            </div>
-
-            <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
-                <h3 class="text-lg font-semibold text-[var(--text)]">Supplier List</h3>
-                <div class="mt-4 overflow-x-auto">
-                    <table class="min-w-full divide-y divide-[var(--border)] text-sm">
-                        <thead class="bg-[var(--background)]">
-                            <tr>
-                                <th class="px-3 py-2 text-left font-semibold text-[var(--muted)]">Name</th>
-                                <th class="px-3 py-2 text-left font-semibold text-[var(--muted)]">Contact</th>
-                                <th class="px-3 py-2 text-left font-semibold text-[var(--muted)]">Email</th>
-                                <th class="px-3 py-2 text-left font-semibold text-[var(--muted)]">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="suppliers-table-body" class="divide-y divide-[var(--border)]">
-                            @forelse ($suppliers as $supplier)
-                                <tr>
-                                    <td class="px-3 py-2">{{ $supplier->name }}</td>
-                                    <td class="px-3 py-2">{{ $supplier->contact_person }}</td>
-                                    <td class="px-3 py-2">{{ $supplier->email }}</td>
-                                    <td class="px-3 py-2">{{ $supplier->status }}</td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="4" class="px-3 py-4 text-[var(--muted)]">No suppliers yet.</td>
-                                </tr>
-                            @endforelse
-                            </tbody>
-                        </table>
-                        <x-ui.loader id="suppliers-api-status" size="sm" label="Loading suppliers from API..." class="mt-3 text-sm text-[var(--muted)]" />
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="mt-6 grid gap-4 sm:grid-cols-3">
+        <x-ui.stat label="Supplier records" :value="$counts['total']" icon="truck" />
+        <x-ui.stat label="Procurement eligible" :value="$counts['eligible']" icon="check-circle" tone="success" />
+        <x-ui.stat label="Pending review" :value="$counts['pending']" icon="clipboard-document-list" tone="warning" />
     </div>
 
-    <script>
-        async function loadSuppliersFromApi() {
-            const status = document.getElementById('suppliers-api-status');
-            const tbody = document.getElementById('suppliers-table-body');
+    <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+        <x-ui.card title="Supplier directory" subtitle="Approval and compliance—not record existence—determine procurement eligibility." :padding="false">
+            <form method="GET" class="grid gap-3 border-b border-neutral-200 p-4 md:grid-cols-3 xl:grid-cols-5" role="search">
+                <x-ui.field name="search" label="Search" :value="$filters['search'] ?? ''" placeholder="Name, TIN, or email" />
+                <x-ui.field name="status" label="Operational state" type="select" :value="$filters['status'] ?? ''" :options="$operationalStatuses" placeholder="All states" />
+                <x-ui.field name="accreditation_status" label="Accreditation" type="select" :value="$filters['accreditation_status'] ?? ''" :options="$accreditationStatuses" placeholder="All decisions" />
+                <x-ui.field name="eligibility" label="Procurement" type="select" :value="$filters['eligibility'] ?? ''" :options="['eligible' => 'Eligible', 'ineligible' => 'Not eligible']" placeholder="All suppliers" />
+                <x-ui.field name="product_category_id" label="Product category" type="select" :value="$filters['product_category_id'] ?? ''" :options="$productCategories" placeholder="All categories" />
+                <x-ui.field name="compliance" label="Compliance alerts" type="select" :value="$filters['compliance'] ?? ''" :options="['alerts' => 'Action required', 'clear' => 'No open alerts']" placeholder="All states" />
+                <x-ui.field name="expiry" label="Expiry" type="select" :value="$filters['expiry'] ?? ''" :options="['within_30_days' => 'Within 30 days']" placeholder="Any validity" />
+                <x-ui.field name="contract" label="Current contract" type="select" :value="$filters['contract'] ?? ''" :options="['active' => 'Has active contract', 'none' => 'No active contract']" placeholder="Any contract" />
+                <x-ui.field name="performance" label="Performance data" type="select" :value="$filters['performance'] ?? ''" :options="['available' => 'Available', 'none' => 'Not yet available']" placeholder="Any history" />
+                <x-ui.field name="sort" label="Sort by" type="select" :value="$filters['sort'] ?? 'name'" :options="['name' => 'Supplier name', 'created_at' => 'Date added', 'accreditation_expires_at' => 'Accreditation expiry']" />
+                <input type="hidden" name="direction" value="{{ $filters['direction'] ?? 'asc' }}">
+                <div class="flex items-end gap-2">
+                    <x-ui.button type="submit">Apply</x-ui.button>
+                    <x-ui.button variant="secondary" :href="route('inventory.suppliers')">Clear</x-ui.button>
+                </div>
+            </form>
 
-            try {
-                await fetch('/sanctum/csrf-cookie', { credentials: 'same-origin' });
-                const response = await fetch('/api/v1/suppliers?per_page=100', {
-                    credentials: 'same-origin',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                });
+            <x-ui.table :sticky-header="false">
+                <x-ui.table.head>
+                    <x-ui.table.th>Supplier</x-ui.table.th>
+                    <x-ui.table.th>Accreditation</x-ui.table.th>
+                    <x-ui.table.th>Compliance</x-ui.table.th>
+                    <x-ui.table.th>Products</x-ui.table.th>
+                    <x-ui.table.th>Lead time</x-ui.table.th>
+                    <x-ui.table.th>Procurement</x-ui.table.th>
+                </x-ui.table.head>
+                <tbody>
+                    @forelse ($suppliers as $supplier)
+                        <x-ui.table.row>
+                            <x-ui.table.td>
+                                <a href="{{ route('inventory.suppliers.show', $supplier) }}" class="font-medium text-primary-700 hover:underline">{{ $supplier->name }}</a>
+                                <span class="block text-xs text-neutral-500">{{ $supplier->trade_name ?: ($supplier->business_structure ? str($supplier->business_structure)->headline() : 'Business type not classified') }}</span>
+                            </x-ui.table.td>
+                            <x-ui.table.td>
+                                <x-ui.badge :status="$supplier->effectiveAccreditationStatus()->value" dot>{{ $supplier->effectiveAccreditationStatus()->label() }}</x-ui.badge>
+                                @if ($supplier->accreditation_expires_at)
+                                    <span class="mt-1 block text-xs text-neutral-500">to {{ $supplier->accreditation_expires_at->format('M d, Y') }}</span>
+                                @endif
+                            </x-ui.table.td>
+                            <x-ui.table.td>
+                                <x-ui.badge :status="$supplier->computed_compliance_state">{{ str($supplier->computed_compliance_state)->headline() }}</x-ui.badge>
+                                <span class="mt-1 block text-xs text-neutral-500">{{ $supplier->documents_count }} document(s)</span>
+                                @if ($supplier->active_compliance_alerts_count)
+                                    <span class="block text-xs font-medium text-warning-700">{{ $supplier->active_compliance_alerts_count }} open expiry alert(s)</span>
+                                @endif
+                            </x-ui.table.td>
+                            <x-ui.table.td>{{ $supplier->active_products_count ?: '—' }}<span class="block text-xs text-neutral-500">{{ $supplier->supplierProducts->pluck('item.category.name')->filter()->unique()->take(2)->join(', ') ?: 'No categories' }}</span></x-ui.table.td>
+                            <x-ui.table.td>{{ $supplier->standard_lead_time_days !== null ? $supplier->standard_lead_time_days.' days' : 'Not set' }}</x-ui.table.td>
+                            <x-ui.table.td>
+                                @if ($supplier->isProcurementEligible())
+                                    <x-ui.badge variant="success">Eligible</x-ui.badge>
+                                @else
+                                    <x-ui.badge variant="neutral">Not eligible</x-ui.badge>
+                                @endif
+                            </x-ui.table.td>
+                        </x-ui.table.row>
+                    @empty
+                        <x-ui.table.empty :colspan="6" icon="truck" title="No matching suppliers" message="Create a supplier record or adjust the filters." />
+                    @endforelse
+                </tbody>
+            </x-ui.table>
 
-                if (!response.ok) {
-                    throw new Error(`API request failed with status ${response.status}`);
-                }
+            @if ($suppliers->hasPages())
+                <div class="border-t border-neutral-200 p-4">{{ $suppliers->links() }}</div>
+            @endif
+        </x-ui.card>
 
-                const payload = await response.json();
-                const suppliers = payload.data || [];
-
-                if (suppliers.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="4" class="px-3 py-4 text-[var(--muted)]">No suppliers found via API.</td></tr>`;
-                } else {
-                    tbody.innerHTML = suppliers.map(supplier => `
-                        <tr>
-                            <td class="px-3 py-2">${supplier.name}</td>
-                            <td class="px-3 py-2">${supplier.contact_person || '—'}</td>
-                            <td class="px-3 py-2">${supplier.email || '—'}</td>
-                            <td class="px-3 py-2">${supplier.status || 'unknown'}</td>
-                        </tr>
-                    `).join('');
-                }
-
-                status.textContent = 'Suppliers loaded from API.';
-            } catch (error) {
-                console.error(error);
-                status.textContent = 'Unable to load suppliers from API. Check console for details.';
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', loadSuppliersFromApi);
-    </script>
+        <x-ui.card title="Register supplier" subtitle="This creates a draft record; it does not approve the supplier.">
+            <form method="POST" action="{{ route('inventory.suppliers.store') }}" class="space-y-4">
+                @csrf
+                <x-ui.field name="name" label="Legal / registered name" required />
+                <x-ui.field name="trade_name" label="Trade name" hint="Optional; do not use this as the legal identity." />
+                <x-ui.field name="business_structure" label="Business structure" type="select" :options="$businessStructures" placeholder="Select if known" />
+                <label class="flex items-start gap-2 text-sm text-neutral-700">
+                    <input type="checkbox" name="provides_regulated_health_products" value="1" @checked(old('provides_regulated_health_products')) class="mt-0.5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500">
+                    <span>Supplies FDA-regulated health products <span class="block text-xs text-neutral-500">Use this to surface applicable regulatory review; it does not by itself prove licensing.</span></span>
+                </label>
+                <x-ui.field name="tax_number" label="Tax identifier" hint="Used for exact duplicate prevention when supplied." />
+                <x-ui.field name="email" label="General business email" type="email" />
+                <x-ui.field name="phone" label="General business phone" />
+                <x-ui.field name="address" label="Registered / business address" type="textarea" rows="2" />
+                <x-ui.field name="standard_lead_time_days" label="Standard lead time (days)" type="number" min="0" />
+                <x-ui.field name="payment_terms" label="Default payment terms" type="textarea" rows="2" />
+                <x-ui.field name="notes" label="Internal notes" type="textarea" rows="2" />
+                <x-ui.button type="submit" class="w-full" data-loading-text="Creating supplier...">Create Draft Supplier</x-ui.button>
+            </form>
+        </x-ui.card>
+    </div>
 </x-app-layout>

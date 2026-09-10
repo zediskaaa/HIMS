@@ -32,6 +32,8 @@ enum Permission: string
     case ManageItems = 'manage_items';
     case ManageLocations = 'manage_locations';
     case ManageSuppliers = 'manage_suppliers';
+    case ReviewSupplierCompliance = 'review_supplier_compliance';
+    case ApproveSuppliers = 'approve_suppliers';
     case ManageProcurement = 'manage_procurement';
     case GenerateForecasts = 'generate_forecasts';
 
@@ -51,6 +53,8 @@ enum Permission: string
             self::ManageItems => 'Manage inventory items',
             self::ManageLocations => 'Manage storage locations',
             self::ManageSuppliers => 'Manage suppliers',
+            self::ReviewSupplierCompliance => 'Review supplier compliance',
+            self::ApproveSuppliers => 'Approve and suspend suppliers',
             self::ManageProcurement => 'Manage procurement',
             self::GenerateForecasts => 'Generate demand forecasts',
             self::ManageUsers => 'Manage users',
@@ -70,6 +74,8 @@ enum Permission: string
             self::ManageItems => 'Add and edit item records and categories.',
             self::ManageLocations => 'Add and edit warehouse zones, racks and bins.',
             self::ManageSuppliers => 'Maintain the supplier directory.',
+            self::ReviewSupplierCompliance => 'Verify supplier evidence and submit accreditation reviews.',
+            self::ApproveSuppliers => 'Decide accreditation and control supplier availability for procurement.',
             self::ManageProcurement => 'Raise and approve requisitions and purchase orders.',
             self::GenerateForecasts => 'Run demand forecasts and save plans.',
             self::ManageUsers => 'Create staff accounts, change roles, deactivate access.',
@@ -90,7 +96,7 @@ enum Permission: string
             self::ViewInventory, self::ManageItems, self::AdjustStock => 'Inventory',
             self::IssueStock, self::RecordMovements => 'Stock Movements',
             self::ManageLocations, self::AcknowledgeAlerts => 'Warehousing',
-            self::ManageSuppliers, self::ManageProcurement => 'Procurement',
+            self::ManageSuppliers, self::ReviewSupplierCompliance, self::ApproveSuppliers, self::ManageProcurement => 'Procurement',
             self::ViewReports, self::GenerateForecasts => 'Records & Analysis',
             self::ManageUsers, self::ViewAuditTrail => 'Administration',
         };

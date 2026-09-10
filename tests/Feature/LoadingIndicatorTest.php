@@ -115,7 +115,6 @@ class LoadingIndicatorTest extends TestCase
 
         foreach ([
             [route('inventory.items'), 'inventory-api-status'],
-            [route('inventory.suppliers'), 'suppliers-api-status'],
             [route('inventory.storage-locations'), 'locations-api-status'],
             [route('inventory.alerts'), 'alerts-api-status'],
             [route('inventory.purchases'), 'purchase-orders-api-status'],
@@ -126,5 +125,14 @@ class LoadingIndicatorTest extends TestCase
                 ->assertSee('id="'.$statusId.'"', false)
                 ->assertSee('loader loader--sm', false);
         }
+
+        // Supplier Management is now server-rendered because its compliance
+        // and authorization state cannot be safely reconstructed by the old
+        // foreground CRUD fetch.
+        $this->actingAs($manager, AuthenticationContext::WEB_GUARD)
+            ->get(route('inventory.suppliers'))
+            ->assertOk()
+            ->assertSee('Supplier directory')
+            ->assertSee('data-loading-text="Creating supplier..."', false);
     }
 }

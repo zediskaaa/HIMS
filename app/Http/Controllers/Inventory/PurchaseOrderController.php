@@ -9,6 +9,7 @@ use App\Models\InventoryItem;
 use App\Models\PurchaseOrder;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
+use App\Rules\ProcurementEligibleSupplier;
 use App\Services\InventoryAutomationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,7 +42,7 @@ class PurchaseOrderController extends Controller implements HasMiddleware
     public function index(): View
     {
         $purchaseOrders = PurchaseOrder::with(['supplier', 'item'])->latest('requested_at')->get();
-        $suppliers = Supplier::where('status', 'active')->get();
+        $suppliers = Supplier::procurementEligible()->orderBy('name')->get();
         $items = InventoryItem::all();
 
         return view('inventory.purchases.index', compact('purchaseOrders', 'suppliers', 'items'));
@@ -50,7 +51,7 @@ class PurchaseOrderController extends Controller implements HasMiddleware
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'supplier_id' => ['required', 'exists:suppliers,id'],
+            'supplier_id' => ['required', new ProcurementEligibleSupplier],
             'item_id' => ['required', 'exists:inventory_items,id'],
             'quantity' => ['required', 'integer', 'min:1'],
             'unit_cost' => ['required', 'numeric', 'min:0'],

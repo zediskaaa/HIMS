@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\SupplierAccreditationStatus;
 use App\Models\InventoryItem;
 use App\Models\ItemStockLevel;
 use App\Models\ProcurementRequest;
@@ -54,7 +55,11 @@ class ProcurementWorkflowTest extends TestCase
 
     private function supplier(string $name = 'Jeffrey Corporation'): Supplier
     {
-        return Supplier::create(['name' => $name, 'status' => 'active']);
+        return Supplier::create([
+            'name' => $name,
+            'status' => 'active',
+            'accreditation_status' => SupplierAccreditationStatus::Approved,
+        ]);
     }
 
     private function request(?Supplier $supplier = null): ProcurementRequest

@@ -10,3 +10,4 @@ Artisan::command('inspire', function () {
 
 // SWS: refresh stock rollups and sweep for low-stock/expiry conditions.
 Schedule::command('inventory:check-alerts')->dailyAt('01:00');
+Schedule::command('suppliers:check-compliance')->dailyAt('01:15')->withoutOverlapping();

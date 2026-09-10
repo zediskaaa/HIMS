@@ -21,45 +21,79 @@
                 <h3 class="text-lg font-semibold text-[var(--text)]">Create Inventory Item</h3>
                 <form method="POST" action="{{ route('inventory.items.store') }}" class="mt-4 grid gap-4 md:grid-cols-2">
                     @csrf
+                    <x-ui.field name="name" label="Item name" required />
+                    <x-ui.field name="sku" label="SKU" required />
+                    <x-ui.field name="category_id" label="Category" type="select" :options="$categories" placeholder="Select category" />
                     <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">Name</label>
-                        <input type="text" name="name" required class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">SKU</label>
-                        <input type="text" name="sku" required class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">Category</label>
-                        <input type="text" name="category" class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">Unit</label>
-                        <input type="text" name="unit" class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">Quantity On Hand</label>
-                        <input type="number" name="quantity_on_hand" value="0" class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">Reorder Level</label>
-                        <input type="number" name="reorder_level" value="0" class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">Supplier</label>
-                        <select name="supplier_id" class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2">
-                            <option value="">Select supplier</option>
-                            @foreach (App\Models\Supplier::all() as $supplier)
-                                <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
+                        <x-ui.field name="unit" label="Unit of measure" list="inventory-unit-options" placeholder="Select or enter a unit" maxlength="50" />
+                        <datalist id="inventory-unit-options">
+                            @foreach ($unitOptions as $unit)
+                                <option value="{{ $unit }}"></option>
                             @endforeach
-                        </select>
+                        </datalist>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--muted)]">Warehouse</label>
-                        <input type="text" name="warehouse_name" class="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
+                    <x-ui.field
+                        name="is_batch_tracked"
+                        label="Batch / lot tracking"
+                        type="select"
+                        :options="['1' => 'Yes — track batches and expiry', '0' => 'No — quantity by location only']"
+                        value="1"
+                        required />
+                    <x-ui.field
+                        name="default_location_id"
+                        label="Default storage location"
+                        type="select"
+                        :options="$locations"
+                        placeholder="Select location"
+                        hint="Required when recording an opening quantity." />
+                    <x-ui.field
+                        name="initial_quantity"
+                        label="Opening quantity"
+                        type="number"
+                        value="0"
+                        min="0"
+                        step="1"
+                        inputmode="numeric"
+                        hint="Recorded as a Stock In movement so the warehouse ledger stays accurate." />
+                    <x-ui.field name="reorder_level" label="Reorder level" type="number" value="0" min="0" step="1" inputmode="numeric" />
+                    <x-ui.field name="expiry_alert_days" label="Expiry alert lead time (days)" type="number" value="30" min="0" max="3650" step="1" inputmode="numeric" />
+                    <x-ui.field name="unit_cost" label="Unit cost" type="number" value="0.00" min="0" max="9999999999.99" step="0.01" inputmode="decimal" />
+                    <x-ui.field
+                        name="batch_number"
+                        label="Opening batch / lot number"
+                        hint="Required only when opening quantity is above zero and batch tracking is enabled." />
+                    <x-ui.field name="expiry_date" label="Opening batch expiry date" type="date" min="{{ today()->toDateString() }}" />
+                    <div class="md:col-span-2">
+                        <x-ui.field name="supplier_id" label="Supplier" type="select" placeholder="No supplier / select later">
+                            @foreach ($eligibleSuppliers as $supplier)
+                                <option value="{{ $supplier->id }}" @selected((string) old('supplier_id') === (string) $supplier->id)>
+                                    {{ $supplier->name }} — Accredited
+                                </option>
+                            @endforeach
+                            @if ($unavailableSuppliers->isNotEmpty())
+                                <optgroup label="Unavailable for procurement">
+                                    @foreach ($unavailableSuppliers as $supplier)
+                                        <option value="{{ $supplier->id }}" disabled>
+                                            {{ $supplier->name }} — {{ $supplier->eligibility_reason }}
+                                        </option>
+                                    @endforeach
+                                </optgroup>
+                            @endif
+                        </x-ui.field>
+                        <p class="mt-1.5 text-xs text-neutral-500">
+                            Only active, approved, and compliant suppliers can be selected.
+                            @can(\App\Enums\Permission::ManageSuppliers->value)
+                                <a href="{{ route('inventory.suppliers') }}" class="font-medium text-primary-700 hover:underline">Review supplier accreditation</a>.
+                            @endcan
+                        </p>
+                        @if ($eligibleSuppliers->isEmpty())
+                            <x-ui.alert variant="warning" title="No accredited supplier is selectable yet" class="mt-3">
+                                Existing supplier records are shown above as unavailable until their accreditation and compliance review is completed. You may save the item without a supplier and link one later.
+                            </x-ui.alert>
+                        @endif
                     </div>
                     <div class="md:col-span-2">
-                        <button type="submit" class="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--primary-dark)]">Save Item</button>
+                        <x-ui.button type="submit" data-loading-text="Saving item...">Save Item</x-ui.button>
                     </div>
                 </form>
             </div>

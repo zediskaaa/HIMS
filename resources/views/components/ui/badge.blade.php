@@ -17,6 +17,8 @@
         'low_stock' => 'warning', 'pending' => 'warning', 'submitted' => 'warning',
         'expiring_soon' => 'warning', 'partially_fulfilled' => 'warning',
         'acknowledged' => 'warning', 'under_review' => 'warning',
+        'pending_review' => 'warning', 'action_required' => 'danger',
+        'warning' => 'warning',
 
         // red — blocked, failed, critical
         'out_of_stock' => 'danger', 'expired' => 'danger', 'rejected' => 'danger',
@@ -24,7 +26,9 @@
 
         // neutral — inert states
         'draft' => 'neutral', 'inactive' => 'neutral', 'archived' => 'neutral',
+        'current' => 'success', 'suspended' => 'danger',
         'converted' => 'primary',
+        'info' => 'primary',
 
         // movement types — direction of stock, not health
         'stock_in' => 'success', 'stock_out' => 'primary', 'transfer' => 'primary',

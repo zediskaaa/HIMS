@@ -73,9 +73,9 @@ class InventoryItem extends Model
         return $this->hasMany(StockAlert::class, 'item_id');
     }
 
-    public function supplierItems(): HasMany
+    public function supplierProducts(): HasMany
     {
-        return $this->hasMany(SupplierItem::class, 'item_id');
+        return $this->hasMany(SupplierProduct::class, 'item_id');
     }
 
     /**

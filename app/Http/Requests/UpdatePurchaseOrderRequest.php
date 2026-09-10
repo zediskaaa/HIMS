@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\ProcurementEligibleSupplier;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdatePurchaseOrderRequest extends FormRequest
@@ -15,7 +16,7 @@ class UpdatePurchaseOrderRequest extends FormRequest
     {
         return [
             'po_number' => 'sometimes|required|string',
-            'supplier_id' => 'sometimes|required|integer|exists:suppliers,id',
+            'supplier_id' => ['sometimes', 'required', 'integer', new ProcurementEligibleSupplier],
             'item_id' => 'sometimes|required|integer|exists:inventory_items,id',
             'quantity' => 'sometimes|required|numeric|min:0.01',
             'unit_cost' => 'nullable|numeric|min:0',

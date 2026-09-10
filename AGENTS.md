@@ -15,7 +15,7 @@ Read every applicable skill in full before task actions; combine skills for cros
 - Laravel/PHP features, fixes, routes, controllers, requests, services, models, enums, APIs, commands, or refactoring -> `hims-laravel-development`
 - Schema, migrations, indexes, foreign keys, relationships, seeders, backfills, deletion, persisted data, or database commands -> `hims-database-safety`
 - Authentication, authorization, guards/panels, roles/permissions, MFA/OTP/TOTP, passwords, lockout, sessions, profile security, or protected accounts -> `hims-security-auth`
-- Blade, Tailwind, Alpine.js, layouts, forms, tables, modals, navigation, frontend behavior, responsive design, or accessibility -> `hims-ui-ux`
+- Blade, Tailwind, Alpine.js, layouts, forms, tables, modals, navigation, frontend behavior, responsive design, or accessibility -> `hims-ui-ux` 
 - Tests, defect reproduction, regression coverage, builds/checks, or verification scope -> `hims-testing`
 - Audit events/logs, attribution, snapshots, search, retention, redaction, or append-only behavior -> `hims-audit-logging`
 

@@ -18,9 +18,10 @@ class SessionApiAccessTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function loginThroughForm(): User
+    private function loginThroughForm(bool $supplierManager = false): User
     {
-        $user = User::factory()->create(['password' => bcrypt('password')]);
+        $factory = User::factory();
+        $user = ($supplierManager ? $factory->inventoryManager() : $factory)->create(['password' => bcrypt('password')]);
 
         $this->post('/login', [
             'email' => $user->email,
@@ -59,7 +60,12 @@ class SessionApiAccessTest extends TestCase
     #[DataProvider('endpointProvider')]
     public function test_session_authenticated_browser_can_read_endpoint(string $endpoint): void
     {
-        $this->loginThroughForm();
+        $this->loginThroughForm(in_array($endpoint, [
+            '/api/v1/suppliers',
+            '/api/v1/procurement-requests',
+            '/api/v1/supplier-quotes',
+            '/api/v1/purchase-orders',
+        ], true));
 
         $response = $this->getJson($endpoint);
 
@@ -73,7 +79,7 @@ class SessionApiAccessTest extends TestCase
 
     public function test_session_authenticated_browser_can_write_through_the_api(): void
     {
-        $this->loginThroughForm();
+        $this->loginThroughForm(supplierManager: true);
 
         // Mirrors the inline create forms: a POST carrying the session cookie.
         $response = $this->postJson('/api/v1/suppliers', [

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\ProcurementEligibleSupplier;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateProcurementRequestRequest extends FormRequest
@@ -22,7 +23,7 @@ class UpdateProcurementRequestRequest extends FormRequest
             'priority' => 'nullable|string',
             'status' => 'nullable|string',
             'requested_at' => 'nullable|date',
-            'supplier_id' => 'nullable|integer|exists:suppliers,id',
+            'supplier_id' => ['nullable', 'integer', new ProcurementEligibleSupplier],
             'approved_by' => 'nullable|integer|exists:users,id',
             'approval_notes' => 'nullable|string',
             'evaluation_score' => 'nullable|numeric',

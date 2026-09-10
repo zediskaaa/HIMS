@@ -80,6 +80,7 @@ enum UserRole: string
                 Permission::ManageItems,
                 Permission::ManageLocations,
                 Permission::ManageSuppliers,
+                Permission::ReviewSupplierCompliance,
                 Permission::ManageProcurement,
                 Permission::GenerateForecasts,
             ],
