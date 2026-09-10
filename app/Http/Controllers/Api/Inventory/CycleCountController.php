@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\Inventory;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\CycleCountDoc;
+use App\Models\User;
 use App\Services\Inventory\CycleCountService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
@@ -47,7 +47,19 @@ class CycleCountController extends Controller implements HasMiddleware
         $validated = $request->validate([
             'count_type' => ['nullable', 'in:ABC,random,location,all'],
             'storage_location_id' => ['nullable', 'exists:storage_locations,id'],
-            'assigned_counter_id' => ['nullable', 'exists:users,id'],
+            'assigned_counter_id' => [
+                'nullable',
+                'exists:users,id',
+                function (string $attribute, mixed $value, \Closure $fail) {
+                    if (! $value) {
+                        return;
+                    }
+                    $user = User::find($value);
+                    if (! $user || ! $user->isActive() || ! $user->hasPermission(Permission::PerformCycleCount)) {
+                        $fail('The selected assigned counter must be an active staff member authorized to perform cycle counts.');
+                    }
+                },
+            ],
         ]);
 
         $this->cycleCountService->calculateAbcClasses();

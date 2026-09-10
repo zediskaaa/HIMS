@@ -52,12 +52,12 @@ class CycleCountService
             }
 
             $cumulative = 0.00;
-            foreach ($items as $row) {
+            foreach ($items as $index => $row) {
                 $cumulative += $row['spend'];
                 $percent = ($cumulative / $totalSpend) * 100;
 
                 $class = 'C';
-                if ($percent <= 80) {
+                if ($index === 0 || $percent <= 80) {
                     $class = 'A';
                 } elseif ($percent <= 95) {
                     $class = 'B';

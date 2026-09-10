@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Inventory;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Enums\UserRole;
 use App\Models\CycleCountDoc;
 use App\Models\StorageLocation;
 use App\Models\User;
@@ -36,7 +37,16 @@ class CycleCountController extends Controller implements HasMiddleware
             ->paginate(15);
 
         $locations = StorageLocation::where('status', 'active')->orderBy('name')->get();
-        $counters = User::where('is_active', true)->orderBy('name')->get();
+
+        $eligibleRoles = collect(UserRole::cases())
+            ->filter(fn (UserRole $role) => $role->grants(Permission::PerformCycleCount))
+            ->map(fn (UserRole $role) => $role->value)
+            ->all();
+
+        $counters = User::active()
+            ->whereIn('role', $eligibleRoles)
+            ->orderBy('name')
+            ->get();
 
         return view('inventory.cycle-counts.index', compact('cycleCounts', 'locations', 'counters'));
     }
@@ -53,7 +63,19 @@ class CycleCountController extends Controller implements HasMiddleware
         $validated = $request->validate([
             'count_type' => ['nullable', 'in:ABC,random,location,all'],
             'storage_location_id' => ['nullable', 'exists:storage_locations,id'],
-            'assigned_counter_id' => ['nullable', 'exists:users,id'],
+            'assigned_counter_id' => [
+                'nullable',
+                'exists:users,id',
+                function (string $attribute, mixed $value, \Closure $fail) {
+                    if (! $value) {
+                        return;
+                    }
+                    $user = User::find($value);
+                    if (! $user || ! $user->isActive() || ! $user->hasPermission(Permission::PerformCycleCount)) {
+                        $fail('The selected assigned counter must be an active staff member authorized to perform cycle counts.');
+                    }
+                },
+            ],
         ]);
 
         $this->cycleCountService->calculateAbcClasses();
