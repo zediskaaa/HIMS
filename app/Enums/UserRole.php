@@ -114,6 +114,9 @@ enum UserRole: string
                 Permission::VerifyLogisticsDocuments,
                 Permission::ApproveIarAcceptance,
                 Permission::ManageChainOfCustody,
+                Permission::ViewProcessReviews,
+                Permission::CreateProcessReview,
+                Permission::ImplementProcessReview,
             ],
 
             // Physically handles stock: receives deliveries, transfers between
@@ -159,6 +162,7 @@ enum UserRole: string
                 Permission::ViewReports,
                 Permission::ViewWarehouseTasks,
                 Permission::ViewLogisticsRecords,
+                Permission::ViewProcessReviews,
             ],
         };
     }

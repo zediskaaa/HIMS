@@ -19,6 +19,7 @@ class InventoryItem extends Model
         'category_id',
         'unit',
         'generic_name',
+        'pndf_code',
         'brand_name',
         'dosage_form_strength',
         'regulatory_category',
@@ -235,5 +236,16 @@ class InventoryItem extends Model
     public function scopeNeedsAttention($query)
     {
         return $query->whereIn('status', ['low_stock', 'out_of_stock']);
+    }
+
+    public function dpriReferencePrices(): HasMany
+    {
+        return $this->hasMany(DpriReferencePrice::class, 'pndf_code', 'pndf_code');
+    }
+
+    public function activeDpriPrice(): BelongsTo
+    {
+        return $this->belongsTo(DpriReferencePrice::class, 'pndf_code', 'pndf_code')
+            ->where('is_active', true);
     }
 }

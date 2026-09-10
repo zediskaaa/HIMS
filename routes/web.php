@@ -25,6 +25,7 @@ use App\Http\Controllers\Inventory\ConsignmentController;
 use App\Http\Controllers\Inventory\LogisticsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\Analytics\ProcessReviewController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -194,6 +195,20 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     // plan needs generate_forecasts. Both are declared on the controller.
     Route::get('/inventory/demand-forecast', [DemandForecastController::class, 'index'])->name('inventory.demand-forecast');
     Route::post('/inventory/demand-forecast', [DemandForecastController::class, 'store'])->name('inventory.demand-forecast.store');
+
+    // Evidence-Based Process Review & DPRI Reference Pricing
+    Route::get('/reviews', [ProcessReviewController::class, 'index'])->name('reviews.index');
+    Route::get('/reviews/create', [ProcessReviewController::class, 'create'])->name('reviews.create');
+    Route::post('/reviews', [ProcessReviewController::class, 'store'])->name('reviews.store');
+    Route::post('/reviews/check-availability', [ProcessReviewController::class, 'checkAvailability'])->name('reviews.check-availability');
+    Route::get('/reviews/dpri', [ProcessReviewController::class, 'dpriIndex'])->name('reviews.dpri');
+    Route::post('/reviews/dpri', [ProcessReviewController::class, 'storeDpri'])->name('reviews.dpri.store');
+    Route::get('/reviews/{review}', [ProcessReviewController::class, 'show'])->name('reviews.show');
+    Route::put('/reviews/{review}', [ProcessReviewController::class, 'update'])->name('reviews.update');
+    Route::post('/reviews/{review}/submit', [ProcessReviewController::class, 'submit'])->name('reviews.submit');
+    Route::post('/reviews/{review}/approve', [ProcessReviewController::class, 'approve'])->name('reviews.approve');
+    Route::post('/reviews/{review}/reject', [ProcessReviewController::class, 'reject'])->name('reviews.reject');
+    Route::post('/reviews/recommendations/{recommendation}/implement', [ProcessReviewController::class, 'implementRecommendation'])->name('reviews.recommendations.implement');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

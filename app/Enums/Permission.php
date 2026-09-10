@@ -58,6 +58,10 @@ enum Permission: string
     case RecordConsignments = 'record_consignments';
     case ManageProcurementPolicy = 'manage_procurement_policy';
     case GenerateForecasts = 'generate_forecasts';
+    case ViewProcessReviews = 'view_process_reviews';
+    case CreateProcessReview = 'create_process_review';
+    case ApproveProcessReview = 'approve_process_review';
+    case ImplementProcessReview = 'implement_process_review';
 
     // Logistics, Document Tracking & Chain of Custody (COA GAM / EOPT / GDP)
     case ViewLogisticsRecords = 'view_logistics_records';
@@ -117,6 +121,10 @@ enum Permission: string
             self::ManageChainOfCustody => 'Record and sign chain-of-custody transfer events',
             self::ManageUsers => 'Manage users',
             self::ViewAuditTrail => 'View audit trail',
+            self::ViewProcessReviews => 'View evidence-based process reviews',
+            self::CreateProcessReview => 'Draft evidence-based process reviews',
+            self::ApproveProcessReview => 'Approve or reject process reviews (Maker-Checker)',
+            self::ImplementProcessReview => 'Execute review corrective action recommendations',
         };
     }
 
@@ -166,6 +174,10 @@ enum Permission: string
             self::ManageChainOfCustody => 'Log custody transitions, condition assessments, and handover signatures.',
             self::ManageUsers => 'Create staff accounts, change roles, deactivate access.',
             self::ViewAuditTrail => 'Review append-only user and authentication activity.',
+            self::ViewProcessReviews => 'Inspect KPI reviews, supplier scorecards, DPRI savings, and bottleneck velocity.',
+            self::CreateProcessReview => 'Initiate and synthesize operational telemetry and transaction datasets into reviews.',
+            self::ApproveProcessReview => 'BAC or Hospital Administrator sign-off for operational review audits.',
+            self::ImplementProcessReview => 'Mark corrective interventions and supplier CAPAs as implemented.',
         };
     }
 
@@ -191,7 +203,8 @@ enum Permission: string
             self::AwardProcurement, self::IssuePurchaseOrder, self::ApprovePurchaseOrder, self::ManageProcurementPolicy => 'Procurement',
             self::ViewLogisticsRecords, self::ManageLogisticsRecords, self::VerifyLogisticsDocuments,
             self::PerformTechnicalInspection, self::ApproveIarAcceptance, self::ManageChainOfCustody => 'Logistics & Records',
-            self::ViewReports, self::GenerateForecasts => 'Records & Analysis',
+            self::ViewReports, self::GenerateForecasts, self::ViewProcessReviews,
+            self::CreateProcessReview, self::ApproveProcessReview, self::ImplementProcessReview => 'Records & Analysis',
             self::ManageUsers, self::ViewAuditTrail => 'Administration',
         };
     }

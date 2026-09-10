@@ -79,6 +79,12 @@ enum AuditAction: string
     case TransmittedIarToCoa = 'transmitted_iar_to_coa';
     case RecordedCustodyTransfer = 'recorded_custody_transfer';
     case UpdatedShipmentStatus = 'updated_shipment_status';
+    case CreatedProcessReview = 'created_process_review';
+    case UpdatedProcessReview = 'updated_process_review';
+    case SubmittedProcessReview = 'submitted_process_review';
+    case ApprovedProcessReview = 'approved_process_review';
+    case RejectedProcessReview = 'rejected_process_review';
+    case ImplementedProcessRecommendation = 'implemented_process_recommendation';
 
     public function label(): string
     {
@@ -158,6 +164,12 @@ enum AuditAction: string
             self::TransmittedIarToCoa => 'Transmitted IAR to Resident COA Auditor',
             self::RecordedCustodyTransfer => 'Recorded Chain of Custody Transfer',
             self::UpdatedShipmentStatus => 'Updated Inbound Shipment Status',
+            self::CreatedProcessReview => 'Created Process Review',
+            self::UpdatedProcessReview => 'Updated Process Review',
+            self::SubmittedProcessReview => 'Submitted Process Review',
+            self::ApprovedProcessReview => 'Approved Process Review',
+            self::RejectedProcessReview => 'Rejected Process Review',
+            self::ImplementedProcessRecommendation => 'Implemented Process Recommendation',
         };
     }
 

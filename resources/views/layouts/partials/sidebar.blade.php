@@ -150,7 +150,7 @@
             </div>
         @endcanany
 
-        @can(\App\Enums\Permission::ViewReports->value)
+        @canany([\App\Enums\Permission::ViewReports->value, \App\Enums\Permission::ViewProcessReviews->value])
             <div>
                 <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                     Records &amp; Analysis
@@ -168,9 +168,15 @@
                                    :active="request()->routeIs('inventory.demand-forecast*')">
                         Demand Forecast
                     </x-ui.nav-item>
+                    @can(\App\Enums\Permission::ViewProcessReviews->value)
+                        <x-ui.nav-item :href="route('reviews.index')" icon="clipboard-document-check"
+                                       :active="request()->routeIs('reviews.*')">
+                            Process Reviews
+                        </x-ui.nav-item>
+                    @endcan
                 </div>
             </div>
-        @endcan
+        @endcanany
 
         {{-- Only administrators hold manage_users, so the section is hidden
              rather than shown-and-refused for everyone else. --}}
