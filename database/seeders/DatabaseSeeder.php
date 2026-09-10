@@ -62,5 +62,6 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->call(InventoryDemoSeeder::class);
+        $this->call(SupplierManagementDemoSeeder::class);
     }
 }
