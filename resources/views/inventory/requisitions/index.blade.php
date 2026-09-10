@@ -133,7 +133,7 @@
                         <p class="text-xs text-neutral-500">Track demand status, reservation holds, and FEFO picking fulfillment.</p>
                     </div>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto hims-table-scroll">
                     <table class="w-full text-left text-sm text-neutral-600">
                         <thead class="bg-neutral-50 text-xs uppercase text-neutral-500 border-b border-neutral-200">
                             <tr>
@@ -144,7 +144,7 @@
                                 <th class="px-6 py-3 font-medium">Urgency</th>
                                 <th class="px-6 py-3 font-medium">Status</th>
                                 <th class="px-6 py-3 font-medium">Date</th>
-                                <th class="px-6 py-3 font-medium text-right">Actions</th>
+                                <th class="px-6 py-3 font-medium text-right hims-sticky-actions min-w-[200px]">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-neutral-200">
@@ -231,8 +231,8 @@
                                     <td class="px-6 py-4 text-xs text-neutral-500">
                                         {{ $req->created_at ? $req->created_at->format('M d, Y') : 'N/A' }}
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <div class="flex items-center justify-end gap-2">
+                                    <td class="px-6 py-4 text-right hims-sticky-actions min-w-[200px]">
+                                        <div class="flex items-center justify-end gap-2 whitespace-nowrap">
                                             <a href="{{ route('inventory.requisitions.show', $req) }}" class="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition">
                                                 View Details
                                             </a>

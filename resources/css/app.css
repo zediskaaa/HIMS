@@ -185,6 +185,62 @@
         height: 0;
         width: 0;
     }
+
+    /*
+     * Data tables with .hims-table-scroll feature an elegant, visible 6px scrollbar
+     * so mouse/trackpad users can immediately see and scroll horizontal overflow.
+     */
+    .hims-table-scroll {
+        -ms-overflow-style: auto;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+    }
+
+    .hims-table-scroll::-webkit-scrollbar {
+        display: block !important;
+        height: 6px !important;
+        width: 6px !important;
+    }
+
+    .hims-table-scroll::-webkit-scrollbar-track {
+        background: transparent !important;
+    }
+
+    .hims-table-scroll::-webkit-scrollbar-thumb {
+        background-color: rgba(156, 163, 175, 0.4) !important;
+        border-radius: 9999px !important;
+    }
+
+    .hims-table-scroll::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(107, 114, 128, 0.7) !important;
+    }
+
+    /*
+     * Sticky action column styling ensures buttons like Edit, Unlock, and Deactivate
+     * remain fixed and visible at the right edge during horizontal scrolling.
+     */
+    .hims-sticky-actions {
+        position: sticky !important;
+        right: 0 !important;
+        z-index: 10;
+        box-shadow: -4px 0 6px -2px rgba(0, 0, 0, 0.06);
+    }
+
+    th.hims-sticky-actions {
+        background-color: #f9fafb !important;
+    }
+
+    td.hims-sticky-actions {
+        background-color: #ffffff;
+    }
+
+    tr:nth-child(even) td.hims-sticky-actions {
+        background-color: #fafafa;
+    }
+
+    tr:hover td.hims-sticky-actions {
+        background-color: #eff6ff !important;
+    }
 }
 
 @keyframes hims-loader-rotate {

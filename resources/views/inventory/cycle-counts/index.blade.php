@@ -95,7 +95,7 @@
                     <h3 class="text-base font-semibold text-neutral-900">Physical Audit Documents</h3>
                     <p class="text-xs text-neutral-500">Historical count registers with frozen inventory snapshots.</p>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto hims-table-scroll">
                     <table class="w-full text-left text-sm text-neutral-600">
                         <thead class="bg-neutral-50 text-xs uppercase text-neutral-500 border-b border-neutral-200">
                             <tr>
@@ -105,7 +105,7 @@
                                 <th class="px-6 py-3 font-medium">Assigned Counter</th>
                                 <th class="px-6 py-3 font-medium">Status</th>
                                 <th class="px-6 py-3 font-medium">Snapshot Date</th>
-                                <th class="px-6 py-3 font-medium text-right">Actions</th>
+                                <th class="px-6 py-3 font-medium text-right hims-sticky-actions min-w-[170px]">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-neutral-200">
@@ -160,8 +160,8 @@
                                     <td class="px-6 py-4 text-xs text-neutral-500">
                                         {{ $doc->snapshot_timestamp ? $doc->snapshot_timestamp->format('M d, Y h:i A') : 'N/A' }}
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <a href="{{ route('inventory.cycle-counts.show', $doc) }}" class="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition">
+                                    <td class="px-6 py-4 text-right hims-sticky-actions min-w-[170px]">
+                                        <a href="{{ route('inventory.cycle-counts.show', $doc) }}" class="inline-block whitespace-nowrap rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition">
                                             {{ in_array($doc->status, ['scheduled', 'in_progress', 'generated']) ? 'Enter Blind Counts' : 'Review Audit' }}
                                         </a>
                                     </td>

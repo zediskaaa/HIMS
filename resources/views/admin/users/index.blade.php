@@ -72,139 +72,256 @@
         title="Accounts"
         :subtitle="$users->total().' '.\Illuminate\Support\Str::plural('account', $users->total())"
         :padding="false">
-        <x-ui.table>
-            <x-ui.table.head>
-                <x-ui.table.th>Employee ID</x-ui.table.th>
-                <x-ui.table.th>Surname</x-ui.table.th>
-                <x-ui.table.th>First Name</x-ui.table.th>
-                <x-ui.table.th>Middle Name</x-ui.table.th>
-                <x-ui.table.th>Department</x-ui.table.th>
-                <x-ui.table.th>Contact Number</x-ui.table.th>
-                <x-ui.table.th>Role</x-ui.table.th>
-                <x-ui.table.th>Status</x-ui.table.th>
-                <x-ui.table.th>Last Sign-in</x-ui.table.th>
-                <x-ui.table.th align="right">Actions</x-ui.table.th>
-            </x-ui.table.head>
-            <tbody>
-                @forelse ($users as $account)
-                    @php($nameComponents = $account->nameComponents())
-                    <x-ui.table.row>
-                        <x-ui.table.td muted>
-                            <span class="font-mono text-xs">{{ $account->employee_id ?? '—' }}</span>
-                        </x-ui.table.td>
 
-                        <x-ui.table.td>
-                            <div class="flex items-center gap-2.5">
-                                <span class="flex items-center justify-center w-8 h-8 rounded-full shrink-0
-                                             text-xs font-semibold
-                                             {{ $account->isActive() ? 'bg-primary-50 text-primary-700' : 'bg-neutral-100 text-neutral-400' }}">
-                                    {{ $account->initials() }}
-                                </span>
-                                <div class="min-w-0">
-                                    <a href="{{ route('admin.users.show', $account) }}"
-                                       title="{{ $account->name }}"
-                                       class="font-medium text-neutral-900 hover:text-primary-700 hover:underline">
-                                        {{ $nameComponents['surname'] ?? $account->name }}
-                                    </a>
-                                    @if ($account->is(auth()->user()))
-                                        <span class="ml-1 text-[11px] font-medium text-neutral-400">(you)</span>
+        {{-- Mobile card view (visible on small mobile screens) --}}
+        <div class="sm:hidden divide-y divide-neutral-200">
+            @forelse ($users as $account)
+                @php($nameComponents = $account->nameComponents())
+                <div class="p-4 space-y-3">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <span class="flex items-center justify-center w-9 h-9 rounded-full shrink-0
+                                         text-xs font-semibold
+                                         {{ $account->isActive() ? 'bg-primary-50 text-primary-700' : 'bg-neutral-100 text-neutral-400' }}">
+                                {{ $account->initials() }}
+                            </span>
+                            <div class="min-w-0">
+                                <a href="{{ route('admin.users.show', $account) }}"
+                                   title="{{ $account->name }}"
+                                   class="font-medium text-neutral-900 hover:text-primary-700 hover:underline truncate block">
+                                    {{ $account->name }}
+                                </a>
+                                <span class="block text-xs text-neutral-500 truncate">{{ $account->email }}</span>
+                            </div>
+                        </div>
+                        @if ($account->is(auth()->user()))
+                            <span class="text-[11px] font-medium text-neutral-400 shrink-0">(you)</span>
+                        @endif
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                        <x-ui.badge :variant="$account->isAdministrator() ? 'primary' : 'neutral'">
+                            {{ $account->role->label() }}
+                        </x-ui.badge>
+                        <x-ui.badge :status="$account->status->value" dot>
+                            {{ $account->status->label() }}
+                        </x-ui.badge>
+                        @if ($account->isTemporarilyLocked())
+                            <x-ui.badge variant="warning">Temporarily Locked</x-ui.badge>
+                        @endif
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-xs text-neutral-600 pt-1">
+                        <div>
+                            <span class="text-neutral-400">ID:</span>
+                            <span class="font-mono font-medium">{{ $account->employee_id ?? '—' }}</span>
+                        </div>
+                        <div>
+                            <span class="text-neutral-400">Dept:</span>
+                            <span class="font-medium">{{ $account->department ?? '—' }}</span>
+                        </div>
+                        <div>
+                            <span class="text-neutral-400">Phone:</span>
+                            <span>{{ $account->phone ?? '—' }}</span>
+                        </div>
+                        <div>
+                            <span class="text-neutral-400">Sign-in:</span>
+                            <span>{{ $account->last_login_at?->format('M d, Y') ?? 'Never' }}</span>
+                        </div>
+                    </div>
+
+                    {{-- Actions on mobile: neatly arranged and fully accessible --}}
+                    <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-100">
+                        @if (in_array($account->getKey(), $manageableAccountIds, true))
+                            <x-ui.button variant="secondary" size="sm"
+                                         :href="route('admin.users.edit', $account)" icon="pencil-square">
+                                Edit
+                            </x-ui.button>
+
+                            @if (in_array($account->getKey(), $unlockableAccountIds, true))
+                                <form method="POST" action="{{ route('admin.users.unlock', $account) }}"
+                                      data-confirm-title="Confirm account unlock"
+                                      data-confirm-message="Are you sure you want to unlock this account?"
+                                      data-confirm-label="Unlock Account">
+                                    @csrf
+                                    @method('PATCH')
+                                    <x-ui.button
+                                        type="submit"
+                                        size="sm"
+                                        data-loading-text="Unlocking account...">
+                                        Unlock
+                                    </x-ui.button>
+                                </form>
+                            @endif
+
+                            @unless ($account->is(auth()->user()))
+                                <form method="POST" action="{{ route('admin.users.toggle-status', $account) }}"
+                                      data-confirm-title="Confirm account status change"
+                                      data-confirm-message="Are you sure you want to {{ $account->isActive() ? 'deactivate' : 'reactivate' }} this user?"
+                                      data-confirm-label="{{ $account->isActive() ? 'Deactivate' : 'Reactivate' }}">
+                                    @csrf
+                                    @method('PATCH')
+                                    <x-ui.button
+                                        type="submit"
+                                        size="sm"
+                                        data-loading-text="Updating account..."
+                                        :variant="$account->isActive() ? 'secondary' : 'primary'">
+                                        {{ $account->isActive() ? 'Deactivate' : 'Reactivate' }}
+                                    </x-ui.button>
+                                </form>
+                            @endunless
+                        @elseif ($account->isProtected())
+                            <x-ui.badge variant="warning">Protected</x-ui.badge>
+                        @else
+                            <span class="text-xs text-neutral-400">Restricted</span>
+                        @endif
+                    </div>
+                </div>
+            @empty
+                <div class="p-8 text-center text-sm text-neutral-500">
+                    <x-ui.icon name="users" class="mx-auto h-8 w-8 text-neutral-400 mb-2" />
+                    <p class="font-semibold text-neutral-700">No accounts match</p>
+                    <p class="text-xs text-neutral-500 mt-1">Adjust the filters, or add the first staff account.</p>
+                </div>
+            @endforelse
+        </div>
+
+        {{-- Desktop/Tablet table view with sticky Actions column --}}
+        <div class="hidden sm:block">
+            <x-ui.table>
+                <x-ui.table.head>
+                    <x-ui.table.th>Employee ID</x-ui.table.th>
+                    <x-ui.table.th>Surname</x-ui.table.th>
+                    <x-ui.table.th>First Name</x-ui.table.th>
+                    <x-ui.table.th>Middle Name</x-ui.table.th>
+                    <x-ui.table.th>Department</x-ui.table.th>
+                    <x-ui.table.th>Contact Number</x-ui.table.th>
+                    <x-ui.table.th>Role</x-ui.table.th>
+                    <x-ui.table.th>Status</x-ui.table.th>
+                    <x-ui.table.th>Last Sign-in</x-ui.table.th>
+                    <x-ui.table.th align="right" class="hims-sticky-actions min-w-[200px]">Actions</x-ui.table.th>
+                </x-ui.table.head>
+                <tbody>
+                    @forelse ($users as $account)
+                        @php($nameComponents = $account->nameComponents())
+                        <x-ui.table.row>
+                            <x-ui.table.td muted>
+                                <span class="font-mono text-xs">{{ $account->employee_id ?? '—' }}</span>
+                            </x-ui.table.td>
+
+                            <x-ui.table.td>
+                                <div class="flex items-center gap-2.5">
+                                    <span class="flex items-center justify-center w-8 h-8 rounded-full shrink-0
+                                                 text-xs font-semibold
+                                                 {{ $account->isActive() ? 'bg-primary-50 text-primary-700' : 'bg-neutral-100 text-neutral-400' }}">
+                                        {{ $account->initials() }}
+                                    </span>
+                                    <div class="min-w-0">
+                                        <a href="{{ route('admin.users.show', $account) }}"
+                                           title="{{ $account->name }}"
+                                           class="font-medium text-neutral-900 hover:text-primary-700 hover:underline">
+                                            {{ $nameComponents['surname'] ?? $account->name }}
+                                        </a>
+                                        @if ($account->is(auth()->user()))
+                                            <span class="ml-1 text-[11px] font-medium text-neutral-400">(you)</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </x-ui.table.td>
+
+                            <x-ui.table.td>
+                                <span class="text-neutral-900">{{ $nameComponents['first_name'] ?? '—' }}</span>
+                                <span class="block text-xs text-neutral-500 truncate">{{ $account->email }}</span>
+                            </x-ui.table.td>
+
+                            <x-ui.table.td muted>{{ $nameComponents['middle_name'] ?? '—' }}</x-ui.table.td>
+
+                            <x-ui.table.td muted>{{ $account->department ?? '—' }}</x-ui.table.td>
+
+                            <x-ui.table.td muted>{{ $account->phone ?? '—' }}</x-ui.table.td>
+
+                            <x-ui.table.td>
+                                <x-ui.badge :variant="$account->isAdministrator() ? 'primary' : 'neutral'">
+                                    {{ $account->role->label() }}
+                                </x-ui.badge>
+                            </x-ui.table.td>
+
+                            <x-ui.table.td>
+                                <x-ui.badge :status="$account->status->value" dot>
+                                    {{ $account->status->label() }}
+                                </x-ui.badge>
+                                @if ($account->isTemporarilyLocked())
+                                    <x-ui.badge variant="warning" class="mt-1">Temporarily Locked</x-ui.badge>
+                                    <span class="mt-1 block whitespace-nowrap text-xs text-neutral-500">
+                                        Until {{ $account->login_locked_until->timezone(config('app.timezone'))->format('M d, Y g:i A') }}
+                                    </span>
+                                @endif
+                            </x-ui.table.td>
+
+                            <x-ui.table.td muted>
+                                {{ $account->last_login_at?->format('M d, Y g:i A') ?? 'Never' }}
+                            </x-ui.table.td>
+
+                            <x-ui.table.td align="right" class="hims-sticky-actions min-w-[200px]">
+                                <div class="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                    @if (in_array($account->getKey(), $manageableAccountIds, true))
+                                        <x-ui.button variant="ghost" size="sm"
+                                                     :href="route('admin.users.edit', $account)">
+                                            Edit
+                                        </x-ui.button>
+
+                                        @if (in_array($account->getKey(), $unlockableAccountIds, true))
+                                            <form method="POST" action="{{ route('admin.users.unlock', $account) }}"
+                                                  data-confirm-title="Confirm account unlock"
+                                                  data-confirm-message="Are you sure you want to unlock this account?"
+                                                  data-confirm-label="Unlock Account">
+                                                @csrf
+                                                @method('PATCH')
+                                                <x-ui.button
+                                                    type="submit"
+                                                    size="sm"
+                                                    data-loading-text="Unlocking account...">
+                                                    Unlock
+                                                </x-ui.button>
+                                            </form>
+                                        @endif
+
+                                        {{-- Deactivating yourself is refused by the service;
+                                             hide the impossible action here as well. --}}
+                                        @unless ($account->is(auth()->user()))
+                                            <form method="POST" action="{{ route('admin.users.toggle-status', $account) }}"
+                                                  data-confirm-title="Confirm account status change"
+                                                  data-confirm-message="Are you sure you want to {{ $account->isActive() ? 'deactivate' : 'reactivate' }} this user?"
+                                                  data-confirm-label="{{ $account->isActive() ? 'Deactivate' : 'Reactivate' }}">
+                                                @csrf
+                                                @method('PATCH')
+                                                <x-ui.button
+                                                    type="submit"
+                                                    size="sm"
+                                                    data-loading-text="Updating account..."
+                                                    :variant="$account->isActive() ? 'secondary' : 'primary'">
+                                                    {{ $account->isActive() ? 'Deactivate' : 'Reactivate' }}
+                                                </x-ui.button>
+                                            </form>
+                                        @endunless
+                                    @elseif ($account->isProtected())
+                                        <x-ui.badge variant="warning">Protected</x-ui.badge>
+                                    @else
+                                        <span class="text-xs text-neutral-400">Restricted</span>
                                     @endif
                                 </div>
-                            </div>
-                        </x-ui.table.td>
-
-                        <x-ui.table.td>
-                            <span class="text-neutral-900">{{ $nameComponents['first_name'] ?? '—' }}</span>
-                            <span class="block text-xs text-neutral-500 truncate">{{ $account->email }}</span>
-                        </x-ui.table.td>
-
-                        <x-ui.table.td muted>{{ $nameComponents['middle_name'] ?? '—' }}</x-ui.table.td>
-
-                        <x-ui.table.td muted>{{ $account->department ?? '—' }}</x-ui.table.td>
-
-                        <x-ui.table.td muted>{{ $account->phone ?? '—' }}</x-ui.table.td>
-
-                        <x-ui.table.td>
-                            <x-ui.badge :variant="$account->isAdministrator() ? 'primary' : 'neutral'">
-                                {{ $account->role->label() }}
-                            </x-ui.badge>
-                        </x-ui.table.td>
-
-                        <x-ui.table.td>
-                            <x-ui.badge :status="$account->status->value" dot>
-                                {{ $account->status->label() }}
-                            </x-ui.badge>
-                            @if ($account->isTemporarilyLocked())
-                                <x-ui.badge variant="warning" class="mt-1">Temporarily Locked</x-ui.badge>
-                                <span class="mt-1 block whitespace-nowrap text-xs text-neutral-500">
-                                    Until {{ $account->login_locked_until->timezone(config('app.timezone'))->format('M d, Y g:i A') }}
-                                </span>
-                            @endif
-                        </x-ui.table.td>
-
-                        <x-ui.table.td muted>
-                            {{ $account->last_login_at?->format('M d, Y g:i A') ?? 'Never' }}
-                        </x-ui.table.td>
-
-                        <x-ui.table.td align="right">
-                            <div class="flex items-center justify-end gap-1.5">
-                                @if (in_array($account->getKey(), $manageableAccountIds, true))
-                                    <x-ui.button variant="ghost" size="sm"
-                                                 :href="route('admin.users.edit', $account)">
-                                        Edit
-                                    </x-ui.button>
-
-                                    @if (in_array($account->getKey(), $unlockableAccountIds, true))
-                                        <form method="POST" action="{{ route('admin.users.unlock', $account) }}"
-                                              data-confirm-title="Confirm account unlock"
-                                              data-confirm-message="Are you sure you want to unlock this account?"
-                                              data-confirm-label="Unlock Account">
-                                            @csrf
-                                            @method('PATCH')
-                                            <x-ui.button
-                                                type="submit"
-                                                size="sm"
-                                                data-loading-text="Unlocking account...">
-                                                Unlock
-                                            </x-ui.button>
-                                        </form>
-                                    @endif
-
-                                    {{-- Deactivating yourself is refused by the service;
-                                         hide the impossible action here as well. --}}
-                                    @unless ($account->is(auth()->user()))
-                                        <form method="POST" action="{{ route('admin.users.toggle-status', $account) }}"
-                                              data-confirm-title="Confirm account status change"
-                                              data-confirm-message="Are you sure you want to {{ $account->isActive() ? 'deactivate' : 'reactivate' }} this user?"
-                                              data-confirm-label="{{ $account->isActive() ? 'Deactivate' : 'Reactivate' }}">
-                                            @csrf
-                                            @method('PATCH')
-                                            <x-ui.button
-                                                type="submit"
-                                                size="sm"
-                                                data-loading-text="Updating account..."
-                                                :variant="$account->isActive() ? 'secondary' : 'primary'">
-                                                {{ $account->isActive() ? 'Deactivate' : 'Reactivate' }}
-                                            </x-ui.button>
-                                        </form>
-                                    @endunless
-                                @elseif ($account->isProtected())
-                                    <x-ui.badge variant="warning">Protected</x-ui.badge>
-                                @else
-                                    <span class="text-xs text-neutral-400">Restricted</span>
-                                @endif
-                            </div>
-                        </x-ui.table.td>
-                    </x-ui.table.row>
-                @empty
-                    <x-ui.table.empty
-                        :colspan="10"
-                        icon="users"
-                        title="No accounts match"
-                        message="Adjust the filters, or add the first staff account." />
-                @endforelse
-            </tbody>
-        </x-ui.table>
+                            </x-ui.table.td>
+                        </x-ui.table.row>
+                    @empty
+                        <x-ui.table.empty
+                            :colspan="10"
+                            icon="users"
+                            title="No accounts match"
+                            message="Adjust the filters, or add the first staff account." />
+                    @endforelse
+                </tbody>
+            </x-ui.table>
+        </div>
 
         @if ($users->hasPages())
             <x-slot:footer>

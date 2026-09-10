@@ -39,7 +39,7 @@
 
             @include('admin.users.partials.form', ['user' => $user, 'roles' => $roles])
 
-            <div class="flex items-center justify-end gap-2 pt-1">
+            <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-2 border-t border-neutral-100">
                 <x-ui.button variant="secondary" :href="route('admin.users.index')">Cancel</x-ui.button>
                 <x-ui.button type="submit" data-loading-text="Saving changes...">Save Changes</x-ui.button>
             </div>

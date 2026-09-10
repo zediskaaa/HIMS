@@ -127,7 +127,7 @@
                     <h3 class="text-base font-semibold text-neutral-900">Stock Transfer Registry</h3>
                     <p class="text-xs text-neutral-500">Track dispatch, transit status, and destination receipt acknowledgment.</p>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto hims-table-scroll">
                     <table class="w-full text-left text-sm text-neutral-600">
                         <thead class="bg-neutral-50 text-xs uppercase text-neutral-500 border-b border-neutral-200">
                             <tr>
@@ -137,7 +137,7 @@
                                 <th class="px-6 py-3 font-medium">Status</th>
                                 <th class="px-6 py-3 font-medium">Dispatched</th>
                                 <th class="px-6 py-3 font-medium">Received</th>
-                                <th class="px-6 py-3 font-medium text-right">Actions</th>
+                                <th class="px-6 py-3 font-medium text-right hims-sticky-actions min-w-[150px]">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-neutral-200">
@@ -189,8 +189,8 @@
                                             <span class="text-neutral-400 italic">Pending destination intake</span>
                                         @endif
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <a href="{{ route('inventory.transfers.show', $trans) }}" class="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition">
+                                    <td class="px-6 py-4 text-right hims-sticky-actions min-w-[150px]">
+                                        <a href="{{ route('inventory.transfers.show', $trans) }}" class="inline-block whitespace-nowrap rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition">
                                             Manage Transfer
                                         </a>
                                     </td>

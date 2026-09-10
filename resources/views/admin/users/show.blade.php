@@ -10,21 +10,38 @@
         ]">
         @if ($canManage)
             <x-slot:actions>
-                @if ($canUnlock)
-                    <form method="POST" action="{{ route('admin.users.unlock', $user) }}"
-                          data-confirm-title="Confirm account unlock"
-                          data-confirm-message="Are you sure you want to unlock this account?"
-                          data-confirm-label="Unlock Account">
-                        @csrf
-                        @method('PATCH')
-                        <x-ui.button type="submit" data-loading-text="Unlocking account...">
-                            Unlock Account
-                        </x-ui.button>
-                    </form>
-                @endif
-                <x-ui.button variant="secondary" :href="route('admin.users.edit', $user)" icon="pencil-square">
-                    Edit
-                </x-ui.button>
+                <div class="flex flex-wrap items-center gap-2">
+                    @if ($canUnlock)
+                        <form method="POST" action="{{ route('admin.users.unlock', $user) }}"
+                              data-confirm-title="Confirm account unlock"
+                              data-confirm-message="Are you sure you want to unlock this account?"
+                              data-confirm-label="Unlock Account">
+                            @csrf
+                            @method('PATCH')
+                            <x-ui.button type="submit" data-loading-text="Unlocking account...">
+                                Unlock Account
+                            </x-ui.button>
+                        </form>
+                    @endif
+                    <x-ui.button variant="secondary" :href="route('admin.users.edit', $user)" icon="pencil-square">
+                        Edit
+                    </x-ui.button>
+                    @unless ($user->is(auth()->user()))
+                        <form method="POST" action="{{ route('admin.users.toggle-status', $user) }}"
+                              data-confirm-title="Confirm account status change"
+                              data-confirm-message="Are you sure you want to {{ $user->isActive() ? 'deactivate' : 'reactivate' }} this user?"
+                              data-confirm-label="{{ $user->isActive() ? 'Deactivate' : 'Reactivate' }}">
+                            @csrf
+                            @method('PATCH')
+                            <x-ui.button
+                                type="submit"
+                                data-loading-text="Updating account..."
+                                :variant="$user->isActive() ? 'secondary' : 'primary'">
+                                {{ $user->isActive() ? 'Deactivate' : 'Reactivate' }}
+                            </x-ui.button>
+                        </form>
+                    @endunless
+                </div>
             </x-slot:actions>
         @endif
     </x-ui.page-header>

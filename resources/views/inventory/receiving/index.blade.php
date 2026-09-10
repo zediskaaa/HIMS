@@ -90,7 +90,7 @@
                         <p class="text-xs text-neutral-500">Select an authorized order to record physical dock arrival and generate a Goods Receipt Note.</p>
                     </div>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto hims-table-scroll">
                     <table class="w-full text-left text-sm text-neutral-600">
                         <thead class="bg-neutral-50 text-xs uppercase text-neutral-500 border-b border-neutral-200">
                             <tr>
@@ -99,7 +99,7 @@
                                 <th class="px-6 py-3 font-medium">Order Items</th>
                                 <th class="px-6 py-3 font-medium">Total Encumbered</th>
                                 <th class="px-6 py-3 font-medium">Fulfillment Status</th>
-                                <th class="px-6 py-3 font-medium text-right">Actions</th>
+                                <th class="px-6 py-3 font-medium text-right hims-sticky-actions min-w-[170px]">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-neutral-200">
@@ -124,12 +124,12 @@
                                             {{ ucfirst(str_replace('_', ' ', $po->status)) }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 text-right">
+                                    <td class="px-6 py-4 text-right hims-sticky-actions min-w-[170px]">
                                         @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
                                             <button
                                                 type="button"
                                                 @click="selectPo('{{ $po->id }}'); showReceiveModal = true"
-                                                class="inline-flex items-center gap-1.5 rounded-md bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+                                                class="inline-flex whitespace-nowrap items-center gap-1.5 rounded-md bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
                                             >
                                                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                                                 Receive Shipment
@@ -155,7 +155,7 @@
                     <h3 class="text-base font-semibold text-neutral-900">Historical Goods Receipt Notes (GRN)</h3>
                     <p class="text-xs text-neutral-500">Authoritative audit evidence of physical stock deliveries and quarantine routing.</p>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto hims-table-scroll">
                     <table class="w-full text-left text-sm text-neutral-600">
                         <thead class="bg-neutral-50 text-xs uppercase text-neutral-500 border-b border-neutral-200">
                             <tr>
@@ -166,7 +166,7 @@
                                 <th class="px-6 py-3 font-medium">Receipt Date</th>
                                 <th class="px-6 py-3 font-medium">Received By</th>
                                 <th class="px-6 py-3 font-medium">Status</th>
-                                <th class="px-6 py-3 font-medium text-right">Details</th>
+                                <th class="px-6 py-3 font-medium text-right hims-sticky-actions min-w-[130px]">Details</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-neutral-200">
@@ -195,8 +195,8 @@
                                             {{ ucfirst(str_replace('_', ' ', $grn->receipt_status)) }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <a href="{{ route('inventory.receiving.show', $grn) }}" class="text-xs font-semibold text-primary-600 hover:text-primary-800">
+                                    <td class="px-6 py-4 text-right hims-sticky-actions min-w-[130px]">
+                                        <a href="{{ route('inventory.receiving.show', $grn) }}" class="inline-block whitespace-nowrap text-xs font-semibold text-primary-600 hover:text-primary-800">
                                             View Note &rarr;
                                         </a>
                                     </td>
