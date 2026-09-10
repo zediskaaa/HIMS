@@ -90,11 +90,57 @@ class SourcingRfq extends Model
 
     public function isDeadlineElapsed(): bool
     {
-        return now()->greaterThanOrEqualTo($this->submission_deadline);
+        return $this->submission_deadline !== null && now()->greaterThanOrEqualTo($this->submission_deadline);
     }
 
     public function isSealed(): bool
     {
         return $this->bidding_type === RfqBiddingType::Sealed && $this->unsealed_at === null;
+    }
+
+    public function isBiddingClosed(): bool
+    {
+        return $this->status === RfqStatus::BiddingClosed
+            || ($this->status === RfqStatus::Published && $this->isDeadlineElapsed());
+    }
+
+    public function canBeEvaluated(): bool
+    {
+        if ($this->status === RfqStatus::Draft
+            || $this->status === RfqStatus::Cancelled
+            || $this->status === RfqStatus::Awarded) {
+            return false;
+        }
+
+        if (! $this->quotes()->exists()) {
+            return false;
+        }
+
+        if ($this->isSealed() && ! $this->isDeadlineElapsed()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function closeBiddingIfExpired(): bool
+    {
+        if ($this->status === RfqStatus::Published && $this->isDeadlineElapsed()) {
+            $this->status = RfqStatus::BiddingClosed;
+            $this->save();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    public function effectiveStatus(): RfqStatus
+    {
+        if ($this->status === RfqStatus::Published && $this->isDeadlineElapsed()) {
+            return RfqStatus::BiddingClosed;
+        }
+
+        return $this->status;
     }
 }

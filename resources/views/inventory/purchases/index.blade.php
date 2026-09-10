@@ -20,8 +20,41 @@
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="{ activeTab: 'enterprise_s2p' }">
+    <div class="py-6" x-data="{ activeTab: 'enterprise_s2p', selectedPoCxml: '', selectedPoNumber: '', showCxmlModal: false }">
         <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+
+            {{-- Flash Notification Banners --}}
+            @if(session('success'))
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 flex items-center justify-between shadow-sm">
+                    <div class="flex items-center gap-2">
+                        <svg class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                        <span class="font-medium">{{ session('success') }}</span>
+                    </div>
+                </div>
+            @endif
+
+            @if(session('info'))
+                <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 flex items-center justify-between shadow-sm">
+                    <div class="flex items-center gap-2">
+                        <svg class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span class="font-medium">{{ session('info') }}</span>
+                    </div>
+                </div>
+            @endif
+
+            @if($errors->any())
+                <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 shadow-sm">
+                    <div class="flex items-center gap-2 font-semibold">
+                        <svg class="h-5 w-5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        <span>Please correct the errors below:</span>
+                    </div>
+                    <ul class="mt-2 list-inside list-disc text-xs space-y-1">
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
             {{-- Metric Cards --}}
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -100,71 +133,164 @@
             {{-- ======================================================== TAB 1: Enterprise S2P Workspace --}}
             <div x-show="activeTab === 'enterprise_s2p'" class="space-y-6">
                 {{-- Department Requisition Intake with Synchronous Budget Soft Commitment --}}
-                <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-                    <div class="flex items-center justify-between border-b border-neutral-100 pb-4">
+                <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm"
+                     x-data="{
+                         prQuantity: 100,
+                         prUnitPrice: 45.00,
+                         prSelectedCost: 0,
+                         prSelectedUom: 'units',
+                         prSelectedBudget: 0,
+                         prItemChanged(event) {
+                             const opt = event.target.options[event.target.selectedIndex];
+                             if (opt && opt.dataset.cost) {
+                                 this.prUnitPrice = parseFloat(opt.dataset.cost);
+                                 this.prSelectedUom = opt.dataset.uom || 'units';
+                             }
+                         },
+                         prCostCenterChanged(event) {
+                             const opt = event.target.options[event.target.selectedIndex];
+                             if (opt && opt.dataset.budget) {
+                                 this.prSelectedBudget = parseFloat(opt.dataset.budget);
+                             }
+                         },
+                         get prTotalEstimated() {
+                             const q = parseFloat(this.prQuantity) || 0;
+                             const p = parseFloat(this.prUnitPrice) || 0;
+                             return (q * p).toFixed(2);
+                         },
+                         get isBudgetExceeded() {
+                             return this.prSelectedBudget > 0 && parseFloat(this.prTotalEstimated) > this.prSelectedBudget;
+                         }
+                     }">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-neutral-100 pb-4 gap-2">
                         <div>
-                            <h3 class="text-lg font-bold text-neutral-900">Requisition Intake &amp; Budget Encumbrance Check</h3>
-                            <p class="text-sm text-neutral-500">Multi-line item intake enforcing real-time departmental budget reservation.</p>
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-lg font-bold text-neutral-900">Requisition Intake &amp; Budget Encumbrance Check</h3>
+                                <span class="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">Synchronous GL Check</span>
+                            </div>
+                            <p class="text-sm text-neutral-500">Multi-attribute intake with automated sequence assignment and real-time departmental budget reservation.</p>
                         </div>
-                        <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Synchronous GL Check</span>
+                        <div class="flex items-center gap-2 self-start sm:self-auto">
+                            <span class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Autogenerated Reference:</span>
+                            <span class="rounded bg-neutral-100 border border-neutral-200 px-2.5 py-1 text-xs font-mono font-bold text-neutral-700 shadow-inner">PR-{{ date('Ymd') }}-AUTO</span>
+                        </div>
                     </div>
 
                     <form method="POST" action="{{ route('inventory.purchases.enterprise-requests.store') }}" class="mt-4 grid gap-4 md:grid-cols-3">
                         @csrf
+                        {{-- Requisition Title --}}
                         <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Requisition Title</label>
                             <input type="text" name="title" placeholder="e.g. ICU PPE &amp; Ventilator Tubing Restock" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required />
                         </div>
+
+                        {{-- Cost Center Dropdown --}}
                         <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Cost Center (Department)</label>
-                            <select name="cost_center_id" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Cost Center (Department Budget)</label>
+                            <select name="cost_center_id" @change="prCostCenterChanged($event)" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
                                 <option value="">Select Cost Center</option>
                                 @foreach($costCenters as $cc)
-                                    <option value="{{ $cc->id }}">{{ $cc->name }} ({{ $cc->code }}) — Available: ₱{{ number_format($cc->currentBudget()?->availableBudget() ?? 1000000, 2) }}</option>
+                                    @php $avail = $cc->currentBudget()?->availableBudget() ?? 1000000; @endphp
+                                    <option value="{{ $cc->id }}" data-budget="{{ $avail }}">
+                                        {{ $cc->name }} ({{ $cc->code }}) — Avail: ₱{{ number_format($avail, 2) }}
+                                    </option>
                                 @endforeach
                             </select>
                         </div>
+
+                        {{-- Procurement Category Dropdown --}}
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Procurement Category</label>
+                            <select name="procurement_category_id" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
+                                <option value="">Select Category</option>
+                                @foreach($categories as $cat)
+                                    <option value="{{ $cat->id }}">{{ $cat->name }} ({{ $cat->code }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        {{-- Procurement Method Dropdown --}}
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Procurement Method</label>
+                            <select name="procurement_method" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
+                                <option value="Request for Quotation" selected>Request for Quotation (Competitive Canvass)</option>
+                                <option value="Direct Contracting">Direct Contracting (Single Source Authorized)</option>
+                                <option value="Emergency Procurement">Emergency Procurement (Stat Patient Care)</option>
+                                <option value="Competitive Bidding">Competitive Bidding (Public Tender)</option>
+                                <option value="Repeat Order">Repeat Order (Contractual Catalog)</option>
+                            </select>
+                        </div>
+
+                        {{-- Priority Level Dropdown --}}
                         <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Priority Level</label>
                             <select name="priority" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500">
-                                <option value="low">Low (Routine)</option>
-                                <option value="medium" selected>Medium (Standard)</option>
-                                <option value="high">High (Priority)</option>
-                                <option value="urgent">Urgent (Clinical Stat)</option>
+                                <option value="low">Low (Routine Stock Replenishment)</option>
+                                <option value="medium" selected>Medium (Standard 14-Day Cycle)</option>
+                                <option value="high">High (Department Critical)</option>
+                                <option value="urgent">Urgent (Clinical Stat / Critical Shortage)</option>
                             </select>
                         </div>
 
+                        {{-- Item Master Dropdown --}}
                         <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Item Master Code</label>
-                            <select name="item_id" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
-                                <option value="">Select Item</option>
+                            <select name="item_id" @change="prItemChanged($event)" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
+                                <option value="">Select Item from Catalog</option>
                                 @foreach($items as $item)
-                                    <option value="{{ $item->id }}">{{ $item->name }} ({{ $item->sku }}) — Current Unit Cost: ₱{{ number_format($item->unit_cost, 2) }}</option>
+                                    <option value="{{ $item->id }}" data-cost="{{ $item->unit_cost }}" data-uom="{{ $item->unit }}" data-sku="{{ $item->sku }}">
+                                        {{ $item->name }} ({{ $item->sku }}) — ₱{{ number_format($item->unit_cost, 2) }} / {{ $item->unit ?: 'unit' }}
+                                    </option>
                                 @endforeach
                             </select>
                         </div>
+
+                        {{-- Requested Quantity (Strict Numbers Only) --}}
                         <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Requested Quantity</label>
-                            <input type="number" name="quantity" min="1" value="100" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required />
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Estimated Unit Price (₱)</label>
-                            <input type="number" step="0.01" name="estimated_unit_price" value="45.00" min="0" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required />
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-600">Requested Quantity</label>
+                                <span class="text-xs text-neutral-500 font-medium" x-show="prSelectedUom">Unit: <strong class="text-neutral-800" x-text="prSelectedUom"></strong></span>
+                            </div>
+                            <input type="number" name="quantity" min="1" step="1" inputmode="numeric" x-model.number="prQuantity"
+                                   onkeydown="return ['Backspace','Delete','ArrowLeft','ArrowRight','Tab'].includes(event.key) || /^[0-9]$/.test(event.key)"
+                                   class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required />
                         </div>
 
-                        <div class="md:col-span-2">
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Clinical Justification &amp; Notes</label>
-                            <input type="text" name="description" placeholder="Explain patient care need, reorder trigger, or clinical protocol rationale..." class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" />
+                        {{-- Estimated Unit Price (Strict Numbers Only) --}}
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Estimated Unit Price (₱)</label>
+                            <input type="number" step="0.01" min="0.01" name="estimated_unit_price" inputmode="decimal" x-model.number="prUnitPrice"
+                                   class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required />
                         </div>
+
+                        {{-- Target Need-By Date --}}
                         <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Target Need-By Date</label>
                             <input type="date" name="need_by_date" value="{{ now()->addDays(14)->toDateString() }}" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" />
                         </div>
 
-                        <div class="md:col-span-3 flex justify-end gap-3 pt-2">
-                            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-primary-700">
+                        {{-- Clinical Justification --}}
+                        <div class="md:col-span-3">
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Clinical Justification &amp; Notes</label>
+                            <input type="text" name="description" placeholder="Explain patient care rationale, minimum consumption threshold, or reorder trigger..." class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" />
+                        </div>
+
+                        {{-- Real-Time Live Calculation & Budget Verification Panel --}}
+                        <div class="md:col-span-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 shadow-sm">
+                            <div>
+                                <span class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Live Calculated Soft Encumbrance:</span>
+                                <div class="flex items-baseline gap-2 mt-0.5">
+                                    <span class="text-2xl font-black text-primary-700">₱<span x-text="Number(prTotalEstimated).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })"></span></span>
+                                    <span class="text-xs text-neutral-500 font-medium">(<span x-text="prQuantity"></span> <span x-text="prSelectedUom"></span> @ ₱<span x-text="parseFloat(prUnitPrice || 0).toFixed(2)"></span>)</span>
+                                </div>
+                            </div>
+                            <div x-show="isBudgetExceeded" class="rounded-md bg-rose-50 border border-rose-200 px-3 py-1.5 text-xs text-rose-700 font-semibold flex items-center gap-1.5">
+                                <svg class="h-4 w-4 shrink-0 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                <span>Warning: Total exceeds selected Cost Center uncommitted budget!</span>
+                            </div>
+                            <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-primary-700">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                                Submit PR with Budget Soft Encumbrance
+                                Submit PR with Soft Encumbrance
                             </button>
                         </div>
                     </form>
@@ -172,39 +298,82 @@
 
                 {{-- Enterprise Requisitions Table --}}
                 <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-                    <h3 class="text-base font-bold text-neutral-900">Active Purchase Requests ({{ $enterpriseRequests->count() }})</h3>
+                    <div class="flex items-center justify-between border-b border-neutral-100 pb-4">
+                        <div>
+                            <h3 class="text-base font-bold text-neutral-900">Active Purchase Requests ({{ $enterpriseRequests->count() }})</h3>
+                            <p class="text-xs text-neutral-500">Chronological ledger of departmental requisitions and soft encumbrances.</p>
+                        </div>
+                    </div>
                     <div class="mt-4 overflow-x-auto">
                         <table class="w-full text-left text-sm text-neutral-700">
                             <thead class="bg-neutral-50 text-xs font-semibold uppercase tracking-wider text-neutral-500">
                                 <tr>
                                     <th class="px-3.5 py-3">PR Number</th>
+                                    <th class="px-3.5 py-3">Category</th>
                                     <th class="px-3.5 py-3">Title &amp; Requester</th>
                                     <th class="px-3.5 py-3">Cost Center</th>
-                                    <th class="px-3.5 py-3">Items / Lines</th>
+                                    <th class="px-3.5 py-3">Priority</th>
+                                    <th class="px-3.5 py-3">Line Items</th>
                                     <th class="px-3.5 py-3">Total Est. (₱)</th>
-                                    <th class="px-3.5 py-3">Encumbrance Status</th>
+                                    <th class="px-3.5 py-3">Status</th>
                                     <th class="px-3.5 py-3">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-neutral-200">
                                 @forelse($enterpriseRequests as $pr)
                                     <tr class="hover:bg-neutral-50">
-                                        <td class="px-3.5 py-3 font-semibold text-neutral-900">{{ $pr->pr_number }}</td>
+                                        <td class="px-3.5 py-3 font-semibold text-neutral-900 font-mono text-xs">{{ $pr->pr_number }}</td>
+                                        <td class="px-3.5 py-3">
+                                            <span class="rounded bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-700">
+                                                {{ $pr->procurementCategory?->code ?? 'GEN' }}
+                                            </span>
+                                        </td>
                                         <td class="px-3.5 py-3">
                                             <p class="font-medium text-neutral-900">{{ $pr->title }}</p>
                                             <p class="text-xs text-neutral-500">{{ $pr->requester?->name }} • {{ $pr->submitted_at?->diffForHumans() }}</p>
                                         </td>
-                                        <td class="px-3.5 py-3">{{ $pr->costCenter?->name }}</td>
-                                        <td class="px-3.5 py-3">{{ $pr->lines->count() }} item(s)</td>
-                                        <td class="px-3.5 py-3 font-bold text-neutral-900">₱{{ number_format($pr->total_estimated_amount, 2) }}</td>
                                         <td class="px-3.5 py-3">
-                                            <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 uppercase tracking-wider">
-                                                {{ $pr->status->value }}
+                                            <span class="font-medium text-neutral-800">{{ $pr->costCenter?->name }}</span>
+                                            <span class="block text-[11px] text-neutral-400 font-mono">{{ $pr->costCenter?->code }}</span>
+                                        </td>
+                                        <td class="px-3.5 py-3">
+                                            @php
+                                                $priorityClasses = match($pr->priority) {
+                                                    'urgent' => 'bg-rose-50 text-rose-700 border-rose-200',
+                                                    'high' => 'bg-amber-50 text-amber-700 border-amber-200',
+                                                    'medium' => 'bg-blue-50 text-blue-700 border-blue-200',
+                                                    default => 'bg-neutral-50 text-neutral-600 border-neutral-200',
+                                                };
+                                            @endphp
+                                            <span class="rounded border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider {{ $priorityClasses }}">
+                                                {{ $pr->priority }}
                                             </span>
                                         </td>
                                         <td class="px-3.5 py-3">
-                                            @if($pr->status->value === 'approved' || $pr->status->value === 'pending_approval')
-                                                <button @click="activeTab = 'sourcing_rfqs'" class="text-xs font-semibold text-primary-600 hover:underline">
+                                            @if($pr->lines->isNotEmpty())
+                                                <p class="text-xs font-medium text-neutral-800">{{ $pr->lines->first()->item_description ?? $pr->lines->first()->item?->name }}</p>
+                                                <p class="text-[11px] text-neutral-500">{{ $pr->lines->sum('quantity') }} total {{ $pr->lines->first()->uom ?: 'units' }} ({{ $pr->lines->count() }} line(s))</p>
+                                            @else
+                                                <span class="text-xs text-neutral-400">0 lines</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-3.5 py-3 font-bold text-neutral-900">₱{{ number_format($pr->total_estimated_amount, 2) }}</td>
+                                        <td class="px-3.5 py-3">
+                                            @php
+                                                $statusClasses = match($pr->status->value ?? $pr->status) {
+                                                    'approved' => 'bg-emerald-50 text-emerald-700',
+                                                    'pending_approval' => 'bg-amber-50 text-amber-700',
+                                                    'rejected' => 'bg-rose-50 text-rose-700',
+                                                    default => 'bg-neutral-100 text-neutral-700',
+                                                };
+                                            @endphp
+                                            <span class="rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wider {{ $statusClasses }}">
+                                                {{ str_replace('_', ' ', $pr->status->value ?? $pr->status) }}
+                                            </span>
+                                        </td>
+                                        <td class="px-3.5 py-3">
+                                            @if(($pr->status->value ?? $pr->status) === 'approved' || ($pr->status->value ?? $pr->status) === 'pending_approval')
+                                                <button @click="activeTab = 'sourcing_rfqs'" class="text-xs font-semibold text-primary-600 hover:underline inline-flex items-center gap-1">
                                                     Package into RFQ &rarr;
                                                 </button>
                                             @else
@@ -214,7 +383,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="px-3.5 py-6 text-center text-sm text-neutral-500">No enterprise purchase requests created yet. Submit one above.</td>
+                                        <td colspan="9" class="px-3.5 py-6 text-center text-sm text-neutral-500">No enterprise purchase requests created yet. Submit one above.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -332,20 +501,66 @@
                                             <span class="font-bold text-neutral-900">{{ $rfq->quotes->count() }}</span> / {{ $rfq->invitations->count() }} invited
                                         </td>
                                         <td class="px-3.5 py-3">
-                                            <span class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 uppercase tracking-wider">
-                                                {{ $rfq->status->value }}
+                                            @php
+                                                $effectiveStatus = $rfq->effectiveStatus();
+                                                $statusTone = match($effectiveStatus) {
+                                                    \App\Enums\RfqStatus::Draft => 'bg-neutral-100 text-neutral-600',
+                                                    \App\Enums\RfqStatus::Published => 'bg-blue-50 text-blue-700',
+                                                    \App\Enums\RfqStatus::BiddingClosed => 'bg-amber-50 text-amber-700',
+                                                    \App\Enums\RfqStatus::UnderEvaluation => 'bg-purple-50 text-purple-700',
+                                                    \App\Enums\RfqStatus::Awarded => 'bg-emerald-50 text-emerald-700',
+                                                    \App\Enums\RfqStatus::Cancelled => 'bg-rose-50 text-rose-700',
+                                                };
+                                            @endphp
+                                            <span class="rounded-full {{ $statusTone }} px-2.5 py-1 text-xs font-semibold uppercase tracking-wider">
+                                                {{ $effectiveStatus->value }}
                                             </span>
                                         </td>
                                         <td class="px-3.5 py-3">
-                                            @if($rfq->quotes->isNotEmpty())
+                                            @if($rfq->status === \App\Enums\RfqStatus::Awarded)
+                                                <span class="inline-flex items-center gap-1 rounded bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                                    Awarded
+                                                </span>
+                                            @elseif($rfq->status === \App\Enums\RfqStatus::Cancelled)
+                                                <span class="text-xs text-neutral-400">Cancelled</span>
+                                            @elseif($rfq->quotes->isEmpty())
+                                                <span class="text-xs text-neutral-400">Awaiting Quotes</span>
+                                            @elseif($rfq->isSealed() && ! $rfq->isDeadlineElapsed())
+                                                <div class="space-y-1">
+                                                    <button type="button" disabled title="Sealed bid evaluation locked until submission deadline elapses ({{ $rfq->submission_deadline->format('M d, Y h:i A') }} PHT)" class="inline-flex items-center gap-1.5 rounded bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-400 cursor-not-allowed border border-neutral-200">
+                                                        <svg class="h-3.5 w-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                                        </svg>
+                                                        Sealed • Bidding Open
+                                                    </button>
+                                                    <p class="text-[11px] text-amber-700 font-medium">
+                                                        Unlocks {{ $rfq->submission_deadline->format('M d, h:i A') }}
+                                                    </p>
+                                                </div>
+                                            @elseif($rfq->evaluations->isNotEmpty())
+                                                <div class="flex items-center gap-1.5">
+                                                    <button @click="activeTab = 'evaluations'" type="button" class="inline-flex items-center gap-1 rounded bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 shadow-sm">
+                                                        View Matrix
+                                                    </button>
+                                                    <form method="POST" action="{{ route('inventory.purchases.rfqs.evaluate', $rfq) }}">
+                                                        @csrf
+                                                        <button type="submit" title="Re-run comparative evaluation matrix" class="rounded border border-neutral-200 p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 transition">
+                                                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            @else
                                                 <form method="POST" action="{{ route('inventory.purchases.rfqs.evaluate', $rfq) }}">
                                                     @csrf
-                                                    <button type="submit" class="inline-flex items-center gap-1 rounded bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-800">
+                                                    <button type="submit" class="inline-flex items-center gap-1 rounded bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-800 shadow-sm transition">
+                                                        <svg class="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                                                        </svg>
                                                         Run Evaluation Matrix
                                                     </button>
                                                 </form>
-                                            @else
-                                                <span class="text-xs text-neutral-400">Awaiting Quotes</span>
                                             @endif
                                         </td>
                                     </tr>
@@ -519,11 +734,162 @@
 
             {{-- ======================================================== TAB 5: Purchase Orders, Revisions & cXML Payloads --}}
             <div x-show="activeTab === 'orders_revisions'" class="space-y-6">
+                {{-- Issue Direct Purchase Order Card --}}
+                <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm"
+                     x-data="{
+                         poQuantity: 100,
+                         poUnitCost: 50.00,
+                         selectedPoUom: 'units',
+                         poItemChanged(event) {
+                             const opt = event.target.options[event.target.selectedIndex];
+                             if (opt && opt.dataset.cost) {
+                                 this.poUnitCost = parseFloat(opt.dataset.cost);
+                                 this.selectedPoUom = opt.dataset.uom || 'units';
+                             }
+                         },
+                         get poTotalEncumbered() {
+                             const q = parseFloat(this.poQuantity) || 0;
+                             const c = parseFloat(this.poUnitCost) || 0;
+                             return (q * c).toFixed(2);
+                         }
+                     }">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-neutral-100 pb-4 gap-2">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-lg font-bold text-neutral-900">Issue Direct Purchase Order &amp; Encumbrance Contract</h3>
+                                <span class="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">Hard Commitment</span>
+                            </div>
+                            <p class="text-sm text-neutral-500">Issue legally binding purchase contract, commit departmental funds, and dispatch cXML OrderRequest document.</p>
+                        </div>
+                        <div class="flex items-center gap-2 self-start sm:self-auto">
+                            <span class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Autogenerated Reference:</span>
+                            <span class="rounded bg-neutral-100 border border-neutral-200 px-2.5 py-1 text-xs font-mono font-bold text-neutral-700 shadow-inner">PO-{{ date('Ymd') }}-AUTO</span>
+                        </div>
+                    </div>
+
+                    <form method="POST" action="{{ route('inventory.purchases.orders.store') }}" class="mt-4 grid gap-4 md:grid-cols-3">
+                        @csrf
+
+                        {{-- Accredited Supplier Dropdown --}}
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Accredited Supplier Counterparty</label>
+                            <select name="supplier_id" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
+                                <option value="">Select Supplier</option>
+                                @foreach($suppliers as $s)
+                                    <option value="{{ $s->id }}">
+                                        {{ $s->name }} (Accreditation: {{ $s->effectiveAccreditationStatus()->value }})
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        {{-- Cost Center Dropdown --}}
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Cost Center (Encumbrance)</label>
+                            <select name="cost_center_id" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
+                                <option value="">Select Cost Center</option>
+                                @foreach($costCenters as $cc)
+                                    @php $avail = $cc->currentBudget()?->availableBudget() ?? 1000000; @endphp
+                                    <option value="{{ $cc->id }}">
+                                        {{ $cc->name }} ({{ $cc->code }}) — Avail: ₱{{ number_format($avail, 2) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        {{-- Item Master Dropdown --}}
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Item Master Code</label>
+                            <select name="item_id" @change="poItemChanged($event)" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
+                                <option value="">Select Item from Catalog</option>
+                                @foreach($items as $item)
+                                    <option value="{{ $item->id }}" data-cost="{{ $item->unit_cost }}" data-uom="{{ $item->unit }}" data-sku="{{ $item->sku }}">
+                                        {{ $item->name }} ({{ $item->sku }}) — Catalog: ₱{{ number_format($item->unit_cost, 2) }} / {{ $item->unit ?: 'unit' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        {{-- Quantity (Strict Numbers Only) --}}
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-600">Ordered Quantity</label>
+                                <span class="text-xs text-neutral-500 font-medium" x-show="selectedPoUom">Unit: <strong class="text-neutral-800" x-text="selectedPoUom"></strong></span>
+                            </div>
+                            <input type="number" name="quantity" min="1" step="1" inputmode="numeric" x-model.number="poQuantity"
+                                   onkeydown="return ['Backspace','Delete','ArrowLeft','ArrowRight','Tab'].includes(event.key) || /^[0-9]$/.test(event.key)"
+                                   class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required />
+                        </div>
+
+                        {{-- Unit Cost (Strict Numbers Only) --}}
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Contracted Unit Cost (₱)</label>
+                            <input type="number" step="0.01" min="0.01" name="unit_cost" inputmode="decimal" x-model.number="poUnitCost"
+                                   class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required />
+                        </div>
+
+                        {{-- Payment Terms Dropdown --}}
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Payment Terms</label>
+                            <select name="payment_terms" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500">
+                                <option value="Net 30" selected>Net 30 (Standard 30 Days)</option>
+                                <option value="Net 60">Net 60 (Extended Capital 60 Days)</option>
+                                <option value="Net 15">Net 15 (Expedited 15 Days)</option>
+                                <option value="COD">COD (Cash on Delivery)</option>
+                                <option value="Advance">Advance (100% Pre-payment)</option>
+                            </select>
+                        </div>
+
+                        {{-- Incoterms Dropdown --}}
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Incoterms (Delivery Terms)</label>
+                            <select name="incoterms" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500">
+                                <option value="DDP" selected>DDP - Delivered Duty Paid (Hospital Receiving Dock)</option>
+                                <option value="FOB">FOB - Free On Board (Vendor Origin Port)</option>
+                                <option value="CIF">CIF - Cost, Insurance &amp; Freight</option>
+                                <option value="EXW">EXW - Ex Works (Factory Floor Pickup)</option>
+                            </select>
+                        </div>
+
+                        {{-- Status Dropdown --}}
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Initial PO Status</label>
+                            <select name="status" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500">
+                                <option value="issued" selected>Issued (Committed &amp; Bound)</option>
+                                <option value="dispatched">Dispatched (Direct EDI / cXML Push)</option>
+                                <option value="pending">Pending Vendor Confirmation</option>
+                            </select>
+                        </div>
+
+                        {{-- Delivery Notes --}}
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Delivery Instructions / Notes</label>
+                            <input type="text" name="notes" placeholder="e.g. Deliver to Central Receiving Dock, Bldg B" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" />
+                        </div>
+
+                        {{-- Live Total & Encumbrance Commitment Box --}}
+                        <div class="md:col-span-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 shadow-sm">
+                            <div>
+                                <span class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Live Committed Hard Encumbrance:</span>
+                                <div class="flex items-baseline gap-2 mt-0.5">
+                                    <span class="text-2xl font-black text-emerald-700">₱<span x-text="Number(poTotalEncumbered).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })"></span></span>
+                                    <span class="text-xs text-neutral-500 font-medium">(<span x-text="poQuantity"></span> <span x-text="selectedPoUom"></span> @ ₱<span x-text="parseFloat(poUnitCost || 0).toFixed(2)"></span>)</span>
+                                </div>
+                            </div>
+                            <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-emerald-700">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                Execute Purchase Order &amp; Dispatch cXML
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                {{-- Purchase Orders Ledger Table --}}
                 <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
                     <div class="flex items-center justify-between border-b border-neutral-100 pb-4">
                         <div>
-                            <h3 class="text-lg font-bold text-neutral-900">Purchase Orders &amp; Change Order Management</h3>
-                            <p class="text-sm text-neutral-500">Legally binding encumbrance, formal revision diffs (PO-REV2), and B2B cXML OrderRequest payloads.</p>
+                            <h3 class="text-lg font-bold text-neutral-900">Purchase Orders Ledger &amp; Fulfillment ({{ $purchaseOrders->count() }})</h3>
+                            <p class="text-sm text-neutral-500">Legally binding encumbrance, revision histories, and B2B cXML OrderRequest payloads.</p>
                         </div>
                         <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">cXML / EDI 850 Dispatch</span>
                     </div>
@@ -534,53 +900,92 @@
                                 <tr>
                                     <th class="px-3.5 py-3">PO Number &amp; Version</th>
                                     <th class="px-3.5 py-3">Supplier Counterparty</th>
-                                    <th class="px-3.5 py-3">Line Items</th>
+                                    <th class="px-3.5 py-3">Line Items &amp; Qty</th>
+                                    <th class="px-3.5 py-3">Cost Center</th>
+                                    <th class="px-3.5 py-3">Commercial Terms</th>
                                     <th class="px-3.5 py-3">Total Encumbered</th>
                                     <th class="px-3.5 py-3">Status</th>
-                                    <th class="px-3.5 py-3">Change Orders (Diffs)</th>
-                                    <th class="px-3.5 py-3">Receiving &amp; Action</th>
+                                    <th class="px-3.5 py-3">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-neutral-200">
                                 @forelse($purchaseOrders as $po)
                                     <tr class="hover:bg-neutral-50">
                                         <td class="px-3.5 py-3">
-                                            <p class="font-bold text-neutral-900">{{ $po->po_number }}</p>
+                                            <p class="font-bold text-neutral-900 font-mono text-xs">{{ $po->po_number }}</p>
                                             <span class="inline-flex rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-mono text-neutral-600">{{ $po->version }}</span>
                                         </td>
-                                        <td class="px-3.5 py-3">{{ $po->supplier?->name }}</td>
+                                        <td class="px-3.5 py-3">
+                                            <p class="font-semibold text-neutral-900">{{ $po->supplier?->name }}</p>
+                                            <p class="text-[11px] text-neutral-500">{{ $po->supplier?->email ?? $po->supplier?->phone }}</p>
+                                        </td>
                                         <td class="px-3.5 py-3">
                                             @if($po->lines->isNotEmpty())
-                                                {{ $po->lines->count() }} line(s)
+                                                <p class="font-medium text-neutral-800">{{ $po->lines->first()->item?->name }}</p>
+                                                <p class="text-[11px] text-neutral-500">{{ $po->lines->sum('ordered_quantity') }} {{ $po->lines->first()->item?->unit ?: 'units' }} ({{ $po->lines->count() }} line(s))</p>
                                             @else
-                                                {{ $po->item?->name }} ({{ $po->quantity }})
+                                                <p class="font-medium text-neutral-800">{{ $po->item?->name ?? 'Direct Item' }}</p>
+                                                <p class="text-[11px] text-neutral-500">{{ $po->quantity }} {{ $po->item?->unit ?: 'units' }}</p>
                                             @endif
+                                        </td>
+                                        <td class="px-3.5 py-3">
+                                            @if($po->costCenter)
+                                                <span class="rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-700">{{ $po->costCenter->code }}</span>
+                                            @else
+                                                <span class="text-xs text-neutral-400">General Fund</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-3.5 py-3">
+                                            <span class="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] font-mono text-neutral-700">{{ $po->payment_terms ?: 'Net 30' }}</span>
+                                            <span class="rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-mono text-blue-700">{{ $po->incoterms ?: 'DDP' }}</span>
                                         </td>
                                         <td class="px-3.5 py-3 font-bold text-neutral-900">₱{{ number_format($po->total_amount, 2) }}</td>
                                         <td class="px-3.5 py-3">
-                                            <span class="rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wider {{ $po->status === 'received' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700' }}">
+                                            @php
+                                                $poStatusClasses = match($po->status) {
+                                                    'received', 'fulfilled' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                                    'dispatched' => 'bg-blue-50 text-blue-700 border-blue-200',
+                                                    'issued' => 'bg-purple-50 text-purple-700 border-purple-200',
+                                                    'pending' => 'bg-amber-50 text-amber-700 border-amber-200',
+                                                    default => 'bg-neutral-100 text-neutral-700 border-neutral-200',
+                                                };
+                                            @endphp
+                                            <span class="rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wider {{ $poStatusClasses }}">
                                                 {{ $po->status }}
                                             </span>
                                         </td>
                                         <td class="px-3.5 py-3">
-                                            <span class="text-xs text-neutral-500">{{ $po->revisions->count() }} revisions</span>
-                                        </td>
-                                        <td class="px-3.5 py-3">
-                                            @if($po->status !== 'received')
-                                                <form method="POST" action="{{ route('inventory.purchases.receive', $po) }}" class="inline">
-                                                    @csrf
-                                                    <button type="submit" class="rounded bg-primary-600 px-3 py-1 text-xs font-semibold text-white hover:bg-primary-700">
-                                                        Receive into Stock
+                                            <div class="flex items-center gap-2">
+                                                @if($po->status !== 'received' && $po->status !== 'fulfilled')
+                                                    <form method="POST" action="{{ route('inventory.purchases.receive', $po) }}" class="inline"
+                                                          data-confirm-title="Receive Purchase Order"
+                                                          data-confirm-message="Are you sure you want to receive this delivery into stock?"
+                                                          data-confirm-label="Receive Delivery">
+                                                        @csrf
+                                                        <button type="submit" class="rounded bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-primary-700 shadow-sm">
+                                                            Receive
+                                                        </button>
+                                                    </form>
+                                                @else
+                                                    <span class="text-xs text-emerald-700 font-semibold inline-flex items-center gap-1">
+                                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                        Stock Posted
+                                                    </span>
+                                                @endif
+
+                                                @if($po->cxml_payload)
+                                                    <button type="button"
+                                                            @click="selectedPoCxml = {{ json_encode($po->cxml_payload) }}; selectedPoNumber = '{{ $po->po_number }}'; showCxmlModal = true;"
+                                                            class="rounded border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs font-mono text-neutral-600 hover:bg-neutral-100">
+                                                        cXML
                                                     </button>
-                                                </form>
-                                            @else
-                                                <span class="text-xs text-emerald-700 font-semibold">Stock In Posted</span>
-                                            @endif
+                                                @endif
+                                            </div>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="px-3.5 py-6 text-center text-sm text-neutral-500">No purchase orders issued yet.</td>
+                                        <td colspan="8" class="px-3.5 py-6 text-center text-sm text-neutral-500">No purchase orders issued yet. Issue one above.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -757,8 +1162,21 @@
                 </div>
 
                 {{-- Stage 4: Purchase order --}}
-                <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-[var(--text)]">Stage 4 • Purchase order</h3>
+                <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm"
+                     x-data="{
+                         s4Qty: 100,
+                         s4Cost: 50.00,
+                         get s4Total() {
+                             return ((parseFloat(this.s4Qty) || 0) * (parseFloat(this.s4Cost) || 0)).toFixed(2);
+                         }
+                     }">
+                    <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
+                        <h3 class="text-lg font-semibold text-[var(--text)]">Stage 4 • Purchase order</h3>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-[var(--muted)]">Autogenerated Reference:</span>
+                            <span class="rounded bg-neutral-100 border border-neutral-200 px-2 py-0.5 text-xs font-mono font-bold text-neutral-700">PO-{{ date('Ymd') }}-AUTO</span>
+                        </div>
+                    </div>
                     <form method="POST" action="{{ route('inventory.purchases.orders.store') }}" class="mt-4 grid gap-4 md:grid-cols-2">
                         @csrf
                         <div>
@@ -767,6 +1185,15 @@
                                 <option value="">Select supplier</option>
                                 @foreach($suppliers as $supplier)
                                     <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Cost Center</label>
+                            <select name="cost_center_id" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2">
+                                <option value="">Select cost center</option>
+                                @foreach($costCenters as $cc)
+                                    <option value="{{ $cc->id }}">{{ $cc->name }} ({{ $cc->code }})</option>
                                 @endforeach
                             </select>
                         </div>
@@ -781,18 +1208,45 @@
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-medium text-[var(--text)]">Quantity</label>
-                            <input type="number" name="quantity" min="1" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" required />
+                            <input type="number" name="quantity" min="1" step="1" inputmode="numeric" x-model.number="s4Qty"
+                                   onkeydown="return ['Backspace','Delete','ArrowLeft','ArrowRight','Tab'].includes(event.key) || /^[0-9]$/.test(event.key)"
+                                   class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" required />
                         </div>
                         <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Unit cost</label>
-                            <input type="number" step="0.01" name="unit_cost" min="0" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" required />
+                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Unit cost (₱)</label>
+                            <input type="number" step="0.01" min="0.01" name="unit_cost" inputmode="decimal" x-model.number="s4Cost"
+                                   class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" required />
                         </div>
-                        <div class="md:col-span-2">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Payment Terms</label>
+                            <select name="payment_terms" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2">
+                                <option value="Net 30" selected>Net 30 (30 Days)</option>
+                                <option value="Net 60">Net 60 (60 Days)</option>
+                                <option value="Net 15">Net 15 (15 Days)</option>
+                                <option value="COD">COD (Cash on Delivery)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Incoterms</label>
+                            <select name="incoterms" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2">
+                                <option value="DDP" selected>DDP - Delivered Duty Paid</option>
+                                <option value="FOB">FOB - Free on Board</option>
+                                <option value="CIF">CIF - Cost, Insurance &amp; Freight</option>
+                                <option value="EXW">EXW - Ex Works</option>
+                            </select>
+                        </div>
+                        <div>
                             <label class="mb-1 block text-sm font-medium text-[var(--text)]">Notes</label>
-                            <textarea name="notes" rows="2" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2"></textarea>
+                            <input type="text" name="notes" placeholder="Delivery dock instructions..." class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
                         </div>
-                        <div class="md:col-span-2">
-                            <button type="submit" class="rounded-xl bg-[var(--primary)] px-4 py-2 font-semibold text-white">Create purchase order</button>
+                        <div class="md:col-span-2 rounded-xl border border-[var(--border)] bg-[var(--background)] p-3 flex items-center justify-between">
+                            <div>
+                                <span class="text-xs text-[var(--muted)]">Computed Total Encumbrance:</span>
+                                <p class="text-lg font-bold text-[var(--text)]">₱<span x-text="Number(s4Total).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })"></span></p>
+                            </div>
+                            <button type="submit" class="rounded-xl bg-[var(--primary)] px-5 py-2 font-semibold text-white shadow hover:opacity-90">
+                                Create purchase order
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -867,6 +1321,30 @@
                 </div>
             </div>
 
+            {{-- B2B cXML Modal Viewer --}}
+            <div x-show="showCxmlModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+                <div class="flex min-h-screen items-center justify-center p-4">
+                    <div class="fixed inset-0 bg-neutral-900/60 transition-opacity" @click="showCxmlModal = false"></div>
+                    <div class="relative w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl transition-all">
+                        <div class="flex items-center justify-between border-b border-neutral-200 pb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="rounded bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-800">B2B cXML Document</span>
+                                <h3 class="text-base font-bold text-neutral-900">OrderRequest: <span x-text="selectedPoNumber" class="font-mono text-primary-700"></span></h3>
+                            </div>
+                            <button @click="showCxmlModal = false" class="rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        <div class="mt-4 max-h-96 overflow-y-auto rounded-lg bg-neutral-900 p-4 font-mono text-xs text-emerald-400 select-all">
+                            <pre><code x-text="selectedPoCxml || 'No cXML payload generated.'"></code></pre>
+                        </div>
+                        <div class="mt-4 flex justify-end">
+                            <button @click="showCxmlModal = false" class="rounded-lg bg-neutral-100 px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-200">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -936,7 +1414,11 @@
 
             @can(\App\Enums\Permission::ManageProcurement->value)
                 return `
-                    <form method="POST" action="/inventory/purchases/requests/${request.id}/approve" class="inline">
+                    <form method="POST" action="/inventory/purchases/requests/${request.id}/approve"
+                          class="inline"
+                          data-confirm-title="Confirm request approval"
+                          data-confirm-message="Are you sure you want to approve this procurement request?"
+                          data-confirm-label="Approve Request">
                         <input type="hidden" name="_token" value="${csrfToken()}">
                         <button type="submit" class="rounded-lg bg-[var(--primary)] px-3 py-1.5 text-xs font-semibold text-white">
                             Approve request

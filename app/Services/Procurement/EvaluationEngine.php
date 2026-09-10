@@ -2,6 +2,8 @@
 
 namespace App\Services\Procurement;
 
+use App\Enums\QuoteStatus;
+use App\Enums\RfqStatus;
 use App\Models\RfqLineItem;
 use App\Models\SourcingEvaluation;
 use App\Models\SourcingRfq;
@@ -42,6 +44,18 @@ class EvaluationEngine
      */
     public function evaluateRfq(SourcingRfq $rfq, User $evaluator): Collection
     {
+        if ($rfq->status === RfqStatus::Draft) {
+            throw new DomainException("Cannot evaluate RFQ #{$rfq->rfq_number}: RFQ package is still in draft.");
+        }
+
+        if ($rfq->status === RfqStatus::Cancelled) {
+            throw new DomainException("Cannot evaluate RFQ #{$rfq->rfq_number}: Sourcing tender has been cancelled.");
+        }
+
+        if ($rfq->status === RfqStatus::Awarded) {
+            throw new DomainException("Cannot evaluate RFQ #{$rfq->rfq_number}: Sourcing tender has already been awarded.");
+        }
+
         if ($rfq->isSealed() && ! $rfq->isDeadlineElapsed()) {
             throw new DomainException(
                 "Sealed Bid Protocol Violation: Cannot evaluate RFQ #{$rfq->rfq_number} before submission deadline ({$rfq->submission_deadline->toIso8601String()}) elapses."
@@ -49,18 +63,30 @@ class EvaluationEngine
         }
 
         return DB::transaction(function () use ($rfq, $evaluator) {
-            // Unseal the RFQ if deadline has passed
-            if ($rfq->unsealed_at === null) {
-                $rfq->unsealed_at = now();
-                $rfq->unsealed_by_user_id = $evaluator->id;
-                $rfq->status = 'under_evaluation';
+            // Lifecycle transition: Published -> BiddingClosed -> UnderEvaluation
+            if ($rfq->status === RfqStatus::Published && $rfq->isDeadlineElapsed()) {
+                $rfq->status = RfqStatus::BiddingClosed;
                 $rfq->save();
             }
 
-            $quotes = $rfq->quotes()->with(['lines', 'supplier'])->get();
+            // Unseal the RFQ and advance to UnderEvaluation
+            $rfq->unsealed_at = $rfq->unsealed_at ?? now();
+            $rfq->unsealed_by_user_id = $rfq->unsealed_by_user_id ?? $evaluator->id;
+            $rfq->status = RfqStatus::UnderEvaluation;
+            $rfq->save();
+
+            // Fetch only valid quotations that are submitted or under review
+            $quotes = $rfq->quotes()
+                ->whereIn('status', [QuoteStatus::Submitted->value, QuoteStatus::UnderReview->value])
+                ->with(['lines', 'supplier'])
+                ->get();
 
             if ($quotes->isEmpty()) {
-                throw new DomainException("Cannot evaluate RFQ #{$rfq->rfq_number}: No supplier quotes have been submitted.");
+                if (! $rfq->quotes()->exists()) {
+                    throw new DomainException("Cannot evaluate RFQ #{$rfq->rfq_number}: No supplier quotes have been submitted.");
+                }
+
+                throw new DomainException("Cannot evaluate RFQ #{$rfq->rfq_number}: No valid submitted supplier quotes are available for evaluation.");
             }
 
             // 1. Calculate and normalize landed costs for each quote

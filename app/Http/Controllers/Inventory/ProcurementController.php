@@ -13,6 +13,7 @@ use App\Models\ApprovalChain;
 use App\Models\CostCenter;
 use App\Models\InventoryItem;
 use App\Models\ProcurementAuditLog;
+use App\Models\ProcurementCategory;
 use App\Models\ProcurementRequest;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
@@ -67,6 +68,11 @@ class ProcurementController extends Controller implements HasMiddleware
             ->latest('id')
             ->get();
 
+        // Auto-close bidding window for published RFQs whose submission deadline has elapsed
+        SourcingRfq::where('status', RfqStatus::Published->value)
+            ->where('submission_deadline', '<=', now())
+            ->update(['status' => RfqStatus::BiddingClosed->value]);
+
         // Sourcing RFQs
         $rfqs = SourcingRfq::with(['lines.item', 'quotes.supplier', 'quotes.lines', 'invitations.supplier', 'evaluations'])
             ->latest('id')
@@ -74,6 +80,9 @@ class ProcurementController extends Controller implements HasMiddleware
 
         // Active Cost Centers
         $costCenters = CostCenter::with('budgets')->where('is_active', true)->get();
+
+        // Procurement Categories
+        $categories = ProcurementCategory::where('is_active', true)->orderBy('name')->get();
 
         // Pending & Active Approval Chains
         $approvalChains = ApprovalChain::with(['steps.approver'])->latest('id')->get();
@@ -96,6 +105,7 @@ class ProcurementController extends Controller implements HasMiddleware
             'enterpriseRequests',
             'rfqs',
             'costCenters',
+            'categories',
             'approvalChains',
             'purchaseOrders',
             'procurementAuditLogs'
@@ -168,11 +178,13 @@ class ProcurementController extends Controller implements HasMiddleware
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'cost_center_id' => ['required', 'exists:cost_centers,id'],
+            'procurement_category_id' => ['nullable', 'exists:procurement_categories,id'],
+            'procurement_method' => ['nullable', 'string'],
             'priority' => ['required', 'in:low,medium,high,urgent'],
             'description' => ['nullable', 'string'],
             'item_id' => ['required', 'exists:inventory_items,id'],
             'quantity' => ['required', 'integer', 'min:1'],
-            'estimated_unit_price' => ['required', 'numeric', 'min:0'],
+            'estimated_unit_price' => ['required', 'numeric', 'min:0.01'],
             'need_by_date' => ['nullable', 'date'],
         ]);
 
@@ -181,16 +193,18 @@ class ProcurementController extends Controller implements HasMiddleware
 
         if (! $this->budgetService->validateBudgetAvailability($costCenter, $totalAmount)) {
             return redirect()->route('inventory.purchases')
-                ->withErrors(['budget' => "Budget limit exceeded for Cost Center '{$costCenter->name}'."]);
+                ->withErrors(['budget' => "Budget limit exceeded for Cost Center '{$costCenter->name}'. Available uncommitted budget is insufficient."]);
         }
 
         DB::transaction(function () use ($validated, $costCenter, $totalAmount, $request) {
             $pr = PurchaseRequest::create([
-                'pr_number' => 'PR-'.now()->format('Ymd').'-'.str_pad((string) mt_rand(1, 9999), 4, '0', STR_PAD_LEFT),
+                'pr_number' => 'PR-'.now()->format('Ymd').'-'.str_pad((string) mt_rand(1000, 9999), 4, '0', STR_PAD_LEFT),
                 'title' => $validated['title'],
                 'description' => $validated['description'] ?? null,
                 'requester_id' => auth()->id(),
                 'cost_center_id' => $costCenter->id,
+                'procurement_category_id' => $validated['procurement_category_id'] ?? null,
+                'procurement_method' => $validated['procurement_method'] ?? ProcurementMethod::RequestForQuotation->value,
                 'total_estimated_amount' => $totalAmount,
                 'currency' => 'PHP',
                 'priority' => $validated['priority'],

@@ -32,7 +32,7 @@ enum RfqStatus: string
             self::Draft => [self::Published, self::Cancelled],
             self::Published => [self::BiddingClosed, self::Cancelled],
             self::BiddingClosed => [self::UnderEvaluation, self::Cancelled],
-            self::UnderEvaluation => [self::Awarded, self::Published, self::Cancelled],
+            self::UnderEvaluation => [self::UnderEvaluation, self::Awarded, self::Published, self::Cancelled],
             self::Awarded, self::Cancelled => [],
         };
     }

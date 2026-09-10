@@ -2,15 +2,26 @@
 
 namespace App\Http\Controllers\Api\Procurement;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\SourcingRfq;
 use App\Services\Procurement\EvaluationEngine;
 use App\Services\Procurement\ProcurementAuditService;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class EvaluationController extends Controller
+class EvaluationController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('can:'.Permission::ManageProcurement->value),
+        ];
+    }
+
     public function __construct(
         private readonly EvaluationEngine $evaluationEngine,
         private readonly ProcurementAuditService $auditService
@@ -24,7 +35,14 @@ class EvaluationController extends Controller
         $rfq = SourcingRfq::with(['quotes.supplier', 'lines.item'])->findOrFail($rfqId);
         $user = $request->user();
 
-        $evaluations = $this->evaluationEngine->evaluateRfq($rfq, $user);
+        try {
+            $evaluations = $this->evaluationEngine->evaluateRfq($rfq, $user);
+        } catch (DomainException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], 422);
+        }
         $splitAwards = $this->evaluationEngine->computeSplitAwardOptimization($rfq);
 
         $this->auditService->record(

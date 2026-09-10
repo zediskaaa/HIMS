@@ -20,6 +20,7 @@ class PurchaseRequest extends Model
         'requester_id',
         'cost_center_id',
         'procurement_category_id',
+        'procurement_method',
         'total_estimated_amount',
         'currency',
         'priority',

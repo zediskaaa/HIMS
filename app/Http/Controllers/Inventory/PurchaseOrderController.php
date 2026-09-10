@@ -65,8 +65,12 @@ class PurchaseOrderController extends Controller implements HasMiddleware
         $validated = $request->validate([
             'supplier_id' => ['required', new ProcurementEligibleSupplier],
             'item_id' => ['required', 'exists:inventory_items,id'],
+            'cost_center_id' => ['nullable', 'exists:cost_centers,id'],
             'quantity' => ['required', 'integer', 'min:1'],
             'unit_cost' => ['required', 'numeric', 'min:0'],
+            'payment_terms' => ['nullable', 'string', 'max:100'],
+            'incoterms' => ['nullable', 'string', 'max:30'],
+            'status' => ['nullable', 'string'],
             'notes' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -79,8 +83,13 @@ class PurchaseOrderController extends Controller implements HasMiddleware
             'po_number' => 'PO-'.now()->format('YmdHis'),
             'total_amount' => $totalAmount,
             'total_encumbered_amount' => $totalAmount,
+            'currency' => 'PHP',
+            'exchange_rate' => 1.0,
+            'payment_terms' => $validated['payment_terms'] ?? 'Net 30',
+            'incoterms' => $validated['incoterms'] ?? 'DDP',
             'version' => 'PO-REV1',
             'revision_number' => 1,
+            'status' => $validated['status'] ?? 'pending',
         ]);
 
         // Automatically create primary PO Line Item
@@ -94,6 +103,9 @@ class PurchaseOrderController extends Controller implements HasMiddleware
             'total_line_amount' => $totalAmount,
             'line_status' => 'open',
         ]);
+
+        $po->cxml_payload = app(POConversionService::class)->generateCxmlPayload($po);
+        $po->save();
 
         $this->budgetService->convertSoftToHardEncumbrance($po);
 
