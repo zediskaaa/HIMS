@@ -68,6 +68,17 @@ enum AuditAction: string
     case PrintedWarehouseLabel = 'printed_warehouse_label';
     case RecordedDangerousDrugTransaction = 'recorded_dangerous_drug_transaction';
     case RecordedSurgicalConsignmentUsage = 'recorded_surgical_consignment_usage';
+    case UploadedLogisticsDocument = 'uploaded_logistics_document';
+    case VerifiedLogisticsDocument = 'verified_logistics_document';
+    case RevisedLogisticsDocument = 'revised_logistics_document';
+    case ArchivedLogisticsDocument = 'archived_logistics_document';
+    case CreatedInspectionAcceptanceReport = 'created_inspection_acceptance_report';
+    case CompletedTechnicalInspection = 'completed_technical_inspection';
+    case ApprovedIarAcceptance = 'approved_iar_acceptance';
+    case RejectedIar = 'rejected_iar';
+    case TransmittedIarToCoa = 'transmitted_iar_to_coa';
+    case RecordedCustodyTransfer = 'recorded_custody_transfer';
+    case UpdatedShipmentStatus = 'updated_shipment_status';
 
     public function label(): string
     {
@@ -136,6 +147,17 @@ enum AuditAction: string
             self::PrintedWarehouseLabel => 'Printed Warehouse Label',
             self::RecordedDangerousDrugTransaction => 'Recorded Dangerous Drug Transaction',
             self::RecordedSurgicalConsignmentUsage => 'Recorded Surgical Consignment Usage',
+            self::UploadedLogisticsDocument => 'Uploaded Logistics Document',
+            self::VerifiedLogisticsDocument => 'Verified Logistics Document',
+            self::RevisedLogisticsDocument => 'Revised Logistics Document',
+            self::ArchivedLogisticsDocument => 'Archived Logistics Document',
+            self::CreatedInspectionAcceptanceReport => 'Created Inspection & Acceptance Report',
+            self::CompletedTechnicalInspection => 'Completed Technical Inspection (IAR)',
+            self::ApprovedIarAcceptance => 'Approved IAR Custodial Acceptance',
+            self::RejectedIar => 'Rejected IAR (Defective/Non-Compliant)',
+            self::TransmittedIarToCoa => 'Transmitted IAR to Resident COA Auditor',
+            self::RecordedCustodyTransfer => 'Recorded Chain of Custody Transfer',
+            self::UpdatedShipmentStatus => 'Updated Inbound Shipment Status',
         };
     }
 

@@ -22,6 +22,7 @@ use App\Http\Controllers\Inventory\SmartWarehousingController;
 use App\Http\Controllers\Inventory\TelemetryController;
 use App\Http\Controllers\Inventory\NarcoticsVaultController;
 use App\Http\Controllers\Inventory\ConsignmentController;
+use App\Http\Controllers\Inventory\LogisticsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
@@ -150,7 +151,27 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::post('/inventory/cycle-counts/{cycleCountDoc}/approve', [CycleCountController::class, 'approve'])->name('inventory.cycle-counts.approve');
     Route::post('/inventory/cycle-counts/calculate-abc', [CycleCountController::class, 'calculateAbc'])->name('inventory.cycle-counts.abc');
 
-    Route::get('/inventory/logistics', [InventoryController::class, 'logistics'])->name('inventory.logistics');
+    // Document Tracking & Logistics Records System (DTRS)
+    Route::get('/inventory/logistics', [LogisticsController::class, 'dashboard'])->name('inventory.logistics');
+    Route::get('/inventory/logistics/documents', [LogisticsController::class, 'documents'])->name('inventory.logistics.documents');
+    Route::post('/inventory/logistics/documents', [LogisticsController::class, 'uploadDocument'])->name('inventory.logistics.documents.upload');
+    Route::post('/inventory/logistics/documents/{document}/verify', [LogisticsController::class, 'verifyDocument'])->name('inventory.logistics.documents.verify');
+    Route::post('/inventory/logistics/documents/{document}/supersede', [LogisticsController::class, 'supersedeDocument'])->name('inventory.logistics.documents.supersede');
+    Route::get('/inventory/logistics/documents/{document}/download', [LogisticsController::class, 'downloadDocument'])->name('inventory.logistics.documents.download');
+
+    Route::get('/inventory/logistics/shipments', [LogisticsController::class, 'shipments'])->name('inventory.logistics.shipments');
+    Route::post('/inventory/logistics/shipments', [LogisticsController::class, 'storeShipment'])->name('inventory.logistics.shipments.store');
+    Route::post('/inventory/logistics/shipments/{shipment}/dock-arrival', [LogisticsController::class, 'recordDockArrival'])->name('inventory.logistics.shipments.dock-arrival');
+
+    Route::get('/inventory/logistics/iar', [LogisticsController::class, 'iarIndex'])->name('inventory.logistics.iar.index');
+    Route::post('/inventory/logistics/receipts/{goodsReceiptNote}/iar', [LogisticsController::class, 'generateIarFromReceipt'])->name('inventory.logistics.iar.generate');
+    Route::get('/inventory/logistics/iar/{iar}', [LogisticsController::class, 'iarShow'])->name('inventory.logistics.iar.show');
+    Route::post('/inventory/logistics/iar/{iar}/technical-inspection', [LogisticsController::class, 'performTechnicalInspection'])->name('inventory.logistics.iar.technical-inspection');
+    Route::post('/inventory/logistics/iar/{iar}/custodial-acceptance', [LogisticsController::class, 'approveCustodialAcceptance'])->name('inventory.logistics.iar.custodial-acceptance');
+    Route::post('/inventory/logistics/iar/{iar}/transmit-coa', [LogisticsController::class, 'transmitToCoa'])->name('inventory.logistics.iar.transmit-coa');
+
+    Route::get('/inventory/logistics/chain-of-custody', [LogisticsController::class, 'chainOfCustody'])->name('inventory.logistics.chain-of-custody');
+    Route::get('/inventory/logistics/ris/{requisition}', [LogisticsController::class, 'risShow'])->name('inventory.logistics.ris.show');
     Route::get('/inventory/purchases', [ProcurementController::class, 'index'])->name('inventory.purchases');
     Route::post('/inventory/purchases/requests', [ProcurementController::class, 'storeRequest'])->name('inventory.purchases.requests.store');
     Route::post('/inventory/purchases/quotes', [ProcurementController::class, 'storeQuote'])->name('inventory.purchases.quotes.store');

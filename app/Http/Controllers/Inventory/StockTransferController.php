@@ -35,7 +35,10 @@ class StockTransferController extends Controller implements HasMiddleware
             ->paginate(15);
 
         $locations = StorageLocation::where('status', 'active')
-            ->where('zone', '!=', 'In-Transit')
+            ->where(function ($query) {
+                $query->whereNull('zone')
+                    ->orWhere('zone', '!=', 'In-Transit');
+            })
             ->orderBy('name')
             ->get();
 

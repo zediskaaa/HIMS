@@ -373,10 +373,29 @@ class RoleBasedAccessTest extends TestCase
     public function test_an_administrator_passes_every_gate_except_audit_trail(): void
     {
         $admin = User::factory()->administrator()->create();
+        $superAdmin = User::factory()->superAdministrator()->create();
+
+        $excludedForAdmin = [
+            Permission::ViewAuditTrail,
+            Permission::ManageWarehouseTasks,
+            Permission::ExecuteWarehouseTasks,
+            Permission::ResolveWarehouseExceptions,
+            Permission::AccessNarcoticsVault,
+            Permission::ApproveIarAcceptance,
+            Permission::PerformTechnicalInspection,
+        ];
 
         foreach (Permission::cases() as $permission) {
-            if ($permission === Permission::ViewAuditTrail) {
-                $this->assertFalse($admin->can($permission->value));
+            $this->assertTrue(
+                $superAdmin->can($permission->value),
+                "Super Administrator should hold {$permission->value}"
+            );
+
+            if (in_array($permission, $excludedForAdmin, true)) {
+                $this->assertFalse(
+                    $admin->can($permission->value),
+                    "Administrator should not hold {$permission->value} due to GxP role separation"
+                );
             } else {
                 $this->assertTrue(
                     $admin->can($permission->value),

@@ -31,6 +31,7 @@
         @endcan
 
         <x-ui.card title="Location registry" subtitle="Occupancy is calculated from the authoritative location balance.">
+            <x-ui.loader id="locations-api-status" size="sm" label="Loading locations from API..." class="mb-3 text-sm text-[var(--muted)]" />
             <x-ui.table>
                 <x-ui.table.head><tr><x-ui.table.th>Code / location</x-ui.table.th><x-ui.table.th>Type</x-ui.table.th><x-ui.table.th>Classification</x-ui.table.th><x-ui.table.th>Purpose</x-ui.table.th><x-ui.table.th>Occupancy</x-ui.table.th><x-ui.table.th>Status</x-ui.table.th><x-ui.table.th>Controls</x-ui.table.th></tr></x-ui.table.head>
                 <tbody>@forelse($locations as $location)<x-ui.table.row>

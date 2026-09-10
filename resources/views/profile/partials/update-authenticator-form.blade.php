@@ -57,7 +57,7 @@
                 if (!res.ok) {
                     this.passwordError = data.errors?.current_password?.[0]
                         || data.errors?.authenticator?.[0]
-                        || 'Current password is incorrect.';
+                        || 'The provided password is incorrect.';
                     return;
                 }
 

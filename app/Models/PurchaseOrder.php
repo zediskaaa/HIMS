@@ -32,6 +32,15 @@ class PurchaseOrder extends Model
         'revision_number',
         'status',
         'notes',
+        'delivery_date',
+        'mode_of_procurement',
+        'penalty_clause_rate',
+        'fund_cluster',
+        'conforme_date',
+        'conforme_signed_by',
+        'entity_name',
+        'ors_burs_number',
+        'created_by_user_id',
         'requested_at',
         'dispatched_at',
         'received_at',
@@ -42,7 +51,10 @@ class PurchaseOrder extends Model
         'total_amount' => 'decimal:2',
         'total_encumbered_amount' => 'decimal:2',
         'exchange_rate' => 'decimal:4',
+        'penalty_clause_rate' => 'decimal:4',
         'revision_number' => 'integer',
+        'delivery_date' => 'date',
+        'conforme_date' => 'date',
         'requested_at' => 'datetime',
         'dispatched_at' => 'datetime',
         'received_at' => 'datetime',
@@ -73,6 +85,11 @@ class PurchaseOrder extends Model
         return $this->belongsTo(CostCenter::class);
     }
 
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
     public function lines(): HasMany
     {
         return $this->hasMany(PurchaseOrderLine::class);
@@ -87,6 +104,21 @@ class PurchaseOrder extends Model
     {
         return $this->hasOne(ApprovalChain::class, 'target_id')
             ->where('chain_type', 'purchase_order');
+    }
+
+    public function shipments(): HasMany
+    {
+        return $this->hasMany(Shipment::class);
+    }
+
+    public function inspectionAcceptanceReports(): HasMany
+    {
+        return $this->hasMany(InspectionAcceptanceReport::class);
+    }
+
+    public function logisticsDocuments(): HasMany
+    {
+        return $this->hasMany(LogisticsDocument::class);
     }
 
     public function statusEnum(): PurchaseOrderStatus

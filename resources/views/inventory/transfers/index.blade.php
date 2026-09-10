@@ -1,31 +1,6 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-                <div class="flex items-center gap-2">
-                    <span class="rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">Internal Logistics</span>
-                    <span class="text-xs text-neutral-500">• In-Transit Virtual Buffer &amp; Discrepancy Tracking</span>
-                </div>
-                <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Stock Transfers</h2>
-                <p class="text-sm text-neutral-600">
-                    Inter-facility and inter-department inventory movements with in-transit buffer accounting and transit damage/loss logging.
-                </p>
-            </div>
-            <div class="flex items-center gap-3">
-                @can(\App\Enums\Permission::TransferStock->value)
-                    <button type="button" @click="newTransferModal = true" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                        </svg>
-                        Initiate Stock Transfer
-                    </button>
-                @endcan
-            </div>
-        </div>
-    </x-slot>
-
     <div class="py-6" x-data="{
-        newTransferModal: false,
+        newTransferModal: {{ $errors->any() ? 'true' : 'false' }},
         sourceLocationId: '',
         destinationLocationId: '',
         itemsList: {{ Js::from($items) }},
@@ -40,8 +15,38 @@
                 this.lines.splice(index, 1);
             }
         }
-    }">
+    }"
+    @open-new-transfer-modal.window="newTransferModal = true"
+    @keydown.escape.window="newTransferModal = false"
+    >
         <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+
+            {{-- Header with Action Button --}}
+            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-neutral-200 pb-5">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">Internal Logistics</span>
+                        <span class="text-xs text-neutral-500">• In-Transit Virtual Buffer &amp; Discrepancy Tracking</span>
+                    </div>
+                    <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Stock Transfers</h2>
+                    <p class="text-sm text-neutral-600">
+                        Inter-facility and inter-department inventory movements with in-transit buffer accounting and transit damage/loss logging.
+                    </p>
+                </div>
+                <div class="flex items-center gap-3">
+                    @can(\App\Enums\Permission::TransferStock->value)
+                        <button type="button"
+                                @click="newTransferModal = true"
+                                id="btn-initiate-stock-transfer"
+                                class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                            Initiate Stock Transfer
+                        </button>
+                    @endcan
+                </div>
+            </div>
 
             {{-- Flash Alerts --}}
             @if(session('success'))
@@ -173,8 +178,20 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="px-6 py-8 text-center text-sm text-neutral-500">
-                                        No stock transfers recorded yet.
+                                    <td colspan="7" class="px-6 py-12 text-center">
+                                        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 mb-3">
+                                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                            </svg>
+                                        </div>
+                                        <p class="text-sm font-semibold text-neutral-800">No stock transfers recorded yet</p>
+                                        <p class="mt-1 text-xs text-neutral-500 max-w-sm mx-auto">Move inventory between storerooms, wards, and facilities with in-transit buffer accounting.</p>
+                                        @can(\App\Enums\Permission::TransferStock->value)
+                                            <button type="button" @click="newTransferModal = true" class="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition">
+                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                                                Initiate First Stock Transfer
+                                            </button>
+                                        @endcan
                                     </td>
                                 </tr>
                             @endforelse

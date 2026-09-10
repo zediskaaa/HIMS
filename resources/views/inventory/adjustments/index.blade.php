@@ -89,7 +89,10 @@
                     </p>
                 </div>
 
-                <form method="POST" action="{{ route('inventory.adjustments.store') }}" class="mt-4 grid gap-4 md:grid-cols-2">
+                <form method="POST" action="{{ route('inventory.adjustments.store') }}" class="mt-4 grid gap-4 md:grid-cols-2"
+                      data-confirm-title="Confirm stock adjustment"
+                      data-confirm-message="Are you sure you want to apply this stock adjustment?"
+                      data-confirm-label="Apply Adjustment">
                     @csrf
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700">Inventory Item</label>

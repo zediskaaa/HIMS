@@ -59,6 +59,14 @@ enum Permission: string
     case ManageProcurementPolicy = 'manage_procurement_policy';
     case GenerateForecasts = 'generate_forecasts';
 
+    // Logistics, Document Tracking & Chain of Custody (COA GAM / EOPT / GDP)
+    case ViewLogisticsRecords = 'view_logistics_records';
+    case ManageLogisticsRecords = 'manage_logistics_records';
+    case VerifyLogisticsDocuments = 'verify_logistics_documents';
+    case PerformTechnicalInspection = 'perform_technical_inspection';
+    case ApproveIarAcceptance = 'approve_iar_acceptance';
+    case ManageChainOfCustody = 'manage_chain_of_custody';
+
     // Administration.
     case ManageUsers = 'manage_users';
     case ViewAuditTrail = 'view_audit_trail';
@@ -101,6 +109,12 @@ enum Permission: string
             self::RecordConsignments => 'Record surgical consignment implant consumption',
             self::ManageProcurementPolicy => 'Manage procurement categories & policy',
             self::GenerateForecasts => 'Generate demand forecasts',
+            self::ViewLogisticsRecords => 'View logistics and document tracking records',
+            self::ManageLogisticsRecords => 'Register shipments, DRs, and logistics records',
+            self::VerifyLogisticsDocuments => 'Verify, approve, and review logistics document records',
+            self::PerformTechnicalInspection => 'Conduct technical inspection and sign IAR inspection portion',
+            self::ApproveIarAcceptance => 'Accept deliveries and post IAR to inventory ledger',
+            self::ManageChainOfCustody => 'Record and sign chain-of-custody transfer events',
             self::ManageUsers => 'Manage users',
             self::ViewAuditTrail => 'View audit trail',
         };
@@ -113,30 +127,30 @@ enum Permission: string
             self::ViewReports => 'Read dashboards, stock levels and reports.',
             self::IssueStock => 'Issue and dispense stock to wards and departments.',
             self::RecordMovements => 'Receive, transfer, dispose and return stock.',
-            self::AcknowledgeAlerts => 'Clear low-stock and expiry alerts.',
-            self::AdjustStock => 'Request and submit stock adjustments.',
-            self::ApproveAdjustment => 'Authorize inventory count variances and adjustments within DOA limits.',
-            self::InspectStock => 'Perform quality inspection and release or reject quarantine stock.',
-            self::PerformCycleCount => 'Schedule and record blind cycle counts.',
-            self::TransferStock => 'Dispatch and receive internal stock transfers.',
-            self::ManageItems => 'Add and edit item records and categories.',
-            self::ManageLocations => 'Add and edit warehouse zones, racks and bins.',
-            self::ManageSuppliers => 'Maintain the supplier directory.',
-            self::ReviewSupplierCompliance => 'Verify supplier evidence and submit accreditation reviews.',
-            self::ApproveSuppliers => 'Decide accreditation and control supplier availability for procurement.',
-            self::ManageProcurement => 'Comprehensive procurement management.',
-            self::CreateRequisition => 'Draft and submit department stock or purchase requisitions.',
-            self::ApproveRequisition => 'Independently approve department requisitions within authority limits.',
-            self::ManageSourcing => 'Package requirements into RFQs and invite accredited suppliers.',
-            self::EvaluateBids => 'Execute comparative evaluation and landed cost scoring.',
-            self::AwardProcurement => 'Recommend supplier award and initiate DOA workflow.',
-            self::IssuePurchaseOrder => 'Convert sourcing awards to purchase orders and dispatch.',
-            self::ApprovePurchaseOrder => 'Authorize purchase orders and revisions in DOA chain.',
-            self::ReceivePurchaseOrder => 'Receive and inspect incoming purchase order deliveries.',
-            self::ViewWarehouseTasks => 'Read warehouse task queues, scan results, and operational exceptions.',
-            self::ManageWarehouseTasks => 'Create, prioritize, assign, block, and cancel warehouse tasks.',
-            self::ExecuteWarehouseTasks => 'Start and complete assigned scan-validated warehouse work.',
-            self::ResolveWarehouseExceptions => 'Investigate and resolve warehouse exceptions with a reason.',
+            self::AcknowledgeAlerts => 'Acknowledge stock alerts.',
+            self::AdjustStock => 'Correct counted balances on the item record.',
+            self::ApproveAdjustment => 'Authorize stock adjustments exceeding threshold.',
+            self::InspectStock => 'Conduct QA/QC assay and release lots.',
+            self::PerformCycleCount => 'Conduct physical inventory counts.',
+            self::TransferStock => 'Move stock between warehouse locations.',
+            self::ManageItems => 'Create, edit and categorize items in the master catalogue.',
+            self::ManageLocations => 'Create, rename and organize storage locations.',
+            self::ManageSuppliers => 'Create and maintain vendor records and catalogues.',
+            self::ReviewSupplierCompliance => 'Upload, inspect and verify compliance documents.',
+            self::ApproveSuppliers => 'Grant accreditation or suspend active suppliers.',
+            self::ManageProcurement => 'Approve or reject departmental purchase requests.',
+            self::CreateRequisition => 'Submit purchase requests for departmental stock.',
+            self::ApproveRequisition => 'Authorize departmental purchase requests within delegation limits.',
+            self::ManageSourcing => 'Create and manage RFQ bidding packages and tenders.',
+            self::EvaluateBids => 'Score commercial and technical quotations.',
+            self::AwardProcurement => 'Issue procurement awards to winning vendors.',
+            self::IssuePurchaseOrder => 'Generate and dispatch binding purchase orders.',
+            self::ApprovePurchaseOrder => 'Authorize high-value commitments and PO revisions.',
+            self::ReceivePurchaseOrder => 'Log delivery arrivals, check packing slips, route to quarantine.',
+            self::ViewWarehouseTasks => 'Read warehouse task assignments, history, and active exceptions.',
+            self::ManageWarehouseTasks => 'Plan, schedule, assign, and cancel warehouse work orders.',
+            self::ExecuteWarehouseTasks => 'Operate barcode workstations and record scan-assisted task steps.',
+            self::ResolveWarehouseExceptions => 'Override routing conflicts and clear quarantine exceptions.',
             self::PrintWarehouseLabels => 'Generate and record internal location, task, and inventory labels.',
             self::ManageWarehouseTopology => 'Manage warehouses, zones, aisles, racks, shelves, and bins.',
             self::ManageTelemetryExcursions => 'Oversee IoT cold-chain temperature telemetry and release holds.',
@@ -144,6 +158,12 @@ enum Permission: string
             self::RecordConsignments => 'Scan and record operating room consignment implant usage.',
             self::ManageProcurementPolicy => 'Configure spend categories, cost centers, and DOA policies.',
             self::GenerateForecasts => 'Run demand forecasts and save plans.',
+            self::ViewLogisticsRecords => 'Read logistics dashboards, documents, shipments, and IARs.',
+            self::ManageLogisticsRecords => 'Create shipment tracking records and upload logistics documentation.',
+            self::VerifyLogisticsDocuments => 'Formally verify authenticity, tax, and regulatory compliance of documents.',
+            self::PerformTechnicalInspection => 'Execute physical specification, expiration, and cold-chain compliance checks.',
+            self::ApproveIarAcceptance => 'Take custodial responsibility, calculate liquidated damages, and increment ledger.',
+            self::ManageChainOfCustody => 'Log custody transitions, condition assessments, and handover signatures.',
             self::ManageUsers => 'Create staff accounts, change roles, deactivate access.',
             self::ViewAuditTrail => 'Review append-only user and authentication activity.',
         };
@@ -169,6 +189,8 @@ enum Permission: string
             self::ManageSuppliers, self::ReviewSupplierCompliance, self::ApproveSuppliers, self::ManageProcurement,
             self::CreateRequisition, self::ApproveRequisition, self::ManageSourcing, self::EvaluateBids,
             self::AwardProcurement, self::IssuePurchaseOrder, self::ApprovePurchaseOrder, self::ManageProcurementPolicy => 'Procurement',
+            self::ViewLogisticsRecords, self::ManageLogisticsRecords, self::VerifyLogisticsDocuments,
+            self::PerformTechnicalInspection, self::ApproveIarAcceptance, self::ManageChainOfCustody => 'Logistics & Records',
             self::ViewReports, self::GenerateForecasts => 'Records & Analysis',
             self::ManageUsers, self::ViewAuditTrail => 'Administration',
         };

@@ -70,6 +70,8 @@ enum UserRole: string
                     Permission::ExecuteWarehouseTasks,
                     Permission::ResolveWarehouseExceptions,
                     Permission::AccessNarcoticsVault,
+                    Permission::ApproveIarAcceptance,
+                    Permission::PerformTechnicalInspection,
                 ], true),
             )),
 
@@ -107,6 +109,11 @@ enum UserRole: string
                 Permission::ManageTelemetryExcursions,
                 Permission::AccessNarcoticsVault,
                 Permission::RecordConsignments,
+                Permission::ViewLogisticsRecords,
+                Permission::ManageLogisticsRecords,
+                Permission::VerifyLogisticsDocuments,
+                Permission::ApproveIarAcceptance,
+                Permission::ManageChainOfCustody,
             ],
 
             // Physically handles stock: receives deliveries, transfers between
@@ -125,6 +132,9 @@ enum UserRole: string
                 Permission::PerformCycleCount,
                 Permission::TransferStock,
                 Permission::RecordConsignments,
+                Permission::ViewLogisticsRecords,
+                Permission::ManageLogisticsRecords,
+                Permission::ManageChainOfCustody,
             ],
 
             // Dispenses to wards and raises departmental requisitions.
@@ -138,6 +148,9 @@ enum UserRole: string
                 Permission::ManageTelemetryExcursions,
                 Permission::AccessNarcoticsVault,
                 Permission::RecordConsignments,
+                Permission::ViewLogisticsRecords,
+                Permission::PerformTechnicalInspection,
+                Permission::VerifyLogisticsDocuments,
             ],
 
             // Auditors and observers. Reads everything, writes nothing.
@@ -145,6 +158,7 @@ enum UserRole: string
                 Permission::ViewInventory,
                 Permission::ViewReports,
                 Permission::ViewWarehouseTasks,
+                Permission::ViewLogisticsRecords,
             ],
         };
     }
