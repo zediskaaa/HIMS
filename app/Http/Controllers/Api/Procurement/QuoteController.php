@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Procurement;
 
+use App\Enums\Permission;
 use App\Enums\QuoteStatus;
 use App\Enums\RfqBiddingType;
 use App\Http\Controllers\Controller;
@@ -14,10 +15,16 @@ use App\Services\Procurement\ProcurementAuditService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Support\Facades\DB;
 
-class QuoteController extends Controller
+class QuoteController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return ['can:'.Permission::EvaluateBids->value];
+    }
+
     public function __construct(
         private readonly EvaluationEngine $evaluationEngine,
         private readonly ProcurementAuditService $auditService

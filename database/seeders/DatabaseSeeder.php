@@ -44,7 +44,8 @@ class DatabaseSeeder extends Seeder
             [UserRole::InventoryManager, 'Ana Reyes', 'ana.reyes@djnrmhs.test', 'EMP-0002', 'Central Supply', 'DemoInventory1!'],
             [UserRole::WarehouseStaff, 'Ben Santos', 'ben.santos@djnrmhs.test', 'EMP-0003', 'Warehouse', 'DemoWarehouse1!'],
             [UserRole::PharmacyStaff, 'Cely Dizon', 'cely.dizon@djnrmhs.test', 'EMP-0004', 'Pharmacy', 'DemoPharmacy1!'],
-            [UserRole::Viewer, 'Dino Cruz', 'dino.cruz@djnrmhs.test', 'EMP-0005', 'Internal Audit', 'DemoViewer1!'],
+            [UserRole::Auditor, 'Dino Cruz', 'dino.cruz@djnrmhs.test', 'EMP-0005', 'Internal Audit', 'DemoAuditor1!'],
+            [UserRole::Viewer, 'Ella Flores', 'ella.flores@djnrmhs.test', 'EMP-0006', 'Quality Office', 'DemoViewer1!'],
         ];
 
         foreach ($staff as [$role, $name, $email, $employeeId, $department, $password]) {

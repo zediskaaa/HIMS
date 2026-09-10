@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -13,7 +14,7 @@ class InventoryItemApiTest extends TestCase
 
     public function test_list_and_create_inventory_item()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->role(UserRole::InventoryManager)->create();
         Sanctum::actingAs($user, ['*']);
 
         $payload = [

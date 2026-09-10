@@ -175,7 +175,7 @@
         </div>
 
         {{-- Record OR Consumption Modal --}}
-        <div x-show="showConsumeModal" class="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 p-4" x-cloak style="display: none;">
+        <div x-show="showConsumeModal" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/60 p-4 sm:items-center" x-cloak style="display: none;">
             <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" @click.away="showConsumeModal = false">
                 <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
                     <h3 class="text-lg font-bold text-amber-900">Record OR Consignment Consumption</h3>

@@ -23,9 +23,9 @@
     ];
 
     $sizes = [
-        'sm' => 'px-2.5 py-1.5 text-xs',
-        'md' => 'px-3.5 py-2 text-sm',
-        'lg' => 'px-4 py-2.5 text-sm',
+        'sm' => 'min-h-9 px-2.5 py-1.5 text-xs',
+        'md' => 'min-h-10 px-3.5 py-2 text-sm',
+        'lg' => 'min-h-11 px-4 py-2.5 text-sm',
     ];
 
     $classes = $base.' '.($variants[$variant] ?? $variants['primary']).' '.($sizes[$size] ?? $sizes['md']);

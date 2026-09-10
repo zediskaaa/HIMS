@@ -97,7 +97,7 @@
                         </span>
                     </div>
                     @if($metrics['iar_coa_due'] > 0)
-                        <p class="mt-1 text-xs font-semibold text-red-600">⚠️ {{ $metrics['iar_coa_due'] }} approaching 5-day COA deadline</p>
+                        <p class="mt-1 flex items-center gap-1 text-xs font-semibold text-red-600"><x-ui.icon name="exclamation-triangle" class="h-3.5 w-3.5 shrink-0" /> {{ $metrics['iar_coa_due'] }} approaching 5-day COA deadline</p>
                     @else
                         <p class="mt-1 text-xs text-neutral-500">Statutory SoD inspection & property acceptance</p>
                     @endif
@@ -201,10 +201,10 @@
                                             <td class="px-6 py-3.5">
                                                 @if($shipment->is_cold_chain)
                                                     <span class="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
-                                                        ❄️ Cold Chain
+                                                        <x-ui.icon name="beaker" class="inline-block h-3.5 w-3.5 align-text-bottom" /> Cold Chain
                                                     </span>
                                                     @if($shipment->temp_excursion)
-                                                        <span class="block mt-1 text-[10px] font-bold text-red-600">🚨 EXCURSION</span>
+                                                        <span class="mt-1 flex items-center gap-1 text-[10px] font-bold text-red-600"><x-ui.icon name="exclamation-triangle" class="h-3 w-3 shrink-0" /> EXCURSION</span>
                                                     @endif
                                                 @else
                                                     <span class="text-xs text-neutral-400">Ambient</span>
@@ -286,7 +286,7 @@
                                             <td class="px-6 py-3.5 text-xs">
                                                 @if($iar->coa_transmitted_at)
                                                     <span class="inline-flex items-center gap-1 font-semibold text-emerald-700">
-                                                        ✓ Transmitted ({{ $iar->coa_transmitted_at->format('M d') }})
+                                                        <x-ui.icon name="check-circle" class="inline-block h-3.5 w-3.5 align-text-bottom" /> Transmitted ({{ $iar->coa_transmitted_at->format('M d') }})
                                                     </span>
                                                 @elseif($iar->isAccepted())
                                                     <span class="inline-flex items-center gap-1 font-semibold text-amber-700">
@@ -348,7 +348,7 @@
                                                         <span class="font-medium text-neutral-800">{{ $log->receiving_party_name ?? ($log->receivingUser->name ?? 'Recipient') }}</span>
                                                     </p>
                                                     <div class="mt-1 flex items-center gap-2 text-[10px] text-neutral-400">
-                                                        <span>📍 {{ $log->destination_location ?? $log->origin_location }}</span>
+                                                        <span class="inline-flex items-center gap-1"><x-ui.icon name="map-pin" class="h-3.5 w-3.5 shrink-0" /> {{ $log->destination_location ?? $log->origin_location }}</span>
                                                         <span>•</span>
                                                         <span>{{ $log->transferred_at->diffForHumans() }}</span>
                                                     </div>
@@ -386,7 +386,7 @@
                                         <p class="mt-0.5 font-mono text-[10px] text-neutral-500">{{ $doc->tracking_number }} • v{{ $doc->version_number }}</p>
                                         <div class="mt-1 flex items-center gap-2 text-[10px]">
                                             @if($doc->isVerified())
-                                                <span class="font-semibold text-emerald-600">✓ Verified SHA-256</span>
+                                                <span class="inline-flex items-center gap-1 font-semibold text-emerald-600"><x-ui.icon name="check-circle" class="h-3.5 w-3.5 shrink-0" /> Verified SHA-256</span>
                                             @else
                                                 <span class="font-semibold text-amber-600">⏳ Pending Audit</span>
                                             @endif

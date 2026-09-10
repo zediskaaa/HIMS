@@ -91,6 +91,11 @@ class UserFactory extends Factory
         return $this->role(UserRole::Viewer);
     }
 
+    public function auditor(): static
+    {
+        return $this->role(UserRole::Auditor);
+    }
+
     public function inactive(): static
     {
         return $this->state(fn (array $attributes) => ['status' => UserStatus::Inactive]);

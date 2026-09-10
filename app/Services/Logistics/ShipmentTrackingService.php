@@ -168,12 +168,12 @@ class ShipmentTrackingService
                     'event_type' => 'dock_arrival',
                     'releasing_party_name' => $shipment->driver_name ?? $shipment->carrier_name,
                     'receiving_user_id' => $receiver->id,
-                    'receiving_party_name' => $receiver->name . ' (Receiving Officer)',
+                    'receiving_party_name' => $receiver->name.' (Receiving Officer)',
                     'origin_location' => $shipment->origin_address ?? 'In-Transit Vehicle',
                     'destination_location' => 'Central Receiving Dock',
                     'package_condition' => $tempExcursion ? 'cold_chain_excursion' : 'good_order',
                     'verification_method' => 'credential_auth',
-                    'notes' => "Shipment arrived. Cold Chain: ".($isColdChain ? 'YES' : 'NO').
+                    'notes' => 'Shipment arrived. Cold Chain: '.($isColdChain ? 'YES' : 'NO').
                              ($isColdChain ? " (Min: {$tempMin}°C, Max: {$tempMax}°C, Excursion: ".($tempExcursion ? 'DETECTED-QUARANTINE' : 'PASS').')' : ''),
                 ],
                 actor: $receiver
@@ -214,7 +214,7 @@ class ShipmentTrackingService
         );
 
         $this->auditLogger->record(
-            action: AuditAction::ShipmentStatusUpdated,
+            action: AuditAction::UpdatedShipmentStatus,
             actor: $actor,
             target: $shipment,
             description: "Shipment {$shipment->shipment_number} status updated to {$status}."

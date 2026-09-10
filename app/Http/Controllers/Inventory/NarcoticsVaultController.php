@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Enums\AuditAction;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
 use App\Models\ItemStockLevel;
 use App\Models\PdeaDangerousDrugsRegister;
 use App\Models\StorageLocation;
-use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\Warehouse\NarcoticsVaultService;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
@@ -16,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -23,6 +25,7 @@ class NarcoticsVaultController extends Controller implements HasMiddleware
 {
     public function __construct(
         private readonly NarcoticsVaultService $vaultService,
+        private readonly AuditLogger $audit,
     ) {}
 
     public static function middleware(): array
@@ -92,10 +95,33 @@ class NarcoticsVaultController extends Controller implements HasMiddleware
 
     public function exportReport(Request $request): StreamedResponse
     {
+        $request->validate([
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+        ]);
+
         $start = $request->filled('start_date') ? Carbon::parse($request->start_date)->startOfDay() : now()->subMonths(6)->startOfDay();
         $end = $request->filled('end_date') ? Carbon::parse($request->end_date)->endOfDay() : now()->endOfDay();
 
+        if ($start->diffInDays($end) > 366) {
+            throw ValidationException::withMessages([
+                'end_date' => 'Narcotics report exports are limited to a one-year period.',
+            ]);
+        }
+
         $records = $this->vaultService->getSemiAnnualReportData($start, $end);
+
+        $this->audit->log(
+            AuditAction::ExportedNarcoticsReport,
+            $request->user(),
+            'Exported a controlled-drug register report.',
+            targetName: $start->toDateString().' to '.$end->toDateString(),
+            newValues: [
+                'start_date' => $start->toDateString(),
+                'end_date' => $end->toDateString(),
+                'record_count' => $records->count(),
+            ],
+        );
 
         $headers = [
             'Content-Type' => 'text/csv',

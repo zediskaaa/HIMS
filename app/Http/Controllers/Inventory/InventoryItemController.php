@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Enums\AuditAction;
 use App\Enums\MovementType;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
@@ -11,6 +12,7 @@ use App\Models\ItemCategory;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Rules\ProcurementEligibleSupplier;
+use App\Services\AuditLogger;
 use App\Services\InventoryAutomationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,7 +26,10 @@ use Illuminate\View\View;
 
 class InventoryItemController extends Controller implements HasMiddleware
 {
-    public function __construct(private readonly InventoryAutomationService $automationService) {}
+    public function __construct(
+        private readonly InventoryAutomationService $automationService,
+        private readonly AuditLogger $audit,
+    ) {}
 
     /**
      * Reading the item list and editing the item master are different jobs.
@@ -150,31 +155,41 @@ class InventoryItemController extends Controller implements HasMiddleware
 
             if ($initialQuantity === 0) {
                 $this->automationService->syncItemTotals($item);
+            } else {
+                $batch = $item->is_batch_tracked
+                    ? ItemBatch::create([
+                        'item_id' => $item->id,
+                        'batch_number' => $validated['batch_number'],
+                        'expiry_date' => $validated['expiry_date'] ?? null,
+                        'received_at' => today(),
+                        'unit_cost' => $validated['unit_cost'] ?? 0,
+                        'initial_quantity' => $initialQuantity,
+                        'status' => 'active',
+                    ])
+                    : null;
 
-                return;
+                $this->automationService->recordMovement([
+                    'item_id' => $item->id,
+                    'movement_type' => MovementType::StockIn,
+                    'quantity' => $initialQuantity,
+                    'to_location_id' => $validated['default_location_id'],
+                    'item_batch_id' => $batch?->id,
+                    'unit_cost' => $validated['unit_cost'] ?? 0,
+                    'remarks' => 'Opening balance recorded during item creation.',
+                ], $request->user()->id);
             }
 
-            $batch = $item->is_batch_tracked
-                ? ItemBatch::create([
-                    'item_id' => $item->id,
-                    'batch_number' => $validated['batch_number'],
-                    'expiry_date' => $validated['expiry_date'] ?? null,
-                    'received_at' => today(),
-                    'unit_cost' => $validated['unit_cost'] ?? 0,
-                    'initial_quantity' => $initialQuantity,
-                    'status' => 'active',
-                ])
-                : null;
-
-            $this->automationService->recordMovement([
-                'item_id' => $item->id,
-                'movement_type' => MovementType::StockIn,
-                'quantity' => $initialQuantity,
-                'to_location_id' => $validated['default_location_id'],
-                'item_batch_id' => $batch?->id,
-                'unit_cost' => $validated['unit_cost'] ?? 0,
-                'remarks' => 'Opening balance recorded during item creation.',
-            ], $request->user()->id);
+            $this->audit->log(
+                AuditAction::CreatedInventoryItem,
+                $request->user(),
+                'Created an inventory item.',
+                $item,
+                $item->sku,
+                newValues: Arr::only($item->getAttributes(), [
+                    'sku', 'name', 'category_id', 'unit', 'unit_cost', 'reorder_level',
+                    'status', 'supplier_id', 'default_location_id', 'quantity_on_hand',
+                ]),
+            );
         });
 
         return redirect()->route('inventory.items')->with('success', 'Inventory item created successfully.');

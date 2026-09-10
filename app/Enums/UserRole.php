@@ -21,6 +21,7 @@ enum UserRole: string
     case InventoryManager = 'inventory_manager';
     case WarehouseStaff = 'warehouse_staff';
     case PharmacyStaff = 'pharmacy_staff';
+    case Auditor = 'auditor';
     case Viewer = 'viewer';
 
     public function label(): string
@@ -31,6 +32,7 @@ enum UserRole: string
             self::InventoryManager => 'Inventory Manager',
             self::WarehouseStaff => 'Warehouse Staff',
             self::PharmacyStaff => 'Pharmacy Staff',
+            self::Auditor => 'Auditor',
             self::Viewer => 'Viewer',
         };
     }
@@ -39,11 +41,12 @@ enum UserRole: string
     {
         return match ($this) {
             self::SuperAdministrator => 'Full administrative access through the dedicated Super Admin panel.',
-            self::Administrator => 'Full access, including user accounts.',
+            self::Administrator => 'Broad operational and user-account access, excluding reserved audit and high-risk warehouse duties.',
             self::InventoryManager => 'Runs the storeroom: items, procurement, forecasts.',
             self::WarehouseStaff => 'Receives and moves stock; clears alerts.',
             self::PharmacyStaff => 'Issues and dispenses stock to wards.',
-            self::Viewer => 'Read-only access for auditors and observers.',
+            self::Auditor => 'Reviews organization-wide operational reports and the append-only Audit Trail.',
+            self::Viewer => 'Read-only operational access for observers.',
         };
     }
 
@@ -156,7 +159,16 @@ enum UserRole: string
                 Permission::VerifyLogisticsDocuments,
             ],
 
-            // Auditors and observers. Reads everything, writes nothing.
+            self::Auditor => [
+                Permission::ViewInventory,
+                Permission::ViewReports,
+                Permission::ViewWarehouseTasks,
+                Permission::ViewLogisticsRecords,
+                Permission::ViewProcessReviews,
+                Permission::ViewAuditTrail,
+            ],
+
+            // Observers can read operational records but not sensitive audit context.
             self::Viewer => [
                 Permission::ViewInventory,
                 Permission::ViewReports,

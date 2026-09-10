@@ -1,15 +1,15 @@
 <x-app-layout>
     <x-ui.page-header
         title="Audit Trail"
-        subtitle="Append-only history of user administration and authentication activity."
+        subtitle="Append-only history of security, administrative, procurement, inventory, warehouse, logistics, and system activity."
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Audit Trail' => null]" />
 
     <x-ui.card
         title="Find Activity"
-        subtitle="Search by actor, employee ID, target, email, action, description, or IP address."
+        subtitle="Use controlled filters for known values and search for descriptive activity."
         class="relative z-20 !overflow-visible">
         <form id="audit-log-filters" method="GET" action="{{ route('admin.audit-logs.index') }}"
-              class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5 xl:items-end">
+              class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:items-end">
             <div
                 class="relative space-y-1.5"
                 x-data="auditSearchAutocomplete({
@@ -81,6 +81,45 @@
             </div>
 
             <x-ui.field
+                name="target"
+                label="Target or reference"
+                type="search"
+                :value="$filters['target'] ?? null"
+                placeholder="Reference, record name, or ID" />
+
+            <x-ui.field
+                name="actor_id"
+                label="User"
+                type="select"
+                :value="$filters['actor_id'] ?? null"
+                placeholder="All users"
+                :options="$actors" />
+
+            <x-ui.field
+                name="actor_role"
+                label="Role snapshot"
+                type="select"
+                :value="$filters['actor_role'] ?? null"
+                placeholder="All roles"
+                :options="$roles" />
+
+            <x-ui.field
+                name="category"
+                label="Category"
+                type="select"
+                :value="$filters['category'] ?? null"
+                placeholder="All categories"
+                :options="$categories" />
+
+            <x-ui.field
+                name="module"
+                label="Module"
+                type="select"
+                :value="$filters['module'] ?? null"
+                placeholder="All modules"
+                :options="$modules" />
+
+            <x-ui.field
                 name="action"
                 label="Action"
                 type="select"
@@ -100,7 +139,23 @@
                 type="date"
                 :value="$filters['date_to'] ?? null" />
 
-            <div class="flex items-center gap-2">
+            <x-ui.field
+                name="outcome"
+                label="Outcome"
+                type="select"
+                :value="$filters['outcome'] ?? null"
+                placeholder="All outcomes"
+                :options="$outcomes" />
+
+            <x-ui.field
+                name="source"
+                label="Source"
+                type="select"
+                :value="$filters['source'] ?? null"
+                placeholder="All sources"
+                :options="$sources" />
+
+            <div class="flex flex-wrap items-center gap-2">
                 <x-ui.button type="submit" icon="magnifying-glass" data-loading-text="Loading activity...">Filter</x-ui.button>
                 @if (array_filter($filters))
                     <x-ui.button variant="secondary" :href="route('admin.audit-logs.index')">Clear</x-ui.button>
@@ -111,12 +166,13 @@
 
     <x-ui.card
         title="Activity"
-        :subtitle="$logs->total().' '.\Illuminate\Support\Str::plural('record', $logs->total()).' - Asia/Manila (PHT)'"
+        :subtitle="$logs->total().' '.\Illuminate\Support\Str::plural('record', $logs->total()).' - '.config('app.timezone').' (PHT)'"
         :padding="false">
         <x-ui.table>
             <x-ui.table.head>
                 <x-ui.table.th>Performed By</x-ui.table.th>
                 <x-ui.table.th>Action</x-ui.table.th>
+                <x-ui.table.th>Module</x-ui.table.th>
                 <x-ui.table.th>Target</x-ui.table.th>
                 <x-ui.table.th>Description</x-ui.table.th>
                 <x-ui.table.th>Date &amp; Time</x-ui.table.th>
@@ -148,6 +204,12 @@
 
                         <x-ui.table.td>
                             <x-ui.badge :variant="$variant">{{ $log->action->label() }}</x-ui.badge>
+                            <span class="mt-1 block text-xs text-neutral-500">{{ $log->event_category ?? $log->action->category() }}</span>
+                        </x-ui.table.td>
+
+                        <x-ui.table.td>
+                            <span class="font-medium text-neutral-800">{{ $log->module ?? $log->action->module() }}</span>
+                            <span class="mt-1 block text-xs text-neutral-500">{{ \Illuminate\Support\Str::headline($log->source ?? 'legacy') }}</span>
                         </x-ui.table.td>
 
                         <x-ui.table.td>
@@ -170,7 +232,7 @@
                                                 <p class="font-semibold text-neutral-600">Before</p>
                                                 @foreach ($log->old_values as $field => $value)
                                                     <p><span class="font-medium">{{ \Illuminate\Support\Str::headline($field) }}:</span>
-                                                        {{ filled($value) ? $value : '-' }}</p>
+                                                        {{ is_array($value) ? json_encode($value, JSON_UNESCAPED_SLASHES) : (filled($value) ? $value : '-') }}</p>
                                                 @endforeach
                                             </div>
                                         @endif
@@ -179,20 +241,27 @@
                                                 <p class="font-semibold text-neutral-600">After</p>
                                                 @foreach ($log->new_values as $field => $value)
                                                     <p><span class="font-medium">{{ \Illuminate\Support\Str::headline($field) }}:</span>
-                                                        {{ filled($value) ? $value : '-' }}</p>
+                                                        {{ is_array($value) ? json_encode($value, JSON_UNESCAPED_SLASHES) : (filled($value) ? $value : '-') }}</p>
                                                 @endforeach
                                             </div>
                                         @endif
                                     </div>
                                 </details>
                             @endif
+                            <a href="{{ route('admin.audit-logs.show', $log) }}" class="mt-2 inline-flex text-xs font-semibold text-primary-700 hover:underline">
+                                Open event details
+                            </a>
                         </x-ui.table.td>
 
                         <x-ui.table.td muted>
-                            <time datetime="{{ $log->created_at->toIso8601String() }}" class="whitespace-nowrap">
-                                {{ $log->created_at->timezone(config('app.timezone'))->format('M d, Y, g:i A') }}
-                                <span class="block text-xs text-neutral-400">PHT (UTC+8)</span>
+                            @php($displayTime = $log->displayTimestamp())
+                            <time datetime="{{ $log->authoritativeTimestamp()->toIso8601String() }}" class="whitespace-nowrap" title="{{ $displayTime->format('F j, Y, g:i:s A').' '.$log->displayTimezoneLabel() }}">
+                                {{ $displayTime->format('M d, Y, g:i:s A') }}
+                                <span class="block text-xs text-neutral-400">{{ $log->displayTimezoneLabel() }}</span>
                             </time>
+                            <x-ui.badge :variant="($log->outcome ?? 'success') === 'success' ? 'success' : 'danger'" class="mt-1">
+                                {{ \Illuminate\Support\Str::headline($log->outcome ?? 'success') }}
+                            </x-ui.badge>
                         </x-ui.table.td>
 
                         <x-ui.table.td muted>
@@ -201,7 +270,7 @@
                     </x-ui.table.row>
                 @empty
                     <x-ui.table.empty
-                        :colspan="6"
+                        :colspan="7"
                         icon="clipboard-document-list"
                         title="No activity found"
                         message="Important user and authentication activity will appear here." />

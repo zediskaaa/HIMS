@@ -41,7 +41,7 @@
             </x-ui.nav-item>
         </div>
 
-        @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::TransferStock->value])
+        @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::ApproveRequisition->value, \App\Enums\Permission::IssueStock->value, \App\Enums\Permission::TransferStock->value, \App\Enums\Permission::PerformCycleCount->value])
             <div>
                 <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                     Inventory
@@ -150,24 +150,28 @@
             </div>
         @endcanany
 
-        @canany([\App\Enums\Permission::ViewReports->value, \App\Enums\Permission::ViewProcessReviews->value])
+        @canany([\App\Enums\Permission::ViewReports->value, \App\Enums\Permission::ViewLogisticsRecords->value, \App\Enums\Permission::ViewProcessReviews->value])
             <div>
                 <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                     Records &amp; Analysis
                 </p>
                 <div class="space-y-0.5">
-                    <x-ui.nav-item :href="route('inventory.logistics')" icon="document-text"
-                                   :active="request()->routeIs('inventory.logistics')">
-                        Documents &amp; Logistics
-                    </x-ui.nav-item>
-                    <x-ui.nav-item :href="route('inventory.reports')" icon="chart-bar"
-                                   :active="request()->routeIs('inventory.reports')">
-                        Reports
-                    </x-ui.nav-item>
-                    <x-ui.nav-item :href="route('inventory.demand-forecast')" icon="arrow-trending-up"
-                                   :active="request()->routeIs('inventory.demand-forecast*')">
-                        Demand Forecast
-                    </x-ui.nav-item>
+                    @can(\App\Enums\Permission::ViewLogisticsRecords->value)
+                        <x-ui.nav-item :href="route('inventory.logistics')" icon="document-text"
+                                       :active="request()->routeIs('inventory.logistics*')">
+                            Documents &amp; Logistics
+                        </x-ui.nav-item>
+                    @endcan
+                    @can(\App\Enums\Permission::ViewReports->value)
+                        <x-ui.nav-item :href="route('inventory.reports')" icon="chart-bar"
+                                       :active="request()->routeIs('inventory.reports')">
+                            Reports
+                        </x-ui.nav-item>
+                        <x-ui.nav-item :href="route('inventory.demand-forecast')" icon="arrow-trending-up"
+                                       :active="request()->routeIs('inventory.demand-forecast*')">
+                            Demand Forecast
+                        </x-ui.nav-item>
+                    @endcan
                     @can(\App\Enums\Permission::ViewProcessReviews->value)
                         <x-ui.nav-item :href="route('reviews.index')" icon="clipboard-document-check"
                                        :active="request()->routeIs('reviews.*')">

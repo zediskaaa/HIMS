@@ -20,7 +20,7 @@ class DatabaseCheck extends Command
             $database = config("database.connections.{$connection}.database");
 
             DB::connection()->getPdo();
-            $this->info("✓ Connected to {$connection}");
+            $this->info("[OK] Connected to {$connection}");
 
             $driver = DB::connection()->getDriverName();
             $this->line("  Driver: {$driver}");
@@ -53,7 +53,7 @@ class DatabaseCheck extends Command
             }
 
             $this->newLine();
-            $this->info('Connection verified ✓');
+            $this->info('Connection verified [OK]');
 
             return self::SUCCESS;
         } catch (\Exception $e) {

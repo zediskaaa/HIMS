@@ -113,7 +113,7 @@
             </div>
 
             {{-- Reviews Table --}}
-            <div class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+            <div class="max-w-full overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
                 <table class="min-w-full divide-y divide-neutral-200">
                     <thead class="bg-neutral-50 text-left text-xs font-semibold text-neutral-500 uppercase tracking-wider">
                         <tr>

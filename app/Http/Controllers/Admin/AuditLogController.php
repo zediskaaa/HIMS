@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\AuditAction;
+use App\Enums\Permission;
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\User;
@@ -27,20 +29,36 @@ class AuditLogController extends Controller implements HasMiddleware
      */
     public static function middleware(): array
     {
-        return ['auth:web,admin,super_admin', 'super-admin'];
+        return ['auth:web,admin,super_admin', 'can:'.Permission::ViewAuditTrail->value];
     }
 
     public function index(Request $request): View
     {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
+            'target' => ['nullable', 'string', 'max:100'],
+            'actor_id' => ['nullable', 'integer', 'exists:users,id'],
+            'actor_role' => ['nullable', Rule::enum(UserRole::class)],
+            'category' => ['nullable', Rule::in(array_keys(AuditAction::categories()))],
+            'module' => ['nullable', Rule::in(array_keys(AuditAction::modules()))],
             'action' => ['nullable', Rule::enum(AuditAction::class)],
+            'outcome' => ['nullable', Rule::in(['success', 'failure'])],
+            'source' => ['nullable', Rule::in(['user', 'system', 'scheduled_job', 'integration'])],
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
         ]);
 
         $searchTerm = trim($filters['search'] ?? '');
+        $targetTerm = trim($filters['target'] ?? '');
         $matchingActions = $this->matchingActionValues($searchTerm);
+        $categoryActions = $this->actionValuesFor('category', $filters['category'] ?? null);
+        $moduleActions = $this->actionValuesFor('module', $filters['module'] ?? null);
+        $fromLocal = filled($filters['date_from'] ?? null)
+            ? CarbonImmutable::parse($filters['date_from'], config('app.timezone'))->startOfDay()
+            : null;
+        $toLocal = filled($filters['date_to'] ?? null)
+            ? CarbonImmutable::parse($filters['date_to'], config('app.timezone'))->endOfDay()
+            : null;
 
         $logs = AuditLog::query()
             ->when($searchTerm !== '', function ($query) use ($matchingActions, $searchTerm): void {
@@ -60,17 +78,32 @@ class AuditLogController extends Controller implements HasMiddleware
                     }
                 });
             })
+            ->when($targetTerm !== '', function ($query) use ($targetTerm): void {
+                $term = '%'.$targetTerm.'%';
+                $query->where(fn ($target) => $target
+                    ->where('target_name', 'like', $term)
+                    ->orWhere('target_reference', 'like', $term)
+                    ->orWhere('target_id', 'like', $term));
+            })
+            ->when(filled($filters['actor_id'] ?? null), fn ($query) => $query->where('user_id', $filters['actor_id']))
+            ->when(filled($filters['actor_role'] ?? null), fn ($query) => $query->where('actor_role', $filters['actor_role']))
+            ->when(filled($filters['category'] ?? null), fn ($query) => $query->where(
+                fn ($categoryQuery) => $categoryQuery
+                    ->where('event_category', $filters['category'])
+                    ->orWhere(fn ($legacy) => $legacy->whereNull('event_category')->whereIn('action', $categoryActions)),
+            ))
+            ->when(filled($filters['module'] ?? null), fn ($query) => $query->where(
+                fn ($moduleQuery) => $moduleQuery
+                    ->where('module', $filters['module'])
+                    ->orWhere(fn ($legacy) => $legacy->whereNull('module')->whereIn('action', $moduleActions)),
+            ))
             ->when(filled($filters['action'] ?? null), fn ($query) => $query->where('action', $filters['action']))
-            ->when(filled($filters['date_from'] ?? null), fn ($query) => $query->where(
-                'created_at',
-                '>=',
-                CarbonImmutable::parse($filters['date_from'], config('app.timezone'))->startOfDay(),
-            ))
-            ->when(filled($filters['date_to'] ?? null), fn ($query) => $query->where(
-                'created_at',
-                '<=',
-                CarbonImmutable::parse($filters['date_to'], config('app.timezone'))->endOfDay(),
-            ))
+            ->when(filled($filters['outcome'] ?? null), fn ($query) => $query->where('outcome', $filters['outcome']))
+            ->when(filled($filters['source'] ?? null), fn ($query) => $query->where('source', $filters['source']))
+            ->when($fromLocal !== null, fn ($query) => $this->whereAuditTime($query, '>=', $fromLocal))
+            ->when($toLocal !== null, fn ($query) => $this->whereAuditTime($query, '<=', $toLocal))
+            ->orderByRaw('CASE WHEN occurred_at_utc IS NULL THEN 1 ELSE 0 END')
+            ->latest('occurred_at_utc')
             ->latest('created_at')
             ->latest('id')
             ->paginate(25)
@@ -79,8 +112,24 @@ class AuditLogController extends Controller implements HasMiddleware
         return view('admin.audit-logs.index', [
             'logs' => $logs,
             'actions' => AuditAction::options(),
+            'categories' => AuditAction::categories(),
+            'modules' => AuditAction::modules(),
+            'roles' => UserRole::options(),
+            'actors' => User::query()->orderBy('name')->pluck('name', 'id')->all(),
+            'outcomes' => ['success' => 'Success', 'failure' => 'Failure'],
+            'sources' => [
+                'user' => 'User',
+                'system' => 'System',
+                'scheduled_job' => 'Scheduled job',
+                'integration' => 'Integration',
+            ],
             'filters' => $filters,
         ]);
+    }
+
+    public function show(AuditLog $auditLog): View
+    {
+        return view('admin.audit-logs.show', ['log' => $auditLog]);
     }
 
     public function suggestions(Request $request): JsonResponse
@@ -236,5 +285,32 @@ class AuditLogController extends Controller implements HasMiddleware
             ->map(fn (AuditAction $action) => $action->value)
             ->values()
             ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function actionValuesFor(string $method, ?string $value): array
+    {
+        if (! filled($value)) {
+            return [];
+        }
+
+        return collect(AuditAction::cases())
+            ->filter(fn (AuditAction $action) => $value === $action->{$method}())
+            ->map(fn (AuditAction $action) => $action->value)
+            ->values()
+            ->all();
+    }
+
+    private function whereAuditTime($query, string $operator, CarbonImmutable $localBoundary): void
+    {
+        $query->where(function ($timeQuery) use ($operator, $localBoundary): void {
+            $timeQuery->where('occurred_at_utc', $operator, $localBoundary->utc()->format('Y-m-d H:i:s.u'))
+                ->orWhere(function ($legacy) use ($operator, $localBoundary): void {
+                    $legacy->whereNull('occurred_at_utc')
+                        ->where('created_at', $operator, $localBoundary->format('Y-m-d H:i:s'));
+                });
+        });
     }
 }

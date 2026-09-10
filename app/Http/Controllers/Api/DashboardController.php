@@ -2,15 +2,22 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
 use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
 
-class DashboardController extends Controller
+class DashboardController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return ['can:'.Permission::ViewInventory->value];
+    }
+
     public function summary(Request $request)
     {
         $totalItems = InventoryItem::count();

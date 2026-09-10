@@ -24,7 +24,7 @@ class CycleCountController extends Controller implements HasMiddleware
             'auth:web,admin,super_admin',
             new Middleware('can:' . Permission::PerformCycleCount->value, only: ['schedule', 'submitCounts', 'calculateAbc']),
             new Middleware('can:' . Permission::ApproveAdjustment->value, only: ['approve']),
-            new Middleware('can:' . Permission::ViewInventory->value, only: ['index', 'show']),
+            new Middleware('can:' . Permission::PerformCycleCount->value, only: ['index', 'show']),
         ];
     }
 

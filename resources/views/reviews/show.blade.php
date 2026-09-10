@@ -576,7 +576,7 @@
             </div>
 
             {{-- Rejection Modal --}}
-            <div x-show="rejectModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-neutral-900/60 p-4 flex items-center justify-center">
+            <div x-show="rejectModal" x-cloak class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/60 p-4 sm:items-center">
                 <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
                     <h3 class="text-lg font-bold text-neutral-900">Return Review to Draft (Rejection)</h3>
                     <p class="text-xs text-neutral-600">Provide an authoritative justification for returning this review to the evaluator.</p>
@@ -593,7 +593,7 @@
             </div>
 
             {{-- Implementation Execution Modal --}}
-            <div x-show="implementModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-neutral-900/60 p-4 flex items-center justify-center">
+            <div x-show="implementModal" x-cloak class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/60 p-4 sm:items-center">
                 <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
                     <h3 class="text-lg font-bold text-neutral-900">Execute Intervention: <span x-text="implementTitle"></span></h3>
                     <p class="text-xs text-neutral-600">Confirm execution of this corrective intervention. Operational parameters such as standard lead times will be synchronized.</p>

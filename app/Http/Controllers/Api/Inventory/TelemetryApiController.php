@@ -2,15 +2,22 @@
 
 namespace App\Http\Controllers\Api\Inventory;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\StorageLocation;
 use App\Services\Warehouse\TelemetryService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
 
-class TelemetryApiController extends Controller
+class TelemetryApiController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return ['can:'.Permission::ManageTelemetryExcursions->value];
+    }
+
     public function __construct(
         private readonly TelemetryService $telemetry,
     ) {}

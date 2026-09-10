@@ -26,7 +26,7 @@
     x-on:keydown.escape.window="open = false"
     x-show="open"
     x-cloak
-    class="fixed inset-0 z-50 flex items-start justify-center px-4 py-8 sm:py-16 overflow-y-auto"
+    class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:py-10"
     role="dialog"
     aria-modal="true"
     @if ($title) aria-label="{{ $title }}" @endif
@@ -42,7 +42,7 @@
     <div
         x-show="open"
         x-transition
-        class="relative w-full {{ $widths[$maxWidth] ?? $widths['lg'] }} bg-white rounded-lg shadow-lg border border-neutral-200"
+        class="relative flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden {{ $widths[$maxWidth] ?? $widths['lg'] }} bg-white rounded-lg shadow-lg border border-neutral-200"
     >
         @if ($title || isset($header))
             <header class="flex items-start justify-between gap-4 px-5 py-4 border-b border-neutral-200">
@@ -61,12 +61,12 @@
             </header>
         @endif
 
-        <div class="p-5">
+        <div class="min-h-0 overflow-y-auto p-4 sm:p-5">
             {{ $slot }}
         </div>
 
         @isset($footer)
-            <footer class="flex items-center justify-end gap-2 px-5 py-4 border-t border-neutral-200 bg-neutral-50">
+            <footer class="flex flex-wrap items-center justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-4 py-4 sm:px-5">
                 {{ $footer }}
             </footer>
         @endisset

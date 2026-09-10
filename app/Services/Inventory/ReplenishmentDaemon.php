@@ -131,7 +131,7 @@ class ReplenishmentDaemon
                 'is_active' => true,
             ]);
 
-            $prNumber = 'PR-AUTO-' . now()->format('Ymd') . '-' . str_pad((string) (PurchaseRequest::count() + 1), 4, '0', STR_PAD_LEFT);
+            $prNumber = 'PR-AUTO-'.now()->format('Ymd').'-'.str_pad((string) (PurchaseRequest::count() + 1), 4, '0', STR_PAD_LEFT);
             $totalEst = round($eoq * (float) ($lockedItem->unit_cost ?? 10.00), 2);
 
             $pr = PurchaseRequest::create([
@@ -153,7 +153,7 @@ class ReplenishmentDaemon
                 'purchase_request_id' => $pr->id,
                 'item_id' => $lockedItem->id,
                 'line_number' => 1,
-                'item_description' => $lockedItem->name . ' (' . $lockedItem->sku . ')',
+                'item_description' => $lockedItem->name.' ('.$lockedItem->sku.')',
                 'quantity' => $eoq,
                 'uom' => $lockedItem->unit ?? 'pcs',
                 'estimated_unit_price' => $lockedItem->unit_cost ?? 10.00,
@@ -162,22 +162,21 @@ class ReplenishmentDaemon
                 'is_contracted_catalog' => false,
             ]);
 
-            if ($user) {
-                $this->auditLogger->record(
-                    AuditAction::CreatedPurchaseRequest,
-                    actor: $user,
-                    target: $pr,
-                    description: "Instantiated draft Purchase Request {$pr->pr_number} for {$lockedItem->name} (EOQ: {$eoq})",
-                    newValues: [
-                        'pr_number' => $pr->pr_number,
-                        'item_id' => $lockedItem->id,
-                        'atp' => $atp,
-                        'on_order' => $onOrder,
-                        'rop' => $rop,
-                        'eoq' => $eoq,
-                    ]
-                );
-            }
+            $this->auditLogger->record(
+                AuditAction::CreatedPurchaseRequest,
+                actor: $user,
+                target: $pr,
+                description: "Instantiated draft Purchase Request {$pr->pr_number} for {$lockedItem->name} (EOQ: {$eoq})",
+                newValues: [
+                    'pr_number' => $pr->pr_number,
+                    'item_id' => $lockedItem->id,
+                    'atp' => $atp,
+                    'on_order' => $onOrder,
+                    'rop' => $rop,
+                    'eoq' => $eoq,
+                ],
+                source: $user === null ? 'scheduled_job' : 'user',
+            );
 
             return $pr;
         });

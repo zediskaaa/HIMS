@@ -51,6 +51,16 @@ class UserManagementTest extends TestCase
             ->assertSee('Ben Santos');
     }
 
+    public function test_only_super_administrator_can_assign_the_auditor_role(): void
+    {
+        $service = app(UserAccountService::class);
+        $admin = $this->admin();
+        $superAdmin = User::factory()->superAdministrator()->create();
+
+        $this->assertNotContains(UserRole::Auditor, $service->assignableRoles($admin));
+        $this->assertContains(UserRole::Auditor, $service->assignableRoles($superAdmin));
+    }
+
     /**
      * Every non-administrator role, driven off the enum rather than a hand
      * written list — a role added later is covered without editing this test.

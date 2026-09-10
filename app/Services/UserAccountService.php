@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\AuditAction;
+use App\Enums\Permission;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\User;
@@ -38,7 +39,7 @@ class UserAccountService
         $roles = collect(UserRole::cases())
             ->filter(fn (UserRole $role) => $actor->isSuperAdministrator()
                 ? ! $role->isSuperAdministrator()
-                : ! $role->isAdministrator())
+                : ! $role->isAdministrator() && ! $role->grants(Permission::ViewAuditTrail))
             ->values()
             ->all();
 
@@ -307,9 +308,11 @@ class UserAccountService
             return;
         }
 
-        $message = $role->isSuperAdministrator()
-            ? 'The Super Administrator role is reserved for the protected system account.'
-            : 'Only a Super Administrator may assign the Administrator role.';
+        $message = match (true) {
+            $role->isSuperAdministrator() => 'The Super Administrator role is reserved for the protected system account.',
+            $role->grants(Permission::ViewAuditTrail) => 'Only a Super Administrator may assign an Audit Trail role.',
+            default => 'Only a Super Administrator may assign the Administrator role.',
+        };
 
         throw ValidationException::withMessages(['role' => [$message]]);
     }

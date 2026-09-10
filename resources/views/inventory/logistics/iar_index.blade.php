@@ -40,7 +40,10 @@
                 <div class="rounded-xl border border-amber-200 bg-amber-50/60 p-5 shadow-sm">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h3 class="text-sm font-bold text-amber-900">📥 Goods Receipts Awaiting Statutory IAR Generation ({{ $unreportedReceipts->count() }})</h3>
+                            <h3 class="flex items-center gap-2 text-sm font-bold text-amber-900">
+                                <x-ui.icon name="arrow-down-tray" class="h-4 w-4 shrink-0" />
+                                <span>Goods Receipts Awaiting Statutory IAR Generation ({{ $unreportedReceipts->count() }})</span>
+                            </h3>
                             <p class="text-xs text-amber-700">Goods have arrived at receiving dock. Formal COA GAM Appendix 50 report must be generated for Technical Inspection.</p>
                         </div>
                     </div>
@@ -157,7 +160,7 @@
 
                                     <td class="px-6 py-4 text-xs">
                                         @if($iar->inspection_date)
-                                            <div class="font-semibold text-emerald-700">✓ Completed</div>
+                                            <div class="flex items-center gap-1.5 font-semibold text-emerald-700"><x-ui.icon name="check-circle" class="h-4 w-4 shrink-0" /> Completed</div>
                                             <div class="text-neutral-500">{{ $iar->inspectedBy->name ?? 'Inspector' }}</div>
                                             <div class="text-[10px] text-neutral-400">{{ $iar->inspection_date->format('M d, Y') }}</div>
                                         @else
@@ -169,7 +172,7 @@
 
                                     <td class="px-6 py-4 text-xs">
                                         @if($iar->acceptance_date)
-                                            <div class="font-semibold text-emerald-700">✓ Accepted</div>
+                                            <div class="flex items-center gap-1.5 font-semibold text-emerald-700"><x-ui.icon name="check-circle" class="h-4 w-4 shrink-0" /> Accepted</div>
                                             <div class="text-neutral-500">{{ $iar->acceptedBy->name ?? 'Custodian' }}</div>
                                             @if($iar->liquidated_damages_amount > 0)
                                                 <div class="mt-0.5 font-bold text-red-600">
@@ -183,13 +186,13 @@
 
                                     <td class="px-6 py-4 text-xs">
                                         @if($iar->coa_transmitted_at)
-                                            <div class="font-bold text-purple-800">✓ Transmitted</div>
+                                            <div class="flex items-center gap-1.5 font-bold text-purple-800"><x-ui.icon name="check-circle" class="h-4 w-4 shrink-0" /> Transmitted</div>
                                             <div class="text-neutral-500">{{ $iar->coa_transmitted_at->format('M d, Y') }}</div>
                                             <div class="font-mono text-[10px] text-neutral-400">Rec: {{ $iar->coa_received_by }}</div>
                                         @elseif($iar->isAccepted())
                                             @if($iar->isCoaDeadlineUrgent())
                                                 <span class="inline-flex rounded bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">
-                                                    ⚠️ OVERDUE (&gt;5 Days)
+                                                    <x-ui.icon name="exclamation-triangle" class="inline-block h-3.5 w-3.5 align-text-bottom" /> OVERDUE (&gt;5 Days)
                                                 </span>
                                             @else
                                                 <span class="inline-flex rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">

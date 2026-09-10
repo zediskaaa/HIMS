@@ -8,6 +8,7 @@ enum AuditAction: string
     case UpdatedUser = 'updated_user';
     case DeletedUser = 'deleted_user';
     case LoggedIn = 'logged_in';
+    case FailedLogin = 'failed_login';
     case LoggedOut = 'logged_out';
     case ChangedPassword = 'changed_password';
     case TemporarilyLockedUser = 'temporarily_locked_user';
@@ -20,7 +21,12 @@ enum AuditAction: string
     case SuspendedSupplier = 'suspended_supplier';
     case InactivatedSupplier = 'inactivated_supplier';
     case ReactivatedSupplier = 'reactivated_supplier';
+    case CreatedInventoryItem = 'created_inventory_item';
+    case UpdatedInventoryItem = 'updated_inventory_item';
+    case DeletedInventoryItem = 'deleted_inventory_item';
+    case RecordedStockMovement = 'recorded_stock_movement';
     case UploadedSupplierDocument = 'uploaded_supplier_document';
+    case DownloadedSupplierDocument = 'downloaded_supplier_document';
     case VerifiedSupplierDocument = 'verified_supplier_document';
     case RejectedSupplierDocument = 'rejected_supplier_document';
     case AddedSupplierProduct = 'added_supplier_product';
@@ -68,7 +74,9 @@ enum AuditAction: string
     case PrintedWarehouseLabel = 'printed_warehouse_label';
     case RecordedDangerousDrugTransaction = 'recorded_dangerous_drug_transaction';
     case RecordedSurgicalConsignmentUsage = 'recorded_surgical_consignment_usage';
+    case ExportedNarcoticsReport = 'exported_narcotics_report';
     case UploadedLogisticsDocument = 'uploaded_logistics_document';
+    case DownloadedLogisticsDocument = 'downloaded_logistics_document';
     case VerifiedLogisticsDocument = 'verified_logistics_document';
     case RevisedLogisticsDocument = 'revised_logistics_document';
     case ArchivedLogisticsDocument = 'archived_logistics_document';
@@ -79,6 +87,8 @@ enum AuditAction: string
     case TransmittedIarToCoa = 'transmitted_iar_to_coa';
     case RecordedCustodyTransfer = 'recorded_custody_transfer';
     case UpdatedShipmentStatus = 'updated_shipment_status';
+    case ShipmentDispatched = 'shipment_dispatched';
+    case ShipmentArrivedDock = 'shipment_arrived_dock';
     case CreatedProcessReview = 'created_process_review';
     case UpdatedProcessReview = 'updated_process_review';
     case SubmittedProcessReview = 'submitted_process_review';
@@ -93,6 +103,7 @@ enum AuditAction: string
             self::UpdatedUser => 'Updated User',
             self::DeletedUser => 'Deleted User',
             self::LoggedIn => 'Logged In',
+            self::FailedLogin => 'Failed Login',
             self::LoggedOut => 'Logged Out',
             self::ChangedPassword => 'Changed Password',
             self::TemporarilyLockedUser => 'Temporarily Locked User',
@@ -105,7 +116,12 @@ enum AuditAction: string
             self::SuspendedSupplier => 'Suspended Supplier',
             self::InactivatedSupplier => 'Inactivated Supplier',
             self::ReactivatedSupplier => 'Reactivated Supplier',
+            self::CreatedInventoryItem => 'Created Inventory Item',
+            self::UpdatedInventoryItem => 'Updated Inventory Item',
+            self::DeletedInventoryItem => 'Deleted Inventory Item',
+            self::RecordedStockMovement => 'Recorded Stock Movement',
             self::UploadedSupplierDocument => 'Uploaded Supplier Document',
+            self::DownloadedSupplierDocument => 'Downloaded Supplier Document',
             self::VerifiedSupplierDocument => 'Verified Supplier Document',
             self::RejectedSupplierDocument => 'Rejected Supplier Document',
             self::AddedSupplierProduct => 'Added Supplier Product',
@@ -153,7 +169,9 @@ enum AuditAction: string
             self::PrintedWarehouseLabel => 'Printed Warehouse Label',
             self::RecordedDangerousDrugTransaction => 'Recorded Dangerous Drug Transaction',
             self::RecordedSurgicalConsignmentUsage => 'Recorded Surgical Consignment Usage',
+            self::ExportedNarcoticsReport => 'Exported Narcotics Report',
             self::UploadedLogisticsDocument => 'Uploaded Logistics Document',
+            self::DownloadedLogisticsDocument => 'Downloaded Logistics Document',
             self::VerifiedLogisticsDocument => 'Verified Logistics Document',
             self::RevisedLogisticsDocument => 'Revised Logistics Document',
             self::ArchivedLogisticsDocument => 'Archived Logistics Document',
@@ -164,6 +182,8 @@ enum AuditAction: string
             self::TransmittedIarToCoa => 'Transmitted IAR to Resident COA Auditor',
             self::RecordedCustodyTransfer => 'Recorded Chain of Custody Transfer',
             self::UpdatedShipmentStatus => 'Updated Inbound Shipment Status',
+            self::ShipmentDispatched => 'Shipment Dispatched',
+            self::ShipmentArrivedDock => 'Shipment Arrived at Dock',
             self::CreatedProcessReview => 'Created Process Review',
             self::UpdatedProcessReview => 'Updated Process Review',
             self::SubmittedProcessReview => 'Submitted Process Review',
@@ -171,6 +191,83 @@ enum AuditAction: string
             self::RejectedProcessReview => 'Rejected Process Review',
             self::ImplementedProcessRecommendation => 'Implemented Process Recommendation',
         };
+    }
+
+    public function module(): string
+    {
+        return match (true) {
+            in_array($this, [
+                self::LoggedIn,
+                self::FailedLogin,
+                self::LoggedOut,
+                self::ChangedPassword,
+                self::TemporarilyLockedUser,
+                self::UnlockedUser,
+            ], true) => 'Authentication',
+            in_array($this, [self::CreatedUser, self::UpdatedUser, self::DeletedUser], true) => 'User Administration',
+            str_contains($this->value, 'supplier') && ! in_array($this, [self::SubmittedSupplierQuote], true) => 'Supplier Management',
+            str_contains($this->value, 'purchase_request')
+                || str_contains($this->value, 'sourcing_rfq')
+                || str_contains($this->value, 'purchase_order')
+                || $this === self::SubmittedSupplierQuote => 'Procurement',
+            str_contains($this->value, 'material_requisition') || $this === self::AcknowledgedMaterialIssuance => 'Store Requisitions',
+            str_contains($this->value, 'inventory_item') => 'Item Master',
+            $this === self::RecordedStockMovement => 'Inventory Movements',
+            str_contains($this->value, 'cycle_count') => 'Cycle Counts',
+            str_contains($this->value, 'inventory_adjustment') => 'Inventory Adjustments',
+            str_contains($this->value, 'stock_transfer') => 'Stock Transfers',
+            str_contains($this->value, 'goods_receipt')
+                || str_contains($this->value, 'quality_inspection')
+                || str_contains($this->value, 'quarantine_stock') => 'Receiving & Quality',
+            str_contains($this->value, 'storage_location') => 'Storage Locations',
+            str_contains($this->value, 'warehouse')
+                || str_contains($this->value, 'dangerous_drug')
+                || str_contains($this->value, 'narcotics')
+                || str_contains($this->value, 'consignment') => 'Warehousing',
+            str_contains($this->value, 'logistics_document')
+                || str_contains($this->value, 'iar')
+                || str_contains($this->value, 'custody_transfer')
+                || str_contains($this->value, 'shipment')
+                || $this === self::CompletedTechnicalInspection => 'Logistics',
+            str_contains($this->value, 'process_review')
+                || $this === self::ImplementedProcessRecommendation => 'Process Reviews',
+            default => 'System',
+        };
+    }
+
+    public function category(): string
+    {
+        return match ($this->module()) {
+            'Authentication' => 'Security',
+            'User Administration' => 'Administration',
+            'Supplier Management', 'Procurement' => 'Supplier & Procurement',
+            'Logistics' => 'Logistics',
+            'Process Reviews' => 'Governance',
+            'System' => 'System',
+            default => 'Inventory & Warehousing',
+        };
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function modules(): array
+    {
+        return collect(self::cases())
+            ->mapWithKeys(fn (self $action) => [$action->module() => $action->module()])
+            ->sortKeys()
+            ->all();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function categories(): array
+    {
+        return collect(self::cases())
+            ->mapWithKeys(fn (self $action) => [$action->category() => $action->category()])
+            ->sortKeys()
+            ->all();
     }
 
     /**

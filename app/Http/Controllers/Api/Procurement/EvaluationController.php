@@ -18,7 +18,7 @@ class EvaluationController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('can:'.Permission::ManageProcurement->value),
+            new Middleware('can:'.Permission::EvaluateBids->value),
         ];
     }
 

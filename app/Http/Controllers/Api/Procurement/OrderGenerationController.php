@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Procurement;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\PurchaseRequest;
 use App\Models\SourcingRfq;
@@ -10,9 +11,15 @@ use App\Services\Procurement\POConversionService;
 use App\Services\Procurement\ProcurementAuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
 
-class OrderGenerationController extends Controller
+class OrderGenerationController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return ['can:'.Permission::IssuePurchaseOrder->value];
+    }
+
     public function __construct(
         private readonly POConversionService $conversionService,
         private readonly ProcurementAuditService $auditService

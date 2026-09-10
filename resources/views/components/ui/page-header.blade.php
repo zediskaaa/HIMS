@@ -31,11 +31,11 @@
         <h1 class="text-xl font-semibold tracking-tight text-neutral-900">{{ $title }}</h1>
 
         @if ($subtitle)
-            <p class="mt-1 text-sm text-neutral-500">{{ $subtitle }}</p>
+            <p class="mt-1 max-w-3xl text-sm text-neutral-500">{{ $subtitle }}</p>
         @endif
     </div>
 
     @isset($actions)
-        <div class="flex items-center gap-2 shrink-0">{{ $actions }}</div>
+        <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{{ $actions }}</div>
     @endisset
 </div>

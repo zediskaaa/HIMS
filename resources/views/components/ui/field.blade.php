@@ -19,7 +19,7 @@
         $hasError ? $id.'-error' : null,
     ])->filter()->implode(' ');
 
-    $control = 'block w-full rounded-md border text-sm shadow-sm transition-colors '
+    $control = 'block min-h-10 w-full rounded-md border text-sm shadow-sm transition-colors '
         .'placeholder:text-neutral-400 '
         .'focus:ring-2 focus:ring-offset-0 '
         .'disabled:bg-neutral-100 disabled:text-neutral-500 disabled:cursor-not-allowed '

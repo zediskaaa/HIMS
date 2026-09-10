@@ -7,6 +7,7 @@ use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Support\AuthenticationContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -197,12 +198,21 @@ class AuditTrailTest extends TestCase
         ]);
     }
 
-    public function test_only_super_administrators_can_access_the_audit_trail(): void
+    public function test_only_audit_authorized_roles_can_access_the_audit_trail(): void
     {
         $admin = $this->admin();
         $superAdmin = User::factory()->superAdministrator()->create();
+        $auditor = User::factory()->auditor()->create();
 
         $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get('/admin/audit-trail')
+            ->assertOk()
+            ->assertSee('Audit Trail');
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        $this->actingAs($auditor, AuthenticationContext::WEB_GUARD)
             ->get('/admin/audit-trail')
             ->assertOk()
             ->assertSee('Audit Trail');
@@ -220,11 +230,19 @@ class AuditTrailTest extends TestCase
         $this->get('/admin/audit-trail')->assertRedirect('/super-admin/login');
     }
 
-    public function test_only_super_administrators_can_access_audit_suggestions(): void
+    public function test_only_audit_authorized_roles_can_access_audit_suggestions(): void
     {
         $superAdmin = User::factory()->superAdministrator()->create();
+        $auditor = User::factory()->auditor()->create();
 
         $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->getJson(route('admin.audit-logs.suggestions', ['query' => 'Audit']))
+            ->assertOk();
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        $this->actingAs($auditor, AuthenticationContext::WEB_GUARD)
             ->getJson(route('admin.audit-logs.suggestions', ['query' => 'Audit']))
             ->assertOk();
 
@@ -453,11 +471,11 @@ class AuditTrailTest extends TestCase
             ->assertOk()
             ->assertSee('Juan Dela Cruz')
             ->assertSee('Logged In')
-            ->assertSee('Aug 27, 2026, 8:15 PM')
+            ->assertSee('Aug 27, 2026, 8:15:00 PM')
             ->assertSee('PHT (UTC+8)');
     }
 
-    public function test_sidebar_link_is_visible_only_to_a_super_administrator(): void
+    public function test_sidebar_link_is_visible_only_to_audit_authorized_roles(): void
     {
         $this->actingAs($this->admin(), AuthenticationContext::ADMIN_GUARD)->get('/dashboard')
             ->assertDontSee('Audit Trail');
@@ -466,6 +484,11 @@ class AuditTrailTest extends TestCase
 
         $this->actingAs(User::factory()->viewer()->create())->get('/dashboard')
             ->assertDontSee('Audit Trail');
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        $this->actingAs(User::factory()->auditor()->create())->get('/dashboard')
+            ->assertSee('Audit Trail');
         $this->flushSession();
         $this->app['auth']->forgetGuards();
 
@@ -499,8 +522,113 @@ class AuditTrailTest extends TestCase
             $this->assertStringContainsString('append-only', $exception->getMessage());
         }
 
-        $this->put("/admin/audit-trail/{$log->id}")->assertNotFound();
-        $this->delete("/admin/audit-trail/{$log->id}")->assertNotFound();
+        $this->put("/admin/audit-trail/{$log->id}")->assertMethodNotAllowed();
+        $this->delete("/admin/audit-trail/{$log->id}")->assertMethodNotAllowed();
         $this->assertDatabaseHas('audit_logs', ['id' => $log->id]);
+    }
+
+    public function test_new_events_store_utc_context_and_remove_sensitive_snapshot_values(): void
+    {
+        $this->travelTo(CarbonImmutable::create(2026, 9, 11, 14, 35, 18, 'Asia/Manila'));
+        $actor = User::factory()->superAdministrator()->create();
+
+        $log = app(AuditLogger::class)->log(
+            AuditAction::UpdatedUser,
+            $actor,
+            'Updated an account.',
+            $actor,
+            'Account',
+            oldValues: ['email' => 'old@example.test', 'password_hash' => 'must-not-appear'],
+            newValues: [
+                'email' => 'new@example.test',
+                'nested' => ['api_token' => 'must-not-appear', 'status' => 'active'],
+            ],
+        );
+
+        $this->assertNotNull($log->event_id);
+        $this->assertSame(UserRole::SuperAdministrator->value, $log->actor_role);
+        $this->assertSame('Administration', $log->event_category);
+        $this->assertSame('User Administration', $log->module);
+        $this->assertSame('success', $log->outcome);
+        $this->assertSame('user', $log->source);
+        $this->assertSame('Asia/Manila', $log->display_timezone);
+        $this->assertSame('2026-09-11 06:35:18.000000', $log->occurred_at_utc);
+        $this->assertSame('September 11, 2026, 2:35:18 PM', $log->displayTimestamp()->format('F j, Y, g:i:s A'));
+        $this->assertArrayNotHasKey('password_hash', $log->old_values);
+        $this->assertArrayNotHasKey('api_token', $log->new_values['nested']);
+        $this->assertSame('active', $log->new_values['nested']['status']);
+        $this->assertStringNotContainsString('must-not-appear', $log->toJson());
+    }
+
+    public function test_audit_filters_and_detail_view_use_server_side_metadata(): void
+    {
+        $superAdmin = User::factory()->superAdministrator()->create();
+        $log = app(AuditLogger::class)->log(
+            AuditAction::ScheduledCycleCount,
+            $superAdmin,
+            'Scheduled a count.',
+            targetName: 'CC-2026-001',
+        );
+        app(AuditLogger::class)->log(AuditAction::LoggedIn, $superAdmin, 'Unrelated activity.');
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get(route('admin.audit-logs.index', [
+                'category' => 'Inventory & Warehousing',
+                'module' => 'Cycle Counts',
+                'outcome' => 'success',
+                'source' => 'user',
+                'target' => 'CC-2026-001',
+            ]))
+            ->assertOk()
+            ->assertSee('Scheduled a count.')
+            ->assertDontSee('Unrelated activity.');
+
+        $this->get(route('admin.audit-logs.show', $log))
+            ->assertOk()
+            ->assertSee($log->event_id)
+            ->assertSee('Authoritative UTC time')
+            ->assertSee('PHT (UTC+8)');
+    }
+
+    public function test_failed_login_is_recorded_without_attempted_credentials(): void
+    {
+        $admin = $this->admin();
+
+        $this->post('/admin/login', [
+            'email' => $admin->email,
+            'password' => 'IncorrectPassword123!',
+        ])->assertSessionHasErrors('email');
+
+        $log = AuditLog::where('action', AuditAction::FailedLogin->value)->firstOrFail();
+
+        $this->assertNull($log->user_id);
+        $this->assertSame((string) $admin->id, $log->target_id);
+        $this->assertStringNotContainsString('IncorrectPassword123!', $log->toJson());
+        $this->assertStringNotContainsString($admin->email, $log->description);
+    }
+
+    public function test_manila_date_filter_uses_utc_boundaries_without_double_conversion(): void
+    {
+        $superAdmin = User::factory()->superAdministrator()->create();
+
+        $this->travelTo(CarbonImmutable::create(2026, 9, 30, 23, 59, 59, 'Asia/Manila'));
+        app(AuditLogger::class)->log(AuditAction::LoggedIn, $superAdmin, 'Inside Manila day.');
+
+        $this->travelTo(CarbonImmutable::create(2026, 10, 1, 0, 0, 1, 'Asia/Manila'));
+        app(AuditLogger::class)->log(AuditAction::LoggedIn, $superAdmin, 'Outside Manila day.');
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get(route('admin.audit-logs.index', [
+                'date_from' => '2026-09-30',
+                'date_to' => '2026-09-30',
+            ]))
+            ->assertOk()
+            ->assertSee('Inside Manila day.')
+            ->assertDontSee('Outside Manila day.');
+
+        $inside = AuditLog::where('description', 'Inside Manila day.')->firstOrFail();
+        $outside = AuditLog::where('description', 'Outside Manila day.')->firstOrFail();
+        $this->assertSame('2026-09-30 15:59:59.000000', $inside->occurred_at_utc);
+        $this->assertSame('2026-09-30 16:00:01.000000', $outside->occurred_at_utc);
     }
 }

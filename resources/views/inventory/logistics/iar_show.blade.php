@@ -172,7 +172,7 @@
                             <div class="text-[11px] space-y-1">
                                 <div><span class="font-semibold">Date Inspected:</span> {{ $iar->inspection_date?->format('F d, Y') ?? '___________________' }}</div>
                                 <div class="mt-2 flex items-start gap-2">
-                                    <span class="font-bold text-base">[{{ $iar->inspection_date ? '✓' : ' ' }}]</span>
+                                    <span class="font-bold text-base">[{{ $iar->inspection_date ? 'X' : ' ' }}]</span>
                                     <span>Inspected, verified and found in order as to quantity and technical specifications.</span>
                                 </div>
                                 @if($iar->inspection_findings)
@@ -201,11 +201,11 @@
                                 <div><span class="font-semibold">Date Received:</span> {{ $iar->acceptance_date?->format('F d, Y') ?? '___________________' }}</div>
                                 <div class="mt-2 space-y-1">
                                     <div class="flex items-center gap-2">
-                                        <span class="font-bold text-base">[{{ $iar->delivery_status === 'complete' || $iar->status === 'accepted' ? '✓' : ' ' }}]</span>
+                                        <span class="font-bold text-base">[{{ $iar->delivery_status === 'complete' || $iar->status === 'accepted' ? 'X' : ' ' }}]</span>
                                         <span>Complete</span>
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <span class="font-bold text-base">[{{ $iar->delivery_status === 'partial' ? '✓' : ' ' }}]</span>
+                                        <span class="font-bold text-base">[{{ $iar->delivery_status === 'partial' ? 'X' : ' ' }}]</span>
                                         <span>Partial (pls. specify quantity)</span>
                                     </div>
                                 </div>
@@ -242,7 +242,7 @@
                     <div>
                         <span class="font-bold">COA 5-Day Statutory Transmittal:</span>
                         @if($iar->coa_transmitted_at)
-                            <span class="text-emerald-800 font-semibold ml-1">✓ Transmitted on {{ $iar->coa_transmitted_at->format('F d, Y') }} (Received by: {{ $iar->coa_received_by }})</span>
+                            <span class="inline-flex items-center gap-1.5 text-emerald-800 font-semibold ml-1"><x-ui.icon name="check-circle" class="h-4 w-4 shrink-0" /> Transmitted on {{ $iar->coa_transmitted_at->format('F d, Y') }} (Received by: {{ $iar->coa_received_by }})</span>
                         @elseif($iar->isAccepted())
                             <span class="text-amber-800 font-bold ml-1">⏳ Pending Transmittal (Deadline: {{ $iar->coa_transmittal_deadline_at?->format('F d, Y') ?? 'Within 5 days' }})</span>
                         @else

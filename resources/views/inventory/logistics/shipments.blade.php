@@ -162,7 +162,7 @@
                                     <td class="px-6 py-4 text-xs">
                                         @if($shipment->is_cold_chain)
                                             <div class="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 font-bold text-blue-700">
-                                                ❄️ Cold Chain
+                                                <x-ui.icon name="beaker" class="inline-block h-3.5 w-3.5 align-text-bottom" /> Cold Chain
                                             </div>
                                             @if($shipment->temp_logger_serial)
                                                 <div class="mt-1 text-[10px] text-neutral-500 font-mono">Logger: {{ $shipment->temp_logger_serial }}</div>
@@ -313,7 +313,7 @@
                                     <input type="checkbox" name="is_cold_chain" id="is_cold_chain" value="1" x-model="isCold"
                                            class="rounded border-neutral-300 text-primary-600 focus:ring-primary-500">
                                     <label for="is_cold_chain" class="text-sm font-semibold text-neutral-900">
-                                        ❄️ Cold Chain Cargo (Vaccines / Biologics / Reagents 2°-8°C)
+                                        <x-ui.icon name="beaker" class="inline-block h-4 w-4 align-text-bottom" /> Cold Chain Cargo (Vaccines / Biologics / Reagents 2°-8°C)
                                     </label>
                                 </div>
 
@@ -363,7 +363,7 @@
 
                             <template x-if="isColdChain">
                                 <div class="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-3">
-                                    <div class="text-xs font-bold text-blue-900">❄️ Thermal Data Logger Verification</div>
+                                    <div class="flex items-center gap-1.5 text-xs font-bold text-blue-900"><x-ui.icon name="beaker" class="h-4 w-4 shrink-0" /> Thermal Data Logger Verification</div>
                                     <div class="grid grid-cols-2 gap-3">
                                         <div>
                                             <label class="block text-[11px] font-semibold text-neutral-600">Min Recorded (°C)</label>

@@ -5,15 +5,15 @@
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Access Control' => null]" />
 
     <x-ui.alert variant="info" title="How to read this">
-        A tick means accounts with that role hold the ability, and the routes and
+        A check icon means accounts with that role hold the ability, and the routes and
         buttons behind it are open to them. A dash means the screen is hidden from
         the sidebar and the request is refused if typed directly into the address
-        bar. Administrators pass every check by design, so their column is full.
+        bar. Reserved duties remain limited even when a role has broad operational access.
     </x-ui.alert>
 
     <x-ui.card
         title="Permission Matrix"
-        subtitle="Rows are abilities grouped by module; columns are the five staff roles.">
+        subtitle="Rows are abilities grouped by module; columns are the configured account roles.">
 
         <div class="overflow-x-auto">
             <table class="w-full text-sm border-collapse">

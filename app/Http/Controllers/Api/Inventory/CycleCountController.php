@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Inventory;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\CycleCountDoc;
 use App\Models\User;
 use App\Services\Inventory\CycleCountService;
 use DomainException;
@@ -20,7 +21,7 @@ class CycleCountController extends Controller implements HasMiddleware
             'auth:sanctum',
             new Middleware('can:' . Permission::PerformCycleCount->value, only: ['schedule', 'submitCounts']),
             new Middleware('can:' . Permission::ApproveAdjustment->value, only: ['approve']),
-            new Middleware('can:' . Permission::ViewInventory->value, only: ['index', 'show']),
+            new Middleware('can:' . Permission::PerformCycleCount->value, only: ['index', 'show']),
         ];
     }
 

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Observers\UserObserver;
 use App\Services\AuditLogger;
 use App\Support\AuthenticationPanel;
+use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -84,6 +85,19 @@ class AppServiceProvider extends ServiceProvider
                     "{$event->user->name} logged in.",
                     $event->user,
                     'Account',
+                );
+            }
+        });
+
+        Event::listen(function (Failed $event): void {
+            if ($event->user instanceof User) {
+                app(AuditLogger::class)->log(
+                    AuditAction::FailedLogin,
+                    null,
+                    'A failed sign-in attempt was recorded for an existing account.',
+                    $event->user,
+                    'Account',
+                    source: 'user',
                 );
             }
         });

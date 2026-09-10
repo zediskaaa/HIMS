@@ -273,10 +273,22 @@ class SupplierController extends Controller implements HasMiddleware
         return back()->with('success', 'Document uploaded and awaiting verification.');
     }
 
-    public function downloadDocument(Supplier $supplier, SupplierDocument $document): StreamedResponse
+    public function downloadDocument(Request $request, Supplier $supplier, SupplierDocument $document): StreamedResponse
     {
         $this->ensureOwnedBy($supplier, $document);
         abort_unless(Storage::disk($document->disk)->exists($document->path), 404);
+
+        $this->audit->log(
+            AuditAction::DownloadedSupplierDocument,
+            $request->user(),
+            'Downloaded protected supplier document evidence.',
+            $document,
+            $document->original_name,
+            newValues: [
+                'supplier_id' => $supplier->id,
+                'document_type' => $document->document_type,
+            ],
+        );
 
         return Storage::disk($document->disk)->download($document->path, $document->original_name);
     }

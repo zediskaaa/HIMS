@@ -284,8 +284,8 @@
                         </div>
 
                         {{-- Line Items Table --}}
-                        <div class="border rounded-xl border-neutral-200 overflow-hidden">
-                            <table class="w-full text-left text-xs text-neutral-600">
+                        <div class="max-w-full overflow-x-auto rounded-xl border border-neutral-200">
+                            <table class="min-w-[48rem] w-full text-left text-xs text-neutral-600">
                                 <thead class="bg-neutral-100 uppercase text-neutral-600 font-semibold border-b">
                                     <tr>
                                         <th class="px-4 py-2.5">Item Description</th>

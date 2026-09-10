@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Procurement;
 
 use App\Enums\ApprovalChainType;
+use App\Enums\Permission;
 use App\Enums\RequisitionStatus;
 use App\Http\Controllers\Controller;
 use App\Models\CostCenter;
@@ -14,10 +15,16 @@ use App\Services\Procurement\BudgetEncumbranceService;
 use App\Services\Procurement\ProcurementAuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Support\Facades\DB;
 
-class RequisitionController extends Controller
+class RequisitionController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return ['can:'.Permission::ManageProcurement->value];
+    }
+
     public function __construct(
         private readonly BudgetEncumbranceService $budgetService,
         private readonly ApprovalRoutingEngine $approvalEngine,

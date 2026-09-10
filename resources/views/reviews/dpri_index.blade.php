@@ -64,7 +64,7 @@
             </div>
 
             {{-- DPRI Catalog Table --}}
-            <div class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+            <div class="max-w-full overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
                 <table class="min-w-full divide-y divide-neutral-200 text-sm">
                     <thead class="bg-neutral-50 text-left text-xs font-semibold text-neutral-500 uppercase tracking-wider">
                         <tr>
@@ -108,7 +108,7 @@
             </div>
 
             {{-- New Reference Price Modal --}}
-            <div x-show="newModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-neutral-900/60 p-4 flex items-center justify-center">
+            <div x-show="newModal" x-cloak class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/60 p-4 sm:items-center">
                 <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
                     <h3 class="text-lg font-bold text-neutral-900">Register DPRI Reference Benchmark</h3>
                     <p class="text-xs text-neutral-600">Register or update official government ceiling price under DOH AO 2019-0040.</p>

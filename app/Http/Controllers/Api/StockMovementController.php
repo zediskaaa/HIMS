@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreStockMovementRequest;
 use App\Http\Requests\UpdateStockMovementRequest;
@@ -9,9 +10,19 @@ use App\Http\Resources\StockMovementResource;
 use App\Models\StockMovement;
 use App\Services\InventoryAutomationService;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class StockMovementController extends Controller
+class StockMovementController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('can:'.Permission::ViewInventory->value, only: ['index', 'show']),
+            new Middleware('can:'.Permission::RecordMovements->value, only: ['store', 'update', 'destroy']),
+        ];
+    }
+
     public function __construct(private readonly InventoryAutomationService $automationService) {}
 
     public function index(Request $request)

@@ -455,6 +455,16 @@ class LoginLockoutService
             'login_retry_at' => $waitMinutes === null ? null : now()->addMinutes($waitMinutes),
         ])->saveQuietly();
 
+        $this->audit->log(
+            AuditAction::FailedLogin,
+            null,
+            'A failed sign-in attempt was recorded for an existing account.',
+            $user,
+            'Account',
+            newValues: ['failed_login_attempt' => $attempt],
+            source: 'user',
+        );
+
         return [
             ...($waitMinutes === null
                 ? ['status' => self::INVALID]

@@ -5,10 +5,10 @@
 ])
 
 <section {{ $attributes->merge([
-    'class' => 'bg-white border border-neutral-200 rounded-lg shadow-sm overflow-hidden',
+    'class' => 'min-w-0 max-w-full bg-white border border-neutral-200 rounded-lg shadow-sm overflow-hidden',
 ]) }}>
     @if ($title || isset($header) || isset($actions))
-        <header class="flex items-start justify-between gap-4 px-5 py-4 border-b border-neutral-200">
+        <header class="flex flex-col items-start justify-between gap-3 border-b border-neutral-200 px-4 py-4 sm:flex-row sm:gap-4 sm:px-5">
             <div class="min-w-0">
                 @isset($header)
                     {{ $header }}
@@ -21,17 +21,17 @@
             </div>
 
             @isset($actions)
-                <div class="flex items-center gap-2 shrink-0">{{ $actions }}</div>
+                <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{{ $actions }}</div>
             @endisset
         </header>
     @endif
 
-    <div class="{{ $padding ? 'p-5' : '' }}">
+    <div class="min-w-0 {{ $padding ? 'p-4 sm:p-5' : '' }}">
         {{ $slot }}
     </div>
 
     @isset($footer)
-        <footer class="px-5 py-3 border-t border-neutral-200 bg-neutral-50">
+        <footer class="min-w-0 border-t border-neutral-200 bg-neutral-50 px-4 py-3 sm:px-5">
             {{ $footer }}
         </footer>
     @endisset

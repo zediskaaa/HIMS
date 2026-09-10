@@ -170,7 +170,7 @@
         </div>
 
         {{-- Ingest Telemetry Modal --}}
-        <div x-show="showIngestModal" class="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 p-4" x-cloak style="display: none;">
+        <div x-show="showIngestModal" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/60 p-4 sm:items-center" x-cloak style="display: none;">
             <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" @click.away="showIngestModal = false">
                 <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
                     <h3 class="text-base font-bold text-neutral-900">Ingest IoT Sensor Reading</h3>
@@ -211,7 +211,7 @@
         </div>
 
         {{-- Release Excursion Hold Modal --}}
-        <div x-show="showReleaseModal" class="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 p-4" x-cloak style="display: none;">
+        <div x-show="showReleaseModal" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/60 p-4 sm:items-center" x-cloak style="display: none;">
             <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" @click.away="showReleaseModal = false">
                 <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
                     <h3 class="text-base font-bold text-red-900">Release Temperature Excursion Hold</h3>

@@ -2,15 +2,26 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDemandPlanRequest;
 use App\Http\Requests\UpdateDemandPlanRequest;
 use App\Http\Resources\DemandPlanResource;
 use App\Models\DemandPlan;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class DemandPlanController extends Controller
+class DemandPlanController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('can:'.Permission::ViewReports->value, only: ['index', 'show']),
+            new Middleware('can:'.Permission::GenerateForecasts->value, only: ['store', 'update', 'destroy']),
+        ];
+    }
+
     public function index(Request $request)
     {
         $perPage = (int) $request->query('per_page', 15);

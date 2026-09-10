@@ -3,29 +3,29 @@
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\PermissionMatrixController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Analytics\ProcessReviewController;
 use App\Http\Controllers\AuthenticatorController;
+use App\Http\Controllers\Inventory\ConsignmentController;
 use App\Http\Controllers\Inventory\CycleCountController;
 use App\Http\Controllers\Inventory\DemandForecastController;
 use App\Http\Controllers\Inventory\GoodsReceiptController;
 use App\Http\Controllers\Inventory\InventoryController;
 use App\Http\Controllers\Inventory\InventoryItemController;
+use App\Http\Controllers\Inventory\LogisticsController;
 use App\Http\Controllers\Inventory\MaterialRequisitionController;
+use App\Http\Controllers\Inventory\NarcoticsVaultController;
 use App\Http\Controllers\Inventory\ProcurementController;
 use App\Http\Controllers\Inventory\PurchaseOrderController;
 use App\Http\Controllers\Inventory\ReportController;
+use App\Http\Controllers\Inventory\SmartWarehousingController;
 use App\Http\Controllers\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Inventory\StockMovementController;
 use App\Http\Controllers\Inventory\StockTransferController;
 use App\Http\Controllers\Inventory\StorageLocationController;
-use App\Http\Controllers\Inventory\WarehouseTaskController;
-use App\Http\Controllers\Inventory\SmartWarehousingController;
 use App\Http\Controllers\Inventory\TelemetryController;
-use App\Http\Controllers\Inventory\NarcoticsVaultController;
-use App\Http\Controllers\Inventory\ConsignmentController;
-use App\Http\Controllers\Inventory\LogisticsController;
+use App\Http\Controllers\Inventory\WarehouseTaskController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SupplierController;
-use App\Http\Controllers\Analytics\ProcessReviewController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -243,6 +243,7 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
 Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('/audit-trail/suggestions', [AuditLogController::class, 'suggestions'])->name('audit-logs.suggestions');
     Route::get('/audit-trail', [AuditLogController::class, 'index'])->name('audit-logs.index');
+    Route::get('/audit-trail/{auditLog}', [AuditLogController::class, 'show'])->name('audit-logs.show');
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
     Route::post('/users', [UserController::class, 'store'])->name('users.store');

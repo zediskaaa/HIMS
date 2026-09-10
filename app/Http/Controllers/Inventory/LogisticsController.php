@@ -13,6 +13,7 @@ use App\Models\MaterialRequisition;
 use App\Models\PurchaseOrder;
 use App\Models\Shipment;
 use App\Models\Supplier;
+use App\Services\AuditLogger;
 use App\Services\Logistics\ChainOfCustodyService;
 use App\Services\Logistics\DocumentTrackingService;
 use App\Services\Logistics\InspectionAcceptanceService;
@@ -65,7 +66,8 @@ class LogisticsController extends Controller implements HasMiddleware
         protected DocumentTrackingService $documentService,
         protected InspectionAcceptanceService $iarService,
         protected ShipmentTrackingService $shipmentService,
-        protected ChainOfCustodyService $custodyService
+        protected ChainOfCustodyService $custodyService,
+        protected AuditLogger $audit,
     ) {}
 
     /**
@@ -250,9 +252,22 @@ class LogisticsController extends Controller implements HasMiddleware
     /**
      * Download Document File (Secure Local Storage Stream)
      */
-    public function downloadDocument(LogisticsDocument $document): StreamedResponse
+    public function downloadDocument(Request $request, LogisticsDocument $document): StreamedResponse
     {
-        return $this->documentService->downloadDocument($document);
+        $response = $this->documentService->downloadDocument($document);
+
+        $this->audit->log(
+            AuditAction::DownloadedLogisticsDocument,
+            $request->user(),
+            'Downloaded a protected logistics document.',
+            $document,
+            $document->tracking_number ?? $document->original_name,
+            newValues: [
+                'document_type' => $document->document_type?->value ?? $document->document_type,
+            ],
+        );
+
+        return $response;
     }
 
     /**

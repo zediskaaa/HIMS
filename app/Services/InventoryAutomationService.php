@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Enums\AuditAction;
 use App\Enums\MovementType;
 use App\Models\InventoryItem;
 use App\Models\ItemBatch;
 use App\Models\ItemStockLevel;
 use App\Models\StockMovement;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +24,10 @@ use Illuminate\Validation\ValidationException;
  */
 class InventoryAutomationService
 {
-    public function __construct(private readonly StockAlertService $alerts) {}
+    public function __construct(
+        private readonly StockAlertService $alerts,
+        private readonly AuditLogger $audit,
+    ) {}
 
     /**
      * Record a stock movement and apply it to the affected balances.
@@ -58,6 +63,23 @@ class InventoryAutomationService
             }
 
             $this->syncItemTotals($item);
+
+            if ($reference === null) {
+                $this->audit->log(
+                    AuditAction::RecordedStockMovement,
+                    $userId === null ? null : User::find($userId),
+                    'Recorded an inventory stock movement.',
+                    $item,
+                    $item->sku,
+                    newValues: [
+                        'movement_type' => $type->value,
+                        'quantity' => $quantity,
+                        'from_location_id' => $fromLocationId,
+                        'to_location_id' => $toLocationId,
+                        'movement_ids' => collect($movements)->pluck('id')->all(),
+                    ],
+                );
+            }
 
             return new Collection($movements);
         });

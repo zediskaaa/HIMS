@@ -122,7 +122,10 @@
                                     </td>
 
                                     <td class="px-6 py-4 text-xs">
-                                        <div class="font-semibold text-neutral-800">📍 {{ $log->destination_location ?? $log->origin_location }}</div>
+                                        <div class="flex items-center gap-1.5 font-semibold text-neutral-800">
+                                            <x-ui.icon name="map-pin" class="h-4 w-4 shrink-0 text-neutral-400" />
+                                            <span>{{ $log->destination_location ?? $log->origin_location }}</span>
+                                        </div>
                                         <div class="mt-0.5">
                                             <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium {{ $log->package_condition === 'good_order' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700' }}">
                                                 Condition: {{ ucwords(str_replace('_', ' ', $log->package_condition)) }}

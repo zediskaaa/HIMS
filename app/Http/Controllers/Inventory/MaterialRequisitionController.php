@@ -22,7 +22,7 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
     {
         return [
             'auth:web,admin,super_admin',
-            new Middleware('can:'.Permission::CreateRequisition->value, only: ['store', 'cancel']),
+            new Middleware('can:'.Permission::CreateRequisition->value, only: ['store', 'cancel', 'acknowledge']),
             new Middleware('can:'.Permission::ApproveRequisition->value, only: ['approve', 'reject']),
             new Middleware('can:'.Permission::IssueStock->value, only: ['issue']),
             new Middleware('can:'.Permission::ViewInventory->value, only: ['index', 'show']),

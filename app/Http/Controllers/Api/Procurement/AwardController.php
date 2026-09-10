@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Procurement;
 
 use App\Enums\ApprovalChainType;
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\SourcingRfq;
 use App\Models\SupplierQuote;
@@ -11,10 +12,16 @@ use App\Services\Procurement\ProcurementAuditService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Support\Facades\DB;
 
-class AwardController extends Controller
+class AwardController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return ['can:'.Permission::AwardProcurement->value];
+    }
+
     public function __construct(
         private readonly ApprovalRoutingEngine $approvalEngine,
         private readonly ProcurementAuditService $auditService

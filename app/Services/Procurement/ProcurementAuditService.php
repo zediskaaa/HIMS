@@ -33,15 +33,21 @@ class ProcurementAuditService
             'created_at' => now(),
         ]);
 
-        // Also call AuditLogger if there is a matching AuditAction enum
+        // Keep the legacy procurement ledger while ensuring the organization-wide
+        // append-only trail receives the same semantic business event.
         $matchingAuditAction = AuditAction::tryFrom($actionType);
-        if ($matchingAuditAction && $actor) {
+        if ($matchingAuditAction) {
             $this->auditLogger->log(
                 $matchingAuditAction,
                 $actor,
-                "{$actor->name} performed {$actionType} on {$entityName} #{$entityId}.",
-                $actor,
-                $entityName
+                ($actor?->name ?? 'System')." performed {$actionType} on {$entityName} #{$entityId}.",
+                targetName: "{$entityName} #{$entityId}",
+                targetType: $entityName,
+                targetId: $entityId,
+                targetReference: "{$entityName} #{$entityId}",
+                oldValues: $oldValues ?? [],
+                newValues: $newValues ?? [],
+                source: $actor === null ? 'system' : 'user',
             );
         }
 
