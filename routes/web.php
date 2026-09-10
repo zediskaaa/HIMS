@@ -81,6 +81,14 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::post('/inventory/purchases/requests/{procurementRequest}/approve', [ProcurementController::class, 'approve'])->name('inventory.purchases.requests.approve');
     Route::post('/inventory/purchases/orders', [PurchaseOrderController::class, 'store'])->name('inventory.purchases.orders.store');
     Route::post('/inventory/purchases/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->name('inventory.purchases.receive');
+    Route::post('/inventory/purchases/enterprise-requests', [ProcurementController::class, 'storeEnterpriseRequest'])->name('inventory.purchases.enterprise-requests.store');
+    Route::post('/inventory/purchases/rfqs', [ProcurementController::class, 'createEnterpriseRfq'])->name('inventory.purchases.rfqs.store');
+    Route::post('/inventory/purchases/rfqs/{rfq}/evaluate', [ProcurementController::class, 'evaluateRfqWeb'])->name('inventory.purchases.rfqs.evaluate');
+    Route::post('/inventory/purchases/rfqs/{rfq}/award', [ProcurementController::class, 'awardRfqWeb'])->name('inventory.purchases.rfqs.award');
+    Route::post('/inventory/purchases/approval-chains/{chain}/approve', [ProcurementController::class, 'approveStepWeb'])->name('inventory.purchases.approval-chains.approve');
+    Route::post('/inventory/purchases/approval-chains/{chain}/reject', [ProcurementController::class, 'rejectStepWeb'])->name('inventory.purchases.approval-chains.reject');
+    Route::post('/inventory/purchases/orders/from-award', [ProcurementController::class, 'generatePoFromAwardWeb'])->name('inventory.purchases.orders.from-award');
+    Route::post('/inventory/purchases/orders/{purchaseOrder}/revise', [PurchaseOrderController::class, 'revise'])->name('inventory.purchases.orders.revise');
     Route::get('/inventory/stock', [InventoryController::class, 'stock'])->name('inventory.stock');
     Route::get('/inventory/alerts', [InventoryController::class, 'alerts'])->name('inventory.alerts');
     Route::get('/inventory/reports', [ReportController::class, 'index'])->name('inventory.reports');

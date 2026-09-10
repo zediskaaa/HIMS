@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Inventory;
 
 use App\Enums\MovementType;
 use App\Enums\Permission;
+use App\Enums\PurchaseOrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
 use App\Models\PurchaseOrder;
@@ -11,6 +12,10 @@ use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Rules\ProcurementEligibleSupplier;
 use App\Services\InventoryAutomationService;
+use App\Services\Procurement\BudgetEncumbranceService;
+use App\Services\Procurement\POConversionService;
+use App\Services\Procurement\ProcurementAuditService;
+use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -32,16 +37,23 @@ class PurchaseOrderController extends Controller implements HasMiddleware
     {
         return [
             'auth:web,admin,super_admin',
-            new Middleware('can:'.Permission::ManageProcurement->value, only: ['index', 'store']),
+            new Middleware('can:'.Permission::ManageProcurement->value, only: ['index', 'store', 'revise']),
             new Middleware('can:'.Permission::RecordMovements->value, only: ['receive']),
         ];
     }
 
-    public function __construct(private readonly InventoryAutomationService $automationService) {}
+    public function __construct(
+        private readonly InventoryAutomationService $automationService,
+        private readonly BudgetEncumbranceService $budgetService,
+        private readonly POConversionService $poConversionService,
+        private readonly ProcurementAuditService $auditService
+    ) {}
 
     public function index(): View
     {
-        $purchaseOrders = PurchaseOrder::with(['supplier', 'item'])->latest('requested_at')->get();
+        $purchaseOrders = PurchaseOrder::with(['supplier', 'item', 'lines.item', 'revisions'])
+            ->latest('requested_at')
+            ->get();
         $suppliers = Supplier::procurementEligible()->orderBy('name')->get();
         $items = InventoryItem::all();
 
@@ -60,59 +72,162 @@ class PurchaseOrderController extends Controller implements HasMiddleware
 
         $quantity = (int) $validated['quantity'];
         $unitCost = (float) $validated['unit_cost'];
+        $totalAmount = round($quantity * $unitCost, 2);
 
-        PurchaseOrder::create([
+        $po = PurchaseOrder::create([
             ...$validated,
             'po_number' => 'PO-'.now()->format('YmdHis'),
-            'total_amount' => round($quantity * $unitCost, 2),
+            'total_amount' => $totalAmount,
+            'total_encumbered_amount' => $totalAmount,
+            'version' => 'PO-REV1',
+            'revision_number' => 1,
         ]);
+
+        // Automatically create primary PO Line Item
+        $po->lines()->create([
+            'item_id' => $po->item_id,
+            'line_number' => 1,
+            'ordered_quantity' => $quantity,
+            'received_quantity' => 0,
+            'invoiced_quantity' => 0,
+            'unit_price' => $unitCost,
+            'total_line_amount' => $totalAmount,
+            'line_status' => 'open',
+        ]);
+
+        $this->budgetService->convertSoftToHardEncumbrance($po);
+
+        $this->auditService->record(
+            auth()->user(),
+            'PurchaseOrder',
+            $po->id,
+            'issued_purchase_order',
+            null,
+            ['po_number' => $po->po_number, 'amount' => $totalAmount]
+        );
 
         return redirect()->route('inventory.purchases')->with('success', 'Purchase order created successfully.');
     }
 
     /**
      * Post a received purchase order into stock.
-     *
-     * This used to add the quantity straight onto `quantity_on_hand` and
-     * record nothing else. That left `item_stock_levels` — which is what the
-     * quantity is actually recomputed from — untouched, so the next stock
-     * movement silently threw the receipt away. Routing through the service
-     * writes the level row, the movement and the rollup in one transaction,
-     * and re-evaluates the item's alerts on the way out.
+     * Supports both multi-line enterprise orders and legacy orders.
      */
     public function receive(PurchaseOrder $purchaseOrder): RedirectResponse
     {
-        if ($purchaseOrder->status === 'received') {
+        if ($purchaseOrder->status === 'received' || $purchaseOrder->status === PurchaseOrderStatus::Fulfilled->value) {
             return redirect()->route('inventory.purchases')->with('info', 'This purchase order has already been received.');
         }
 
-        $item = $purchaseOrder->item;
+        $fallbackLocationId = StorageLocation::query()->orderBy('id')->value('id');
 
-        // Goods have to land somewhere. Fall back to the item's default
-        // location, then to any location at all, so a seeded demo PO can
-        // still be received without the operator picking a bin.
-        $locationId = $item->default_location_id ?? StorageLocation::query()->orderBy('id')->value('id');
-
-        if ($locationId === null) {
+        if ($fallbackLocationId === null) {
             return redirect()->route('inventory.purchases')
                 ->withErrors(['receive' => 'No storage location exists to receive this order into.']);
         }
 
-        DB::transaction(function () use ($purchaseOrder, $item, $locationId): void {
-            $this->automationService->recordMovement([
-                'item_id' => $item->id,
-                'movement_type' => MovementType::StockIn,
-                'quantity' => (int) $purchaseOrder->quantity,
-                'to_location_id' => $locationId,
-                'unit_cost' => $purchaseOrder->unit_cost ?? $item->unit_cost,
-                'remarks' => 'Received against '.$purchaseOrder->po_number,
-            ], auth()->id(), $purchaseOrder);
+        DB::transaction(function () use ($purchaseOrder, $fallbackLocationId): void {
+            if ($purchaseOrder->lines()->exists()) {
+                foreach ($purchaseOrder->lines as $line) {
+                    $item = $line->item;
+                    $locId = $item->default_location_id ?? $fallbackLocationId;
+                    $qtyToReceive = $line->remainingQuantity() > 0 ? $line->remainingQuantity() : $line->ordered_quantity;
+
+                    $this->automationService->recordMovement([
+                        'item_id' => $item->id,
+                        'movement_type' => MovementType::StockIn,
+                        'quantity' => $qtyToReceive,
+                        'to_location_id' => $locId,
+                        'unit_cost' => $line->unit_price ?? $item->unit_cost,
+                        'remarks' => "Received against {$purchaseOrder->po_number} Line #{$line->line_number}",
+                    ], auth()->id(), $purchaseOrder);
+
+                    $line->received_quantity += $qtyToReceive;
+                    $line->line_status = 'received';
+                    $line->save();
+                }
+            } else {
+                // Legacy single-item fallback
+                $item = $purchaseOrder->item;
+                $locId = $item->default_location_id ?? $fallbackLocationId;
+
+                $this->automationService->recordMovement([
+                    'item_id' => $item->id,
+                    'movement_type' => MovementType::StockIn,
+                    'quantity' => (int) $purchaseOrder->quantity,
+                    'to_location_id' => $locId,
+                    'unit_cost' => $purchaseOrder->unit_cost ?? $item->unit_cost,
+                    'remarks' => 'Received against '.$purchaseOrder->po_number,
+                ], auth()->id(), $purchaseOrder);
+            }
 
             $purchaseOrder->status = 'received';
             $purchaseOrder->received_at = now();
             $purchaseOrder->save();
+
+            // Record fulfillment in budget
+            $this->budgetService->recordFulfillmentSpent($purchaseOrder, (float) $purchaseOrder->total_amount);
+
+            $this->auditService->record(
+                auth()->user(),
+                'PurchaseOrder',
+                $purchaseOrder->id,
+                'received_purchase_order',
+                null,
+                ['po_number' => $purchaseOrder->po_number, 'received_at' => now()->toIso8601String()]
+            );
         });
 
         return redirect()->route('inventory.purchases')->with('success', 'Goods received and inventory updated.');
+    }
+
+    /**
+     * Submit a Purchase Order Revision / Change Order.
+     */
+    public function revise(Request $request, PurchaseOrder $purchaseOrder): RedirectResponse
+    {
+        $validated = $request->validate([
+            'unit_cost' => ['required', 'numeric', 'min:0'],
+            'quantity' => ['required', 'integer', 'min:1'],
+            'justification' => ['required', 'string', 'max:500'],
+        ]);
+
+        $newLines = [
+            [
+                'item_id' => $purchaseOrder->item_id ?? $purchaseOrder->lines()->first()?->item_id,
+                'ordered_quantity' => (int) $validated['quantity'],
+                'unit_price' => (float) $validated['unit_cost'],
+            ],
+        ];
+
+        try {
+            $revision = $this->poConversionService->submitPoRevision(
+                $purchaseOrder,
+                $newLines,
+                $validated['justification'],
+                auth()->user()
+            );
+
+            $this->auditService->record(
+                auth()->user(),
+                'PurchaseOrder',
+                $purchaseOrder->id,
+                'amended_purchase_order',
+                null,
+                [
+                    'revision_code' => $revision->change_order_code,
+                    'variance_percentage' => $revision->variance_percentage,
+                    'requires_doa' => $revision->requires_doa_reapproval,
+                ]
+            );
+
+            $msg = $revision->requires_doa_reapproval
+                ? "PO Change Order {$revision->change_order_code} submitted. Financial variance ({$revision->variance_percentage}%) exceeds 5% DOA policy threshold and requires re-approval."
+                : "PO Change Order {$revision->change_order_code} applied successfully.";
+
+            return redirect()->route('inventory.purchases')->with('success', $msg);
+        } catch (DomainException $e) {
+            return redirect()->route('inventory.purchases')->withErrors(['revise' => $e->getMessage()]);
+        }
     }
 }

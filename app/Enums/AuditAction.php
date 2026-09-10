@@ -28,6 +28,17 @@ enum AuditAction: string
     case AddedSupplierPrice = 'added_supplier_price';
     case AddedSupplierContract = 'added_supplier_contract';
     case UpdatedSupplierContract = 'updated_supplier_contract';
+    case CreatedPurchaseRequest = 'created_purchase_request';
+    case ApprovedPurchaseRequest = 'approved_purchase_request';
+    case CreatedSourcingRfq = 'created_sourcing_rfq';
+    case PublishedSourcingRfq = 'published_sourcing_rfq';
+    case SubmittedSupplierQuote = 'submitted_supplier_quote';
+    case EvaluatedSourcingRfq = 'evaluated_sourcing_rfq';
+    case AwardedSourcingRfq = 'awarded_sourcing_rfq';
+    case IssuedPurchaseOrder = 'issued_purchase_order';
+    case ApprovedPurchaseOrder = 'approved_purchase_order';
+    case AmendedPurchaseOrder = 'amended_purchase_order';
+    case ReceivedPurchaseOrder = 'received_purchase_order';
 
     public function label(): string
     {
@@ -56,6 +67,17 @@ enum AuditAction: string
             self::AddedSupplierPrice => 'Added Supplier Price',
             self::AddedSupplierContract => 'Added Supplier Contract',
             self::UpdatedSupplierContract => 'Updated Supplier Contract',
+            self::CreatedPurchaseRequest => 'Created Purchase Request',
+            self::ApprovedPurchaseRequest => 'Approved Purchase Request',
+            self::CreatedSourcingRfq => 'Created Sourcing RFQ',
+            self::PublishedSourcingRfq => 'Published Sourcing RFQ',
+            self::SubmittedSupplierQuote => 'Submitted Supplier Quote',
+            self::EvaluatedSourcingRfq => 'Evaluated Sourcing RFQ',
+            self::AwardedSourcingRfq => 'Awarded Sourcing RFQ',
+            self::IssuedPurchaseOrder => 'Issued Purchase Order',
+            self::ApprovedPurchaseOrder => 'Approved Purchase Order',
+            self::AmendedPurchaseOrder => 'Amended Purchase Order',
+            self::ReceivedPurchaseOrder => 'Received Purchase Order',
         };
     }
 

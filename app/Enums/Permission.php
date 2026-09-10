@@ -35,6 +35,15 @@ enum Permission: string
     case ReviewSupplierCompliance = 'review_supplier_compliance';
     case ApproveSuppliers = 'approve_suppliers';
     case ManageProcurement = 'manage_procurement';
+    case CreateRequisition = 'create_requisition';
+    case ApproveRequisition = 'approve_requisition';
+    case ManageSourcing = 'manage_sourcing';
+    case EvaluateBids = 'evaluate_bids';
+    case AwardProcurement = 'award_procurement';
+    case IssuePurchaseOrder = 'issue_purchase_order';
+    case ApprovePurchaseOrder = 'approve_purchase_order';
+    case ReceivePurchaseOrder = 'receive_purchase_order';
+    case ManageProcurementPolicy = 'manage_procurement_policy';
     case GenerateForecasts = 'generate_forecasts';
 
     // Administration.
@@ -56,6 +65,15 @@ enum Permission: string
             self::ReviewSupplierCompliance => 'Review supplier compliance',
             self::ApproveSuppliers => 'Approve and suspend suppliers',
             self::ManageProcurement => 'Manage procurement',
+            self::CreateRequisition => 'Create purchase requests',
+            self::ApproveRequisition => 'Approve purchase requests',
+            self::ManageSourcing => 'Manage sourcing and RFQs',
+            self::EvaluateBids => 'Evaluate supplier quotations and bids',
+            self::AwardProcurement => 'Recommend and award sourcing events',
+            self::IssuePurchaseOrder => 'Create and dispatch purchase orders',
+            self::ApprovePurchaseOrder => 'Approve purchase orders & revisions',
+            self::ReceivePurchaseOrder => 'Receive purchase order deliveries',
+            self::ManageProcurementPolicy => 'Manage procurement categories & policy',
             self::GenerateForecasts => 'Generate demand forecasts',
             self::ManageUsers => 'Manage users',
             self::ViewAuditTrail => 'View audit trail',
@@ -76,7 +94,16 @@ enum Permission: string
             self::ManageSuppliers => 'Maintain the supplier directory.',
             self::ReviewSupplierCompliance => 'Verify supplier evidence and submit accreditation reviews.',
             self::ApproveSuppliers => 'Decide accreditation and control supplier availability for procurement.',
-            self::ManageProcurement => 'Raise and approve requisitions and purchase orders.',
+            self::ManageProcurement => 'Comprehensive procurement management.',
+            self::CreateRequisition => 'Draft and submit department purchase requests with budget verification.',
+            self::ApproveRequisition => 'Approve department purchase requests within authority limit.',
+            self::ManageSourcing => 'Package requirements into RFQs and invite accredited suppliers.',
+            self::EvaluateBids => 'Execute comparative evaluation and landed cost scoring.',
+            self::AwardProcurement => 'Recommend supplier award and initiate DOA workflow.',
+            self::IssuePurchaseOrder => 'Convert sourcing awards to purchase orders and dispatch.',
+            self::ApprovePurchaseOrder => 'Authorize purchase orders and revisions in DOA chain.',
+            self::ReceivePurchaseOrder => 'Receive and inspect incoming purchase order deliveries.',
+            self::ManageProcurementPolicy => 'Configure spend categories, cost centers, and DOA policies.',
             self::GenerateForecasts => 'Run demand forecasts and save plans.',
             self::ManageUsers => 'Create staff accounts, change roles, deactivate access.',
             self::ViewAuditTrail => 'Review append-only user and authentication activity.',
@@ -95,8 +122,10 @@ enum Permission: string
         return match ($this) {
             self::ViewInventory, self::ManageItems, self::AdjustStock => 'Inventory',
             self::IssueStock, self::RecordMovements => 'Stock Movements',
-            self::ManageLocations, self::AcknowledgeAlerts => 'Warehousing',
-            self::ManageSuppliers, self::ReviewSupplierCompliance, self::ApproveSuppliers, self::ManageProcurement => 'Procurement',
+            self::ManageLocations, self::AcknowledgeAlerts, self::ReceivePurchaseOrder => 'Warehousing',
+            self::ManageSuppliers, self::ReviewSupplierCompliance, self::ApproveSuppliers, self::ManageProcurement,
+            self::CreateRequisition, self::ApproveRequisition, self::ManageSourcing, self::EvaluateBids,
+            self::AwardProcurement, self::IssuePurchaseOrder, self::ApprovePurchaseOrder, self::ManageProcurementPolicy => 'Procurement',
             self::ViewReports, self::GenerateForecasts => 'Records & Analysis',
             self::ManageUsers, self::ViewAuditTrail => 'Administration',
         };

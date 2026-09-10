@@ -82,32 +82,30 @@ enum UserRole: string
                 Permission::ManageSuppliers,
                 Permission::ReviewSupplierCompliance,
                 Permission::ManageProcurement,
+                Permission::CreateRequisition,
+                Permission::ManageSourcing,
+                Permission::EvaluateBids,
+                Permission::IssuePurchaseOrder,
                 Permission::GenerateForecasts,
             ],
 
             // Physically handles stock: receives deliveries, transfers between
-            // zones, issues to wards, and clears the alerts that result. No
-            // authority over the records themselves — an item they cannot count
-            // is a question for the inventory manager, not a row they may edit,
-            // and adjust_stock is withheld for the same reason: correcting a
-            // balance must not be done by the person who counted it.
+            // zones, issues to wards, and clears the alerts that result.
             self::WarehouseStaff => [
                 Permission::ViewInventory,
                 Permission::ViewReports,
                 Permission::IssueStock,
                 Permission::RecordMovements,
                 Permission::AcknowledgeAlerts,
+                Permission::ReceivePurchaseOrder,
             ],
 
-            // Dispenses to wards and nothing else. They need to see what is on
-            // the shelf to dispense against it, so view_inventory is granted —
-            // this is the view-only access to medicine stock the department
-            // genuinely needs. issue_stock covers dispensing; the receiving,
-            // transfer and return types stay with the warehouse.
+            // Dispenses to wards and raises departmental requisitions.
             self::PharmacyStaff => [
                 Permission::ViewInventory,
                 Permission::ViewReports,
                 Permission::IssueStock,
+                Permission::CreateRequisition,
             ],
 
             // Auditors and observers. Reads everything, writes nothing.

@@ -30,5 +30,21 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('supplier-quotes', SupplierQuoteController::class)->only(['index', 'show', 'store', 'update']);
         Route::apiResource('demand-plans', DemandPlanController::class);
         Route::get('dashboard-summary', [DashboardController::class, 'summary']);
+
+        // Enterprise Source-to-Pay (S2P) & Procure-to-Pay (P2P) Endpoints
+        Route::prefix('procurement')->middleware(\App\Http\Middleware\EnsureIdempotency::class)->group(function () {
+            Route::get('requisitions', [\App\Http\Controllers\Api\Procurement\RequisitionController::class, 'index']);
+            Route::get('requisitions/{requisition}', [\App\Http\Controllers\Api\Procurement\RequisitionController::class, 'show']);
+            Route::post('requisitions', [\App\Http\Controllers\Api\Procurement\RequisitionController::class, 'store']);
+
+            Route::get('rfqs', [\App\Http\Controllers\Api\Procurement\RfqController::class, 'index']);
+            Route::get('rfqs/{rfq}', [\App\Http\Controllers\Api\Procurement\RfqController::class, 'show']);
+            Route::post('rfqs', [\App\Http\Controllers\Api\Procurement\RfqController::class, 'store']);
+            Route::post('rfqs/{rfqId}/quotes', [\App\Http\Controllers\Api\Procurement\QuoteController::class, 'store']);
+            Route::post('rfqs/{rfqId}/evaluate', [\App\Http\Controllers\Api\Procurement\EvaluationController::class, 'evaluate']);
+            Route::post('rfqs/{rfqId}/award', [\App\Http\Controllers\Api\Procurement\AwardController::class, 'award']);
+
+            Route::post('orders/generate', [\App\Http\Controllers\Api\Procurement\OrderGenerationController::class, 'generate']);
+        });
     });
 });
