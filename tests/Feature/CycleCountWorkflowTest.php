@@ -244,4 +244,66 @@ class CycleCountWorkflowTest extends TestCase
         $doc->refresh();
         $this->assertEquals('posted', $doc->status); // Status is 'posted' after variance resolution
     }
+
+    public function test_cycle_count_show_renders_approval_button_for_independent_approver_and_enforces_sod(): void
+    {
+        $counter = $this->createWarehouseStaff();
+        $manager = $this->createInventoryManager();
+        $item = $this->createItem();
+        $location = $this->createLocation();
+
+        ItemStockLevel::create([
+            'item_id' => $item->id,
+            'storage_location_id' => $location->id,
+            'quantity' => 50,
+            'reserved_quantity' => 0,
+        ]);
+
+        $this->actingAs($manager)->post(route('inventory.cycle-counts.schedule'), [
+            'count_type' => 'ABC',
+            'storage_location_id' => $location->id,
+            'assigned_counter_id' => $counter->id,
+        ]);
+
+        $doc = CycleCountDoc::first();
+        $line = $doc->lines->first();
+
+        // When scheduled, show page informs user that physical counts are awaited
+        $responseScheduled = $this->actingAs($manager)->get(route('inventory.cycle-counts.show', $doc));
+        $responseScheduled->assertOk()
+            ->assertSee('Pending Physical Count Submission')
+            ->assertSee('Blind Physical Count Sheet')
+            ->assertDontSee('Approve &amp; Post Variances', false);
+
+        // Counter submits physical counts
+        $this->actingAs($counter)->post(route('inventory.cycle-counts.submit', $doc), [
+            'counts' => [$line->id => 45],
+        ]);
+
+        $doc->refresh();
+
+        // 1. Counter visits show page -> SoD notice is rendered, Approve button is NOT rendered
+        $responseCounter = $this->actingAs($counter)->get(route('inventory.cycle-counts.show', $doc));
+        $responseCounter->assertOk()
+            ->assertSee('Approval Locked (You are the Assigned Counter)')
+            ->assertSee('Segregation of Duties (SoD) Active')
+            ->assertDontSee('Approve &amp; Post Variances', false);
+
+        // 2. Independent Inventory Manager visits show page -> Approve button IS rendered!
+        $responseManager = $this->actingAs($manager)->get(route('inventory.cycle-counts.show', $doc));
+        $responseManager->assertOk()
+            ->assertSee('Approve &amp; Post Variances', false)
+            ->assertSee('Variance Analysis &amp; Reconciliation Matrix', false);
+
+        // 3. Manager approves
+        $this->actingAs($manager)->post(route('inventory.cycle-counts.approve', $doc));
+        $doc->refresh();
+
+        // 4. After posting, show page displays Reconciled & Posted and keeps variance table
+        $responsePosted = $this->actingAs($manager)->get(route('inventory.cycle-counts.show', $doc));
+        $responsePosted->assertOk()
+            ->assertSee('Reconciled &amp; Posted', false)
+            ->assertSee('Variance Analysis &amp; Reconciliation Matrix', false);
+    }
 }
+

@@ -17,7 +17,7 @@
                 </p>
             </div>
             <div class="flex items-center gap-3">
-                @if($cycleCountDoc->status === 'completed' && auth()->user()->can(\App\Enums\Permission::ApproveAdjustment->value) && auth()->id() !== $cycleCountDoc->assigned_counter_id)
+                @if(in_array($cycleCountDoc->status, ['completed', 'recount_pending']) && auth()->user()->can(\App\Enums\Permission::ApproveAdjustment->value) && auth()->id() !== $cycleCountDoc->assigned_counter_id)
                     <form action="{{ route('inventory.cycle-counts.approve', $cycleCountDoc) }}" method="POST">
                         @csrf
                         <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
@@ -27,6 +27,28 @@
                             Approve &amp; Post Variances
                         </button>
                     </form>
+                @elseif(in_array($cycleCountDoc->status, ['completed', 'recount_pending']) && auth()->id() === $cycleCountDoc->assigned_counter_id)
+                    <span class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-sm" title="Internal control policy requires an independent approver.">
+                        <svg class="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m0 0v2m0-2h2m-2 0H10m4-11a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        Approval Locked (You are the Assigned Counter)
+                    </span>
+                @elseif(in_array($cycleCountDoc->status, ['completed', 'recount_pending']))
+                    <span class="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-medium text-neutral-600">
+                        Awaiting Approver (Inventory Manager / Admin)
+                    </span>
+                @elseif(in_array($cycleCountDoc->status, ['posted', 'approved']))
+                    <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                        <svg class="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Reconciled &amp; Posted
+                    </span>
+                @elseif(in_array($cycleCountDoc->status, ['scheduled', 'in_progress', 'generated']))
+                    <span class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800">
+                        Pending Physical Count Submission
+                    </span>
                 @endif
             </div>
         </div>
@@ -78,15 +100,15 @@
             @endif
 
             {{-- Segregation of Duties Notice --}}
-            @if($cycleCountDoc->status === 'completed' && auth()->id() === $cycleCountDoc->assigned_counter_id)
-                <div class="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-800 flex items-start gap-3 shadow-sm">
-                    <svg class="h-5 w-5 text-neutral-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            @if(in_array($cycleCountDoc->status, ['completed', 'recount_pending']) && auth()->id() === $cycleCountDoc->assigned_counter_id)
+                <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-3 shadow-sm">
+                    <svg class="h-5 w-5 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m0 0v2m0-2h2m-2 0H10m4-11a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
                     <div>
-                        <p class="font-semibold text-neutral-900">Segregation of Duties Enforced</p>
-                        <p class="text-xs text-neutral-600 mt-0.5">
-                            You recorded the physical counts for this audit document. In compliance with internal controls, the counting officer cannot approve ledger variance adjustments. An authorized inventory manager must review and post these adjustments.
+                        <p class="font-bold text-amber-900">Segregation of Duties (SoD) Active: Independent Approval Required</p>
+                        <p class="text-xs text-amber-800 mt-0.5">
+                            You are the <strong>Assigned Counter</strong> who submitted the physical counts for this document. Under hospital internal controls and GxP compliance, the counting officer cannot approve ledger variance adjustments. An independent <strong>Inventory Manager</strong>, <strong>Administrator</strong>, or <strong>Super Administrator</strong> must log in to review and post these adjustments.
                         </p>
                     </div>
                 </div>
@@ -98,17 +120,22 @@
                     <div>
                         <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">Document Status</p>
                         <div class="mt-2">
-                            @if($cycleCountDoc->status === 'scheduled')
+                            @if(in_array($cycleCountDoc->status, ['scheduled', 'in_progress', 'generated']))
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
                                     <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
                                     Scheduled (Awaiting Counts)
                                 </span>
                             @elseif($cycleCountDoc->status === 'completed')
-                                <span class="inline-flex items-center gap-1.5 rounded-full bg-primary-100 px-3 py-1 text-xs font-semibold text-primary-800">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-primary-500"></span>
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
                                     Completed (Pending Approval)
                                 </span>
-                            @elseif($cycleCountDoc->status === 'approved')
+                            @elseif($cycleCountDoc->status === 'recount_pending')
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                    Recount Flagged (Pending Review)
+                                </span>
+                            @elseif(in_array($cycleCountDoc->status, ['posted', 'approved']))
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
                                     <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
                                     Approved &amp; Reconciled
@@ -150,8 +177,44 @@
                 </div>
             </div>
 
+            {{-- Approver Role & Governance Guide --}}
+            <div class="rounded-xl border border-neutral-200 bg-neutral-50/90 p-4 shadow-sm text-xs text-neutral-700">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-200 pb-2.5 mb-2.5">
+                    <span class="font-bold text-neutral-900 flex items-center gap-1.5">
+                        <svg class="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        Cycle Count Approval &amp; Internal Controls Matrix
+                    </span>
+                    <span class="text-neutral-500">Dual-Authorization &amp; Segregation of Duties (SoD) Protocol</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="rounded-lg border border-neutral-200/80 bg-white p-2.5">
+                        <span class="font-semibold text-neutral-900 block mb-1 text-emerald-700">Sino ang Pwedeng Mag-Approve?</span>
+                        <ul class="list-disc list-inside space-y-1 text-neutral-600">
+                            <li><strong class="text-neutral-800">Inventory Manager:</strong> Primary approver para sa adjustments up to ₱25,000.</li>
+                            <li><strong class="text-neutral-800">Administrator / Super Admin:</strong> Required kapag ang variance ay lumagpas sa ₱25,000.</li>
+                        </ul>
+                    </div>
+                    <div class="rounded-lg border border-neutral-200/80 bg-white p-2.5">
+                        <span class="font-semibold text-neutral-900 block mb-1 text-amber-700">Bakit Walang Approve Button?</span>
+                        <ul class="list-disc list-inside space-y-1 text-neutral-600">
+                            <li><strong>Scheduled pa lang:</strong> Kailangan munang i-encode at i-submit ang physical counts sa ibaba.</li>
+                            <li><strong>Assigned Counter ka:</strong> Bawal aprubahan ng nagbilang ang sarili niyang bilang (SoD rule).</li>
+                        </ul>
+                    </div>
+                    <div class="rounded-lg border border-neutral-200/80 bg-white p-2.5">
+                        <span class="font-semibold text-neutral-900 block mb-1 text-indigo-700">Dual-Tier Variance Thresholds</span>
+                        <ul class="list-disc list-inside space-y-1 text-neutral-600">
+                            <li><strong>&gt; 2% o &gt; ₱5,000:</strong> Auto-flagged for recount verification bago i-reconcile.</li>
+                            <li><strong>&gt; ₱25,000:</strong> Strict requirement para sa Plant Controller / Administrator authorization.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
             {{-- IF COUNTING IN PROGRESS: BLIND INPUT FORM --}}
-            @if(in_array($cycleCountDoc->status, ['scheduled', 'in_progress']))
+            @if(in_array($cycleCountDoc->status, ['scheduled', 'in_progress', 'generated']))
                 <div class="rounded-xl border border-neutral-200 bg-white shadow-sm overflow-hidden">
                     <div class="border-b border-neutral-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div>
@@ -209,8 +272,8 @@
                 </div>
             @endif
 
-            {{-- IF COMPLETED OR APPROVED: VARIANCE REVELATION TABLE --}}
-            @if(in_array($cycleCountDoc->status, ['completed', 'approved']))
+            {{-- IF COMPLETED, RECOUNT PENDING, OR POSTED: VARIANCE REVELATION TABLE --}}
+            @if(in_array($cycleCountDoc->status, ['completed', 'recount_pending', 'posted', 'approved']))
                 <div class="rounded-xl border border-neutral-200 bg-white shadow-sm overflow-hidden">
                     <div class="border-b border-neutral-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div>

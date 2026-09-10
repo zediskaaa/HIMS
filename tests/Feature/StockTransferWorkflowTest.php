@@ -230,4 +230,35 @@ class StockTransferWorkflowTest extends TestCase
             ->first();
         $this->assertEquals(0, $inTransitLevel->in_transit_quantity);
     }
+
+    public function test_initiating_stock_transfer_validates_stock_availability_and_rejects_insufficient_quantity(): void
+    {
+        extract($this->createSetup());
+
+        $this->actingAs($staff);
+
+        // Source location has 100 units. Requesting 150 units must fail validation.
+        $response = $this->from(route('inventory.transfers.index'))->post(route('inventory.transfers.store'), [
+            'source_location_id' => $source->id,
+            'destination_location_id' => $destination->id,
+            'notes' => 'Excess transfer request',
+            'lines' => [
+                ['item_id' => $item->id, 'quantity' => 150],
+            ],
+        ]);
+
+        $response->assertRedirect(route('inventory.transfers.index'));
+        $response->assertSessionHasErrors(['lines.0.quantity']);
+
+        // Verify index view provides locationStockMap for reactive validation
+        $indexResponse = $this->get(route('inventory.transfers.index'));
+        $indexResponse->assertOk();
+        $locationStockMap = $indexResponse->viewData('locationStockMap');
+        $this->assertArrayHasKey($source->id, $locationStockMap);
+        $this->assertEquals(100, $locationStockMap[$source->id][$item->id]);
+
+        // Verify that no transfer was created
+        $this->assertEquals(0, StockTransfer::count());
+    }
 }
+

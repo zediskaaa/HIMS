@@ -5,14 +5,17 @@ namespace App\Http\Controllers\Inventory;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
+use App\Models\ItemStockLevel;
 use App\Models\StockTransfer;
 use App\Models\StorageLocation;
 use App\Services\Inventory\TransferService;
+use App\Services\InventoryAutomationService;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class StockTransferController extends Controller implements HasMiddleware
@@ -26,7 +29,10 @@ class StockTransferController extends Controller implements HasMiddleware
         ];
     }
 
-    public function __construct(private readonly TransferService $transferService) {}
+    public function __construct(
+        private readonly TransferService $transferService,
+        private readonly InventoryAutomationService $automationService
+    ) {}
 
     public function index(): View
     {
@@ -44,7 +50,18 @@ class StockTransferController extends Controller implements HasMiddleware
 
         $items = InventoryItem::where('quantity_on_hand', '>', 0)->orderBy('name')->get();
 
-        return view('inventory.transfers.index', compact('transfers', 'locations', 'items'));
+        $stockLevels = ItemStockLevel::query()
+            ->where('quantity', '>', 0)
+            ->select('item_id', 'storage_location_id', DB::raw('SUM(quantity) as available_qty'))
+            ->groupBy('item_id', 'storage_location_id')
+            ->get();
+
+        $locationStockMap = [];
+        foreach ($stockLevels as $sl) {
+            $locationStockMap[$sl->storage_location_id][$sl->item_id] = (int) $sl->available_qty;
+        }
+
+        return view('inventory.transfers.index', compact('transfers', 'locations', 'items', 'locationStockMap'));
     }
 
     public function show(StockTransfer $stockTransfer): View
@@ -64,7 +81,28 @@ class StockTransferController extends Controller implements HasMiddleware
             'lines.*.item_id' => ['required', 'exists:inventory_items,id'],
             'lines.*.quantity' => ['required', 'integer', 'min:1'],
             'lines.*.item_batch_id' => ['nullable', 'exists:item_batches,id'],
+        ], [
+            'destination_location_id.different' => 'Ang Origin at Destination location ay hindi maaaring magkatulad.',
         ]);
+
+        $sourceLocation = StorageLocation::find($validated['source_location_id']);
+        $insufficientErrors = [];
+        foreach ($validated['lines'] as $index => $line) {
+            $available = $this->automationService->availableAt((int) $line['item_id'], (int) $validated['source_location_id'], $line['item_batch_id'] ?? null);
+            $qty = (int) $line['quantity'];
+            if ($qty > $available) {
+                $item = InventoryItem::find($line['item_id']);
+                $itemName = $item ? $item->name : "Item #{$line['item_id']}";
+                $locName = $sourceLocation ? $sourceLocation->name : 'Origin Location';
+                $insufficientErrors["lines.{$index}.quantity"] = "Kulang ang stock para sa {$itemName} sa {$locName}. Mayroon lamang {$available} units na available, ngunit {$qty} units ang inilagay mo.";
+            }
+        }
+
+        if (!empty($insufficientErrors)) {
+            return redirect()->back()
+                ->withErrors($insufficientErrors)
+                ->withInput();
+        }
 
         try {
             $transfer = $this->transferService->dispatchTransfer($validated, $request->user());

@@ -131,7 +131,7 @@
                                         <p class="text-neutral-500">{{ $doc->assignedCounter->email ?? '' }}</p>
                                     </td>
                                     <td class="px-6 py-4">
-                                        @if($doc->status === 'scheduled')
+                                        @if(in_array($doc->status, ['scheduled', 'generated']))
                                             <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
                                                 Scheduled (Pending Count)
                                             </span>
@@ -140,10 +140,14 @@
                                                 Counting in Progress
                                             </span>
                                         @elseif($doc->status === 'completed')
-                                            <span class="inline-flex items-center rounded-full bg-primary-100 px-2.5 py-0.5 text-xs font-semibold text-primary-800">
+                                            <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800">
                                                 Counted (Pending Approval)
                                             </span>
-                                        @elseif($doc->status === 'approved')
+                                        @elseif($doc->status === 'recount_pending')
+                                            <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                                                Recount Flagged (Pending Review)
+                                            </span>
+                                        @elseif(in_array($doc->status, ['posted', 'approved']))
                                             <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
                                                 Approved &amp; Reconciled
                                             </span>
@@ -158,7 +162,7 @@
                                     </td>
                                     <td class="px-6 py-4 text-right">
                                         <a href="{{ route('inventory.cycle-counts.show', $doc) }}" class="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition">
-                                            {{ in_array($doc->status, ['scheduled', 'in_progress']) ? 'Enter Blind Counts' : 'Review Audit' }}
+                                            {{ in_array($doc->status, ['scheduled', 'in_progress', 'generated']) ? 'Enter Blind Counts' : 'Review Audit' }}
                                         </a>
                                     </td>
                                 </tr>
