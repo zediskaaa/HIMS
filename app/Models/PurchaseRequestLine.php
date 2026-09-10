@@ -50,4 +50,14 @@ class PurchaseRequestLine extends Model
     {
         return $this->belongsTo(SupplierContract::class, 'contract_id');
     }
+
+    public function getRequestedQuantityAttribute(): int
+    {
+        return (int) ($this->quantity ?? 0);
+    }
+
+    public function setRequestedQuantityAttribute($value): void
+    {
+        $this->attributes['quantity'] = $value;
+    }
 }

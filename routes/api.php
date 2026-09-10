@@ -46,5 +46,38 @@ Route::prefix('v1')->group(function () {
 
             Route::post('orders/generate', [\App\Http\Controllers\Api\Procurement\OrderGenerationController::class, 'generate']);
         });
+
+        // Enterprise Materials Management & Inventory Endpoints
+        Route::prefix('inventory')->middleware(\App\Http\Middleware\EnsureIdempotency::class)->group(function () {
+            Route::get('receipts', [\App\Http\Controllers\Api\Inventory\GoodsReceiptController::class, 'index']);
+            Route::get('receipts/{goodsReceiptNote}', [\App\Http\Controllers\Api\Inventory\GoodsReceiptController::class, 'show']);
+            Route::post('receipts', [\App\Http\Controllers\Api\Inventory\GoodsReceiptController::class, 'store']);
+
+            Route::post('qc/{batchId}/release', [\App\Http\Controllers\Api\Inventory\QualityControlController::class, 'releaseByBatch']);
+            Route::post('qc/inspections/{inspection}/release', [\App\Http\Controllers\Api\Inventory\QualityControlController::class, 'releaseInspection']);
+            Route::post('qc/inspections/{inspection}/reject', [\App\Http\Controllers\Api\Inventory\QualityControlController::class, 'rejectInspection']);
+
+            Route::get('requisitions', [\App\Http\Controllers\Api\Inventory\RequisitionController::class, 'index']);
+            Route::get('requisitions/{requisition}', [\App\Http\Controllers\Api\Inventory\RequisitionController::class, 'show']);
+            Route::post('requisitions', [\App\Http\Controllers\Api\Inventory\RequisitionController::class, 'store']);
+            Route::post('requisitions/{reqId}/approve', [\App\Http\Controllers\Api\Inventory\RequisitionController::class, 'approve']);
+            Route::post('requisitions/{reqId}/reject', [\App\Http\Controllers\Api\Inventory\RequisitionController::class, 'reject']);
+            Route::get('requisitions/{reqId}/picklist', [\App\Http\Controllers\Api\Inventory\RequisitionController::class, 'picklist']);
+            Route::post('requisitions/{reqId}/issue', [\App\Http\Controllers\Api\Inventory\RequisitionController::class, 'issue']);
+
+            Route::get('cycle-counts', [\App\Http\Controllers\Api\Inventory\CycleCountController::class, 'index']);
+            Route::get('cycle-counts/{cycleCountDoc}', [\App\Http\Controllers\Api\Inventory\CycleCountController::class, 'show']);
+            Route::post('cycle-counts/schedule', [\App\Http\Controllers\Api\Inventory\CycleCountController::class, 'schedule']);
+            Route::post('cycle-counts/{countId}/submit', [\App\Http\Controllers\Api\Inventory\CycleCountController::class, 'submitCounts']);
+            Route::post('cycle-counts/{countId}/approve', [\App\Http\Controllers\Api\Inventory\CycleCountController::class, 'approve']);
+
+            Route::get('adjustments', [\App\Http\Controllers\Api\Inventory\AdjustmentController::class, 'index']);
+            Route::get('adjustments/{inventoryAdjustment}', [\App\Http\Controllers\Api\Inventory\AdjustmentController::class, 'show']);
+            Route::post('adjustments', [\App\Http\Controllers\Api\Inventory\AdjustmentController::class, 'store']);
+            Route::post('adjustments/{adjustmentId}/authorize', [\App\Http\Controllers\Api\Inventory\AdjustmentController::class, 'authorizeAdjustment']);
+
+            Route::get('items/{itemId}/replenishment-status', [\App\Http\Controllers\Api\Inventory\ReplenishmentController::class, 'status']);
+            Route::post('items/{itemId}/replenish', [\App\Http\Controllers\Api\Inventory\ReplenishmentController::class, 'evaluate']);
+        });
     });
 });

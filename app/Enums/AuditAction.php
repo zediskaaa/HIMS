@@ -39,6 +39,23 @@ enum AuditAction: string
     case ApprovedPurchaseOrder = 'approved_purchase_order';
     case AmendedPurchaseOrder = 'amended_purchase_order';
     case ReceivedPurchaseOrder = 'received_purchase_order';
+    case CreatedGoodsReceipt = 'created_goods_receipt';
+    case PostedGoodsReceipt = 'posted_goods_receipt';
+    case CompletedQualityInspection = 'completed_quality_inspection';
+    case ReleasedQuarantineStock = 'released_quarantine_stock';
+    case RejectedQuarantineStock = 'rejected_quarantine_stock';
+    case CreatedMaterialRequisition = 'created_material_requisition';
+    case ApprovedMaterialRequisition = 'approved_material_requisition';
+    case RejectedMaterialRequisition = 'rejected_material_requisition';
+    case CancelledMaterialRequisition = 'cancelled_material_requisition';
+    case IssuedMaterialRequisition = 'issued_material_requisition';
+    case AcknowledgedMaterialIssuance = 'acknowledged_material_issuance';
+    case DispatchedStockTransfer = 'dispatched_stock_transfer';
+    case ReceivedStockTransfer = 'received_stock_transfer';
+    case ScheduledCycleCount = 'scheduled_cycle_count';
+    case RecordedBlindCount = 'recorded_blind_count';
+    case ApprovedInventoryAdjustment = 'approved_inventory_adjustment';
+    case PostedInventoryAdjustment = 'posted_inventory_adjustment';
 
     public function label(): string
     {
@@ -78,6 +95,23 @@ enum AuditAction: string
             self::ApprovedPurchaseOrder => 'Approved Purchase Order',
             self::AmendedPurchaseOrder => 'Amended Purchase Order',
             self::ReceivedPurchaseOrder => 'Received Purchase Order',
+            self::CreatedGoodsReceipt => 'Created Goods Receipt',
+            self::PostedGoodsReceipt => 'Posted Goods Receipt',
+            self::CompletedQualityInspection => 'Completed Quality Inspection',
+            self::ReleasedQuarantineStock => 'Released Quarantine Stock',
+            self::RejectedQuarantineStock => 'Rejected Quarantine Stock',
+            self::CreatedMaterialRequisition => 'Created Material Requisition',
+            self::ApprovedMaterialRequisition => 'Approved Material Requisition',
+            self::RejectedMaterialRequisition => 'Rejected Material Requisition',
+            self::CancelledMaterialRequisition => 'Cancelled Material Requisition',
+            self::IssuedMaterialRequisition => 'Issued Material Requisition',
+            self::AcknowledgedMaterialIssuance => 'Acknowledged Material Issuance',
+            self::DispatchedStockTransfer => 'Dispatched Stock Transfer',
+            self::ReceivedStockTransfer => 'Received Stock Transfer',
+            self::ScheduledCycleCount => 'Scheduled Cycle Count',
+            self::RecordedBlindCount => 'Recorded Blind Count',
+            self::ApprovedInventoryAdjustment => 'Approved Inventory Adjustment',
+            self::PostedInventoryAdjustment => 'Posted Inventory Adjustment',
         };
     }
 

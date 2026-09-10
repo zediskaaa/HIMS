@@ -22,11 +22,17 @@ class ItemStockLevel extends Model
         'item_batch_id',
         'quantity',
         'reserved_quantity',
+        'quarantined_quantity',
+        'blocked_quantity',
+        'in_transit_quantity',
     ];
 
     protected $casts = [
         'quantity' => 'integer',
         'reserved_quantity' => 'integer',
+        'quarantined_quantity' => 'integer',
+        'blocked_quantity' => 'integer',
+        'in_transit_quantity' => 'integer',
     ];
 
     public function item(): BelongsTo

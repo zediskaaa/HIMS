@@ -4,14 +4,18 @@ use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\PermissionMatrixController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AuthenticatorController;
+use App\Http\Controllers\Inventory\CycleCountController;
 use App\Http\Controllers\Inventory\DemandForecastController;
+use App\Http\Controllers\Inventory\GoodsReceiptController;
 use App\Http\Controllers\Inventory\InventoryController;
 use App\Http\Controllers\Inventory\InventoryItemController;
+use App\Http\Controllers\Inventory\MaterialRequisitionController;
 use App\Http\Controllers\Inventory\ProcurementController;
 use App\Http\Controllers\Inventory\PurchaseOrderController;
 use App\Http\Controllers\Inventory\ReportController;
 use App\Http\Controllers\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Inventory\StockMovementController;
+use App\Http\Controllers\Inventory\StockTransferController;
 use App\Http\Controllers\Inventory\StorageLocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SupplierController;
@@ -74,6 +78,40 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::post('/inventory/stock-movements', [StockMovementController::class, 'store'])->name('inventory.stock-movements.store');
     Route::get('/inventory/adjustments', [StockAdjustmentController::class, 'index'])->name('inventory.adjustments');
     Route::post('/inventory/adjustments', [StockAdjustmentController::class, 'store'])->name('inventory.adjustments.store');
+    Route::post('/inventory/adjustments/{inventoryAdjustment}/approve', [StockAdjustmentController::class, 'approve'])->name('inventory.adjustments.approve');
+
+    // Inbound Goods Receiving & QC Inspection
+    Route::get('/inventory/receiving', [GoodsReceiptController::class, 'index'])->name('inventory.receiving.index');
+    Route::post('/inventory/receiving', [GoodsReceiptController::class, 'storeReceipt'])->name('inventory.receiving.store');
+    Route::get('/inventory/receiving/{goodsReceiptNote}', [GoodsReceiptController::class, 'show'])->name('inventory.receiving.show');
+    Route::get('/inventory/qc', [GoodsReceiptController::class, 'qcQueue'])->name('inventory.qc.index');
+    Route::post('/inventory/qc/{inspection}/release', [GoodsReceiptController::class, 'releaseQc'])->name('inventory.qc.release');
+    Route::post('/inventory/qc/{inspection}/reject', [GoodsReceiptController::class, 'rejectQc'])->name('inventory.qc.reject');
+
+    // Material Store Requisitions & Picking
+    Route::get('/inventory/requisitions', [MaterialRequisitionController::class, 'index'])->name('inventory.requisitions.index');
+    Route::post('/inventory/requisitions', [MaterialRequisitionController::class, 'store'])->name('inventory.requisitions.store');
+    Route::get('/inventory/requisitions/{requisition}', [MaterialRequisitionController::class, 'show'])->name('inventory.requisitions.show');
+    Route::post('/inventory/requisitions/{requisition}/approve', [MaterialRequisitionController::class, 'approve'])->name('inventory.requisitions.approve');
+    Route::post('/inventory/requisitions/{requisition}/reject', [MaterialRequisitionController::class, 'reject'])->name('inventory.requisitions.reject');
+    Route::post('/inventory/requisitions/{requisition}/cancel', [MaterialRequisitionController::class, 'cancel'])->name('inventory.requisitions.cancel');
+    Route::post('/inventory/requisitions/{requisition}/issue', [MaterialRequisitionController::class, 'issue'])->name('inventory.requisitions.issue');
+    Route::post('/inventory/requisitions/{requisition}/acknowledge', [MaterialRequisitionController::class, 'acknowledge'])->name('inventory.requisitions.acknowledge');
+
+    // Internal Transfers
+    Route::get('/inventory/transfers', [StockTransferController::class, 'index'])->name('inventory.transfers.index');
+    Route::post('/inventory/transfers', [StockTransferController::class, 'store'])->name('inventory.transfers.store');
+    Route::get('/inventory/transfers/{stockTransfer}', [StockTransferController::class, 'show'])->name('inventory.transfers.show');
+    Route::post('/inventory/transfers/{stockTransfer}/receive', [StockTransferController::class, 'receive'])->name('inventory.transfers.receive');
+
+    // Cycle Counting
+    Route::get('/inventory/cycle-counts', [CycleCountController::class, 'index'])->name('inventory.cycle-counts.index');
+    Route::post('/inventory/cycle-counts', [CycleCountController::class, 'schedule'])->name('inventory.cycle-counts.schedule');
+    Route::get('/inventory/cycle-counts/{cycleCountDoc}', [CycleCountController::class, 'show'])->name('inventory.cycle-counts.show');
+    Route::post('/inventory/cycle-counts/{cycleCountDoc}/counts', [CycleCountController::class, 'submitCounts'])->name('inventory.cycle-counts.submit');
+    Route::post('/inventory/cycle-counts/{cycleCountDoc}/approve', [CycleCountController::class, 'approve'])->name('inventory.cycle-counts.approve');
+    Route::post('/inventory/cycle-counts/calculate-abc', [CycleCountController::class, 'calculateAbc'])->name('inventory.cycle-counts.abc');
+
     Route::get('/inventory/logistics', [InventoryController::class, 'logistics'])->name('inventory.logistics');
     Route::get('/inventory/purchases', [ProcurementController::class, 'index'])->name('inventory.purchases');
     Route::post('/inventory/purchases/requests', [ProcurementController::class, 'storeRequest'])->name('inventory.purchases.requests.store');

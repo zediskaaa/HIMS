@@ -42,4 +42,30 @@ class AuditLogger
             'user_agent' => $request?->userAgent(),
         ]);
     }
+
+    /**
+     * Named-argument friendly alias for log().
+     *
+     * @param  array<string, mixed>  $oldValues
+     * @param  array<string, mixed>  $newValues
+     */
+    public function record(
+        AuditAction $action,
+        ?User $actor = null,
+        ?Model $target = null,
+        string $description = '',
+        ?string $targetName = null,
+        array $oldValues = [],
+        array $newValues = [],
+    ): AuditLog {
+        return $this->log(
+            action: $action,
+            actor: $actor,
+            description: $description,
+            target: $target,
+            targetName: $targetName,
+            oldValues: $oldValues,
+            newValues: $newValues,
+        );
+    }
 }

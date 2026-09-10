@@ -17,10 +17,18 @@ class InventoryItem extends Model
         'category_id',
         'unit',
         'is_batch_tracked',
+        'is_serial_tracked',
+        'abc_class',
+        'costing_method',
         'quantity_on_hand',
         'reserved_quantity',
         'reorder_level',
         'expiry_alert_days',
+        'safety_stock',
+        'reorder_point',
+        'economic_order_quantity',
+        'lead_time_days',
+        'annual_demand',
         'unit_cost',
         'total_value',
         'supplier_id',
@@ -30,10 +38,16 @@ class InventoryItem extends Model
 
     protected $casts = [
         'is_batch_tracked' => 'boolean',
+        'is_serial_tracked' => 'boolean',
         'quantity_on_hand' => 'integer',
         'reserved_quantity' => 'integer',
         'reorder_level' => 'integer',
         'expiry_alert_days' => 'integer',
+        'safety_stock' => 'integer',
+        'reorder_point' => 'integer',
+        'economic_order_quantity' => 'integer',
+        'lead_time_days' => 'integer',
+        'annual_demand' => 'integer',
         'unit_cost' => 'decimal:2',
         'total_value' => 'decimal:2',
     ];
@@ -78,6 +92,31 @@ class InventoryItem extends Model
         return $this->hasMany(SupplierProduct::class, 'item_id');
     }
 
+    public function grnLines(): HasMany
+    {
+        return $this->hasMany(GoodsReceiptNoteLine::class, 'item_id');
+    }
+
+    public function requisitionLines(): HasMany
+    {
+        return $this->hasMany(MaterialRequisitionLine::class, 'item_id');
+    }
+
+    public function transferLines(): HasMany
+    {
+        return $this->hasMany(StockTransferLine::class, 'item_id');
+    }
+
+    public function cycleCountLines(): HasMany
+    {
+        return $this->hasMany(CycleCountLine::class, 'item_id');
+    }
+
+    public function adjustments(): HasMany
+    {
+        return $this->hasMany(InventoryAdjustment::class, 'item_id');
+    }
+
     /**
      * Live total across every location. `quantity_on_hand` caches this value;
      * use this when you need the authoritative number.
@@ -85,6 +124,42 @@ class InventoryItem extends Model
     public function actualQuantityOnHand(): int
     {
         return (int) $this->stockLevels()->sum('quantity');
+    }
+
+    /**
+     * Physical on-hand inventory encompasses Unrestricted, Quarantined, and Blocked stock.
+     */
+    public function physicalQuantityOnHand(): int
+    {
+        return (int) $this->stockLevels()->selectRaw('coalesce(sum(quantity + quarantined_quantity + blocked_quantity), 0) as total')->value('total');
+    }
+
+    public function quarantinedQuantity(): int
+    {
+        return (int) $this->stockLevels()->sum('quarantined_quantity');
+    }
+
+    public function blockedQuantity(): int
+    {
+        return (int) $this->stockLevels()->sum('blocked_quantity');
+    }
+
+    public function inTransitQuantity(): int
+    {
+        return (int) $this->stockLevels()->sum('in_transit_quantity');
+    }
+
+    public function reservedQuantity(): int
+    {
+        return (int) ($this->reserved_quantity ?? $this->stockLevels()->sum('reserved_quantity'));
+    }
+
+    /**
+     * Available-to-Promise (ATP) = Unrestricted On-Hand - Committed Reservations + In-Transit.
+     */
+    public function availableToPromise(): int
+    {
+        return max(0, (int) $this->quantity_on_hand - (int) $this->reserved_quantity + $this->inTransitQuantity());
     }
 
     public function availableQuantity(): int

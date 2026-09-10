@@ -180,6 +180,109 @@ class InventoryAutomationService
         return $level;
     }
 
+    public function adjustQuarantinedStock(int $itemId, int $locationId, ?int $batchId, int $delta): ItemStockLevel
+    {
+        $level = ItemStockLevel::firstOrCreate(
+            [
+                'item_id' => $itemId,
+                'storage_location_id' => $locationId,
+                'item_batch_id' => $batchId,
+            ],
+            ['quantity' => 0, 'reserved_quantity' => 0, 'quarantined_quantity' => 0, 'blocked_quantity' => 0, 'in_transit_quantity' => 0]
+        );
+
+        $level->quarantined_quantity = max(0, (int) $level->quarantined_quantity + $delta);
+        $level->save();
+
+        return $level;
+    }
+
+    public function adjustBlockedStock(int $itemId, int $locationId, ?int $batchId, int $delta): ItemStockLevel
+    {
+        $level = ItemStockLevel::firstOrCreate(
+            [
+                'item_id' => $itemId,
+                'storage_location_id' => $locationId,
+                'item_batch_id' => $batchId,
+            ],
+            ['quantity' => 0, 'reserved_quantity' => 0, 'quarantined_quantity' => 0, 'blocked_quantity' => 0, 'in_transit_quantity' => 0]
+        );
+
+        $level->blocked_quantity = max(0, (int) $level->blocked_quantity + $delta);
+        $level->save();
+
+        return $level;
+    }
+
+    public function adjustInTransitStock(int $itemId, int $locationId, ?int $batchId, int $delta): ItemStockLevel
+    {
+        $level = ItemStockLevel::firstOrCreate(
+            [
+                'item_id' => $itemId,
+                'storage_location_id' => $locationId,
+                'item_batch_id' => $batchId,
+            ],
+            ['quantity' => 0, 'reserved_quantity' => 0, 'quarantined_quantity' => 0, 'blocked_quantity' => 0, 'in_transit_quantity' => 0]
+        );
+
+        $level->in_transit_quantity = max(0, (int) $level->in_transit_quantity + $delta);
+        $level->save();
+
+        return $level;
+    }
+
+    public function reserveStock(int $itemId, int $locationId, ?int $batchId, int $quantity): ItemStockLevel
+    {
+        $level = ItemStockLevel::firstOrCreate(
+            [
+                'item_id' => $itemId,
+                'storage_location_id' => $locationId,
+                'item_batch_id' => $batchId,
+            ],
+            ['quantity' => 0, 'reserved_quantity' => 0]
+        );
+
+        $available = $batchId !== null
+            ? $level->availableQuantity()
+            : (int) ItemStockLevel::where('item_id', $itemId)
+                ->selectRaw('coalesce(sum(quantity - reserved_quantity), 0) as avail')
+                ->value('avail');
+
+        if ($available < $quantity) {
+            throw ValidationException::withMessages([
+                'quantity' => ['Insufficient available stock to place reservation. Available: '.$available.', Requested: '.$quantity],
+            ]);
+        }
+
+        $level->reserved_quantity = (int) $level->reserved_quantity + $quantity;
+        $level->save();
+
+        $item = InventoryItem::lockForUpdate()->findOrFail($itemId);
+        $this->syncItemTotals($item);
+
+        return $level;
+    }
+
+    public function releaseReservation(int $itemId, int $locationId, ?int $batchId, int $quantity): ItemStockLevel
+    {
+        $level = ItemStockLevel::firstOrCreate(
+            [
+                'item_id' => $itemId,
+                'storage_location_id' => $locationId,
+                'item_batch_id' => $batchId,
+            ],
+            ['quantity' => 0, 'reserved_quantity' => 0]
+        );
+
+        $level->reserved_quantity = max(0, (int) $level->reserved_quantity - $quantity);
+        $level->save();
+
+        $item = InventoryItem::lockForUpdate()->findOrFail($itemId);
+        $this->syncItemTotals($item);
+
+        return $level;
+    }
+
     private function resolveStatus(InventoryItem $item): string
     {
         if ((int) $item->quantity_on_hand <= 0) {

@@ -11,6 +11,12 @@ enum MovementType: string
     case Disposal = 'disposal';
     case Issuance = 'issuance';
     case ReturnToSupplier = 'return_to_supplier';
+    case Quarantine = 'quarantine';
+    case QualityRelease = 'quality_release';
+    case QualityReject = 'quality_reject';
+    case TransferDispatch = 'transfer_dispatch';
+    case TransferReceipt = 'transfer_receipt';
+    case DepartmentReturn = 'department_return';
 
     public function label(): string
     {
@@ -22,6 +28,12 @@ enum MovementType: string
             self::Disposal => 'Disposal',
             self::Issuance => 'Issuance',
             self::ReturnToSupplier => 'Return to Supplier',
+            self::Quarantine => 'Quarantine Intake',
+            self::QualityRelease => 'Quality Release',
+            self::QualityReject => 'Quality Rejection',
+            self::TransferDispatch => 'Transfer Dispatch',
+            self::TransferReceipt => 'Transfer Receipt',
+            self::DepartmentReturn => 'Department Return',
         };
     }
 
@@ -36,6 +48,8 @@ enum MovementType: string
             self::Disposal,
             self::Issuance,
             self::ReturnToSupplier,
+            self::TransferDispatch,
+            self::QualityReject,
         ], true);
     }
 
@@ -44,7 +58,13 @@ enum MovementType: string
      */
     public function incrementsDestination(): bool
     {
-        return in_array($this, [self::StockIn, self::Transfer], true);
+        return in_array($this, [
+            self::StockIn,
+            self::Transfer,
+            self::QualityRelease,
+            self::TransferReceipt,
+            self::DepartmentReturn,
+        ], true);
     }
 
     /**
@@ -95,6 +115,12 @@ enum MovementType: string
             self::Disposal => 'write off damaged or expired stock',
             self::Issuance => 'dispense to a ward or department',
             self::ReturnToSupplier => 'send back to vendor',
+            self::Quarantine => 'intake into quarantine bin',
+            self::QualityRelease => 'release from quarantine to active stock',
+            self::QualityReject => 'reject from quarantine to blocked',
+            self::TransferDispatch => 'dispatch to in-transit location',
+            self::TransferReceipt => 'receive from in-transit into destination',
+            self::DepartmentReturn => 'return unused stock from department',
         };
     }
 

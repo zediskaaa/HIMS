@@ -29,6 +29,10 @@ enum Permission: string
 
     // Custodial — reshapes the records rather than moving the stock.
     case AdjustStock = 'adjust_stock';
+    case ApproveAdjustment = 'approve_adjustment';
+    case InspectStock = 'inspect_stock';
+    case PerformCycleCount = 'perform_cycle_count';
+    case TransferStock = 'transfer_stock';
     case ManageItems = 'manage_items';
     case ManageLocations = 'manage_locations';
     case ManageSuppliers = 'manage_suppliers';
@@ -59,6 +63,10 @@ enum Permission: string
             self::RecordMovements => 'Record stock movements',
             self::AcknowledgeAlerts => 'Acknowledge stock alerts',
             self::AdjustStock => 'Adjust stock balances',
+            self::ApproveAdjustment => 'Approve stock adjustments',
+            self::InspectStock => 'Inspect and release quarantine stock',
+            self::PerformCycleCount => 'Perform cycle counts',
+            self::TransferStock => 'Transfer stock between locations',
             self::ManageItems => 'Manage inventory items',
             self::ManageLocations => 'Manage storage locations',
             self::ManageSuppliers => 'Manage suppliers',
@@ -88,7 +96,11 @@ enum Permission: string
             self::IssueStock => 'Issue and dispense stock to wards and departments.',
             self::RecordMovements => 'Receive, transfer, dispose and return stock.',
             self::AcknowledgeAlerts => 'Clear low-stock and expiry alerts.',
-            self::AdjustStock => 'Correct a recorded balance after a cycle count.',
+            self::AdjustStock => 'Request and submit stock adjustments.',
+            self::ApproveAdjustment => 'Authorize inventory count variances and adjustments within DOA limits.',
+            self::InspectStock => 'Perform quality inspection and release or reject quarantine stock.',
+            self::PerformCycleCount => 'Schedule and record blind cycle counts.',
+            self::TransferStock => 'Dispatch and receive internal stock transfers.',
             self::ManageItems => 'Add and edit item records and categories.',
             self::ManageLocations => 'Add and edit warehouse zones, racks and bins.',
             self::ManageSuppliers => 'Maintain the supplier directory.',
@@ -120,9 +132,9 @@ enum Permission: string
     public function module(): string
     {
         return match ($this) {
-            self::ViewInventory, self::ManageItems, self::AdjustStock => 'Inventory',
-            self::IssueStock, self::RecordMovements => 'Stock Movements',
-            self::ManageLocations, self::AcknowledgeAlerts, self::ReceivePurchaseOrder => 'Warehousing',
+            self::ViewInventory, self::ManageItems, self::AdjustStock, self::ApproveAdjustment => 'Inventory',
+            self::IssueStock, self::RecordMovements, self::TransferStock => 'Stock Movements',
+            self::ManageLocations, self::AcknowledgeAlerts, self::ReceivePurchaseOrder, self::InspectStock, self::PerformCycleCount => 'Warehousing',
             self::ManageSuppliers, self::ReviewSupplierCompliance, self::ApproveSuppliers, self::ManageProcurement,
             self::CreateRequisition, self::ApproveRequisition, self::ManageSourcing, self::EvaluateBids,
             self::AwardProcurement, self::IssuePurchaseOrder, self::ApprovePurchaseOrder, self::ManageProcurementPolicy => 'Procurement',

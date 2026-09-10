@@ -77,12 +77,17 @@ enum UserRole: string
                 Permission::RecordMovements,
                 Permission::AcknowledgeAlerts,
                 Permission::AdjustStock,
+                Permission::ApproveAdjustment,
+                Permission::InspectStock,
+                Permission::PerformCycleCount,
+                Permission::TransferStock,
                 Permission::ManageItems,
                 Permission::ManageLocations,
                 Permission::ManageSuppliers,
                 Permission::ReviewSupplierCompliance,
                 Permission::ManageProcurement,
                 Permission::CreateRequisition,
+                Permission::ApproveRequisition,
                 Permission::ManageSourcing,
                 Permission::EvaluateBids,
                 Permission::IssuePurchaseOrder,
@@ -98,6 +103,9 @@ enum UserRole: string
                 Permission::RecordMovements,
                 Permission::AcknowledgeAlerts,
                 Permission::ReceivePurchaseOrder,
+                Permission::InspectStock,
+                Permission::PerformCycleCount,
+                Permission::TransferStock,
             ],
 
             // Dispenses to wards and raises departmental requisitions.
@@ -106,6 +114,7 @@ enum UserRole: string
                 Permission::ViewReports,
                 Permission::IssueStock,
                 Permission::CreateRequisition,
+                Permission::InspectStock,
             ],
 
             // Auditors and observers. Reads everything, writes nothing.

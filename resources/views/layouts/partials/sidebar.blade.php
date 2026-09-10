@@ -41,7 +41,7 @@
             </x-ui.nav-item>
         </div>
 
-        @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::AdjustStock->value])
+        @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::TransferStock->value])
             <div>
                 <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                     Inventory
@@ -61,6 +61,24 @@
                             Stock Movements
                         </x-ui.nav-item>
                     @endcan
+                    @canany([\App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::ApproveRequisition->value, \App\Enums\Permission::IssueStock->value])
+                        <x-ui.nav-item :href="route('inventory.requisitions.index')" icon="document-duplicate"
+                                       :active="request()->routeIs('inventory.requisitions*')">
+                            Store Requisitions
+                        </x-ui.nav-item>
+                    @endcanany
+                    @can(\App\Enums\Permission::TransferStock->value)
+                        <x-ui.nav-item :href="route('inventory.transfers.index')" icon="truck"
+                                       :active="request()->routeIs('inventory.transfers*')">
+                            Transfers
+                        </x-ui.nav-item>
+                    @endcan
+                    @can(\App\Enums\Permission::PerformCycleCount->value)
+                        <x-ui.nav-item :href="route('inventory.cycle-counts.index')" icon="clipboard-document-check"
+                                       :active="request()->routeIs('inventory.cycle-counts*')">
+                            Cycle Counts
+                        </x-ui.nav-item>
+                    @endcan
                     @can(\App\Enums\Permission::AdjustStock->value)
                         <x-ui.nav-item :href="route('inventory.adjustments')" icon="clipboard-document-list"
                                        :active="request()->routeIs('inventory.adjustments*')">
@@ -71,12 +89,24 @@
             </div>
         @endcanany
 
-        @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::ManageLocations->value])
+        @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::InspectStock->value])
             <div>
                 <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                     Warehousing
                 </p>
                 <div class="space-y-0.5">
+                    @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
+                        <x-ui.nav-item :href="route('inventory.receiving.index')" icon="arrow-down-tray"
+                                       :active="request()->routeIs('inventory.receiving*')">
+                            Dock Receiving
+                        </x-ui.nav-item>
+                    @endcan
+                    @can(\App\Enums\Permission::InspectStock->value)
+                        <x-ui.nav-item :href="route('inventory.qc.index')" icon="shield-check"
+                                       :active="request()->routeIs('inventory.qc*')">
+                            QC Inspection Queue
+                        </x-ui.nav-item>
+                    @endcan
                     @can(\App\Enums\Permission::ViewInventory->value)
                         <x-ui.nav-item :href="route('inventory.storage-locations')" icon="building-storefront"
                                        :active="request()->routeIs('inventory.storage-locations*')">
