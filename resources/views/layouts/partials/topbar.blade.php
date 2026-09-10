@@ -1,4 +1,4 @@
-<header class="sticky top-0 z-30 flex items-center gap-3 h-16 px-4 lg:px-8
+<header class="sticky top-0 z-30 flex min-w-0 max-w-full items-center gap-3 h-16 px-4 sm:px-6 lg:px-8
                bg-white/95 backdrop-blur border-b border-neutral-200">
     {{-- Sidebar toggle (small screens only) --}}
     <button

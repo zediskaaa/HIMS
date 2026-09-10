@@ -19,7 +19,7 @@
         $hasError ? $id.'-error' : null,
     ])->filter()->implode(' ');
 
-    $control = 'block min-h-10 w-full rounded-md border text-sm shadow-sm transition-colors '
+    $control = 'block min-h-10 min-w-0 max-w-full w-full rounded-md border text-sm shadow-sm transition-colors '
         .'placeholder:text-neutral-400 '
         .'focus:ring-2 focus:ring-offset-0 '
         .'disabled:bg-neutral-100 disabled:text-neutral-500 disabled:cursor-not-allowed '
@@ -36,7 +36,7 @@
     ]);
 @endphp
 
-<div class="space-y-1.5">
+<div class="min-w-0 max-w-full space-y-1.5">
     @if ($label)
         <label for="{{ $id }}" class="block text-sm font-medium text-neutral-700">
             {{ $label }}

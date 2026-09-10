@@ -25,9 +25,28 @@
 }
 
 @layer base {
+    html,
     body {
         @apply bg-neutral-50 text-neutral-800 antialiased;
+        max-width: 100%;
+        min-width: 0;
         margin: 0;
+        overflow-x: hidden;
+        overflow-wrap: break-word;
+    }
+
+    @supports (overflow: clip) {
+        html,
+        body {
+            overflow-x: clip;
+        }
+    }
+
+    input,
+    select,
+    textarea {
+        max-width: 100%;
+        min-width: 0;
     }
 
     /* Visible focus ring on every focusable element, not just form controls. */
@@ -73,6 +92,18 @@
 }
 
 @layer components {
+    .hims-app-shell,
+    .hims-app-content {
+        max-width: 100%;
+        min-width: 0;
+        width: 100%;
+    }
+
+    .hims-app-content > *,
+    .hims-app-content :where(.flex, .grid) > * {
+        min-width: 0;
+    }
+
     .loader {
         --color-1: currentColor;
         --size: 1.25px;
@@ -133,6 +164,26 @@
     .menu-link.active {
         @apply bg-primary-600 text-white rounded-md;
         margin: 0 2px;
+    }
+}
+
+@layer utilities {
+    /*
+     * Wide tables and tab lists remain horizontally scrollable without a
+     * visual scrollbar creating a bar across the interface.
+     */
+    .overflow-x-auto {
+        -ms-overflow-style: none;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-inline: contain;
+        scrollbar-width: none;
+        touch-action: pan-x pan-y;
+    }
+
+    .overflow-x-auto::-webkit-scrollbar {
+        display: none;
+        height: 0;
+        width: 0;
     }
 }
 

@@ -1,5 +1,5 @@
 <aside
-    class="fixed inset-y-0 left-0 z-40 flex flex-col w-64 bg-white border-r border-neutral-200
+    class="fixed inset-y-0 left-0 z-40 flex w-64 max-w-[calc(100vw-2rem)] flex-col bg-white border-r border-neutral-200
            transition-transform duration-200 lg:translate-x-0"
     :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
 >

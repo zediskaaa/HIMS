@@ -153,7 +153,7 @@
                     <x-ui.field name="contact_type" label="Purpose" type="select" :options="['primary'=>'Primary','procurement'=>'Procurement','sales'=>'Sales','finance'=>'Finance / billing','authorized_representative'=>'Authorized representative','other'=>'Other']" required />
                     <x-ui.field name="position" label="Position / title" />
                     <x-ui.field name="email" label="Email" type="email" />
-                    <div class="grid grid-cols-2 gap-3"><x-ui.field name="phone" label="Phone" /><x-ui.field name="mobile" label="Mobile" /></div>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2"><x-ui.field name="phone" label="Phone" /><x-ui.field name="mobile" label="Mobile" /></div>
                     <label class="flex gap-2 text-sm"><input type="checkbox" name="is_primary" value="1" class="rounded border-neutral-300 text-primary-600"> Primary contact</label>
                     <x-ui.button type="submit" data-loading-text="Adding contact...">Add Contact</x-ui.button>
                 </form>
@@ -211,7 +211,7 @@
                     <x-ui.field name="document_type" label="Document type" placeholder="e.g. FDA License to Operate" required />
                     <x-ui.field name="document_number" label="Reference number" />
                     <x-ui.field name="issuing_authority" label="Issuing authority" />
-                    <div class="grid grid-cols-2 gap-3"><x-ui.field name="issued_at" label="Issue date" type="date" /><x-ui.field name="expires_at" label="Expiry date" type="date" /></div>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2"><x-ui.field name="issued_at" label="Issue date" type="date" /><x-ui.field name="expires_at" label="Expiry date" type="date" /></div>
                     <x-ui.field name="file" label="File" type="file" accept=".pdf,.jpg,.jpeg,.png" required />
                     <x-ui.field name="replaces_document_id" label="Replaces / renews" type="select" :options="$supplier->documents->where('is_current', true)->mapWithKeys(fn($document) => [$document->id => $document->document_type.' — '.($document->document_number ?: $document->original_name)])->all()" placeholder="New evidence (not a replacement)" hint="Selecting a document preserves it as history and carries forward its required/blocking controls." />
                     <label class="flex gap-2 text-sm"><input type="checkbox" name="required_for_accreditation" value="1" class="rounded border-neutral-300 text-primary-600"> Required for this accreditation</label>
@@ -261,9 +261,9 @@
                         <x-ui.field name="item_id" label="Inventory item" type="select" :options="$items->mapWithKeys(fn($item) => [$item->id => $item->name.' ('.$item->sku.')'])->all()" placeholder="Select item" required />
                         <x-ui.field name="supplier_sku" label="Supplier SKU / catalog no." />
                         <x-ui.field name="supplier_product_name" label="Supplier product name" />
-                        <div class="grid grid-cols-2 gap-3"><x-ui.field name="brand" label="Brand" /><x-ui.field name="manufacturer" label="Manufacturer" /></div>
-                        <div class="grid grid-cols-2 gap-3"><x-ui.field name="pack_size" label="Pack size" /><x-ui.field name="unit" label="Supplier unit" /></div>
-                        <div class="grid grid-cols-2 gap-3"><x-ui.field name="minimum_order_quantity" label="MOQ" type="number" min="1" /><x-ui.field name="lead_time_days" label="Lead days" type="number" min="0" /></div>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2"><x-ui.field name="brand" label="Brand" /><x-ui.field name="manufacturer" label="Manufacturer" /></div>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2"><x-ui.field name="pack_size" label="Pack size" /><x-ui.field name="unit" label="Supplier unit" /></div>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2"><x-ui.field name="minimum_order_quantity" label="MOQ" type="number" min="1" /><x-ui.field name="lead_time_days" label="Lead days" type="number" min="0" /></div>
                         <label class="flex gap-2 text-sm"><input type="checkbox" name="is_preferred" value="1" class="rounded border-neutral-300 text-primary-600"> Preferred source for this item</label>
                         <x-ui.button type="submit">Link Product</x-ui.button>
                         </form>
@@ -277,9 +277,9 @@
                             @csrf
                             <x-ui.field name="supplier_product_id" label="Supplier product" type="select" :options="$activeProducts->mapWithKeys(fn($p) => [$p->id => $p->item->name])->all()" required />
                             <x-ui.field name="supplier_contract_id" label="Contract reference" type="select" :options="$supplier->contracts->filter(fn($c) => $c->effectiveStatus() === 'active')->mapWithKeys(fn($c) => [$c->id => $c->contract_number])->all()" placeholder="No contract" />
-                            <div class="grid grid-cols-2 gap-3"><x-ui.field name="currency" label="Currency" value="PHP" required /><x-ui.field name="unit_price" label="Unit price" type="number" step="0.01" min="0.01" required /></div>
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2"><x-ui.field name="currency" label="Currency" value="PHP" required /><x-ui.field name="unit_price" label="Unit price" type="number" step="0.01" min="0.01" required /></div>
                             <x-ui.field name="minimum_order_quantity" label="Minimum quantity for price" type="number" min="1" value="1" required />
-                            <div class="grid grid-cols-2 gap-3"><x-ui.field name="effective_from" label="Effective from" type="date" required /><x-ui.field name="effective_until" label="Effective until" type="date" /></div>
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2"><x-ui.field name="effective_from" label="Effective from" type="date" required /><x-ui.field name="effective_until" label="Effective until" type="date" /></div>
                             <x-ui.button type="submit">Record Price</x-ui.button>
                         </form>
                     @endif
@@ -303,7 +303,7 @@
                     @csrf
                     <x-ui.field name="contract_number" label="Contract number" required />
                     <x-ui.field name="contract_type" label="Contract type" />
-                    <div class="grid grid-cols-2 gap-3"><x-ui.field name="starts_at" label="Start date" type="date" required /><x-ui.field name="ends_at" label="End date" type="date" /></div>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2"><x-ui.field name="starts_at" label="Start date" type="date" required /><x-ui.field name="ends_at" label="End date" type="date" /></div>
                     <x-ui.field name="status" label="Record status" type="select" :options="['active'=>'Active','inactive'=>'Inactive']" required />
                     <x-ui.field name="payment_terms" label="Payment terms" type="textarea" rows="2" />
                     <x-ui.field name="delivery_terms" label="Delivery terms" type="textarea" rows="2" />

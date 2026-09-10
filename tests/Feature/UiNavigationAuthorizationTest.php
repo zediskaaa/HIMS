@@ -96,4 +96,21 @@ class UiNavigationAuthorizationTest extends TestCase
 
         $this->assertSame([], $violations, 'Emoji or symbol icons remain in: '.implode(', ', $violations));
     }
+
+    public function test_shared_layout_contains_viewport_overflow_and_mobile_width_safeguards(): void
+    {
+        $css = file_get_contents(resource_path('css/app.css'));
+        $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+        $field = file_get_contents(resource_path('views/components/ui/field.blade.php'));
+        $table = file_get_contents(resource_path('views/components/ui/table.blade.php'));
+
+        $this->assertIsString($css);
+        $this->assertStringContainsString('overflow-x: clip', $css);
+        $this->assertStringContainsString('scrollbar-width: none', $css);
+        $this->assertStringContainsString('.overflow-x-auto::-webkit-scrollbar', $css);
+        $this->assertStringContainsString('hims-app-shell', $layout);
+        $this->assertStringContainsString('hims-app-content', $layout);
+        $this->assertStringContainsString('min-w-0 max-w-full w-full', $field);
+        $this->assertStringContainsString('w-full min-w-0 max-w-full touch-pan-x', $table);
+    }
 }

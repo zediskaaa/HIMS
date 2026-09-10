@@ -176,7 +176,7 @@
                     @csrf
                     <div>
                         <label class="text-xs font-semibold uppercase text-neutral-500">Movement Direction *</label>
-                        <div class="mt-1 grid grid-cols-2 gap-2">
+                        <div class="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
                             <button type="button" @click="isInbound = false" :class="!isInbound ? 'bg-purple-600 text-white font-bold' : 'bg-neutral-100 text-neutral-700'" class="rounded-lg py-2 text-xs transition">
                                 Outbound Dispensing (Requires Yellow Rx)
                             </button>

@@ -45,7 +45,7 @@
             {{-- Search & Year Filters --}}
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <form method="GET" action="{{ route('reviews.dpri') }}" class="flex flex-wrap items-center gap-3">
-                    <div class="relative w-72">
+                    <div class="relative w-full sm:w-72">
                         <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by drug name or PNDF code..." class="w-full rounded-lg border-neutral-300 pl-9 text-sm focus:border-indigo-500 focus:ring-indigo-500">
                         <svg class="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                     </div>
@@ -122,7 +122,7 @@
                             <label class="block text-xs font-semibold text-neutral-700">Generic Drug Name <span class="text-rose-500">*</span></label>
                             <input type="text" name="drug_name" required placeholder="e.g. Amoxicillin" class="mt-1 w-full rounded-lg border-neutral-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
                         </div>
-                        <div class="grid grid-cols-2 gap-3">
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
                                 <label class="block text-xs font-semibold text-neutral-700">Dosage Form &amp; Strength</label>
                                 <input type="text" name="dosage_form_strength" placeholder="e.g. 500mg capsule" class="mt-1 w-full rounded-lg border-neutral-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -132,7 +132,7 @@
                                 <input type="text" name="unit_of_measure" required placeholder="e.g. capsule" class="mt-1 w-full rounded-lg border-neutral-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
                             </div>
                         </div>
-                        <div class="grid grid-cols-2 gap-3">
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
                                 <label class="block text-xs font-semibold text-neutral-700">DPRI Ceiling Price (₱) <span class="text-rose-500">*</span></label>
                                 <input type="number" step="0.0001" min="0" name="ceiling_price" required placeholder="e.g. 4.50" class="mt-1 w-full rounded-lg border-neutral-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">

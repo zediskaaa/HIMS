@@ -191,7 +191,7 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="grid gap-3 grid-cols-2">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
                             <label for="temperature_celsius" class="text-xs font-semibold uppercase text-neutral-500">Temperature (°C) *</label>
                             <input type="number" step="0.01" id="temperature_celsius" name="temperature_celsius" required placeholder="e.g. 4.50" class="mt-1 w-full rounded-lg border-neutral-300 text-sm font-bold">

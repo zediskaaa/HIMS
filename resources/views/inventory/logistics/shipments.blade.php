@@ -236,7 +236,7 @@
 
                         <form method="POST" action="{{ route('inventory.logistics.shipments.store') }}" class="mt-4 space-y-4">
                             @csrf
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
                                     <label class="block text-xs font-semibold uppercase text-neutral-600">Linked Purchase Order</label>
                                     <select name="purchase_order_id" class="mt-1 block w-full rounded-lg border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500">
@@ -257,7 +257,7 @@
                                 </div>
                             </div>
 
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
                                     <label class="block text-xs font-semibold uppercase text-neutral-600">Carrier / Logistics Provider *</label>
                                     <input type="text" name="carrier_name" required placeholder="e.g. Zuellig Pharma Logistics, 2GO, Lalamove"
@@ -270,7 +270,7 @@
                                 </div>
                             </div>
 
-                            <div class="grid grid-cols-3 gap-4">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 <div>
                                     <label class="block text-xs font-semibold uppercase text-neutral-600">Vehicle Plate #</label>
                                     <input type="text" name="vehicle_plate_number" placeholder="e.g. NCD-8812"
@@ -295,7 +295,7 @@
                                 <p class="mt-0.5 text-[10px] text-neutral-500">Serial Shipping Container Code per GS1-128 standard with Modulo-10 check digit.</p>
                             </div>
 
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
                                     <label class="block text-xs font-semibold uppercase text-neutral-600">Dispatch Date</label>
                                     <input type="date" name="dispatch_date" value="{{ date('Y-m-d') }}"
@@ -364,7 +364,7 @@
                             <template x-if="isColdChain">
                                 <div class="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-3">
                                     <div class="flex items-center gap-1.5 text-xs font-bold text-blue-900"><x-ui.icon name="beaker" class="h-4 w-4 shrink-0" /> Thermal Data Logger Verification</div>
-                                    <div class="grid grid-cols-2 gap-3">
+                                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                         <div>
                                             <label class="block text-[11px] font-semibold text-neutral-600">Min Recorded (°C)</label>
                                             <input type="number" step="0.1" name="temp_min" placeholder="e.g. 3.2" required

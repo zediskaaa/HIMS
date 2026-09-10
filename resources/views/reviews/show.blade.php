@@ -107,7 +107,7 @@
             @endif
 
             {{-- Key Metrics KPI Summary Cards --}}
-            <div class="grid grid-cols-2 gap-4 lg:grid-cols-5">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
                     <div class="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Total Spend Evaluated</div>
                     <div class="mt-1.5 text-xl font-bold text-neutral-900">₱ {{ number_format($review->metrics_summary['total_spend'] ?? 0, 2) }}</div>

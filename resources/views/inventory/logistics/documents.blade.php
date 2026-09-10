@@ -251,7 +251,7 @@
                                        class="mt-1 block w-full rounded-lg border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500">
                             </div>
 
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
                                     <label class="block text-xs font-semibold uppercase text-neutral-600">Document / Reference #</label>
                                     <input type="text" name="document_number" placeholder="e.g. SI-2026-00441"

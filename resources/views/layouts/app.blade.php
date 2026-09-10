@@ -29,7 +29,7 @@
     data-session-activity-url="{{ route($sessionActivityRoute) }}"
     data-session-expired-url="{{ Illuminate\Support\Facades\URL::signedRoute($sessionExpiredRoute, absolute: false) }}"
 >
-    <div x-data="{ sidebarOpen: false }" class="min-h-full min-w-0">
+    <div x-data="{ sidebarOpen: false }" class="hims-app-shell min-h-full overflow-x-clip">
 
         @include('layouts.partials.sidebar')
 
@@ -43,11 +43,11 @@
             aria-hidden="true"
         ></div>
 
-        <div class="min-w-0 lg:pl-64">
+        <div class="w-full min-w-0 max-w-full lg:pl-64">
             @include('layouts.partials.topbar')
 
-            <main class="min-w-0 px-4 py-6 lg:px-8 lg:py-8">
-                <div class="mx-auto min-w-0 max-w-7xl space-y-6">
+            <main class="hims-app-content overflow-x-clip px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+                <div class="mx-auto w-full min-w-0 max-w-7xl space-y-6">
                     {{-- Legacy pages pass a $header slot; new pages use <x-ui.page-header>. --}}
                     @isset($header)
                         <div>{{ $header }}</div>

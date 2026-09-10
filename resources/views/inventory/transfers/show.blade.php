@@ -232,7 +232,7 @@
                                             <p class="text-xs text-neutral-500 font-mono">Dispatched: {{ $line->quantity }} units</p>
                                             <input type="hidden" name="lines[{{ $idx }}][line_id]" value="{{ $line->id }}">
                                         </div>
-                                        <div class="grid grid-cols-3 gap-3">
+                                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                             <div>
                                                 <label class="block text-xs font-semibold text-emerald-700">Received Qty</label>
                                                 <input type="number" name="lines[{{ $idx }}][received_quantity]" min="0" max="{{ $line->quantity }}" value="{{ $line->quantity }}" required
