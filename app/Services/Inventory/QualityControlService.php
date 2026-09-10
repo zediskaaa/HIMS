@@ -10,8 +10,12 @@ use App\Models\QualityInspection;
 use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\User;
+use App\Models\InventorySerial;
 use App\Services\AuditLogger;
 use App\Services\InventoryAutomationService;
+use App\Services\Warehouse\LocationCompatibilityService;
+use App\Services\Warehouse\WarehouseTaskService;
+use App\Enums\WarehouseTaskType;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -20,7 +24,9 @@ class QualityControlService
 {
     public function __construct(
         private readonly InventoryAutomationService $automationService,
-        private readonly AuditLogger $auditLogger
+        private readonly AuditLogger $auditLogger,
+        private readonly LocationCompatibilityService $compatibilityService,
+        private readonly WarehouseTaskService $taskService,
     ) {}
 
     /**
@@ -51,12 +57,18 @@ class QualityControlService
             }
 
             $targetLocation = StorageLocation::findOrFail($targetLocationId);
+            $this->compatibilityService->assertCompatible($targetLocation, $item, $acceptedQuantity);
+            $receivingStaging = StorageLocation::query()
+                ->active()
+                ->where('is_receiving_staging', true)
+                ->first() ?? $targetLocation;
 
             // 1. Decrement quarantined balance
             $this->automationService->adjustQuarantinedStock($item->id, $quarantineLocId, $qi->item_batch_id, -$acceptedQuantity);
 
-            // 2. Increment unrestricted active stock balance at target bin
-            $this->automationService->adjustStockLevel($item->id, $targetLocationId, $qi->item_batch_id, $acceptedQuantity);
+            // 2. Release into receiving staging. Physical put-away happens only
+            // after the generated task is scan-validated and completed.
+            $this->automationService->adjustStockLevel($item->id, $receivingStaging->id, $qi->item_batch_id, $acceptedQuantity);
 
             // 3. Flip batch to active if batch exists
             if ($qi->item_batch_id) {
@@ -75,7 +87,7 @@ class QualityControlService
                 'quantity' => $acceptedQuantity,
                 'unit_cost' => $grnLine->unit_cost ?? $item->unit_cost,
                 'from_location_id' => $quarantineLocId,
-                'to_location_id' => $targetLocationId,
+                'to_location_id' => $receivingStaging->id,
                 'reference_type' => QualityInspection::class,
                 'reference_id' => $qi->id,
                 'remarks' => "QC Release by {$inspector->name}. Findings: " . ($findings ?? 'Conforms to standards'),
@@ -101,16 +113,40 @@ class QualityControlService
             // 6. Sync item totals and alerts
             $this->automationService->syncItemTotals($item);
 
+            if ($receivingStaging->id !== $targetLocation->id) {
+                $this->taskService->create([
+                    'task_type' => WarehouseTaskType::PutAway,
+                    'priority' => 'high',
+                    'source_location_id' => $receivingStaging->id,
+                    'destination_location_id' => $targetLocation->id,
+                    'item_id' => $item->id,
+                    'item_batch_id' => $qi->item_batch_id,
+                    'requested_quantity' => $acceptedQuantity,
+                    'idempotency_key' => "put-away-for-inspection-{$qi->id}",
+                    'due_at' => now()->addHours(4),
+                    'recommendation_reason' => 'QC-approved stock routed from receiving staging to a compatible active location.',
+                ], $inspector, $qi);
+            }
+
+            InventorySerial::query()
+                ->where('source_type', $grnLine->getMorphClass())
+                ->where('source_id', $grnLine->id)
+                ->update([
+                    'storage_location_id' => $receivingStaging->id,
+                    'status' => 'available',
+                ]);
+
             $this->auditLogger->record(
                 AuditAction::ReleasedQuarantineStock,
                 actor: $inspector,
                 target: $qi,
-                description: "Released {$acceptedQuantity} units of {$item->name} from Quarantine to {$targetLocation->name}",
+                description: "Released {$acceptedQuantity} units of {$item->name} from quarantine to receiving staging",
                 newValues: [
                     'inspection_id' => $qi->id,
                     'item_id' => $item->id,
                     'accepted_quantity' => $acceptedQuantity,
-                    'target_location' => $targetLocation->name,
+                    'staging_location' => $receivingStaging->name,
+                    'recommended_destination' => $targetLocation->name,
                 ]
             );
 

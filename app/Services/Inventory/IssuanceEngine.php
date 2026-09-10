@@ -5,24 +5,29 @@ namespace App\Services\Inventory;
 use App\Enums\AuditAction;
 use App\Enums\MovementType;
 use App\Enums\Permission;
+use App\Enums\WarehouseTaskType;
 use App\Models\InventoryItem;
 use App\Models\ItemStockLevel;
 use App\Models\MaterialRequisition;
 use App\Models\MaterialRequisitionLine;
 use App\Models\StorageLocation;
 use App\Models\User;
+use App\Models\WarehouseTask;
 use App\Services\AuditLogger;
 use App\Services\InventoryAutomationService;
+use App\Services\Warehouse\WarehouseTaskService;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class IssuanceEngine
 {
     public function __construct(
         private readonly InventoryAutomationService $automationService,
-        private readonly AuditLogger $auditLogger
+        private readonly AuditLogger $auditLogger,
+        private readonly WarehouseTaskService $warehouseTasks,
     ) {}
 
     /**
@@ -45,6 +50,8 @@ class IssuanceEngine
                 'urgency' => $data['urgency'] ?? 'routine',
                 'justification' => $data['justification'] ?? null,
             ]);
+            $requisition->requisition_number = 'MR-'.now()->format('Ymd').'-'.str_pad((string) $requisition->id, 4, '0', STR_PAD_LEFT);
+            $requisition->save();
 
             $lines = $data['lines'] ?? [];
             if (empty($lines)) {
@@ -107,6 +114,8 @@ class IssuanceEngine
                 throw new DomainException("Cannot approve requisition in status {$req->status}.");
             }
 
+            $dispatchStaging = StorageLocation::query()->active()->where('is_dispatch_staging', true)->first();
+
             foreach ($req->lines as $line) {
                 $item = InventoryItem::lockForUpdate()->findOrFail($line->item_id);
                 $requestedQty = $line->requested_quantity;
@@ -118,16 +127,35 @@ class IssuanceEngine
                     ]);
                 }
 
-                // Place hard reservation on the primary stock location or default location
-                $locId = $item->default_location_id ?? StorageLocation::where('status', 'active')->value('id');
-                if (! $locId) {
-                    throw new DomainException("No active storage location found for item {$item->name}.");
+                $allocations = $this->allocateAcrossLocations($item, $requestedQty);
+                foreach ($allocations as $allocation) {
+                    $this->automationService->reserveStock($item->id, $allocation['location_id'], $allocation['batch_id'], $allocation['quantity']);
+
+                    if ($dispatchStaging) {
+                        $this->warehouseTasks->create([
+                            'task_type' => WarehouseTaskType::Pick,
+                            'priority' => match ($req->urgency) {
+                                'stat_emergency' => 'urgent',
+                                'urgent' => 'high',
+                                default => 'normal',
+                            },
+                            'source_location_id' => $allocation['location_id'],
+                            'destination_location_id' => $dispatchStaging->id,
+                            'item_id' => $item->id,
+                            'item_batch_id' => $allocation['batch_id'],
+                            'requested_quantity' => $allocation['quantity'],
+                            'idempotency_key' => "pick-for-requisition-line-{$line->id}-location-{$allocation['location_id']}-batch-".($allocation['batch_id'] ?? 'none'),
+                            'due_at' => $req->required_date?->endOfDay(),
+                            'recommendation_reason' => $item->is_expiry_tracked || $item->is_batch_tracked
+                                ? 'Earliest eligible expiry selected first (FEFO), then warehouse pick sequence.'
+                                : 'Available stock selected by warehouse pick sequence (FIFO-compatible).',
+                        ], $approver, $line);
+                    }
                 }
 
-                $this->automationService->reserveStock($item->id, $locId, null, $requestedQty);
-
                 $line->reserved_quantity = $requestedQty;
-                $line->storage_location_id = $locId;
+                $line->storage_location_id = $allocations[0]['location_id'];
+                $line->item_batch_id = count($allocations) === 1 ? $allocations[0]['batch_id'] : null;
                 $line->line_status = 'reserved';
                 $line->save();
             }
@@ -157,15 +185,49 @@ class IssuanceEngine
      */
     public static function generateRequisitionNumber(): string
     {
-        $prefix = 'MR-'.now()->format('Ymd').'-';
-        $countToday = MaterialRequisition::where('requisition_number', 'like', "{$prefix}%")->count();
-        $seq = $countToday + 1;
-        do {
-            $candidate = $prefix.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
-            $seq++;
-        } while (MaterialRequisition::where('requisition_number', $candidate)->exists());
+        return 'MR-'.now()->format('Ymd').'-'.Str::ulid();
+    }
 
-        return $candidate;
+    /** @return array<int, array{location_id:int,batch_id:int|null,quantity:int}> */
+    private function allocateAcrossLocations(InventoryItem $item, int $quantity): array
+    {
+        $levels = ItemStockLevel::query()
+            ->where('item_stock_levels.item_id', $item->id)
+            ->whereRaw('item_stock_levels.quantity > item_stock_levels.reserved_quantity')
+            ->whereHas('location', fn ($query) => $query->active()->where('is_dispatch_staging', false))
+            ->with(['location', 'batch'])
+            ->leftJoin('item_batches', 'item_stock_levels.item_batch_id', '=', 'item_batches.id')
+            ->orderByRaw('item_batches.expiry_date is null')
+            ->orderBy('item_batches.expiry_date')
+            ->orderBy('item_stock_levels.id')
+            ->select('item_stock_levels.*')
+            ->lockForUpdate()
+            ->get();
+
+        $remaining = $quantity;
+        $allocations = [];
+        foreach ($levels as $level) {
+            if ($level->batch && ($level->batch->isExpired() || ! in_array($level->batch->status, ['active', 'available'], true))) {
+                continue;
+            }
+            $available = max(0, $level->quantity - $level->reserved_quantity);
+            $take = min($remaining, $available);
+            if ($take > 0) {
+                $allocations[] = ['location_id' => $level->storage_location_id, 'batch_id' => $level->item_batch_id, 'quantity' => $take];
+                $remaining -= $take;
+            }
+            if ($remaining === 0) {
+                break;
+            }
+        }
+
+        if ($remaining > 0) {
+            throw ValidationException::withMessages([
+                'inventory' => ["Insufficient eligible location stock for {$item->name}. Short by {$remaining}."],
+            ]);
+        }
+
+        return $allocations;
     }
 
     /**
@@ -224,17 +286,29 @@ class IssuanceEngine
             // If requisition was approved, release any placed ATP reservations
             if ($req->status === 'approved') {
                 foreach ($req->lines as $line) {
-                    if ($line->reserved_quantity > 0 && $line->storage_location_id) {
-                        $this->automationService->releaseReservation(
-                            $line->item_id,
-                            $line->storage_location_id,
-                            $line->item_batch_id,
-                            $line->reserved_quantity
-                        );
-                        $line->reserved_quantity = 0;
-                        $line->line_status = 'cancelled';
-                        $line->save();
+                    $openTasks = WarehouseTask::query()
+                        ->where('reference_type', $line->getMorphClass())
+                        ->where('reference_id', $line->id)
+                        ->where('task_type', WarehouseTaskType::Pick->value)
+                        ->whereNotIn('status', ['completed', 'cancelled'])
+                        ->lockForUpdate()
+                        ->get();
+
+                    if ($openTasks->isNotEmpty()) {
+                        foreach ($openTasks as $task) {
+                            $remainingReservation = max(0, $task->requested_quantity - $task->completed_quantity);
+                            if ($remainingReservation > 0) {
+                                $this->automationService->releaseReservation($task->item_id, $task->source_location_id, $task->item_batch_id, $remainingReservation);
+                            }
+                            $this->warehouseTasks->cancel($task, $reason ?? 'Source requisition cancelled', $actor);
+                        }
+                    } elseif ($line->reserved_quantity > 0) {
+                        $this->releaseReservedStock($line->item_id, $line->reserved_quantity);
                     }
+
+                    $line->reserved_quantity = 0;
+                    $line->line_status = 'cancelled';
+                    $line->save();
                 }
             }
 
@@ -336,6 +410,15 @@ class IssuanceEngine
                 throw new DomainException("Cannot issue requisition in status {$req->status}.");
             }
 
+            $hasWarehouseTasks = WarehouseTask::query()
+                ->where('reference_type', MaterialRequisitionLine::class)
+                ->whereIn('reference_id', $req->lines->pluck('id'))
+                ->whereNotIn('status', ['cancelled'])
+                ->exists();
+            if ($hasWarehouseTasks) {
+                throw new DomainException('This requisition is controlled by warehouse pick, pack, and dispatch tasks. Complete those tasks instead of using direct issue.');
+            }
+
             $linesInput = $issueData['lines'] ?? [];
 
             foreach ($req->lines as $line) {
@@ -358,7 +441,7 @@ class IssuanceEngine
                 // Release reserved quantity first
                 $reservedToRelease = min($line->reserved_quantity, $issueQty);
                 if ($reservedToRelease > 0) {
-                    $this->automationService->releaseReservation($item->id, (int) $locId, null, $reservedToRelease);
+                    $this->releaseReservedStock($item->id, $reservedToRelease, (int) $locId, $batchId ? (int) $batchId : null);
                     $line->reserved_quantity -= $reservedToRelease;
                 }
 
@@ -401,6 +484,38 @@ class IssuanceEngine
 
             return $req;
         });
+    }
+
+    private function releaseReservedStock(int $itemId, int $quantity, ?int $locationId = null, ?int $batchId = null): void
+    {
+        $levels = ItemStockLevel::query()
+            ->where('item_stock_levels.item_id', $itemId)
+            ->where('item_stock_levels.reserved_quantity', '>', 0)
+            ->when($locationId, fn ($query) => $query->where('item_stock_levels.storage_location_id', $locationId))
+            ->when($batchId, fn ($query) => $query->where('item_stock_levels.item_batch_id', $batchId))
+            ->with('batch')
+            ->leftJoin('item_batches', 'item_stock_levels.item_batch_id', '=', 'item_batches.id')
+            ->orderByRaw('item_batches.expiry_date is null')
+            ->orderBy('item_batches.expiry_date')
+            ->select('item_stock_levels.*')
+            ->lockForUpdate()
+            ->get();
+
+        $remaining = $quantity;
+        foreach ($levels as $level) {
+            $release = min($remaining, (int) $level->reserved_quantity);
+            if ($release > 0) {
+                $this->automationService->releaseReservation($itemId, $level->storage_location_id, $level->item_batch_id, $release);
+                $remaining -= $release;
+            }
+            if ($remaining === 0) {
+                break;
+            }
+        }
+
+        if ($remaining > 0) {
+            throw new DomainException("Cannot release {$quantity} reserved units; {$remaining} units are no longer reserved.");
+        }
     }
 
     /**

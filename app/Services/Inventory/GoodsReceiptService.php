@@ -21,6 +21,8 @@ use Carbon\Carbon;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
+use App\Models\InventorySerial;
 
 class GoodsReceiptService
 {
@@ -61,7 +63,7 @@ class GoodsReceiptService
                 ]
             );
 
-            $grnNumber = 'GRN-' . now()->format('Ymd') . '-' . str_pad((string) (GoodsReceiptNote::count() + 1), 4, '0', STR_PAD_LEFT);
+            $grnNumber = 'GRN-'.now()->format('Ymd').'-'.Str::ulid();
 
             $grn = GoodsReceiptNote::create([
                 'grn_number' => $grnNumber,
@@ -78,19 +80,10 @@ class GoodsReceiptService
 
             $linesData = $data['lines'] ?? [];
 
-            if (empty($linesData) && $po->lines()->exists()) {
-                // Default to receiving remaining quantities on all lines if not provided explicitly
-                foreach ($po->lines as $line) {
-                    $rem = $line->remainingQuantity();
-                    if ($rem > 0) {
-                        $linesData[] = [
-                            'po_line_id' => $line->id,
-                            'received_quantity' => $rem,
-                            'batch_number' => 'LOT-' . now()->format('YmdHis'),
-                            'expiry_date' => now()->addMonths(12)->toDateString(),
-                        ];
-                    }
-                }
+            if (empty($linesData)) {
+                throw ValidationException::withMessages([
+                    'lines' => ['Enter the actual received quantity and manufacturer identifiers for at least one purchase-order line.'],
+                ]);
             }
 
             $totalReceivedValue = 0.00;
@@ -131,7 +124,7 @@ class GoodsReceiptService
                     ]);
                 }
 
-                if ($item->expiry_alert_days > 0 && !$expiryDate) {
+                if ($item->is_expiry_tracked && ! $expiryDate) {
                     throw ValidationException::withMessages([
                         'lines' => ["Item {$item->name} requires an expiration date."]
                     ]);
@@ -146,6 +139,13 @@ class GoodsReceiptService
                 if ($manufacturedDate && $manufacturedDate->isFuture()) {
                     throw ValidationException::withMessages([
                         'lines' => ["Manufacturing date for {$item->name} cannot be in the future."]
+                    ]);
+                }
+
+                $serialNumber = trim((string) ($lineInput['serial_number'] ?? ''));
+                if ($item->is_serial_tracked && ($receivedQty !== 1 || $serialNumber === '')) {
+                    throw ValidationException::withMessages([
+                        'lines' => ["Serial-tracked item {$item->name} must be received one unit per line with its manufacturer serial number."],
                     ]);
                 }
 
@@ -182,10 +182,22 @@ class GoodsReceiptService
                     'lot_number' => $lineInput['lot_number'] ?? null,
                     'expiry_date' => $expiryDate,
                     'manufactured_date' => $manufacturedDate,
-                    'serial_number' => $lineInput['serial_number'] ?? null,
+                    'serial_number' => $serialNumber ?: null,
                     'status' => 'quarantined',
                     'notes' => $lineInput['notes'] ?? null,
                 ]);
+
+                if ($item->is_serial_tracked) {
+                    InventorySerial::create([
+                        'item_id' => $item->id,
+                        'item_batch_id' => $batch?->id,
+                        'storage_location_id' => $quarantineLocation->id,
+                        'serial_number' => $serialNumber,
+                        'status' => 'quarantined',
+                        'source_type' => GoodsReceiptNoteLine::class,
+                        'source_id' => $grnLine->id,
+                    ]);
+                }
 
                 // Place into quarantine stock balance
                 $this->automationService->adjustQuarantinedStock($item->id, $quarantineLocation->id, $batch?->id, $receivedQty);

@@ -208,7 +208,7 @@
                                 </div>
                                 <div>
                                     <h3 class="text-lg font-bold text-neutral-900">QC Release: Quarantine to Unrestricted Stock</h3>
-                                    <p class="text-xs text-neutral-500">Authorize stock release to target operational storage location.</p>
+                                    <p class="text-xs text-neutral-500">Select the compatible final destination; configured warehouses route released stock through receiving staging first.</p>
                                 </div>
                             </div>
 
@@ -233,6 +233,7 @@
                                             <option value="{{ $loc->id }}">{{ $loc->name }} ({{ $loc->code }}) &bull; {{ $loc->zone ?? 'Unrestricted' }}</option>
                                         @endforeach
                                     </select>
+                                    <p class="mt-1 text-xs text-neutral-500">The selected location is the put-away destination. The system creates a warehouse task when physical staging is enabled.</p>
                                 </div>
 
                                 <div>

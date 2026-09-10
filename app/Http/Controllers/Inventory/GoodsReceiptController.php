@@ -98,8 +98,11 @@ class GoodsReceiptController extends Controller implements HasMiddleware
             ->latest('inspection_date')
             ->paginate(15);
 
-        $storageLocations = StorageLocation::where('status', 'active')
-            ->where('zone', '!=', 'Quarantine')
+        $storageLocations = StorageLocation::active()
+            ->where('is_quarantine', false)
+            ->where('is_damaged_stock', false)
+            ->where('is_dispatch_staging', false)
+            ->whereNotIn('type', ['warehouse', 'zone', 'aisle', 'rack', 'shelf', 'level', 'department'])
             ->orderBy('name')
             ->get();
 
@@ -124,7 +127,7 @@ class GoodsReceiptController extends Controller implements HasMiddleware
             );
 
             return redirect()->route('inventory.qc.index')
-                ->with('success', "Stock released from quarantine to unrestricted inventory.");
+                ->with('success', 'Stock released from quarantine. If receiving staging is configured, a scan-validated put-away task now controls the final move.');
         } catch (DomainException $e) {
             return redirect()->back()->withErrors(['qc' => $e->getMessage()]);
         }

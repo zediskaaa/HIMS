@@ -17,6 +17,11 @@ use App\Http\Controllers\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Inventory\StockMovementController;
 use App\Http\Controllers\Inventory\StockTransferController;
 use App\Http\Controllers\Inventory\StorageLocationController;
+use App\Http\Controllers\Inventory\WarehouseTaskController;
+use App\Http\Controllers\Inventory\SmartWarehousingController;
+use App\Http\Controllers\Inventory\TelemetryController;
+use App\Http\Controllers\Inventory\NarcoticsVaultController;
+use App\Http\Controllers\Inventory\ConsignmentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
@@ -74,6 +79,39 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::post('/inventory/items', [InventoryItemController::class, 'store'])->name('inventory.items.store');
     Route::get('/inventory/storage-locations', [StorageLocationController::class, 'index'])->name('inventory.storage-locations');
     Route::post('/inventory/storage-locations', [StorageLocationController::class, 'store'])->name('inventory.storage-locations.store');
+    Route::patch('/inventory/storage-locations/{storageLocation}/status', [StorageLocationController::class, 'updateStatus'])->name('inventory.storage-locations.status');
+    Route::post('/inventory/storage-locations/{storageLocation}/label', [StorageLocationController::class, 'printLabel'])->name('inventory.storage-locations.label');
+    Route::get('/inventory/warehouse-tasks', [WarehouseTaskController::class, 'index'])->name('inventory.warehouse-tasks.index');
+    Route::post('/inventory/warehouse-tasks', [WarehouseTaskController::class, 'store'])->name('inventory.warehouse-tasks.store');
+    Route::get('/inventory/warehouse-tasks/{warehouseTask}', [WarehouseTaskController::class, 'show'])->name('inventory.warehouse-tasks.show');
+    Route::post('/inventory/warehouse-tasks/{warehouseTask}/assign', [WarehouseTaskController::class, 'assign'])->name('inventory.warehouse-tasks.assign');
+    Route::post('/inventory/warehouse-tasks/{warehouseTask}/start', [WarehouseTaskController::class, 'start'])->name('inventory.warehouse-tasks.start');
+    Route::post('/inventory/warehouse-tasks/{warehouseTask}/scan', [WarehouseTaskController::class, 'scan'])->name('inventory.warehouse-tasks.scan');
+    Route::post('/inventory/warehouse-tasks/{warehouseTask}/complete', [WarehouseTaskController::class, 'complete'])->name('inventory.warehouse-tasks.complete');
+    Route::post('/inventory/warehouse-tasks/{warehouseTask}/cancel', [WarehouseTaskController::class, 'cancel'])->name('inventory.warehouse-tasks.cancel');
+    Route::post('/inventory/warehouse-tasks/{warehouseTask}/label', [WarehouseTaskController::class, 'printLabel'])->name('inventory.warehouse-tasks.label');
+    Route::post('/inventory/warehouse-exceptions/{warehouseException}/resolve', [WarehouseTaskController::class, 'resolveException'])->name('inventory.warehouse-exceptions.resolve');
+
+    // Smart Warehousing Suite
+    Route::get('/inventory/warehousing', [SmartWarehousingController::class, 'dashboard'])->name('inventory.warehousing.dashboard');
+    Route::get('/inventory/warehousing/locations', [SmartWarehousingController::class, 'locations'])->name('inventory.warehousing.locations');
+    Route::post('/inventory/warehousing/locations', [SmartWarehousingController::class, 'storeLocation'])->name('inventory.warehousing.locations.store');
+    Route::get('/inventory/warehousing/scan-station', [SmartWarehousingController::class, 'scanStation'])->name('inventory.warehousing.scan-station');
+
+    // IoT Cold-Chain Telemetry & MKT
+    Route::get('/inventory/warehousing/telemetry', [TelemetryController::class, 'index'])->name('inventory.warehousing.telemetry');
+    Route::post('/inventory/warehousing/telemetry', [TelemetryController::class, 'store'])->name('inventory.warehousing.telemetry.store');
+    Route::post('/inventory/warehousing/telemetry/{location}/release', [TelemetryController::class, 'release'])->name('inventory.warehousing.telemetry.release');
+
+    // Dangerous Drugs & PDEA Narcotics Vault
+    Route::get('/inventory/warehousing/narcotics', [NarcoticsVaultController::class, 'index'])->name('inventory.warehousing.narcotics');
+    Route::post('/inventory/warehousing/narcotics', [NarcoticsVaultController::class, 'store'])->name('inventory.warehousing.narcotics.store');
+    Route::get('/inventory/warehousing/narcotics/export', [NarcoticsVaultController::class, 'exportReport'])->name('inventory.warehousing.narcotics.export');
+
+    // Surgical Consignment & Bill-Only Implants
+    Route::get('/inventory/warehousing/consignment', [ConsignmentController::class, 'index'])->name('inventory.warehousing.consignment');
+    Route::post('/inventory/warehousing/consignment/consume', [ConsignmentController::class, 'consume'])->name('inventory.warehousing.consignment.consume');
+
     Route::get('/inventory/stock-movements', [StockMovementController::class, 'index'])->name('inventory.stock-movements');
     Route::post('/inventory/stock-movements', [StockMovementController::class, 'store'])->name('inventory.stock-movements.store');
     Route::get('/inventory/adjustments', [StockAdjustmentController::class, 'index'])->name('inventory.adjustments');

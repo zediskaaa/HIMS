@@ -23,6 +23,8 @@ class StockMovement extends Model
         'reference_type',
         'reference_id',
         'remarks',
+        'hash',
+        'previous_hash',
         'moved_at',
         'user_id',
     ];

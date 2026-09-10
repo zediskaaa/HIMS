@@ -47,6 +47,15 @@ enum Permission: string
     case IssuePurchaseOrder = 'issue_purchase_order';
     case ApprovePurchaseOrder = 'approve_purchase_order';
     case ReceivePurchaseOrder = 'receive_purchase_order';
+    case ViewWarehouseTasks = 'view_warehouse_tasks';
+    case ManageWarehouseTasks = 'manage_warehouse_tasks';
+    case ExecuteWarehouseTasks = 'execute_warehouse_tasks';
+    case ResolveWarehouseExceptions = 'resolve_warehouse_exceptions';
+    case PrintWarehouseLabels = 'print_warehouse_labels';
+    case ManageWarehouseTopology = 'manage_warehouse_topology';
+    case ManageTelemetryExcursions = 'manage_telemetry_excursions';
+    case AccessNarcoticsVault = 'access_narcotics_vault';
+    case RecordConsignments = 'record_consignments';
     case ManageProcurementPolicy = 'manage_procurement_policy';
     case GenerateForecasts = 'generate_forecasts';
 
@@ -81,6 +90,15 @@ enum Permission: string
             self::IssuePurchaseOrder => 'Create and dispatch purchase orders',
             self::ApprovePurchaseOrder => 'Approve purchase orders & revisions',
             self::ReceivePurchaseOrder => 'Receive purchase order deliveries',
+            self::ViewWarehouseTasks => 'View warehouse tasks and scans',
+            self::ManageWarehouseTasks => 'Create, assign, and cancel warehouse tasks',
+            self::ExecuteWarehouseTasks => 'Execute assigned warehouse tasks',
+            self::ResolveWarehouseExceptions => 'Resolve warehouse exceptions',
+            self::PrintWarehouseLabels => 'Print internal warehouse labels',
+            self::ManageWarehouseTopology => 'Configure warehouse zones and spatial hierarchy',
+            self::ManageTelemetryExcursions => 'Monitor telemetry and release excursion holds',
+            self::AccessNarcoticsVault => 'Access and execute narcotics vault operations',
+            self::RecordConsignments => 'Record surgical consignment implant consumption',
             self::ManageProcurementPolicy => 'Manage procurement categories & policy',
             self::GenerateForecasts => 'Generate demand forecasts',
             self::ManageUsers => 'Manage users',
@@ -115,6 +133,15 @@ enum Permission: string
             self::IssuePurchaseOrder => 'Convert sourcing awards to purchase orders and dispatch.',
             self::ApprovePurchaseOrder => 'Authorize purchase orders and revisions in DOA chain.',
             self::ReceivePurchaseOrder => 'Receive and inspect incoming purchase order deliveries.',
+            self::ViewWarehouseTasks => 'Read warehouse task queues, scan results, and operational exceptions.',
+            self::ManageWarehouseTasks => 'Create, prioritize, assign, block, and cancel warehouse tasks.',
+            self::ExecuteWarehouseTasks => 'Start and complete assigned scan-validated warehouse work.',
+            self::ResolveWarehouseExceptions => 'Investigate and resolve warehouse exceptions with a reason.',
+            self::PrintWarehouseLabels => 'Generate and record internal location, task, and inventory labels.',
+            self::ManageWarehouseTopology => 'Manage warehouses, zones, aisles, racks, shelves, and bins.',
+            self::ManageTelemetryExcursions => 'Oversee IoT cold-chain temperature telemetry and release holds.',
+            self::AccessNarcoticsVault => 'Participate in dual-custody narcotics vault storage and dispensing.',
+            self::RecordConsignments => 'Scan and record operating room consignment implant usage.',
             self::ManageProcurementPolicy => 'Configure spend categories, cost centers, and DOA policies.',
             self::GenerateForecasts => 'Run demand forecasts and save plans.',
             self::ManageUsers => 'Create staff accounts, change roles, deactivate access.',
@@ -134,7 +161,11 @@ enum Permission: string
         return match ($this) {
             self::ViewInventory, self::ManageItems, self::AdjustStock, self::ApproveAdjustment => 'Inventory',
             self::IssueStock, self::RecordMovements, self::TransferStock => 'Stock Movements',
-            self::ManageLocations, self::AcknowledgeAlerts, self::ReceivePurchaseOrder, self::InspectStock, self::PerformCycleCount => 'Warehousing',
+            self::ManageLocations, self::AcknowledgeAlerts, self::ReceivePurchaseOrder, self::InspectStock,
+            self::PerformCycleCount, self::ViewWarehouseTasks, self::ManageWarehouseTasks,
+            self::ExecuteWarehouseTasks, self::ResolveWarehouseExceptions, self::PrintWarehouseLabels,
+            self::ManageWarehouseTopology, self::ManageTelemetryExcursions, self::AccessNarcoticsVault,
+            self::RecordConsignments => 'Warehousing',
             self::ManageSuppliers, self::ReviewSupplierCompliance, self::ApproveSuppliers, self::ManageProcurement,
             self::CreateRequisition, self::ApproveRequisition, self::ManageSourcing, self::EvaluateBids,
             self::AwardProcurement, self::IssuePurchaseOrder, self::ApprovePurchaseOrder, self::ManageProcurementPolicy => 'Procurement',

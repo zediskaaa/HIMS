@@ -89,7 +89,7 @@
             </div>
         @endcanany
 
-        @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::InspectStock->value])
+        @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::InspectStock->value, \App\Enums\Permission::ViewWarehouseTasks->value])
             <div>
                 <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                     Warehousing
@@ -105,6 +105,12 @@
                         <x-ui.nav-item :href="route('inventory.qc.index')" icon="shield-check"
                                        :active="request()->routeIs('inventory.qc*')">
                             QC Inspection Queue
+                        </x-ui.nav-item>
+                    @endcan
+                    @can(\App\Enums\Permission::ViewWarehouseTasks->value)
+                        <x-ui.nav-item :href="route('inventory.warehouse-tasks.index')" icon="clipboard-document-list"
+                                       :active="request()->routeIs('inventory.warehouse-tasks*')">
+                            Warehouse Tasks
                         </x-ui.nav-item>
                     @endcan
                     @can(\App\Enums\Permission::ViewInventory->value)

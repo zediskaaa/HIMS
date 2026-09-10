@@ -27,6 +27,7 @@ class InventoryItemController extends Controller
     public function store(StoreInventoryItemRequest $request)
     {
         $data = $request->validated();
+        $data += ['is_batch_tracked' => false, 'is_serial_tracked' => false, 'is_expiry_tracked' => false];
         $item = InventoryItem::create($data);
 
         return (new InventoryItemResource($item))->response()->setStatusCode(201);

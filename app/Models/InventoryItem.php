@@ -14,10 +14,26 @@ class InventoryItem extends Model
     protected $fillable = [
         'name',
         'sku',
+        'barcode_value',
+        'gtin',
         'category_id',
         'unit',
+        'generic_name',
+        'brand_name',
+        'dosage_form_strength',
+        'regulatory_category',
+        'lasa_group_code',
+        'storage_temp_min',
+        'storage_temp_max',
+        'fda_cpr_number',
+        'is_consignment',
         'is_batch_tracked',
         'is_serial_tracked',
+        'is_expiry_tracked',
+        'storage_classification',
+        'temperature_classification',
+        'pick_face_minimum',
+        'pick_face_maximum',
         'abc_class',
         'costing_method',
         'quantity_on_hand',
@@ -39,6 +55,12 @@ class InventoryItem extends Model
     protected $casts = [
         'is_batch_tracked' => 'boolean',
         'is_serial_tracked' => 'boolean',
+        'is_expiry_tracked' => 'boolean',
+        'is_consignment' => 'boolean',
+        'storage_temp_min' => 'decimal:2',
+        'storage_temp_max' => 'decimal:2',
+        'pick_face_minimum' => 'integer',
+        'pick_face_maximum' => 'integer',
         'quantity_on_hand' => 'integer',
         'reserved_quantity' => 'integer',
         'reorder_level' => 'integer',
@@ -51,6 +73,21 @@ class InventoryItem extends Model
         'unit_cost' => 'decimal:2',
         'total_value' => 'decimal:2',
     ];
+
+    public function isDangerousDrug(): bool
+    {
+        return $this->regulatory_category === 'DANGEROUS_DRUG';
+    }
+
+    public function isHighAlert(): bool
+    {
+        return $this->regulatory_category === 'HIGH_ALERT';
+    }
+
+    public function isConsignment(): bool
+    {
+        return (bool) $this->is_consignment;
+    }
 
     public function supplier(): BelongsTo
     {
@@ -117,6 +154,16 @@ class InventoryItem extends Model
         return $this->hasMany(InventoryAdjustment::class, 'item_id');
     }
 
+    public function serials(): HasMany
+    {
+        return $this->hasMany(InventorySerial::class, 'item_id');
+    }
+
+    public function warehouseTasks(): HasMany
+    {
+        return $this->hasMany(WarehouseTask::class, 'item_id');
+    }
+
     /**
      * Live total across every location. `quantity_on_hand` caches this value;
      * use this when you need the authoritative number.
@@ -155,11 +202,11 @@ class InventoryItem extends Model
     }
 
     /**
-     * Available-to-Promise (ATP) = Unrestricted On-Hand - Committed Reservations + In-Transit.
+     * Available-to-Promise excludes stock that is quarantined, blocked, or in transit.
      */
     public function availableToPromise(): int
     {
-        return max(0, (int) $this->quantity_on_hand - (int) $this->reserved_quantity + $this->inTransitQuantity());
+        return max(0, (int) $this->quantity_on_hand - (int) $this->reserved_quantity);
     }
 
     public function availableQuantity(): int

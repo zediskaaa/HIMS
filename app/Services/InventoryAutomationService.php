@@ -245,6 +245,7 @@ class InventoryAutomationService
         $available = $batchId !== null
             ? $level->availableQuantity()
             : (int) ItemStockLevel::where('item_id', $itemId)
+                ->where('storage_location_id', $locationId)
                 ->selectRaw('coalesce(sum(quantity - reserved_quantity), 0) as avail')
                 ->value('avail');
 

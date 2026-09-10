@@ -23,6 +23,8 @@
                     @csrf
                     <x-ui.field name="name" label="Item name" required />
                     <x-ui.field name="sku" label="SKU" required />
+                    <x-ui.field name="barcode_value" label="Internal barcode" maxlength="100" placeholder="Defaults can be printed after creation" />
+                    <x-ui.field name="gtin" label="GTIN" inputmode="numeric" pattern="[0-9]{8,14}" maxlength="14" hint="8 to 14 digits; leading zeroes are preserved." />
                     <x-ui.field name="category_id" label="Category" type="select" :options="$categories" placeholder="Select category" />
                     <div>
                         <x-ui.field name="unit" label="Unit of measure" list="inventory-unit-options" placeholder="Select or enter a unit" maxlength="50" />
@@ -40,6 +42,26 @@
                         value="1"
                         required />
                     <x-ui.field
+                        name="is_serial_tracked"
+                        label="Serial tracking"
+                        type="select"
+                        :options="['0' => 'No', '1' => 'Yes — one serial per received unit']"
+                        value="0"
+                        required />
+                    <x-ui.field
+                        name="is_expiry_tracked"
+                        label="Expiry tracking"
+                        type="select"
+                        :options="['1' => 'Yes — expiry is required on receipt', '0' => 'No']"
+                        value="1"
+                        required />
+                    <x-ui.field name="storage_classification" label="Storage classification" type="select"
+                        :options="['general' => 'General', 'medical_supply' => 'Medical supply', 'pharmaceutical' => 'Pharmaceutical', 'sterile' => 'Sterile', 'cold_chain' => 'Cold chain', 'controlled' => 'Controlled / restricted', 'flammable' => 'Flammable', 'hazardous' => 'Hazardous']"
+                        placeholder="General / not restricted" />
+                    <x-ui.field name="temperature_classification" label="Temperature classification" type="select"
+                        :options="['ambient' => 'Ambient', 'controlled_room' => 'Controlled room temperature', 'refrigerated' => 'Refrigerated', 'frozen' => 'Frozen', 'deep_frozen' => 'Deep frozen']"
+                        placeholder="Not specified" />
+                    <x-ui.field
                         name="default_location_id"
                         label="Default storage location"
                         type="select"
@@ -56,6 +78,8 @@
                         inputmode="numeric"
                         hint="Recorded as a Stock In movement so the warehouse ledger stays accurate." />
                     <x-ui.field name="reorder_level" label="Reorder level" type="number" value="0" min="0" step="1" inputmode="numeric" />
+                    <x-ui.field name="pick_face_minimum" label="Pick-face minimum" type="number" value="0" min="0" step="1" inputmode="numeric" />
+                    <x-ui.field name="pick_face_maximum" label="Pick-face maximum" type="number" value="0" min="0" step="1" inputmode="numeric" hint="Use 0 when no pick-face limit is configured." />
                     <x-ui.field name="expiry_alert_days" label="Expiry alert lead time (days)" type="number" value="30" min="0" max="3650" step="1" inputmode="numeric" />
                     <x-ui.field name="unit_cost" label="Unit cost" type="number" value="0.00" min="0" max="9999999999.99" step="0.01" inputmode="decimal" />
                     <x-ui.field

@@ -89,9 +89,17 @@ class InventoryItemController extends Controller implements HasMiddleware
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'sku' => ['required', 'string', 'max:255', 'unique:inventory_items'],
+            'barcode_value' => ['nullable', 'string', 'max:100', 'unique:inventory_items,barcode_value'],
+            'gtin' => ['nullable', 'digits_between:8,14', 'unique:inventory_items,gtin'],
             'category_id' => ['nullable', 'integer', Rule::exists('item_categories', 'id')->where('is_active', true)],
             'unit' => ['nullable', 'string', 'max:50'],
             'is_batch_tracked' => ['required', 'boolean'],
+            'is_serial_tracked' => ['required', 'boolean'],
+            'is_expiry_tracked' => ['required', 'boolean'],
+            'storage_classification' => ['nullable', Rule::in(['general', 'medical_supply', 'pharmaceutical', 'sterile', 'cold_chain', 'hazardous', 'flammable', 'controlled'])],
+            'temperature_classification' => ['nullable', Rule::in(['ambient', 'controlled_room', 'refrigerated', 'frozen', 'deep_frozen'])],
+            'pick_face_minimum' => ['nullable', 'integer', 'min:0'],
+            'pick_face_maximum' => ['nullable', 'integer', 'min:0', 'gte:pick_face_minimum'],
             'initial_quantity' => ['nullable', 'integer', 'min:0'],
             'reorder_level' => ['nullable', 'integer', 'min:0'],
             'expiry_alert_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
@@ -112,9 +120,19 @@ class InventoryItemController extends Controller implements HasMiddleware
             'expiry_date' => ['nullable', 'date', 'after_or_equal:today'],
         ]);
 
-        if (! $request->boolean('is_batch_tracked') && filled($validated['expiry_date'] ?? null)) {
+        if (! $request->boolean('is_batch_tracked') && ($request->boolean('is_expiry_tracked') || filled($validated['expiry_date'] ?? null))) {
             throw ValidationException::withMessages([
                 'expiry_date' => 'An expiry date requires batch or lot tracking.',
+            ]);
+        }
+        if ($request->boolean('is_serial_tracked') && (int) ($validated['initial_quantity'] ?? 0) > 0) {
+            throw ValidationException::withMessages([
+                'initial_quantity' => 'Create serialized stock through receiving so each unit receives a verified serial number.',
+            ]);
+        }
+        if ($request->boolean('is_expiry_tracked') && (int) ($validated['initial_quantity'] ?? 0) > 0 && blank($validated['expiry_date'] ?? null)) {
+            throw ValidationException::withMessages([
+                'expiry_date' => 'An expiry date is required for opening stock of an expiry-tracked item.',
             ]);
         }
 
@@ -123,6 +141,8 @@ class InventoryItemController extends Controller implements HasMiddleware
             $item = InventoryItem::create([
                 ...Arr::except($validated, ['initial_quantity', 'batch_number', 'expiry_date']),
                 'is_batch_tracked' => $request->boolean('is_batch_tracked'),
+                'is_serial_tracked' => $request->boolean('is_serial_tracked'),
+                'is_expiry_tracked' => $request->boolean('is_expiry_tracked'),
                 'quantity_on_hand' => 0,
                 'reserved_quantity' => 0,
                 'total_value' => 0,

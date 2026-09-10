@@ -25,7 +25,9 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('suppliers', SupplierController::class)->only(['index', 'show', 'store', 'update']);
         Route::apiResource('purchase-orders', PurchaseOrderController::class)->only(['index', 'show', 'store', 'update']);
         Route::apiResource('stock-movements', StockMovementController::class);
-        Route::apiResource('storage-locations', StorageLocationController::class);
+        // Locations are deactivated or blocked; deletion is not exposed because
+        // stock and task history must continue to resolve their identifiers.
+        Route::apiResource('storage-locations', StorageLocationController::class)->only(['index', 'show', 'store', 'update']);
         Route::apiResource('procurement-requests', ProcurementRequestController::class)->only(['index', 'show', 'store', 'update']);
         Route::apiResource('supplier-quotes', SupplierQuoteController::class)->only(['index', 'show', 'store', 'update']);
         Route::apiResource('demand-plans', DemandPlanController::class);
@@ -78,6 +80,17 @@ Route::prefix('v1')->group(function () {
 
             Route::get('items/{itemId}/replenishment-status', [\App\Http\Controllers\Api\Inventory\ReplenishmentController::class, 'status']);
             Route::post('items/{itemId}/replenish', [\App\Http\Controllers\Api\Inventory\ReplenishmentController::class, 'evaluate']);
+
+            Route::get('warehouse-tasks', [\App\Http\Controllers\Api\Inventory\WarehouseTaskController::class, 'index']);
+            Route::get('warehouse-tasks/{warehouseTask}', [\App\Http\Controllers\Api\Inventory\WarehouseTaskController::class, 'show']);
+            Route::post('warehouse-tasks', [\App\Http\Controllers\Api\Inventory\WarehouseTaskController::class, 'store']);
+            Route::post('warehouse-tasks/{warehouseTask}/assign', [\App\Http\Controllers\Api\Inventory\WarehouseTaskController::class, 'assign']);
+            Route::post('warehouse-tasks/{warehouseTask}/start', [\App\Http\Controllers\Api\Inventory\WarehouseTaskController::class, 'start']);
+            Route::post('warehouse-tasks/{warehouseTask}/scans', [\App\Http\Controllers\Api\Inventory\WarehouseTaskController::class, 'scan']);
+            Route::post('warehouse-tasks/{warehouseTask}/complete', [\App\Http\Controllers\Api\Inventory\WarehouseTaskController::class, 'complete']);
+            Route::post('warehouse-tasks/{warehouseTask}/cancel', [\App\Http\Controllers\Api\Inventory\WarehouseTaskController::class, 'cancel']);
+
+            Route::post('telemetry/ingest', [\App\Http\Controllers\Api\Inventory\TelemetryApiController::class, 'ingest']);
         });
     });
 });

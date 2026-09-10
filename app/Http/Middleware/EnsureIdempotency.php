@@ -17,10 +17,22 @@ class EnsureIdempotency
             return $next($request);
         }
 
-        $cacheKey = 'idempotency:'.md5($idempotencyKey.':'.$request->path());
+        $cacheKey = 'idempotency:'.hash('sha256', implode(':', [
+            (string) $request->user()?->getAuthIdentifier(),
+            $request->method(),
+            $request->path(),
+            $idempotencyKey,
+        ]));
+        $requestFingerprint = hash('sha256', $request->getContent());
 
         if (Cache::has($cacheKey)) {
             $cached = Cache::get($cacheKey);
+
+            if (($cached['fingerprint'] ?? null) !== $requestFingerprint) {
+                return response()->json([
+                    'message' => 'This Idempotency-Key was already used with a different request payload.',
+                ], 409);
+            }
 
             return response()->json($cached['data'], $cached['status'], [
                 'X-Idempotent-Replay' => 'true',
@@ -33,6 +45,7 @@ class EnsureIdempotency
             Cache::put($cacheKey, [
                 'status' => $response->getStatusCode(),
                 'data' => json_decode($response->getContent(), true) ?? $response->getContent(),
+                'fingerprint' => $requestFingerprint,
             ], now()->addMinutes(30));
         }
 

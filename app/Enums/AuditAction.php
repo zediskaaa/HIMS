@@ -56,6 +56,18 @@ enum AuditAction: string
     case RecordedBlindCount = 'recorded_blind_count';
     case ApprovedInventoryAdjustment = 'approved_inventory_adjustment';
     case PostedInventoryAdjustment = 'posted_inventory_adjustment';
+    case CreatedStorageLocation = 'created_storage_location';
+    case UpdatedStorageLocationStatus = 'updated_storage_location_status';
+    case CreatedWarehouseTask = 'created_warehouse_task';
+    case AssignedWarehouseTask = 'assigned_warehouse_task';
+    case StartedWarehouseTask = 'started_warehouse_task';
+    case CompletedWarehouseTask = 'completed_warehouse_task';
+    case CancelledWarehouseTask = 'cancelled_warehouse_task';
+    case RaisedWarehouseException = 'raised_warehouse_exception';
+    case ResolvedWarehouseException = 'resolved_warehouse_exception';
+    case PrintedWarehouseLabel = 'printed_warehouse_label';
+    case RecordedDangerousDrugTransaction = 'recorded_dangerous_drug_transaction';
+    case RecordedSurgicalConsignmentUsage = 'recorded_surgical_consignment_usage';
 
     public function label(): string
     {
@@ -112,6 +124,18 @@ enum AuditAction: string
             self::RecordedBlindCount => 'Recorded Blind Count',
             self::ApprovedInventoryAdjustment => 'Approved Inventory Adjustment',
             self::PostedInventoryAdjustment => 'Posted Inventory Adjustment',
+            self::CreatedStorageLocation => 'Created Storage Location',
+            self::UpdatedStorageLocationStatus => 'Updated Storage Location Status',
+            self::CreatedWarehouseTask => 'Created Warehouse Task',
+            self::AssignedWarehouseTask => 'Assigned Warehouse Task',
+            self::StartedWarehouseTask => 'Started Warehouse Task',
+            self::CompletedWarehouseTask => 'Completed Warehouse Task',
+            self::CancelledWarehouseTask => 'Cancelled Warehouse Task',
+            self::RaisedWarehouseException => 'Raised Warehouse Exception',
+            self::ResolvedWarehouseException => 'Resolved Warehouse Exception',
+            self::PrintedWarehouseLabel => 'Printed Warehouse Label',
+            self::RecordedDangerousDrugTransaction => 'Recorded Dangerous Drug Transaction',
+            self::RecordedSurgicalConsignmentUsage => 'Recorded Surgical Consignment Usage',
         };
     }
 

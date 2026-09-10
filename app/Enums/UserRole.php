@@ -64,7 +64,13 @@ enum UserRole: string
             self::SuperAdministrator => Permission::cases(),
             self::Administrator => array_values(array_filter(
                 Permission::cases(),
-                fn (Permission $permission) => $permission !== Permission::ViewAuditTrail,
+                fn (Permission $permission) => ! in_array($permission, [
+                    Permission::ViewAuditTrail,
+                    Permission::ManageWarehouseTasks,
+                    Permission::ExecuteWarehouseTasks,
+                    Permission::ResolveWarehouseExceptions,
+                    Permission::AccessNarcoticsVault,
+                ], true),
             )),
 
             // Owns the storeroom records: the item master, supplier directory,
@@ -92,6 +98,15 @@ enum UserRole: string
                 Permission::EvaluateBids,
                 Permission::IssuePurchaseOrder,
                 Permission::GenerateForecasts,
+                Permission::ViewWarehouseTasks,
+                Permission::ManageWarehouseTasks,
+                Permission::ExecuteWarehouseTasks,
+                Permission::ResolveWarehouseExceptions,
+                Permission::PrintWarehouseLabels,
+                Permission::ManageWarehouseTopology,
+                Permission::ManageTelemetryExcursions,
+                Permission::AccessNarcoticsVault,
+                Permission::RecordConsignments,
             ],
 
             // Physically handles stock: receives deliveries, transfers between
@@ -103,9 +118,13 @@ enum UserRole: string
                 Permission::RecordMovements,
                 Permission::AcknowledgeAlerts,
                 Permission::ReceivePurchaseOrder,
+                Permission::ViewWarehouseTasks,
+                Permission::ExecuteWarehouseTasks,
+                Permission::PrintWarehouseLabels,
                 Permission::InspectStock,
                 Permission::PerformCycleCount,
                 Permission::TransferStock,
+                Permission::RecordConsignments,
             ],
 
             // Dispenses to wards and raises departmental requisitions.
@@ -115,12 +134,17 @@ enum UserRole: string
                 Permission::IssueStock,
                 Permission::CreateRequisition,
                 Permission::InspectStock,
+                Permission::ViewWarehouseTasks,
+                Permission::ManageTelemetryExcursions,
+                Permission::AccessNarcoticsVault,
+                Permission::RecordConsignments,
             ],
 
             // Auditors and observers. Reads everything, writes nothing.
             self::Viewer => [
                 Permission::ViewInventory,
                 Permission::ViewReports,
+                Permission::ViewWarehouseTasks,
             ],
         };
     }
