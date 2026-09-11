@@ -22,6 +22,8 @@ class ComprehensiveDemoSeeder extends Seeder
             SmartWarehousingDemoSeeder::class,
             LogisticsDemoSeeder::class,
             ProcessReviewDemoSeeder::class,
+            OperationalMetricsDemoSeeder::class,
+            ErrorRecoveryDemoSeeder::class,
         ]);
 
         $this->command?->info('Comprehensive HIMS sample data is ready. See docs/demo-data.md for the account and module guide.');

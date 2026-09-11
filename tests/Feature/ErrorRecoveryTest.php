@@ -95,6 +95,35 @@ class ErrorRecoveryTest extends TestCase
         $response->assertSee('System Recovery Center');
         $response->assertSee('Total Incidents');
         $response->assertSee('System Health Telemetry');
+        $response->assertSee('Incident Recovery Pipeline');
+        $response->assertSee('table-fixed');
+        $response->assertSee('Technical Diagnostics');
+        $response->assertSee('lg:hidden');
+    }
+
+    public function test_recovery_center_renders_responsive_compound_columns_and_cards(): void
+    {
+        $superAdmin = $this->superAdmin();
+        SystemRecoveryRecord::create([
+            'error_id' => 'REC-TEST-999',
+            'module' => 'procurement',
+            'operation' => 'po_approval',
+            'error_summary' => 'Deadlock encountered during PO confirmation',
+            'status' => 'pending',
+            'is_retryable' => true,
+        ]);
+
+        $response = $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get('/admin/recovery');
+
+        $response->assertOk();
+        $response->assertSee('REC-TEST-999');
+        $response->assertSee('procurement');
+        $response->assertSee('po_approval');
+        $response->assertSee('Deadlock encountered during PO confirmation');
+        $response->assertSee('Diagnostics');
+        $response->assertSee('Smart Retry');
+        $response->assertSee('Resolve');
     }
 
     public function test_super_administrator_can_view_system_health_diagnostics(): void
