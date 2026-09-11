@@ -212,6 +212,7 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::patch('/profile/session-timeout-reminder', [ProfileController::class, 'updateSessionTimeoutReminder'])->name('profile.session-timeout-reminder.update');
     Route::patch('/profile/mfa', [ProfileController::class, 'updateMfa'])->name('profile.mfa.update');
     Route::post('/profile/authenticator/setup', [AuthenticatorController::class, 'setup'])
         ->middleware('throttle:5,1')

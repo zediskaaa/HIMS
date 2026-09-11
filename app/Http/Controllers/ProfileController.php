@@ -92,4 +92,25 @@ class ProfileController extends Controller
 
         return Redirect::route('profile.edit');
     }
+
+    public function updateSessionTimeoutReminder(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'session_timeout_reminder_enabled' => ['required', 'boolean'],
+        ]);
+
+        $enabled = (bool) $validated['session_timeout_reminder_enabled'];
+        $request->user()->forceFill([
+            'session_timeout_reminder_enabled' => $enabled,
+        ])->save();
+
+        $request->session()->put(
+            'session_reminder_success',
+            $enabled
+                ? 'Session timeout reminders are now ON.'
+                : 'Session timeout reminders are now OFF. Automatic logout remains active.',
+        );
+
+        return Redirect::route('profile.edit');
+    }
 }

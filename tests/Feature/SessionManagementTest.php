@@ -31,6 +31,7 @@ class SessionManagementTest extends TestCase
             ->assertOk()
             ->assertSee('data-session-timeout-seconds="240"', false)
             ->assertSee('data-session-warning-seconds="60"', false)
+            ->assertSee('data-session-warning-enabled="true"', false)
             ->assertSee('data-session-warning', false)
             ->assertSee('aria-modal="true"', false)
             ->assertSee('aria-live="polite"', false)
@@ -40,6 +41,30 @@ class SessionManagementTest extends TestCase
             ->assertSee('Your session is about to expire')
             ->assertSee('Continue Session')
             ->assertSee('Dismiss');
+    }
+
+    public function test_disabling_the_reminder_does_not_disable_automatic_session_expiration(): void
+    {
+        $user = User::factory()->create([
+            'session_timeout_reminder_enabled' => false,
+        ]);
+
+        $this->actingAs($user)
+            ->get('/profile')
+            ->assertOk()
+            ->assertSee('data-session-warning-enabled="false"', false)
+            ->assertSee('preload="none"', false);
+
+        $response = $this
+            ->withSession([
+                EnforceSessionInactivity::LAST_ACTIVITY_AT => now()->subMinutes(4)->getTimestamp(),
+            ])
+            ->get('/dashboard');
+
+        $response
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('session_timeout', true);
+        $this->assertGuest();
     }
 
     public function test_session_warning_sound_is_available_from_the_public_asset_directory(): void

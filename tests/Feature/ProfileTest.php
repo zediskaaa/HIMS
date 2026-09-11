@@ -23,6 +23,8 @@ class ProfileTest extends TestCase
 
         $response
             ->assertOk()
+            ->assertSee('Session Timeout Reminder')
+            ->assertSee('name="session_timeout_reminder_enabled"', false)
             ->assertSee('Last Name')
             ->assertSee('First Name')
             ->assertSee('Middle Name')
@@ -32,6 +34,58 @@ class ProfileTest extends TestCase
             ->assertSee('name="current_password"', false)
             ->assertSee('Required only when changing your email address.')
             ->assertDontSee('name="name"', false);
+    }
+
+    public function test_session_timeout_reminder_can_be_turned_off_and_on(): void
+    {
+        $user = User::factory()->create([
+            'session_timeout_reminder_enabled' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->patch(route('profile.session-timeout-reminder.update'), [
+                'session_timeout_reminder_enabled' => '0',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas(
+                'session_reminder_success',
+                'Session timeout reminders are now OFF. Automatic logout remains active.',
+            )
+            ->assertRedirect('/profile');
+
+        $this->assertFalse($user->refresh()->session_timeout_reminder_enabled);
+
+        $this->get('/profile')
+            ->assertOk()
+            ->assertSee('Session timeout reminders are now OFF. Automatic logout remains active.')
+            ->assertSee('data-session-warning-enabled="false"', false)
+            ->assertSee('preload="none"', false);
+
+        $this->patch(route('profile.session-timeout-reminder.update'), [
+            'session_timeout_reminder_enabled' => '1',
+        ])->assertSessionHasNoErrors()
+            ->assertSessionHas('session_reminder_success', 'Session timeout reminders are now ON.')
+            ->assertRedirect('/profile');
+
+        $this->assertTrue($user->refresh()->session_timeout_reminder_enabled);
+    }
+
+    public function test_invalid_session_timeout_reminder_value_is_rejected(): void
+    {
+        $user = User::factory()->create([
+            'session_timeout_reminder_enabled' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->from('/profile')
+            ->patch(route('profile.session-timeout-reminder.update'), [
+                'session_timeout_reminder_enabled' => 'sometimes',
+            ])
+            ->assertRedirect('/profile')
+            ->assertSessionHasErrors('session_timeout_reminder_enabled')
+            ->assertSessionMissing('session_reminder_success');
+
+        $this->assertTrue($user->refresh()->session_timeout_reminder_enabled);
     }
 
     public function test_profile_information_can_be_updated(): void

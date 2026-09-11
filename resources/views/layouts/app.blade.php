@@ -26,6 +26,7 @@
     class="h-full font-sans antialiased bg-neutral-50 text-neutral-800"
     data-session-timeout-seconds="{{ (int) config('session.lifetime') * 60 }}"
     data-session-warning-seconds="{{ (int) config('session.warning_seconds') }}"
+    data-session-warning-enabled="{{ auth()->user()?->session_timeout_reminder_enabled === false ? 'false' : 'true' }}"
     data-session-activity-url="{{ route($sessionActivityRoute) }}"
     data-session-expired-url="{{ Illuminate\Support\Facades\URL::signedRoute($sessionExpiredRoute, absolute: false) }}"
 >
@@ -90,7 +91,7 @@
         <audio
             data-session-warning-audio
             src="{{ asset('audio/session_sound.mp3') }}"
-            preload="auto"
+            preload="{{ auth()->user()?->session_timeout_reminder_enabled === false ? 'none' : 'auto' }}"
             hidden
         ></audio>
 

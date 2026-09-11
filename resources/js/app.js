@@ -87,6 +87,7 @@ const resetButtonLoading = (button) => {
 const startSessionMonitor = () => {
     const timeoutSeconds = Number(document.body.dataset.sessionTimeoutSeconds);
     const configuredWarningSeconds = Number(document.body.dataset.sessionWarningSeconds);
+    const warningEnabled = document.body.dataset.sessionWarningEnabled !== 'false';
     const activityUrl = document.body.dataset.sessionActivityUrl;
     const expiredUrl = document.body.dataset.sessionExpiredUrl;
     const warningDialog = document.querySelector('[data-session-warning]');
@@ -249,7 +250,7 @@ const startSessionMonitor = () => {
     };
 
     const showWarning = () => {
-        if (expirationStarted || warningDismissed || warningOpen) return;
+        if (!warningEnabled || expirationStarted || warningDismissed || warningOpen) return;
 
         warningOpen = true;
         previouslyFocusedElement = document.activeElement;
@@ -278,7 +279,9 @@ const startSessionMonitor = () => {
             return;
         }
 
-        if (remaining <= warningMs) {
+        if (!warningEnabled) {
+            closeWarning();
+        } else if (remaining <= warningMs) {
             showWarning();
         } else {
             warningDismissed = false;

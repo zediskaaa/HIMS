@@ -40,6 +40,7 @@ class UserFactory extends Factory
             'role' => UserRole::Viewer,
             'status' => UserStatus::Active,
             'mfa_enabled' => false,
+            'session_timeout_reminder_enabled' => true,
             'employee_id' => 'EMP-'.fake()->unique()->numberBetween(1000, 9999),
             'department' => fake()->randomElement(['Pharmacy', 'Central Supply', 'Laboratory', 'Nursing']),
             'phone' => '09'.fake()->numerify('#########'),

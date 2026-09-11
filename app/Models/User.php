@@ -72,6 +72,7 @@ class User extends Authenticatable
             'login_locked_until' => 'datetime',
             'is_protected' => 'boolean',
             'mfa_enabled' => 'boolean',
+            'session_timeout_reminder_enabled' => 'boolean',
             'authenticator_secret' => EncryptedAuthenticatorSecret::class,
             'authenticator_enabled_at' => 'datetime',
             'password' => 'hashed',
