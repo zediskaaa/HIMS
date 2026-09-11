@@ -282,9 +282,13 @@
                             </div>
 
                             <div>
-                                <label class="block text-xs font-semibold uppercase text-neutral-600">File Attachment (PDF or Image, max 15MB) *</label>
-                                <input type="file" name="file" required accept=".pdf,.png,.jpg,.jpeg,.webp"
+                                <div class="flex items-center justify-between">
+                                    <label class="block text-xs font-semibold uppercase text-neutral-600">File Attachment (PDF or Image, max 15MB) *</label>
+                                    <span class="text-[11px] text-primary-700 font-medium">Supports Camera Photo Capture</span>
+                                </div>
+                                <input type="file" name="file" required accept=".pdf,.png,.jpg,.jpeg,.webp" capture="environment"
                                        class="mt-1 block w-full text-sm text-neutral-500 file:mr-4 file:rounded-lg file:border-0 file:bg-primary-50 file:px-4 file:py-2 file:text-xs file:font-semibold file:text-primary-700 hover:file:bg-primary-100">
+                                <p class="mt-0.5 text-[10px] text-neutral-400">On mobile or tablet, tap to take a photo of the delivery receipt directly with the rear camera.</p>
                             </div>
 
                             <div>

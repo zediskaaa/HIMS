@@ -197,7 +197,18 @@
 
                     <div class="grid gap-3 sm:grid-cols-2">
                         <div>
-                            <label for="serial_number" class="text-xs font-semibold uppercase text-neutral-500">Serial Number / DataMatrix</label>
+                            <div class="flex items-center justify-between">
+                                <label for="serial_number" class="text-xs font-semibold uppercase text-neutral-500">Serial Number / DataMatrix</label>
+                                <x-ui.camera-scanner
+                                    id="camera-scanner-consignment"
+                                    target-input-id="serial_number"
+                                    button-text="Scan"
+                                    button-size="sm"
+                                    button-variant="secondary"
+                                    title="Scan Surgical Implant Serial / DataMatrix"
+                                    hint="Align implant package serial barcode or GS1 DataMatrix within frame."
+                                />
+                            </div>
                             <input type="text" id="serial_number" name="serial_number" placeholder="SN-99401" class="mt-1 w-full rounded-lg border-neutral-300 font-mono text-sm">
                         </div>
                         <div>

@@ -56,8 +56,17 @@
                 @php($prompt = $scanPrompts[$acceptedScans] ?? 'Required scans complete')
                 <x-ui.card title="Scan verification" :subtitle="$prompt">
                     <form method="POST" action="{{ route('inventory.warehouse-tasks.scan', $warehouseTask) }}" class="flex flex-col gap-3 sm:flex-row">@csrf
-                        <input type="text" name="scan_value" required autofocus autocomplete="off" placeholder="Scan or type the identifier" class="min-w-0 flex-1 rounded-lg border-neutral-300 font-mono" aria-label="Warehouse scan value">
+                        <input type="text" id="task_scan_input_{{ $warehouseTask->id }}" name="scan_value" required autofocus autocomplete="off" placeholder="Scan or type the identifier" class="min-w-0 flex-1 rounded-lg border-neutral-300 font-mono" aria-label="Warehouse scan value">
                         <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::ulid() }}">
+                        <x-ui.camera-scanner
+                            id="camera-scanner-task-{{ $warehouseTask->id }}"
+                            target-input-id="task_scan_input_{{ $warehouseTask->id }}"
+                            button-text="Scan with Camera"
+                            button-variant="secondary"
+                            :auto-submit="true"
+                            title="Verify Task Step with Camera"
+                            hint="{{ $prompt }}"
+                        />
                         <x-ui.button type="submit">Validate scan</x-ui.button>
                     </form>
                     <p class="mt-2 text-xs text-neutral-500">Identifiers stay as text so leading zeroes, separators, lots, and serials are preserved.</p>

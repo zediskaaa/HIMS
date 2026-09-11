@@ -221,14 +221,49 @@
                             <h3 class="text-base font-semibold text-neutral-900">Blind Physical Count Sheet</h3>
                             <p class="text-xs text-neutral-500">Count physical units on shelves/bins and enter actual quantities. Expected system totals are hidden to prevent bias.</p>
                         </div>
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 border border-emerald-200">
-                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                            Blind Count Active
-                        </span>
+                        <div class="flex items-center gap-2.5">
+                            @can(\App\Enums\Permission::PerformCycleCount->value)
+                            <x-ui.camera-scanner
+                                id="camera-scanner-cycle-count"
+                                button-text="Scan Shelf Item"
+                                button-size="sm"
+                                button-variant="secondary"
+                                event-name="cycle-count-scanned"
+                                title="Scan Shelf Item Barcode / QR"
+                                hint="Scan item barcode, SKU, or location QR to jump to its count line."
+                            />
+                            @endcan
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 border border-emerald-200">
+                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                Blind Count Active
+                            </span>
+                        </div>
                     </div>
 
                     @can(\App\Enums\Permission::PerformCycleCount->value)
-                    <form action="{{ route('inventory.cycle-counts.submit', $cycleCountDoc) }}" method="POST">
+                    <form
+                        action="{{ route('inventory.cycle-counts.submit', $cycleCountDoc) }}"
+                        method="POST"
+                        @cycle-count-scanned.window="
+                            const scanned = ($event.detail.code || '').trim().toLowerCase();
+                            const rows = $el.querySelectorAll('tr[data-scan-target]');
+                            let matched = false;
+                            rows.forEach(r => {
+                                const targets = (r.dataset.scanTarget || '').toLowerCase().split('|');
+                                if (targets.some(t => t && (t === scanned || scanned.includes(t) || t.includes(scanned)))) {
+                                    r.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    r.classList.add('bg-emerald-100');
+                                    setTimeout(() => r.classList.remove('bg-emerald-100'), 3000);
+                                    const input = r.querySelector('input[type=number]');
+                                    if (input) { input.focus(); input.select(); }
+                                    matched = true;
+                                }
+                            });
+                            if (!matched) {
+                                alert('Scanned item/location [' + $event.detail.code + '] is not in this cycle count schedule.');
+                            }
+                        "
+                    >
                         @csrf
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-sm text-neutral-600">
@@ -242,7 +277,10 @@
                                 </thead>
                                 <tbody class="divide-y divide-neutral-200">
                                     @foreach($cycleCountDoc->lines as $line)
-                                        <tr class="hover:bg-neutral-50">
+                                        <tr
+                                            class="hover:bg-neutral-50 transition-colors duration-300"
+                                            data-scan-target="{{ $line->item?->barcode_value }}|{{ $line->item?->sku }}|{{ $line->item?->gtin }}|{{ $line->location?->barcode_value }}|{{ $line->location?->code }}|{{ $line->batch?->batch_number }}"
+                                        >
                                             <td class="px-6 py-4">
                                                 <p class="font-semibold text-neutral-900">{{ $line->item->name ?? 'Item #' . $line->inventory_item_id }}</p>
                                                 <p class="text-xs text-neutral-500">SKU: {{ $line->item->sku ?? 'N/A' }} | Class: {{ $line->item->abc_class ?? 'C' }}</p>

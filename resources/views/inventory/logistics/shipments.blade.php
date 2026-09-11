@@ -296,8 +296,19 @@
                             </div>
 
                             <div>
-                                <label class="block text-xs font-semibold uppercase text-neutral-600">GS1 SSCC Barcode (18 Numeric Digits)</label>
-                                <input type="text" name="sscc" maxlength="18" placeholder="e.g. 000123456700000018"
+                                <div class="flex items-center justify-between">
+                                    <label for="shipment_sscc_input" class="block text-xs font-semibold uppercase text-neutral-600">GS1 SSCC Barcode (18 Numeric Digits)</label>
+                                    <x-ui.camera-scanner
+                                        id="camera-scanner-shipment-sscc"
+                                        target-input-id="shipment_sscc_input"
+                                        button-text="Scan SSCC"
+                                        button-size="sm"
+                                        button-variant="secondary"
+                                        title="Scan Pallet / Shipment GS1 SSCC Barcode"
+                                        hint="Align the 18-digit Serial Shipping Container Code barcode within the frame."
+                                    />
+                                </div>
+                                <input type="text" id="shipment_sscc_input" name="sscc" maxlength="18" placeholder="e.g. 000123456700000018"
                                        class="mt-1 block w-full font-mono rounded-lg border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500">
                                 <p class="mt-0.5 text-[10px] text-neutral-500">Serial Shipping Container Code per GS1-128 standard with Modulo-10 check digit.</p>
                             </div>

@@ -1,8 +1,10 @@
 import './bootstrap';
 
 import Alpine from 'alpinejs';
+import { himsCameraScanner, playScanAudio } from './scanner';
 
 window.Alpine = Alpine;
+window.playScanAudio = playScanAudio;
 
 const loadingButtons = new WeakMap();
 
@@ -1211,5 +1213,7 @@ Alpine.data('auditSearchAutocomplete', ({ endpoint, formId, initialQuery = '' })
         this.reset();
     },
 }));
+
+Alpine.data('himsCameraScanner', himsCameraScanner);
 
 Alpine.start();

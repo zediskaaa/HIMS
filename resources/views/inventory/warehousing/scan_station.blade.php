@@ -122,11 +122,24 @@
                                             <span class="text-xs text-neutral-500 font-mono">Auto-Focus Active</span>
                                         </div>
 
-                                        <div class="flex gap-2">
-                                            <input type="text" id="scan_value_{{ $task->id }}" name="scan_value" autofocus required placeholder="Scan or enter barcode / GS1 DataMatrix string..." class="w-full rounded-xl border-neutral-300 font-mono text-base font-semibold shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                                            <button type="submit" class="rounded-xl bg-primary-600 px-6 py-3 font-semibold text-white shadow-sm hover:bg-primary-700">
-                                                Verify
-                                            </button>
+                                        <div class="flex flex-col sm:flex-row gap-2">
+                                            <div class="relative flex-1">
+                                                <input type="text" id="scan_value_{{ $task->id }}" name="scan_value" autofocus required placeholder="Scan or enter barcode / GS1 DataMatrix string..." class="w-full rounded-xl border-neutral-300 font-mono text-base font-semibold shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <x-ui.camera-scanner
+                                                    id="camera-scanner-{{ $task->id }}"
+                                                    target-input-id="scan_value_{{ $task->id }}"
+                                                    button-text="Open Camera"
+                                                    button-variant="secondary"
+                                                    :auto-submit="true"
+                                                    title="Scan Task Barcode / QR Code"
+                                                    hint="Point camera at source location QR, item GS1 DataMatrix/barcode, or destination location QR."
+                                                />
+                                                <button type="submit" class="rounded-xl bg-primary-600 px-6 py-2.5 font-semibold text-white shadow-sm hover:bg-primary-700">
+                                                    Verify
+                                                </button>
+                                            </div>
                                         </div>
                                     </form>
 

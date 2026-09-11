@@ -104,8 +104,14 @@
                 <div class="space-y-0.5">
                     @can(\App\Enums\Permission::ViewWarehouseTasks->value)
                         <x-ui.nav-item :href="route('inventory.warehousing.dashboard')" icon="building-storefront"
-                                       :active="request()->routeIs('inventory.warehousing*')">
+                                       :active="request()->routeIs('inventory.warehousing*') && !request()->routeIs('inventory.warehousing.scan-station*')">
                             Smart Warehousing
+                        </x-ui.nav-item>
+                    @endcan
+                    @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
+                        <x-ui.nav-item :href="route('inventory.warehousing.scan-station')" icon="camera"
+                                       :active="request()->routeIs('inventory.warehousing.scan-station*')">
+                            Scan Workstation
                         </x-ui.nav-item>
                     @endcan
                     @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
