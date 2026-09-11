@@ -118,9 +118,7 @@
             </div>
         @endcanany
 
-        {{-- Only administrators hold manage_users, so the section is hidden
-             rather than shown-and-refused for everyone else. --}}
-        @canany([\App\Enums\Permission::ManageUsers->value, \App\Enums\Permission::ViewAuditTrail->value])
+        @canany([\App\Enums\Permission::ManageUsers->value, \App\Enums\Permission::ViewAuditTrail->value, \App\Enums\Permission::ManageSystemRecovery->value])
             <div>
                 <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                     Administration
@@ -136,6 +134,12 @@
                         <x-ui.nav-item :href="route('admin.audit-logs.index')" icon="clipboard-document-list"
                                        :active="request()->routeIs('admin.audit-logs.*')">
                             Audit Trail
+                        </x-ui.nav-item>
+                    @endcan
+                    @can(\App\Enums\Permission::ManageSystemRecovery->value)
+                        <x-ui.nav-item :href="route('admin.recovery.index')" icon="shield-check"
+                                       :active="request()->routeIs('admin.recovery.*', 'super-admin.recovery.*')">
+                            Recovery Center
                         </x-ui.nav-item>
                     @endcan
                 </div>

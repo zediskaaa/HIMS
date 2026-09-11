@@ -95,6 +95,10 @@ enum AuditAction: string
     case ApprovedProcessReview = 'approved_process_review';
     case RejectedProcessReview = 'rejected_process_review';
     case ImplementedProcessRecommendation = 'implemented_process_recommendation';
+    case TriggeredRecoveryAction = 'triggered_recovery_action';
+    case SystemOperationFailed = 'system_operation_failed';
+    case SystemOperationRecovered = 'system_operation_recovered';
+    case SystemHealthMaintenance = 'system_health_maintenance';
 
     public function label(): string
     {
@@ -190,6 +194,10 @@ enum AuditAction: string
             self::ApprovedProcessReview => 'Approved Process Review',
             self::RejectedProcessReview => 'Rejected Process Review',
             self::ImplementedProcessRecommendation => 'Implemented Process Recommendation',
+            self::TriggeredRecoveryAction => 'Triggered Recovery Action',
+            self::SystemOperationFailed => 'System Operation Failed',
+            self::SystemOperationRecovered => 'System Operation Recovered',
+            self::SystemHealthMaintenance => 'System Health Maintenance',
         };
     }
 
@@ -231,6 +239,9 @@ enum AuditAction: string
                 || $this === self::CompletedTechnicalInspection => 'Logistics',
             str_contains($this->value, 'process_review')
                 || $this === self::ImplementedProcessRecommendation => 'Process Reviews',
+            str_contains($this->value, 'recovery')
+                || str_contains($this->value, 'system_operation')
+                || $this === self::SystemHealthMaintenance => 'System Recovery',
             default => 'System',
         };
     }
@@ -243,7 +254,7 @@ enum AuditAction: string
             'Supplier Management', 'Procurement' => 'Supplier & Procurement',
             'Logistics' => 'Logistics',
             'Process Reviews' => 'Governance',
-            'System' => 'System',
+            'System', 'System Recovery' => 'System',
             default => 'Inventory & Warehousing',
         };
     }

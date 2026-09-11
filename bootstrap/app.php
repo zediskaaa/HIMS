@@ -35,7 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->redirectGuestsTo(fn (Request $request) => match (true) {
             $request->is('super-admin/*') => route('super-admin.login'),
-            $request->routeIs('admin.audit-logs.*') => route('super-admin.login'),
+            $request->routeIs('admin.audit-logs.*', 'admin.recovery.*') => route('super-admin.login'),
             $request->is('admin/*') => route('admin.login'),
             default => route('login'),
         });
@@ -79,5 +79,59 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return response()->view('errors.419', status: 419);
+        });
+
+        // Safe failure handling for domain-managed transaction recovery
+        $exceptions->render(function (\App\Exceptions\SafeOperationException $exception, Request $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $exception->getMessage(),
+                    'error_id' => $exception->errorId,
+                    'module' => $exception->module,
+                ], 500);
+            }
+
+            return response()->view('errors.500', ['errorId' => $exception->errorId], 500);
+        });
+
+        // Safe failure handling for unhandled server exceptions (redacts stack traces/SQL queries)
+        $exceptions->render(function (Throwable $exception, Request $request) {
+            if ($exception instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface
+                || $exception instanceof \Illuminate\Validation\ValidationException
+                || $exception instanceof \Illuminate\Auth\AuthenticationException
+                || $exception instanceof \Illuminate\Auth\Access\AuthorizationException
+                || $exception instanceof \Illuminate\Session\TokenMismatchException
+                || $exception instanceof \App\Exceptions\SafeOperationException) {
+                return null;
+            }
+
+            if (config('app.debug') && ! app()->environment('production', 'testing')) {
+                return null;
+            }
+
+            try {
+                $recovery = app(\App\Services\Recovery\SafeExecutionService::class)->recordFailure(
+                    exception: $exception,
+                    module: 'system',
+                    operation: 'http_request',
+                    context: ['path' => $request->path()],
+                    isRetryable: false,
+                    strategy: 'unhandled_exception_intercept'
+                );
+                $errorId = $recovery->error_id;
+            } catch (Throwable) {
+                $errorId = 'REC-' . strtoupper(\Illuminate\Support\Str::random(8));
+            }
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'An unexpected system error occurred. Operations were safely aborted.',
+                    'error_id' => $errorId,
+                ], 500);
+            }
+
+            return response()->view('errors.500', ['errorId' => $errorId], 500);
         });
     })->create();
