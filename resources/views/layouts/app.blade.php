@@ -54,7 +54,11 @@
             @include('layouts.partials.topbar')
 
             <main class="hims-app-content overflow-x-clip px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-                <div class="mx-auto w-full min-w-0 max-w-7xl space-y-6">
+                <div @class([
+                    'mx-auto w-full min-w-0 space-y-6',
+                    'max-w-none' => $fullWidth,
+                    'max-w-7xl' => ! $fullWidth,
+                ])>
                     {{-- Legacy pages pass a $header slot; new pages use <x-ui.page-header>. --}}
                     @isset($header)
                         <div>{{ $header }}</div>

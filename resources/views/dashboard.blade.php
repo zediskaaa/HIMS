@@ -13,7 +13,7 @@
     };
 @endphp
 
-<x-app-layout>
+<x-app-layout full-width>
     <x-slot:title>{{ $dashboardTitle }}</x-slot:title>
 
     <x-ui.page-header
@@ -47,6 +47,7 @@
         server process to keep alive, and nothing new to install.
     --}}
     <div
+        class="hims-dashboard space-y-4 xl:space-y-5"
         x-data="dashboardLive({{ Js::from(route('dashboard.live')) }})"
         x-init="start()"
         @dashboard-refresh.window="refresh()"
@@ -134,7 +135,7 @@
         />
         @endcan
     </div>
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3 xl:gap-5">
         {{-- Stock alerts --}}
         <x-ui.card class="lg:col-span-2" :padding="false">
             <x-slot:header>
@@ -183,11 +184,18 @@
         </x-ui.card>
     </div>
 
-    <div>
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-12 2xl:gap-5">
         {{-- Operational snapshot. The supplier and purchase-order figures are
              procurement's business, so an account without it sees the stock
              lines only rather than counts it cannot act on. --}}
-        <x-ui.card title="Operational snapshot">
+        <x-ui.card
+            title="Operational snapshot"
+            @class([
+                'lg:col-span-2',
+                '2xl:col-span-3' => auth()->user()->can(\App\Enums\Permission::ViewProcurementSensitiveData->value),
+                '2xl:col-span-4' => auth()->user()->cannot(\App\Enums\Permission::ViewProcurementSensitiveData->value),
+            ])
+        >
             <dl class="divide-y divide-neutral-100">
                 @foreach (array_merge(
                     auth()->user()->can(\App\Enums\Permission::ViewSuppliers->value) ? [
@@ -207,14 +215,12 @@
                 @endforeach
             </dl>
         </x-ui.card>
-    </div>
 
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {{-- Pending purchase orders. Hidden without manage_procurement: the
              card's "View all" leads to a screen that would refuse them, and
              the rows name suppliers and amounts they have no business in. --}}
         @can(\App\Enums\Permission::ViewProcurementSensitiveData->value)
-        <x-ui.card :padding="false">
+        <x-ui.card class="dashboard-pending-orders 2xl:col-span-4" :padding="false">
             <x-slot:header>
                 <h2 class="text-sm font-semibold text-neutral-900">Pending purchase orders</h2>
                 <p class="mt-0.5 text-xs text-neutral-500">Awaiting approval or delivery</p>
@@ -224,7 +230,14 @@
                 <x-ui.button variant="ghost" size="sm" :href="route('inventory.purchases')">View all</x-ui.button>
             </x-slot:actions>
 
-            <x-ui.table :sticky-header="false">
+            <x-ui.table class="2xl:table-fixed" :sticky-header="false">
+                <colgroup>
+                    <col class="2xl:w-[28%]">
+                    <col class="2xl:w-[28%]">
+                    <col class="2xl:w-[24%]">
+                    <col class="2xl:w-[20%]">
+                </colgroup>
+
                 <x-ui.table.head>
                     <x-ui.table.th>PO number</x-ui.table.th>
                     <x-ui.table.th>Supplier</x-ui.table.th>
@@ -235,7 +248,7 @@
                 <tbody>
                     @forelse ($pendingPurchaseOrders as $po)
                         <x-ui.table.row>
-                            <x-ui.table.td>
+                            <x-ui.table.td class="break-words">
                                 <span class="font-medium text-neutral-900">{{ $po->po_number }}</span>
                                 @if ($po->requested_at)
                                     <span class="block text-xs text-neutral-500">
@@ -243,8 +256,8 @@
                                     </span>
                                 @endif
                             </x-ui.table.td>
-                            <x-ui.table.td muted>{{ $po->supplier?->name ?? '—' }}</x-ui.table.td>
-                            <x-ui.table.td numeric>₱{{ number_format((float) $po->total_amount, 2) }}</x-ui.table.td>
+                            <x-ui.table.td class="break-words" muted>{{ $po->supplier?->name ?? '—' }}</x-ui.table.td>
+                            <x-ui.table.td class="whitespace-nowrap text-xs 2xl:text-sm" numeric>₱{{ number_format((float) $po->total_amount, 2) }}</x-ui.table.td>
                             <x-ui.table.td>
                                 <x-ui.badge :status="$po->status" />
                             </x-ui.table.td>
@@ -263,7 +276,13 @@
         @endcan
 
         {{-- Recent stock movements --}}
-        <x-ui.card :padding="false">
+        <x-ui.card
+            :padding="false"
+            @class([
+                '2xl:col-span-5' => auth()->user()->can(\App\Enums\Permission::ViewProcurementSensitiveData->value),
+                'lg:col-span-2 2xl:col-span-8' => auth()->user()->cannot(\App\Enums\Permission::ViewProcurementSensitiveData->value),
+            ])
+        >
             <x-slot:header>
                 <h2 class="text-sm font-semibold text-neutral-900">Recent stock movements</h2>
                 <p class="mt-0.5 text-xs text-neutral-500">Latest issued, received and transferred stock</p>

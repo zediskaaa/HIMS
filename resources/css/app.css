@@ -104,6 +104,36 @@
         min-width: 0;
     }
 
+    /*
+     * A zoomed-out desktop activates the three-column dashboard. Keep its
+     * summary tables compact enough to remain useful as an at-a-glance view;
+     * smaller screens retain the roomier, touch-friendly table spacing.
+     */
+    @media (min-width: 1536px) {
+        .hims-dashboard table :where(th, td) {
+            padding-top: 0.5rem !important;
+            padding-bottom: 0.5rem !important;
+        }
+
+        .hims-dashboard .dashboard-pending-orders table :where(th, td) {
+            padding-right: 0.5rem !important;
+            padding-left: 0.5rem !important;
+        }
+    }
+
+    /* This compact dashboard table is sized to fit; keep its fallback touch
+       scrolling available on narrow screens without drawing a scrollbar. */
+    .dashboard-pending-orders .hims-table-scroll {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .dashboard-pending-orders .hims-table-scroll::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+
     .loader {
         --color-1: currentColor;
         --size: 1.25px;
