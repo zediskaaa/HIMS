@@ -20,17 +20,43 @@
 
     {{--
         Navigation.
-
-        Every entry is gated on the same permission its route enforces, so the
-        sidebar shows a door only when it will open. The section headers use
-        @canany so a group whose items are all hidden does not leave a heading
-        floating above nothing. Secondary workflows live as contextual buttons
-        on their major module page instead of crowding this navigation rail.
-
-        The permissions themselves live in App\Enums\UserRole::permissions(),
-        and /admin/permissions renders the full matrix.
+        Major modules are collapsible accordion dropdowns; clicking a major module expands its
+        minor submodule links while automatically closing any other open major tab.
     --}}
-    <nav class="flex-1 px-3 py-4 space-y-6 overflow-y-auto" aria-label="Main navigation">
+    @php
+        $initialOpenDropdown = null;
+        if (request()->routeIs(
+            'inventory.items*', 'inventory.stock', 'inventory.stock-movements*',
+            'inventory.requisitions*', 'inventory.transfers*', 'inventory.cycle-counts*',
+            'inventory.adjustments*', 'inventory.alerts*', 'inventory.import*'
+        )) {
+            $initialOpenDropdown = 'inventory';
+        } elseif (request()->routeIs(
+            'inventory.warehousing*', 'inventory.receiving*', 'inventory.qc*',
+            'inventory.warehouse-tasks*', 'inventory.storage-locations*'
+        )) {
+            $initialOpenDropdown = 'warehousing';
+        } elseif (request()->routeIs(
+            'inventory.purchases*', 'inventory.suppliers*', 'inventory.demand-forecast*'
+        )) {
+            $initialOpenDropdown = 'procurement';
+        } elseif (request()->routeIs(
+            'inventory.logistics*', 'inventory.reports*', 'reviews.*'
+        )) {
+            $initialOpenDropdown = 'records';
+        } elseif (request()->routeIs(
+            'admin.users.*', 'admin.permissions', 'admin.audit-logs.*',
+            'admin.recovery.*', 'super-admin.recovery.*'
+        )) {
+            $initialOpenDropdown = 'administration';
+        }
+    @endphp
+    <nav
+        class="flex-1 px-3 py-4 space-y-3 overflow-y-auto"
+        aria-label="Main navigation"
+        x-data="{ activeDropdown: '{{ $initialOpenDropdown }}' }"
+    >
+        {{-- 1. Core Dashboard --}}
         <div class="space-y-0.5">
             <x-ui.nav-item
                 :href="route(\App\Support\AuthenticationContext::dashboardRoute())"
@@ -41,109 +67,272 @@
             </x-ui.nav-item>
         </div>
 
-        @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::ApproveRequisition->value, \App\Enums\Permission::IssueStock->value, \App\Enums\Permission::TransferStock->value, \App\Enums\Permission::PerformCycleCount->value])
-            <div>
-                <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                    Inventory
-                </p>
-                <div class="space-y-0.5">
-                    @can(\App\Enums\Permission::ViewInventory->value)
-                        <x-ui.nav-item :href="route('inventory.items')" icon="cube"
-                                       :active="request()->routeIs('inventory.items*', 'inventory.stock', 'inventory.stock-movements*', 'inventory.requisitions*', 'inventory.transfers*', 'inventory.cycle-counts*', 'inventory.adjustments*', 'inventory.alerts')"
-                                       :badge="$openAlertCount ?? null">
-                            Inventory
-                        </x-ui.nav-item>
-                    @endcan
-                </div>
-            </div>
+        {{-- 2. Inventory (Major Tab Dropdown) --}}
+        @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::ApproveRequisition->value, \App\Enums\Permission::IssueStock->value, \App\Enums\Permission::TransferStock->value, \App\Enums\Permission::PerformCycleCount->value, \App\Enums\Permission::ManageItems->value])
+            @php
+                $isInventoryActive = request()->routeIs(
+                    'inventory.items*', 'inventory.stock', 'inventory.stock-movements*',
+                    'inventory.requisitions*', 'inventory.transfers*', 'inventory.cycle-counts*',
+                    'inventory.adjustments*', 'inventory.alerts*', 'inventory.import*'
+                );
+            @endphp
+            <x-ui.nav-dropdown
+                id="inventory"
+                title="Inventory"
+                icon="cube"
+                :active="$isInventoryActive"
+                :badge="$openAlertCount ?? null"
+            >
+                @can(\App\Enums\Permission::ViewInventory->value)
+                    <x-ui.nav-item sub :href="route('inventory.items')" :active="request()->routeIs('inventory.items*')">
+                        Inventory Items
+                    </x-ui.nav-item>
+                    <x-ui.nav-item sub :href="route('inventory.stock')" :active="request()->routeIs('inventory.stock')">
+                        Stock Levels
+                    </x-ui.nav-item>
+                    <x-ui.nav-item sub :href="route('inventory.stock-movements')" :active="request()->routeIs('inventory.stock-movements*')">
+                        Stock Movements
+                    </x-ui.nav-item>
+                @endcan
+
+                @canany([\App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::ApproveRequisition->value, \App\Enums\Permission::IssueStock->value])
+                    <x-ui.nav-item sub :href="route('inventory.requisitions.index')" :active="request()->routeIs('inventory.requisitions*')">
+                        Store Requisitions
+                    </x-ui.nav-item>
+                @endcanany
+
+                @can(\App\Enums\Permission::TransferStock->value)
+                    <x-ui.nav-item sub :href="route('inventory.transfers.index')" :active="request()->routeIs('inventory.transfers*')">
+                        Stock Transfers
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::PerformCycleCount->value)
+                    <x-ui.nav-item sub :href="route('inventory.cycle-counts.index')" :active="request()->routeIs('inventory.cycle-counts*')">
+                        Cycle Counts
+                    </x-ui.nav-item>
+                @endcan
+
+                @canany([\App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::ApproveAdjustment->value])
+                    <x-ui.nav-item sub :href="route('inventory.adjustments')" :active="request()->routeIs('inventory.adjustments*')">
+                        Stock Adjustments
+                    </x-ui.nav-item>
+                @endcanany
+
+                @can(\App\Enums\Permission::AcknowledgeAlerts->value)
+                    <x-ui.nav-item sub :href="route('inventory.alerts')" :active="request()->routeIs('inventory.alerts*')" :badge="$openAlertCount ?? null">
+                        Stock Alerts
+                    </x-ui.nav-item>
+                @endcan
+
+                @canany([\App\Enums\Permission::ManageItems->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ManageSuppliers->value])
+                    <x-ui.nav-item sub :href="route('inventory.import.index')" :active="request()->routeIs('inventory.import*')">
+                        Import Data
+                    </x-ui.nav-item>
+                @endcanany
+            </x-ui.nav-dropdown>
         @endcanany
 
-        @canany([\App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::ManageLocations->value])
-            <div>
-                <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                    Warehousing
-                </p>
-                <div class="space-y-0.5">
-                    @can(\App\Enums\Permission::ViewWarehouseTasks->value)
-                        <x-ui.nav-item :href="route('inventory.warehousing.dashboard')" icon="building-storefront"
-                                       :active="request()->routeIs('inventory.warehousing*', 'inventory.receiving*', 'inventory.qc*', 'inventory.warehouse-tasks*', 'inventory.storage-locations*')">
-                            Smart Warehousing
-                        </x-ui.nav-item>
-                    @endcan
-                </div>
-            </div>
+        {{-- 3. Smart Warehousing (Major Tab Dropdown) --}}
+        @canany([\App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::InspectStock->value, \App\Enums\Permission::ExecuteWarehouseTasks->value, \App\Enums\Permission::ManageTelemetryExcursions->value, \App\Enums\Permission::AccessNarcoticsVault->value, \App\Enums\Permission::RecordConsignments->value])
+            @php
+                $isWarehousingActive = request()->routeIs(
+                    'inventory.warehousing*', 'inventory.receiving*', 'inventory.qc*',
+                    'inventory.warehouse-tasks*', 'inventory.storage-locations*'
+                );
+            @endphp
+            <x-ui.nav-dropdown
+                id="warehousing"
+                title="Smart Warehousing"
+                icon="building-storefront"
+                :active="$isWarehousingActive"
+            >
+                @can(\App\Enums\Permission::ViewWarehouseTasks->value)
+                    <x-ui.nav-item sub :href="route('inventory.warehousing.dashboard')" :active="request()->routeIs('inventory.warehousing.dashboard')">
+                        Warehouse Dashboard
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::ManageLocations->value)
+                    <x-ui.nav-item sub :href="route('inventory.warehousing.locations')" :active="request()->routeIs('inventory.warehousing.locations')">
+                        Locations Explorer
+                    </x-ui.nav-item>
+                    <x-ui.nav-item sub :href="route('inventory.storage-locations')" :active="request()->routeIs('inventory.storage-locations*')">
+                        Location Registry
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::ViewWarehouseTasks->value)
+                    <x-ui.nav-item sub :href="route('inventory.warehouse-tasks.index')" :active="request()->routeIs('inventory.warehouse-tasks*')">
+                        Warehouse Tasks
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
+                    <x-ui.nav-item sub :href="route('inventory.receiving.index')" :active="request()->routeIs('inventory.receiving*')">
+                        Dock Receiving
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::InspectStock->value)
+                    <x-ui.nav-item sub :href="route('inventory.qc.index')" :active="request()->routeIs('inventory.qc*')">
+                        QC Inspection
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
+                    <x-ui.nav-item sub :href="route('inventory.warehousing.scan-station')" :active="request()->routeIs('inventory.warehousing.scan-station')">
+                        Scan Workstation
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::ManageTelemetryExcursions->value)
+                    <x-ui.nav-item sub :href="route('inventory.warehousing.telemetry')" :active="request()->routeIs('inventory.warehousing.telemetry')">
+                        IoT Telemetry
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::AccessNarcoticsVault->value)
+                    <x-ui.nav-item sub :href="route('inventory.warehousing.narcotics')" :active="request()->routeIs('inventory.warehousing.narcotics')">
+                        PDEA Narcotics Vault
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::RecordConsignments->value)
+                    <x-ui.nav-item sub :href="route('inventory.warehousing.consignment')" :active="request()->routeIs('inventory.warehousing.consignment')">
+                        Consignments
+                    </x-ui.nav-item>
+                @endcan
+            </x-ui.nav-dropdown>
         @endcanany
 
-        @canany([\App\Enums\Permission::ViewProcurement->value, \App\Enums\Permission::ViewSuppliers->value])
-            <div>
-                <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                    Procurement
-                </p>
-                <div class="space-y-0.5">
-                    @can(\App\Enums\Permission::ViewProcurement->value)
-                        <x-ui.nav-item :href="route('inventory.purchases')" icon="clipboard-document-list"
-                                       :active="request()->routeIs('inventory.purchases*', 'inventory.suppliers*', 'inventory.demand-forecast*')">
-                            Procurement &amp; Sourcing
-                        </x-ui.nav-item>
-                    @endcan
-                </div>
-            </div>
+        {{-- 4. Procurement & Sourcing (Major Tab Dropdown) --}}
+        @canany([\App\Enums\Permission::ViewProcurement->value, \App\Enums\Permission::ViewSuppliers->value, \App\Enums\Permission::GenerateForecasts->value])
+            @php
+                $isProcurementActive = request()->routeIs(
+                    'inventory.purchases*', 'inventory.suppliers*', 'inventory.demand-forecast*'
+                );
+            @endphp
+            <x-ui.nav-dropdown
+                id="procurement"
+                title="Procurement"
+                icon="clipboard-document-list"
+                :active="$isProcurementActive"
+            >
+                @can(\App\Enums\Permission::ViewProcurement->value)
+                    <x-ui.nav-item sub :href="route('inventory.purchases')" :active="request()->routeIs('inventory.purchases*')">
+                        Purchase Orders &amp; S2P
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::ViewSuppliers->value)
+                    <x-ui.nav-item sub :href="route('inventory.suppliers')" :active="request()->routeIs('inventory.suppliers*')">
+                        Suppliers Directory
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::GenerateForecasts->value)
+                    <x-ui.nav-item sub :href="route('inventory.demand-forecast')" :active="request()->routeIs('inventory.demand-forecast*')">
+                        Demand Forecasts
+                    </x-ui.nav-item>
+                @endcan
+            </x-ui.nav-dropdown>
         @endcanany
 
+        {{-- 5. Records & Logistics (Major Tab Dropdown) --}}
         @canany([\App\Enums\Permission::ViewReports->value, \App\Enums\Permission::ViewLogisticsRecords->value, \App\Enums\Permission::ViewProcessReviews->value])
-            <div>
-                <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                    Records &amp; Analysis
-                </p>
-                <div class="space-y-0.5">
-                    @can(\App\Enums\Permission::ViewLogisticsRecords->value)
-                        <x-ui.nav-item :href="route('inventory.logistics')" icon="document-text"
-                                       :active="request()->routeIs('inventory.logistics*')">
-                            Documents &amp; Logistics
+            @php
+                $isRecordsActive = request()->routeIs(
+                    'inventory.logistics*', 'inventory.reports*', 'reviews.*'
+                );
+            @endphp
+            <x-ui.nav-dropdown
+                id="records"
+                title="Records & Logistics"
+                icon="document-text"
+                :active="$isRecordsActive"
+            >
+                @can(\App\Enums\Permission::ViewLogisticsRecords->value)
+                    <x-ui.nav-item sub :href="route('inventory.logistics')" :active="request()->routeIs('inventory.logistics') && !request()->routeIs('inventory.logistics.*')">
+                        Logistics Overview
+                    </x-ui.nav-item>
+
+                    @can(\App\Enums\Permission::ViewLogisticsSensitiveData->value)
+                        <x-ui.nav-item sub :href="route('inventory.logistics.documents')" :active="request()->routeIs('inventory.logistics.documents*')">
+                            Documents Registry
                         </x-ui.nav-item>
                     @endcan
-                    @can(\App\Enums\Permission::ViewReports->value)
-                        <x-ui.nav-item :href="route('inventory.reports')" icon="chart-bar"
-                                       :active="request()->routeIs('inventory.reports')">
-                            Reports
+
+                    <x-ui.nav-item sub :href="route('inventory.logistics.shipments')" :active="request()->routeIs('inventory.logistics.shipments*')">
+                        Shipments &amp; 3PL
+                    </x-ui.nav-item>
+
+                    <x-ui.nav-item sub :href="route('inventory.logistics.iar.index')" :active="request()->routeIs('inventory.logistics.iar*')">
+                        COA IAR Reports
+                    </x-ui.nav-item>
+
+                    @can(\App\Enums\Permission::ViewLogisticsSensitiveData->value)
+                        <x-ui.nav-item sub :href="route('inventory.logistics.chain-of-custody')" :active="request()->routeIs('inventory.logistics.chain-of-custody*')">
+                            Chain of Custody
                         </x-ui.nav-item>
                     @endcan
-                    @can(\App\Enums\Permission::ViewProcessReviews->value)
-                        <x-ui.nav-item :href="route('reviews.index')" icon="clipboard-document-check"
-                                       :active="request()->routeIs('reviews.*')">
-                            Process Reviews
-                        </x-ui.nav-item>
-                    @endcan
-                </div>
-            </div>
+                @endcan
+
+                @can(\App\Enums\Permission::ViewReports->value)
+                    <x-ui.nav-item sub :href="route('inventory.reports')" :active="request()->routeIs('inventory.reports*')">
+                        Reports &amp; Analytics
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::ViewProcessReviews->value)
+                    <x-ui.nav-item sub :href="route('reviews.index')" :active="request()->routeIs('reviews.index', 'reviews.show', 'reviews.create')">
+                        Process Reviews
+                    </x-ui.nav-item>
+                    <x-ui.nav-item sub :href="route('reviews.dpri')" :active="request()->routeIs('reviews.dpri*')">
+                        DOH DPRI Benchmarks
+                    </x-ui.nav-item>
+                @endcan
+            </x-ui.nav-dropdown>
         @endcanany
 
+        {{-- 6. Administration & Governance (Major Tab Dropdown) --}}
         @canany([\App\Enums\Permission::ManageUsers->value, \App\Enums\Permission::ViewAuditTrail->value, \App\Enums\Permission::ManageSystemRecovery->value])
-            <div>
-                <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                    Administration
-                </p>
-                <div class="space-y-0.5">
-                    @can(\App\Enums\Permission::ManageUsers->value)
-                        <x-ui.nav-item :href="route('admin.users.index')" icon="users"
-                                       :active="request()->routeIs('admin.users.*', 'admin.permissions')">
-                            User Management
-                        </x-ui.nav-item>
-                    @endcan
-                    @can(\App\Enums\Permission::ViewAuditTrail->value)
-                        <x-ui.nav-item :href="route('admin.audit-logs.index')" icon="clipboard-document-list"
-                                       :active="request()->routeIs('admin.audit-logs.*')">
-                            Audit Trail
-                        </x-ui.nav-item>
-                    @endcan
-                    @can(\App\Enums\Permission::ManageSystemRecovery->value)
-                        <x-ui.nav-item :href="route('admin.recovery.index')" icon="shield-check"
-                                       :active="request()->routeIs('admin.recovery.*', 'super-admin.recovery.*')">
-                            Recovery Center
-                        </x-ui.nav-item>
-                    @endcan
-                </div>
-            </div>
+            @php
+                $isAdminActive = request()->routeIs(
+                    'admin.users.*', 'admin.permissions', 'admin.audit-logs.*',
+                    'admin.recovery.*', 'super-admin.recovery.*'
+                );
+            @endphp
+            <x-ui.nav-dropdown
+                id="administration"
+                title="Administration"
+                icon="shield-check"
+                :active="$isAdminActive"
+            >
+                @can(\App\Enums\Permission::ManageUsers->value)
+                    <x-ui.nav-item sub :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')">
+                        User Management
+                    </x-ui.nav-item>
+                    <x-ui.nav-item sub :href="route('admin.permissions')" :active="request()->routeIs('admin.permissions')">
+                        Roles &amp; Permissions
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::ViewAuditTrail->value)
+                    <x-ui.nav-item sub :href="route('admin.audit-logs.index')" :active="request()->routeIs('admin.audit-logs.*')">
+                        Audit Trail
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::ManageSystemRecovery->value)
+                    <x-ui.nav-item sub :href="route('admin.recovery.index')" :active="request()->routeIs('admin.recovery.index', 'super-admin.recovery.index', 'admin.recovery.show')">
+                        Recovery Center
+                    </x-ui.nav-item>
+                    <x-ui.nav-item sub :href="route('admin.recovery.health')" :active="request()->routeIs('admin.recovery.health', 'super-admin.recovery.health')">
+                        Health Telemetry
+                    </x-ui.nav-item>
+                @endcan
+            </x-ui.nav-dropdown>
         @endcanany
     </nav>
 

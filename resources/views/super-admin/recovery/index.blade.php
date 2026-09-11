@@ -689,7 +689,7 @@
                             </div>
                             <div class="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
                                 <span class="font-semibold uppercase tracking-wider text-neutral-500 text-[10px]">Source Location</span>
-                                <div class="font-mono text-neutral-900 mt-0.5 break-all" x-text="selectedRecord && selectedRecord.technical_details ? (selectedRecord.technical_details.file + ':' + selectedRecord.technical_details.line) : 'N/A'"></div>
+                                <div class="font-mono text-neutral-900 mt-0.5 break-all" x-text="(selectedRecord && selectedRecord.technical_details && selectedRecord.technical_details.file) ? (selectedRecord.technical_details.file + (selectedRecord.technical_details.line ? (':' + selectedRecord.technical_details.line) : '')) : 'N/A'"></div>
                             </div>
                         </div>
 

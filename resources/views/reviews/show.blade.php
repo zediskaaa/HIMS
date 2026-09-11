@@ -1,6 +1,7 @@
 <x-app-layout>
     <div class="py-6" x-data="{
         activeTab: 'velocity',
+        openDropdown: null,
         rejectModal: false,
         implementModal: false,
         implementUrl: '',
@@ -159,46 +160,171 @@
                 </div>
             </div>
 
-            {{-- Navigation Tabs --}}
-            <div class="border-b border-neutral-200">
-                <nav class="-mb-px flex space-x-6 overflow-x-auto text-sm font-medium">
-                    <button type="button" @click="activeTab = 'velocity'"
-                            :class="activeTab === 'velocity' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'"
-                            class="whitespace-nowrap border-b-2 py-3 px-1 transition flex items-center gap-2">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                        Process Velocity &amp; Lead Time
-                    </button>
-                    <button type="button" @click="activeTab = 'scorecards'"
-                            :class="activeTab === 'scorecards' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'"
-                            class="whitespace-nowrap border-b-2 py-3 px-1 transition flex items-center gap-2">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        Supplier Scorecards ({{ $review->supplierScorecards->count() }})
-                    </button>
-                    <button type="button" @click="activeTab = 'savings'"
-                            :class="activeTab === 'savings' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'"
-                            class="whitespace-nowrap border-b-2 py-3 px-1 transition flex items-center gap-2">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        DPRI Price Ceiling Savings ({{ $review->procurementSavingsLogs->count() }})
-                    </button>
-                    <button type="button" @click="activeTab = 'shrinkage'"
-                            :class="activeTab === 'shrinkage' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'"
-                            class="whitespace-nowrap border-b-2 py-3 px-1 transition flex items-center gap-2">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                        COA Shrinkage &amp; Audits ({{ $review->inventoryShrinkageReports->count() }})
-                    </button>
-                    <button type="button" @click="activeTab = 'recommendations'"
-                            :class="activeTab === 'recommendations' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'"
-                            class="whitespace-nowrap border-b-2 py-3 px-1 transition flex items-center gap-2">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                        Recommendations &amp; CAPAs ({{ $review->processRecommendations->count() }})
-                    </button>
-                    <button type="button" @click="activeTab = 'context'"
-                            :class="activeTab === 'context' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'"
-                            class="whitespace-nowrap border-b-2 py-3 px-1 transition flex items-center gap-2">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        Qualitative Narrative
-                    </button>
-                </nav>
+            {{-- Navigation: Major Dropdown Tabs --}}
+            <div class="rounded-xl border border-neutral-200 bg-white p-2.5 shadow-sm">
+                {{-- Mobile / Small Screen Quick Selector (< sm) --}}
+                <div class="sm:hidden">
+                    <label for="review-mobile-tab-select" class="block text-[11px] font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
+                        Select Review Section:
+                    </label>
+                    <select
+                        id="review-mobile-tab-select"
+                        x-model="activeTab"
+                        class="block w-full rounded-lg border border-neutral-300 py-2.5 pl-3 pr-10 text-xs font-semibold text-neutral-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 shadow-2xs"
+                    >
+                        <optgroup label="Supply Chain &amp; Sourcing Analytics">
+                            <option value="velocity">Process Velocity &amp; Lead Time</option>
+                            <option value="scorecards">Supplier Scorecards ({{ $review->supplierScorecards->count() }})</option>
+                            <option value="savings">DPRI Price Ceiling Savings ({{ $review->procurementSavingsLogs->count() }})</option>
+                        </optgroup>
+                        <optgroup label="Audit, Compliance &amp; Governance">
+                            <option value="shrinkage">COA Shrinkage &amp; Audits ({{ $review->inventoryShrinkageReports->count() }})</option>
+                            <option value="recommendations">Recommendations &amp; CAPAs ({{ $review->processRecommendations->count() }})</option>
+                            <option value="context">Qualitative Narrative</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                {{-- Desktop & Tablet Major Dropdown Tabs (>= sm) --}}
+                <div class="hidden sm:flex sm:items-center sm:gap-3 flex-wrap text-xs">
+                    {{-- Major Tab 1: Supply Chain & Sourcing Analytics --}}
+                    <div class="relative" @click.outside="if (openDropdown === 'analytics') openDropdown = null">
+                        <button
+                            type="button"
+                            @click="openDropdown = openDropdown === 'analytics' ? null : 'analytics'"
+                            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold transition shadow-2xs"
+                            :class="['velocity', 'scorecards', 'savings'].includes(activeTab)
+                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                : 'bg-neutral-50 text-neutral-700 border border-neutral-200 hover:bg-neutral-100'"
+                        >
+                            <svg class="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                            <span>Supply Chain &amp; Sourcing Analytics</span>
+                            <span
+                                x-show="['velocity', 'scorecards', 'savings'].includes(activeTab)"
+                                class="rounded-full bg-indigo-200/70 px-1.5 py-0.5 text-[10px] font-bold text-indigo-800"
+                                x-text="activeTab === 'velocity' ? 'Velocity' : (activeTab === 'scorecards' ? 'Scorecards' : 'Savings')"
+                            ></span>
+                            <svg class="h-3.5 w-3.5 text-neutral-400 transition-transform duration-200" :class="openDropdown === 'analytics' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+
+                        <div
+                            x-show="openDropdown === 'analytics'"
+                            x-cloak
+                            x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0 -translate-y-1.5 scale-95"
+                            x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                            x-transition:leave="transition ease-in-out duration-200"
+                            x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                            x-transition:leave-end="opacity-0 -translate-y-1.5 scale-95"
+                            class="absolute left-0 z-40 mt-1.5 w-72 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl space-y-1"
+                        >
+                            <button
+                                type="button"
+                                @click="activeTab = 'velocity'; openDropdown = null"
+                                class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
+                                :class="activeTab === 'velocity' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-neutral-700 hover:bg-neutral-50'"
+                            >
+                                <span class="flex items-center gap-2">
+                                    <svg class="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                    <span>Process Velocity &amp; Lead Time</span>
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                @click="activeTab = 'scorecards'; openDropdown = null"
+                                class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
+                                :class="activeTab === 'scorecards' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-neutral-700 hover:bg-neutral-50'"
+                            >
+                                <span class="flex items-center gap-2">
+                                    <svg class="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    <span>Supplier Scorecards</span>
+                                </span>
+                                <span class="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-bold text-neutral-600">{{ $review->supplierScorecards->count() }}</span>
+                            </button>
+                            <button
+                                type="button"
+                                @click="activeTab = 'savings'; openDropdown = null"
+                                class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
+                                :class="activeTab === 'savings' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-neutral-700 hover:bg-neutral-50'"
+                            >
+                                <span class="flex items-center gap-2">
+                                    <svg class="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    <span>DPRI Price Ceiling Savings</span>
+                                </span>
+                                <span class="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-bold text-neutral-600">{{ $review->procurementSavingsLogs->count() }}</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Major Tab 2: Audit, Compliance & Governance --}}
+                    <div class="relative" @click.outside="if (openDropdown === 'governance') openDropdown = null">
+                        <button
+                            type="button"
+                            @click="openDropdown = openDropdown === 'governance' ? null : 'governance'"
+                            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold transition shadow-2xs"
+                            :class="['shrinkage', 'recommendations', 'context'].includes(activeTab)
+                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                : 'bg-neutral-50 text-neutral-700 border border-neutral-200 hover:bg-neutral-100'"
+                        >
+                            <svg class="h-4 w-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            <span>Audit, Compliance &amp; Governance</span>
+                            <span
+                                x-show="['shrinkage', 'recommendations', 'context'].includes(activeTab)"
+                                class="rounded-full bg-indigo-200/70 px-1.5 py-0.5 text-[10px] font-bold text-indigo-800"
+                                x-text="activeTab === 'shrinkage' ? 'Shrinkage' : (activeTab === 'recommendations' ? 'CAPAs' : 'Narrative')"
+                            ></span>
+                            <svg class="h-3.5 w-3.5 text-neutral-400 transition-transform duration-200" :class="openDropdown === 'governance' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+
+                        <div
+                            x-show="openDropdown === 'governance'"
+                            x-cloak
+                            x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0 -translate-y-1.5 scale-95"
+                            x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                            x-transition:leave="transition ease-in-out duration-200"
+                            x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                            x-transition:leave-end="opacity-0 -translate-y-1.5 scale-95"
+                            class="absolute left-0 z-40 mt-1.5 w-72 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl space-y-1"
+                        >
+                            <button
+                                type="button"
+                                @click="activeTab = 'shrinkage'; openDropdown = null"
+                                class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
+                                :class="activeTab === 'shrinkage' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-neutral-700 hover:bg-neutral-50'"
+                            >
+                                <span class="flex items-center gap-2">
+                                    <svg class="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                                    <span>COA Shrinkage &amp; Audits</span>
+                                </span>
+                                <span class="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-bold text-neutral-600">{{ $review->inventoryShrinkageReports->count() }}</span>
+                            </button>
+                            <button
+                                type="button"
+                                @click="activeTab = 'recommendations'; openDropdown = null"
+                                class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
+                                :class="activeTab === 'recommendations' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-neutral-700 hover:bg-neutral-50'"
+                            >
+                                <span class="flex items-center gap-2">
+                                    <svg class="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                    <span>Recommendations &amp; CAPAs</span>
+                                </span>
+                                <span class="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-bold text-neutral-600">{{ $review->processRecommendations->count() }}</span>
+                            </button>
+                            <button
+                                type="button"
+                                @click="activeTab = 'context'; openDropdown = null"
+                                class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
+                                :class="activeTab === 'context' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-neutral-700 hover:bg-neutral-50'"
+                            >
+                                <span class="flex items-center gap-2">
+                                    <svg class="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                    <span>Qualitative Narrative</span>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {{-- TAB 1: PROCESS VELOCITY & BOTTLENECKS --}}
