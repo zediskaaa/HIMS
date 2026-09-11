@@ -195,6 +195,6 @@ class StockAlertReactivityTest extends TestCase
         $this->actingAs($user)->get('/dashboard')
             ->assertStatus(200)
             ->assertSee('Surgical Gloves (Large)')
-            ->assertDontSee('999');
+            ->assertDontSeeText('999');
     }
 }

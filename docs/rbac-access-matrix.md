@@ -10,6 +10,55 @@ Access is enforced by Laravel Gates and controller middleware. Blade checks mirr
 
 Legend: **Yes** = allowed; **No** = forbidden; **Conditional** = allowed only for the stated workflow/status and, where applicable, a different maker/checker actor; **Summary** = aggregate or non-sensitive fields only. “Export” includes an available download/print action; the application currently has no generic bulk export for most pages.
 
+## Consolidated implemented matrix
+
+This is the requested role-by-module view. The detailed tables below identify the individual tabs and workflow qualifications behind each cell.
+
+| Role | Module | Tab/Page | View | Create | Edit | Delete | Approve | Process | Export | Sensitive Data | Visible Actions |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|
+| Pharmacy Staff | Supplier/Vendor | None | No | No | No | No | No | No | No | No | None |
+| Pharmacy Staff | Procurement/Sourcing | Requisitions; PO registry | Yes | Requisition | Own request only | No | No | Submit/cancel own request | No | No commercial/financial data | Create/submit requisition; view fulfillment |
+| Pharmacy Staff | Inventory | Items; stock; movements; requisitions; transfers; QC; reports | Yes | Requisition/issue/transfer | No master edit | No | No | Issue, transfer, inspect | Print non-financial report | Clinical stock/batch data only | Issue stock; transfer; inspect assigned lots |
+| Pharmacy Staff | Smart Warehousing | None | No | No | No | No | No | No | No | No | None |
+| Pharmacy Staff | Documents/Logistics | Documents; shipments; IAR; custody | Yes | No | No | No | No | Verify documents; technical inspection | Download evidence | Required inspection evidence | Verify; inspect; download |
+| Pharmacy Staff | Process Review | None | No | No | No | No | No | No | No | No | None |
+| Warehouse Staff | Supplier/Vendor | None | No | No | No | No | No | No | No | No | None |
+| Warehouse Staff | Procurement/Sourcing | PO fulfillment | Yes | No | No | No | No | Receive authorized PO | No | No prices, totals, or evaluations | View PO status; receive |
+| Warehouse Staff | Inventory | Items; stock; movements; receiving; transfers; cycle counts; reports | Yes | Receipt/movement/count/transfer | Operational records only | No | No adjustment approval | Receive, issue, move, inspect, count | Labels; non-financial report print | Physical stock and batch data | Receive; transfer; count; inspect; record movement |
+| Warehouse Staff | Smart Warehousing | Dashboard; tasks; scans; locations | Yes | No manual planning | Assigned execution only | No | No | Start/scan/complete tasks | Task/location labels | Task, scan, batch, location evidence | Put away; pick; dispatch; scan; complete |
+| Warehouse Staff | Documents/Logistics | Documents; shipments; IAR; custody | Yes | Shipment/document/IAR | Supersede; dock updates | No | No | Register inbound; custody handover | Download evidence | Detailed operational evidence | Register shipment; upload; dock; custody transfer |
+| Warehouse Staff | Process Review | None | No | No | No | No | No | No | No | No | None |
+| Inventory Manager | Supplier/Vendor | All operational supplier tabs | Yes | Yes | Yes | No permanent delete | No accreditation decision | Submit/verify/manage | Download evidence | Yes | Register/edit supplier; contacts; documents; products; prices; contracts |
+| Inventory Manager | Procurement/Sourcing | S2P; RFQ; evaluation; PO; requisitions | Yes | Yes | Yes | No permanent delete | Conditional maker/checker | Evaluate, award, issue, receive | Print/read | Yes | Create PR/RFQ/PO; evaluate; award; approve where eligible; receive |
+| Inventory Manager | Inventory | All inventory pages | Yes | Yes | Yes | No historical delete | Conditional maker/checker | Full storeroom workflow | Reports; labels | Yes | Create item; movement; adjustment; transfer; count; receive |
+| Inventory Manager | Smart Warehousing | All warehouse pages | Yes | Tasks/locations | Yes | No historical delete | Conditional | Plan, execute, resolve | Labels | Yes | Create/assign/start/scan/complete/cancel; topology; telemetry |
+| Inventory Manager | Documents/Logistics | All logistics tabs | Yes | Yes | Yes/version | No destructive delete | Custodial acceptance | Verify/register/accept/transmit | Download evidence | Yes | Register; upload; verify; inspect where granted; accept; custody transfer |
+| Inventory Manager | Process Review | Reviews; evidence; DPRI | Yes | Review/benchmark | Draft narrative | No | No | Submit; implement approved action | Print | Yes | Create/edit/submit review; manage DPRI; implement |
+| Administrator | Supplier/Vendor | Detailed supplier/evidence tabs | Yes | No | No | No | Accreditation/status | Compliance verification | Download evidence | Yes | Verify; approve/reject/suspend/reactivate |
+| Administrator | Procurement/Sourcing | S2P evidence; PO; approvals; policy | Yes | Policy only | Policy/config only | No | Requisition/DOA governance | No sourcing/issue/receive | Print/read | Yes | Approve/reject eligible steps; manage policy |
+| Administrator | Inventory | Items; stock; reports; forecasts; adjustments; locations | Yes | No physical transaction | Location/topology config | No | Adjustment/requisition governance | Generate forecasts | Reports; labels | Yes | Configure locations; approve eligible variance; forecast |
+| Administrator | Smart Warehousing | Dashboard; tasks; topology | Yes | Location/topology | Location/topology | No | No operational approval | No physical execution | Labels | Oversight | Configure topology; print labels |
+| Administrator | Documents/Logistics | Dashboard and detailed evidence | Yes | No | No | No | No | No | Download evidence | Yes | View/download only |
+| Administrator | Process Review | Reviews; evidence; DPRI | Yes | No | No | No | Conditional maker/checker | Approve/reject only | Print | Yes | Approve/reject another actor's submitted review |
+| Super Administrator | Supplier/Vendor | All | Yes | Yes | Yes | No permanent delete | Conditional | Yes | Download evidence | All | All authorized supplier actions |
+| Super Administrator | Procurement/Sourcing | All | Yes | Yes | Yes | No permanent delete | Conditional | Yes | Print/read | All | All authorized procurement actions |
+| Super Administrator | Inventory | All | Yes | Yes | Yes | No historical delete | Conditional | Yes | Reports; labels | All | All authorized inventory actions |
+| Super Administrator | Smart Warehousing | All | Yes | Yes | Yes | No historical delete | Conditional | Yes | Labels | All | All authorized warehouse actions |
+| Super Administrator | Documents/Logistics | All | Yes | Yes | Yes/version | No destructive delete | Yes | Yes | Download evidence | All | All authorized logistics actions |
+| Super Administrator | Process Review | All | Yes | Yes | Yes | No | Conditional | Yes | Print | All | All authorized review actions |
+| Auditor | Supplier/Vendor | All evidence/history tabs | Yes | No | No | No | No | No | Download evidence | Audit-required evidence | View/download only |
+| Auditor | Procurement/Sourcing | S2P; RFQ; matrix; PO; procurement logs | Yes | No | No | No | No | No | Print/read | Financial/evaluation evidence | View/print only |
+| Auditor | Inventory | Items; stock; movements; reports; task history | Yes | No | No | No | No | No | Print | Read-only operational/financial evidence | View/print only |
+| Auditor | Smart Warehousing | Dashboard; tasks; scans; locations/history | Yes | No | No | No | No | No | No operational labels | Read-only warehouse evidence | View only |
+| Auditor | Documents/Logistics | Documents; shipments; IAR; custody | Yes | No | No | No | No | No | Download evidence | Detailed audit evidence | View/download only |
+| Auditor | Process Review | Reviews; evidence; DPRI | Yes | No | No | No | No | No | Print | Full review evidence | View/print only |
+| Viewer | Supplier/Vendor | Directory; overview; performance summary | Summary | No | No | No | No | No | No evidence download | Non-sensitive summary | View summary only |
+| Viewer | Procurement/Sourcing | PO status/fulfillment | Summary | No | No | No | No | No | No | No finance/evaluation data | View status only |
+| Viewer | Inventory | Items; stock; movements; reports | Summary | No | No | No | No | No | Print non-financial report | No valuation, supplier link, adjustments, or notes | View summary/history only |
+| Viewer | Smart Warehousing | None | No | No | No | No | No | No | No | No | None |
+| Viewer | Documents/Logistics | Aggregate dashboard | Summary | No | No | No | No | No | No evidence download | Aggregate counts only | View summary only |
+| Viewer | Process Review | Published/historical reviews | Yes | No | No | No | No | No | Print | Read-only published evidence | View/print only |
+
 ## Supplier / Vendor Management
 
 | Role | Tab / page | View | Create | Edit | Delete | Approve | Process | Export | Sensitive data |
@@ -112,6 +161,12 @@ Legend: **Yes** = allowed; **No** = forbidden; **Conditional** = allowed only fo
 | Procurement/API exposed financials, quotations, commercial terms, evaluations, and internal notes too broadly | Viewer, Warehouse Staff | Read access to a parent module disclosed unnecessary commercial data | Added `view_procurement_sensitive_data`; web tables/tabs and API resources redact these fields while Auditor retains read-only evidence |
 | Viewer could open detailed shipment/document/IAR/custody pages | Viewer | Operational evidence and custody identities were available beyond summary need | Added `view_logistics_sensitive_data`; Viewer is limited to aggregate dashboard metrics |
 | Administrator had warehouse topology permissions without the page-view permission | Administrator | Valid configuration navigation could end in 403 | Added warehouse-task view access without granting task execution |
+| Dashboard mutation shortcuts were rendered in both the header and empty state | Auditor, Viewer, Administrator | “Record movement” or “New item” appeared even when the corresponding POST action was forbidden | Both shortcut locations now require the exact movement or item-management ability |
+| Dashboard and live/API summaries returned inventory value to every inventory reader | Viewer, Warehouse Staff, Pharmacy Staff | Financial valuation leaked through cards and JSON despite commercial-field redaction elsewhere | Valuation is rendered and returned only with `view_procurement_sensitive_data`; unauthorized JSON keys are omitted |
+| Reports exposed valuation, spend, supplier spend, and movement costs to all report readers | Viewer, Warehouse Staff, Pharmacy Staff | Read-only report access implicitly disclosed commercial and financial data | Monetary cards, columns, and procurement-spend sections are conditionally absent; operational counts remain available |
+| Item list/API disclosed linked supplier and item cost/value through a related resource | Viewer, Warehouse Staff, Pharmacy Staff | Restricted supplier/commercial data remained reachable through Inventory rather than Procurement | Supplier fields now require `view_suppliers`; unit cost and total value require `view_procurement_sensitive_data` in the API and UI |
+| Opening the procurement workspace auto-updated expired RFQs | Auditor, Viewer, all read-only sessions | A GET by a read-only role changed procurement state | Removed the write from the read controller; the existing scheduled `procurement:close-expired-rfqs` command and authorized evaluation workflow own the transition |
+| Item masters and demand plans exposed DELETE API routes | Any holder of broad item/forecast management | Historical records could be permanently removed using a permission that was not a dedicated delete authority | DELETE routes and controller actions removed; records are revised or retired by status and DELETE now returns 405 |
 
 ## Verification expectations
 

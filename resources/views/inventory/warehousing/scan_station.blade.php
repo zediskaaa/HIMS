@@ -126,7 +126,7 @@
                                         <h4 class="text-xs font-semibold uppercase text-neutral-500 tracking-wider">Scan Verification Progression</h4>
                                         <span class="text-xs font-medium @if($activeStepNum === 4) text-emerald-600 @else text-primary-700 @endif">
                                             @if($activeStepNum === 4)
-                                                ✓ All 3 scan steps verified
+                                                All 3 scan steps verified
                                             @else
                                                 Waiting for Step {{ $activeStepNum }} of 3
                                             @endif
@@ -286,7 +286,7 @@
                                                     @if($activeStepNum <= 3)
                                                         &bull; Expecting Step {{ $activeStepNum }}: {{ $activeStepInfo['title'] }}
                                                     @else
-                                                        &bull; ✓ All Steps Complete
+                                                        &bull; All Steps Complete
                                                     @endif
                                                 </span>
                                             </label>
@@ -323,7 +323,7 @@
                                                     @csrf
                                                     <input type="hidden" name="scan_value" value="{{ $sourceVal }}">
                                                     <button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-mono border transition-all @if($activeStepNum === 1) bg-primary-600 text-white font-bold border-primary-700 ring-2 ring-primary-500/30 shadow-sm @else bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50 @endif">
-                                                        @if($activeStepNum === 1) 👉 @endif Step 1: Scan Source ({{ $task->sourceLocation->code }})
+                                                        @if($activeStepNum === 1) Current: @endif Step 1: Scan Source ({{ $task->sourceLocation->code }})
                                                     </button>
                                                 </form>
                                             @endif
@@ -331,7 +331,7 @@
                                                 @csrf
                                                 <input type="hidden" name="scan_value" value="{{ $itemVal }}">
                                                 <button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-mono border transition-all @if($activeStepNum === 2) bg-primary-600 text-white font-bold border-primary-700 ring-2 ring-primary-500/30 shadow-sm @else bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50 @endif">
-                                                    @if($activeStepNum === 2) 👉 @endif Step 2: Scan Item ({{ $task->item?->sku }})
+                                                    @if($activeStepNum === 2) Current: @endif Step 2: Scan Item ({{ $task->item?->sku }})
                                                 </button>
                                             </form>
                                             @if($task->destinationLocation)
@@ -339,7 +339,7 @@
                                                     @csrf
                                                     <input type="hidden" name="scan_value" value="{{ $destVal }}">
                                                     <button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-mono border transition-all @if($activeStepNum === 3) bg-primary-600 text-white font-bold border-primary-700 ring-2 ring-primary-500/30 shadow-sm @else bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50 @endif">
-                                                        @if($activeStepNum === 3) 👉 @endif Step 3: Scan Dest ({{ $task->destinationLocation->code }})
+                                                        @if($activeStepNum === 3) Current: @endif Step 3: Scan Dest ({{ $task->destinationLocation->code }})
                                                     </button>
                                                 </form>
                                             @endif
