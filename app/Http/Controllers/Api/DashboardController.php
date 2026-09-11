@@ -24,9 +24,11 @@ class DashboardController extends Controller implements HasMiddleware
         $lowStockItems = InventoryItem::whereIn('status', ['low_stock', 'out_of_stock'])->count();
         $outOfStockItems = InventoryItem::where('status', 'out_of_stock')->count();
         $totalOnHand = InventoryItem::sum('quantity_on_hand');
-        $totalInventoryValue = InventoryItem::sum('total_value');
-        $totalSuppliers = Supplier::count();
-        $activeSuppliers = Supplier::where('status', 'active')->count();
+        $canViewFinancials = $request->user()->can(Permission::ViewProcurementSensitiveData->value);
+        $canViewSuppliers = $request->user()->can(Permission::ViewSuppliers->value);
+        $totalInventoryValue = $canViewFinancials ? InventoryItem::sum('total_value') : null;
+        $totalSuppliers = $canViewSuppliers ? Supplier::count() : null;
+        $activeSuppliers = $canViewSuppliers ? Supplier::where('status', 'active')->count() : null;
         $storageLocations = StorageLocation::count();
         $recentMovements = StockMovement::with(['item'])->latest('moved_at')->take(6)->get()->map(function ($movement) {
             return [
@@ -38,7 +40,7 @@ class DashboardController extends Controller implements HasMiddleware
             ];
         });
 
-        return response()->json([
+        return response()->json(array_filter([
             'total_items' => $totalItems,
             'low_stock_items' => $lowStockItems,
             'out_of_stock_items' => $outOfStockItems,
@@ -48,6 +50,6 @@ class DashboardController extends Controller implements HasMiddleware
             'active_suppliers' => $activeSuppliers,
             'storage_locations' => $storageLocations,
             'recent_movements' => $recentMovements,
-        ]);
+        ], fn (mixed $value): bool => $value !== null));
     }
 }

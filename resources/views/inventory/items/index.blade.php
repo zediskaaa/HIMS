@@ -133,7 +133,9 @@
                                 <th class="px-3 py-2 text-left font-semibold text-[var(--muted)]">SKU</th>
                                 <th class="px-3 py-2 text-left font-semibold text-[var(--muted)]">Qty</th>
                                 <th class="px-3 py-2 text-left font-semibold text-[var(--muted)]">Reorder</th>
-                                <th class="px-3 py-2 text-left font-semibold text-[var(--muted)]">Supplier</th>
+                                @can(\App\Enums\Permission::ViewSuppliers->value)
+                                    <th class="px-3 py-2 text-left font-semibold text-[var(--muted)]">Supplier</th>
+                                @endcan
                             </tr>
                         </thead>
                         <tbody id="inventory-items-table-body" class="divide-y divide-[var(--border)]">
@@ -143,11 +145,13 @@
                                     <td class="px-3 py-2">{{ $item->sku }}</td>
                                     <td class="px-3 py-2">{{ $item->quantity_on_hand }}</td>
                                     <td class="px-3 py-2">{{ $item->reorder_level }}</td>
-                                    <td class="px-3 py-2">{{ $item->supplier?->name ?? '—' }}</td>
+                                    @can(\App\Enums\Permission::ViewSuppliers->value)
+                                        <td class="px-3 py-2">{{ $item->supplier?->name ?? '—' }}</td>
+                                    @endcan
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="px-3 py-4 text-[var(--muted)]">No inventory items yet.</td>
+                                    <td colspan="{{ auth()->user()->can(\App\Enums\Permission::ViewSuppliers->value) ? 5 : 4 }}" class="px-3 py-4 text-[var(--muted)]">No inventory items yet.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -162,6 +166,7 @@
         async function loadInventoryItemsFromApi() {
             const status = document.getElementById('inventory-api-status');
             const tbody = document.getElementById('inventory-items-table-body');
+            const canViewSuppliers = @json(auth()->user()->can(\App\Enums\Permission::ViewSuppliers->value));
 
             try {
                 await fetch('/sanctum/csrf-cookie', { credentials: 'same-origin' });
@@ -181,7 +186,7 @@
                 const items = payload.data || [];
 
                 if (items.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-4 text-[var(--muted)]">No inventory items found via API.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="${canViewSuppliers ? 5 : 4}" class="px-3 py-4 text-[var(--muted)]">No inventory items found via API.</td></tr>`;
                 } else {
                     tbody.innerHTML = items.map(item => `
                         <tr>
@@ -189,7 +194,7 @@
                             <td class="px-3 py-2">${item.sku}</td>
                             <td class="px-3 py-2">${item.quantity_on_hand}</td>
                             <td class="px-3 py-2">${item.reorder_level}</td>
-                            <td class="px-3 py-2">${item.supplier ? item.supplier.name : '—'}</td>
+                            ${canViewSuppliers ? `<td class="px-3 py-2">${item.supplier ? item.supplier.name : '—'}</td>` : ''}
                         </tr>
                     `).join('');
                 }

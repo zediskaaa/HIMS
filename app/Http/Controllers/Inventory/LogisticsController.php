@@ -34,6 +34,8 @@ class LogisticsController extends Controller implements HasMiddleware
             'auth:web,admin,super_admin',
             new Middleware('can:'.Permission::ViewLogisticsRecords->value, only: [
                 'dashboard',
+            ]),
+            new Middleware('can:'.Permission::ViewLogisticsSensitiveData->value, only: [
                 'documents',
                 'downloadDocument',
                 'shipments',

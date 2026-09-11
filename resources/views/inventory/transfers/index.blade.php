@@ -227,6 +227,7 @@
         </div>
 
         {{-- INITIATE TRANSFER MODAL --}}
+        @can(\App\Enums\Permission::TransferStock->value)
         <div x-show="newTransferModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0"
@@ -250,8 +251,9 @@
                                 <div>
                                     <h3 class="text-lg font-bold text-neutral-900">Initiate Inter-Location Stock Transfer</h3>
                                     <p class="text-xs text-neutral-500">Dispatch inventory into the virtual In-Transit location buffer.</p>
-                                </div>
-                            </div>
+        </div>
+        @endcan
+    </div>
 
                             {{-- In-Modal Error Alert --}}
                             @if($errors->any())

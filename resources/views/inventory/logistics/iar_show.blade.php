@@ -290,6 +290,7 @@
             </div>
 
             {{-- Perform Technical Inspection Modal --}}
+            @can(\App\Enums\Permission::PerformTechnicalInspection->value)
             <div x-show="inspectModalOpen" style="display: none;" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
                 <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
                     <div x-show="inspectModalOpen" @click="inspectModalOpen = false" class="fixed inset-0 bg-neutral-900/60 transition-opacity"></div>
@@ -333,8 +334,10 @@
                     </div>
                 </div>
             </div>
+            @endcan
 
             {{-- Approve Custodial Acceptance Modal --}}
+            @can(\App\Enums\Permission::ApproveIarAcceptance->value)
             <div x-show="acceptModalOpen" style="display: none;" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
                 <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
                     <div x-show="acceptModalOpen" @click="acceptModalOpen = false" class="fixed inset-0 bg-neutral-900/60 transition-opacity"></div>
@@ -415,6 +418,7 @@
                     </div>
                 </div>
             </div>
+            @endcan
 
         </div>
     </div>

@@ -73,10 +73,13 @@ enum UserRole: string
                 Permission::ViewInventory,
                 Permission::ViewReports,
                 Permission::ViewSuppliers,
+                Permission::ViewSupplierSensitiveData,
                 Permission::ReviewSupplierCompliance,
                 Permission::ApproveSuppliers,
                 Permission::ViewProcurement,
+                Permission::ViewProcurementSensitiveData,
                 Permission::ViewLogisticsRecords,
+                Permission::ViewLogisticsSensitiveData,
                 Permission::ViewProcessReviews,
                 Permission::ApproveProcessReview,
                 Permission::ApproveRequisition,
@@ -84,6 +87,7 @@ enum UserRole: string
                 Permission::ManageUsers,
                 Permission::ManageProcurementPolicy,
                 Permission::ManageLocations,
+                Permission::ViewWarehouseTasks,
                 Permission::ManageWarehouseTopology,
                 Permission::PrintWarehouseLabels,
                 Permission::GenerateForecasts,
@@ -97,7 +101,9 @@ enum UserRole: string
                 Permission::ViewInventory,
                 Permission::ViewReports,
                 Permission::ViewSuppliers,
+                Permission::ViewSupplierSensitiveData,
                 Permission::ViewProcurement,
+                Permission::ViewProcurementSensitiveData,
                 Permission::IssueStock,
                 Permission::RecordMovements,
                 Permission::AcknowledgeAlerts,
@@ -130,6 +136,7 @@ enum UserRole: string
                 Permission::AccessNarcoticsVault,
                 Permission::RecordConsignments,
                 Permission::ViewLogisticsRecords,
+                Permission::ViewLogisticsSensitiveData,
                 Permission::ManageLogisticsRecords,
                 Permission::VerifyLogisticsDocuments,
                 Permission::ApproveIarAcceptance,
@@ -158,6 +165,7 @@ enum UserRole: string
                 Permission::TransferStock,
                 Permission::RecordConsignments,
                 Permission::ViewLogisticsRecords,
+                Permission::ViewLogisticsSensitiveData,
                 Permission::ManageLogisticsRecords,
                 Permission::ManageChainOfCustody,
             ],
@@ -176,23 +184,26 @@ enum UserRole: string
                 Permission::AccessNarcoticsVault,
                 Permission::RecordConsignments,
                 Permission::ViewLogisticsRecords,
+                Permission::ViewLogisticsSensitiveData,
                 Permission::PerformTechnicalInspection,
                 Permission::VerifyLogisticsDocuments,
             ],
 
-            // Independent regulatory compliance and QA: read-only visibility into
-            // inventory, procurement, suppliers, immutable audit trail, and Maker-Checker
-            // sign-off on process reviews/CAPAs.
+            // Independent regulatory compliance and QA: strictly read-only
+            // visibility into operational records and the immutable audit trail.
+            // Auditors observe evidence; they never create, verify, approve, or
+            // otherwise change the evidence or workflow being audited.
             self::Auditor => [
                 Permission::ViewInventory,
                 Permission::ViewReports,
                 Permission::ViewSuppliers,
-                Permission::ReviewSupplierCompliance,
+                Permission::ViewSupplierSensitiveData,
                 Permission::ViewProcurement,
+                Permission::ViewProcurementSensitiveData,
                 Permission::ViewWarehouseTasks,
                 Permission::ViewLogisticsRecords,
+                Permission::ViewLogisticsSensitiveData,
                 Permission::ViewProcessReviews,
-                Permission::ApproveProcessReview,
                 Permission::ViewAuditTrail,
             ],
 

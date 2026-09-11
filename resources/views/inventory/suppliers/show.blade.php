@@ -21,7 +21,17 @@
     </x-ui.page-header>
 
     <nav class="mt-5 flex gap-2 overflow-x-auto border-b border-neutral-200 pb-2 text-sm" aria-label="Supplier profile sections">
-        @foreach (['overview' => 'Overview', 'contacts' => 'Contacts', 'compliance' => 'Compliance', 'products' => 'Products & Pricing', 'contracts' => 'Contracts', 'performance' => 'Performance', 'history' => 'History'] as $anchor => $label)
+        @php
+            $profileSections = ['overview' => 'Overview'];
+            if (auth()->user()?->can(\App\Enums\Permission::ViewSupplierSensitiveData->value)) {
+                $profileSections += ['contacts' => 'Contacts', 'compliance' => 'Compliance', 'products' => 'Products & Pricing', 'contracts' => 'Contracts'];
+            }
+            $profileSections += ['performance' => 'Performance'];
+            if (auth()->user()?->can(\App\Enums\Permission::ViewSupplierSensitiveData->value)) {
+                $profileSections += ['history' => 'History'];
+            }
+        @endphp
+        @foreach ($profileSections as $anchor => $label)
             <a href="#{{ $anchor }}" class="whitespace-nowrap rounded-md px-3 py-1.5 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900">{{ $label }}</a>
         @endforeach
     </nav>
@@ -65,6 +75,7 @@
                     <div><span class="text-xs font-semibold uppercase text-neutral-500">Legal / Registered Name</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->name }}</p></div>
                     <div><span class="text-xs font-semibold uppercase text-neutral-500">Trade Name</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->trade_name ?: '—' }}</p></div>
                     <div><span class="text-xs font-semibold uppercase text-neutral-500">Business Structure</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->business_structure ? str($supplier->business_structure)->headline() : '—' }}</p></div>
+                    @can(\App\Enums\Permission::ViewSupplierSensitiveData->value)
                     <div><span class="text-xs font-semibold uppercase text-neutral-500">Tax Identifier (TIN)</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->tax_number ?: '—' }}</p></div>
                     <div><span class="text-xs font-semibold uppercase text-neutral-500">General Email</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->email ?: '—' }}</p></div>
                     <div><span class="text-xs font-semibold uppercase text-neutral-500">Phone</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->phone ?: '—' }}</p></div>
@@ -75,6 +86,10 @@
                     <div><span class="text-xs font-semibold uppercase text-neutral-500">Regulated Health Products</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->provides_regulated_health_products ? 'Yes (FDA Regulated)' : 'No' }}</p></div>
                     <div class="md:col-span-2"><span class="text-xs font-semibold uppercase text-neutral-500">Default Payment Terms</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->payment_terms ?: '—' }}</p></div>
                     <div class="md:col-span-2"><span class="text-xs font-semibold uppercase text-neutral-500">Internal Notes</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->notes ?: '—' }}</p></div>
+                    @else
+                    <div><span class="text-xs font-semibold uppercase text-neutral-500">Standard Lead Time</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->standard_lead_time_days !== null ? $supplier->standard_lead_time_days.' days' : '—' }}</p></div>
+                    <div><span class="text-xs font-semibold uppercase text-neutral-500">Regulated Health Products</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->provides_regulated_health_products ? 'Yes (FDA Regulated)' : 'No' }}</p></div>
+                    @endcan
                 </div>
                 @endcan
             </x-ui.card>
@@ -89,7 +104,9 @@
                         <div class="flex justify-between gap-3 font-medium"><dt>New procurement</dt><dd>{{ $supplier->isProcurementEligible() ? 'Allowed' : 'Blocked' }}</dd></div>
                     </dl>
                     @if ($supplier->suspension_reason)
+                        @can(\App\Enums\Permission::ViewSupplierSensitiveData->value)
                         <p class="mt-4 rounded-md bg-danger-50 p-3 text-sm text-danger-700"><strong>Suspension reason:</strong> {{ $supplier->suspension_reason }}</p>
+                        @endcan
                     @endif
                 </x-ui.card>
 
@@ -146,6 +163,7 @@
             </div>
         </section>
 
+        @can(\App\Enums\Permission::ViewSupplierSensitiveData->value)
         <section id="contacts" class="scroll-mt-20 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
             <x-ui.card title="Contacts" subtitle="Only business contact details needed for procurement are stored." :padding="false">
                 <x-ui.table :sticky-header="false">
@@ -164,6 +182,7 @@
                     </tbody>
                 </x-ui.table>
             </x-ui.card>
+            @can(\App\Enums\Permission::ManageSuppliers->value)
             <x-ui.card title="Add contact">
                 <form method="POST" action="{{ route('inventory.suppliers.contacts.store', $supplier) }}" class="space-y-3">
                     @csrf
@@ -176,6 +195,7 @@
                     <x-ui.button type="submit" data-loading-text="Adding contact...">Add Contact</x-ui.button>
                 </form>
             </x-ui.card>
+            @endcan
         </section>
 
         <section id="compliance" class="scroll-mt-20 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
@@ -220,6 +240,7 @@
                 </x-ui.table>
                 </x-ui.card>
             </div>
+            @can(\App\Enums\Permission::ManageSuppliers->value)
             <x-ui.card title="Upload evidence" subtitle="Private PDF/JPG/PNG, up to 10 MB.">
                 @if ($supplier->provides_regulated_health_products)
                     <x-ui.alert variant="info" title="Regulated product scope" class="mb-4">Check applicable establishment and product authorizations using the FDA Verification Portal. An LTO is not automatically sufficient for every product.</x-ui.alert>
@@ -238,6 +259,7 @@
                     <x-ui.button type="submit" data-loading-text="Uploading securely...">Upload for Verification</x-ui.button>
                 </form>
             </x-ui.card>
+            @endcan
         </section>
 
         <section id="products" class="scroll-mt-20 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
@@ -256,11 +278,13 @@
                                 @empty <span class="text-xs text-neutral-500">No price history</span> @endforelse
                             </x-ui.table.td>
                             <x-ui.table.td><x-ui.badge :status="$product->is_active ? 'active' : 'inactive'">{{ $product->is_active ? 'Active' : 'Inactive' }}</x-ui.badge>@if($product->is_preferred)<x-ui.badge variant="primary">Preferred</x-ui.badge>@endif
+                                @can(\App\Enums\Permission::ManageSuppliers->value)
                                 @if($product->is_active)
                                     <form method="POST" action="{{ route('inventory.suppliers.products.deactivate', [$supplier, $product]) }}" class="mt-2">@csrf @method('PATCH')<button class="text-xs text-danger-700 hover:underline">Deactivate</button></form>
                                 @else
                                     <form method="POST" action="{{ route('inventory.suppliers.products.reactivate', [$supplier, $product]) }}" class="mt-2">@csrf @method('PATCH')<button class="text-xs text-primary-700 hover:underline">Reactivate</button></form>
                                 @endif
+                                @endcan
                             </x-ui.table.td>
                         </x-ui.table.row>
                     @empty
@@ -269,6 +293,7 @@
                     </tbody>
                 </x-ui.table>
             </x-ui.card>
+            @can(\App\Enums\Permission::ManageSuppliers->value)
             <div class="space-y-6">
                 <x-ui.card title="Link product">
                     @if ($items->isEmpty())
@@ -303,6 +328,7 @@
                     @endif
                 </x-ui.card>
             </div>
+            @endcan
         </section>
 
         <section id="contracts" class="scroll-mt-20 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
@@ -311,11 +337,12 @@
                     <x-ui.table.head><x-ui.table.th>Contract</x-ui.table.th><x-ui.table.th>Period</x-ui.table.th><x-ui.table.th>Terms</x-ui.table.th><x-ui.table.th>Status</x-ui.table.th></x-ui.table.head>
                     <tbody>
                     @forelse($supplier->contracts as $contract)
-                        <x-ui.table.row><x-ui.table.td><span class="font-medium">{{ $contract->contract_number }}</span><span class="block text-xs text-neutral-500">{{ $contract->contract_type ?: 'Type not specified' }}</span></x-ui.table.td><x-ui.table.td>{{ $contract->starts_at->format('M d, Y') }} — {{ $contract->ends_at?->format('M d, Y') ?? 'open-ended' }}</x-ui.table.td><x-ui.table.td><span class="block text-xs">Payment: {{ $contract->payment_terms ?: '—' }}</span><span class="block text-xs">Delivery: {{ $contract->delivery_terms ?: '—' }}</span></x-ui.table.td><x-ui.table.td><x-ui.badge :status="$contract->effectiveStatus()">{{ str($contract->effectiveStatus())->headline() }}</x-ui.badge><form method="POST" action="{{ route('inventory.suppliers.contracts.update', [$supplier, $contract]) }}" class="mt-2">@csrf @method('PATCH')<input type="hidden" name="status" value="{{ $contract->status === 'active' ? 'inactive' : 'active' }}"><button class="text-xs text-primary-700 hover:underline">Mark {{ $contract->status === 'active' ? 'inactive' : 'active' }}</button></form></x-ui.table.td></x-ui.table.row>
+                        <x-ui.table.row><x-ui.table.td><span class="font-medium">{{ $contract->contract_number }}</span><span class="block text-xs text-neutral-500">{{ $contract->contract_type ?: 'Type not specified' }}</span></x-ui.table.td><x-ui.table.td>{{ $contract->starts_at->format('M d, Y') }} — {{ $contract->ends_at?->format('M d, Y') ?? 'open-ended' }}</x-ui.table.td><x-ui.table.td><span class="block text-xs">Payment: {{ $contract->payment_terms ?: '—' }}</span><span class="block text-xs">Delivery: {{ $contract->delivery_terms ?: '—' }}</span></x-ui.table.td><x-ui.table.td><x-ui.badge :status="$contract->effectiveStatus()">{{ str($contract->effectiveStatus())->headline() }}</x-ui.badge>@can(\App\Enums\Permission::ManageSuppliers->value)<form method="POST" action="{{ route('inventory.suppliers.contracts.update', [$supplier, $contract]) }}" class="mt-2">@csrf @method('PATCH')<input type="hidden" name="status" value="{{ $contract->status === 'active' ? 'inactive' : 'active' }}"><button class="text-xs text-primary-700 hover:underline">Mark {{ $contract->status === 'active' ? 'inactive' : 'active' }}</button></form>@endcan</x-ui.table.td></x-ui.table.row>
                     @empty <x-ui.table.empty :colspan="4" icon="document-text" title="No contracts recorded" message="Add a reference when a supplier agreement actually exists." /> @endforelse
                     </tbody>
                 </x-ui.table>
             </x-ui.card>
+            @can(\App\Enums\Permission::ManageSuppliers->value)
             <x-ui.card title="Add contract reference">
                 <form method="POST" action="{{ route('inventory.suppliers.contracts.store', $supplier) }}" class="space-y-3">
                     @csrf
@@ -329,7 +356,9 @@
                     <x-ui.button type="submit">Record Contract</x-ui.button>
                 </form>
             </x-ui.card>
+            @endcan
         </section>
+        @endcan
 
         <section id="performance" class="scroll-mt-20">
             <x-ui.card title="Supplier performance" subtitle="Only facts available from existing purchase and receiving records are shown.">
@@ -342,6 +371,7 @@
             </x-ui.card>
         </section>
 
+        @can(\App\Enums\Permission::ViewSupplierSensitiveData->value)
         <section id="history" class="scroll-mt-20 grid gap-6 lg:grid-cols-2">
             <x-ui.card title="Accreditation history" subtitle="Every submitted review cycle remains intact.">
                 <ol class="space-y-4">
@@ -362,5 +392,6 @@
                 @endcan
             </x-ui.card>
         </section>
+        @endcan
     </div>
 </x-app-layout>

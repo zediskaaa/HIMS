@@ -22,7 +22,9 @@ enum Permission: string
     case ViewInventory = 'view_inventory';
     case ViewReports = 'view_reports';
     case ViewSuppliers = 'view_suppliers';
+    case ViewSupplierSensitiveData = 'view_supplier_sensitive_data';
     case ViewProcurement = 'view_procurement';
+    case ViewProcurementSensitiveData = 'view_procurement_sensitive_data';
 
     // Day-to-day stock operations.
     case IssueStock = 'issue_stock';
@@ -67,6 +69,7 @@ enum Permission: string
 
     // Logistics, Document Tracking & Chain of Custody (COA GAM / EOPT / GDP)
     case ViewLogisticsRecords = 'view_logistics_records';
+    case ViewLogisticsSensitiveData = 'view_logistics_sensitive_data';
     case ManageLogisticsRecords = 'manage_logistics_records';
     case VerifyLogisticsDocuments = 'verify_logistics_documents';
     case PerformTechnicalInspection = 'perform_technical_inspection';
@@ -83,7 +86,9 @@ enum Permission: string
             self::ViewInventory => 'View stock levels',
             self::ViewReports => 'View reports',
             self::ViewSuppliers => 'View supplier profiles',
+            self::ViewSupplierSensitiveData => 'View sensitive supplier evidence and commercial data',
             self::ViewProcurement => 'View procurement and purchase orders',
+            self::ViewProcurementSensitiveData => 'View sensitive procurement financials and evaluations',
             self::IssueStock => 'Issue and dispense stock',
             self::RecordMovements => 'Record stock movements',
             self::AcknowledgeAlerts => 'Acknowledge stock alerts',
@@ -118,6 +123,7 @@ enum Permission: string
             self::ManageProcurementPolicy => 'Manage procurement categories & policy',
             self::GenerateForecasts => 'Generate demand forecasts',
             self::ViewLogisticsRecords => 'View logistics and document tracking records',
+            self::ViewLogisticsSensitiveData => 'View sensitive logistics evidence and custody details',
             self::ManageLogisticsRecords => 'Register shipments, DRs, and logistics records',
             self::VerifyLogisticsDocuments => 'Verify, approve, and review logistics document records',
             self::PerformTechnicalInspection => 'Conduct technical inspection and sign IAR inspection portion',
@@ -137,8 +143,10 @@ enum Permission: string
         return match ($this) {
             self::ViewInventory => 'Read item records, stock levels and open alerts.',
             self::ViewReports => 'Read dashboards, stock levels and reports.',
-            self::ViewSuppliers => 'Read vendor profiles, compliance records, and performance scorecards.',
-            self::ViewProcurement => 'Read purchase requests, RFQs, comparative evaluations, and purchase orders.',
+            self::ViewSuppliers => 'Read the supplier directory, qualification status, and operational summary.',
+            self::ViewSupplierSensitiveData => 'Read supplier contacts, tax identifiers, addresses, compliance files, pricing, contracts, and internal history.',
+            self::ViewProcurement => 'Read procurement status, quantities, suppliers, and purchase-order fulfillment records.',
+            self::ViewProcurementSensitiveData => 'Read budgets, unit costs, total commitments, quotations, commercial terms, and internal bid evaluations.',
             self::IssueStock => 'Issue and dispense stock to wards and departments.',
             self::RecordMovements => 'Receive, transfer, dispose and return stock.',
             self::AcknowledgeAlerts => 'Acknowledge stock alerts.',
@@ -172,7 +180,8 @@ enum Permission: string
             self::RecordConsignments => 'Scan and record operating room consignment implant usage.',
             self::ManageProcurementPolicy => 'Configure spend categories, cost centers, and DOA policies.',
             self::GenerateForecasts => 'Run demand forecasts and save plans.',
-            self::ViewLogisticsRecords => 'Read logistics dashboards, documents, shipments, and IARs.',
+            self::ViewLogisticsRecords => 'Read aggregate logistics dashboard metrics.',
+            self::ViewLogisticsSensitiveData => 'Read shipment identifiers, carrier details, IARs, documents, and chain-of-custody evidence.',
             self::ManageLogisticsRecords => 'Create shipment tracking records and upload logistics documentation.',
             self::VerifyLogisticsDocuments => 'Formally verify authenticity, tax, and regulatory compliance of documents.',
             self::PerformTechnicalInspection => 'Execute physical specification, expiration, and cold-chain compliance checks.',
@@ -204,10 +213,10 @@ enum Permission: string
             self::ExecuteWarehouseTasks, self::ResolveWarehouseExceptions, self::PrintWarehouseLabels,
             self::ManageWarehouseTopology, self::ManageTelemetryExcursions, self::AccessNarcoticsVault,
             self::RecordConsignments => 'Warehousing',
-            self::ViewSuppliers, self::ViewProcurement, self::ManageSuppliers, self::ReviewSupplierCompliance, self::ApproveSuppliers, self::ManageProcurement,
+            self::ViewSuppliers, self::ViewSupplierSensitiveData, self::ViewProcurement, self::ViewProcurementSensitiveData, self::ManageSuppliers, self::ReviewSupplierCompliance, self::ApproveSuppliers, self::ManageProcurement,
             self::CreateRequisition, self::ApproveRequisition, self::ManageSourcing, self::EvaluateBids,
             self::AwardProcurement, self::IssuePurchaseOrder, self::ApprovePurchaseOrder, self::ManageProcurementPolicy => 'Procurement',
-            self::ViewLogisticsRecords, self::ManageLogisticsRecords, self::VerifyLogisticsDocuments,
+            self::ViewLogisticsRecords, self::ViewLogisticsSensitiveData, self::ManageLogisticsRecords, self::VerifyLogisticsDocuments,
             self::PerformTechnicalInspection, self::ApproveIarAcceptance, self::ManageChainOfCustody => 'Logistics & Records',
             self::ViewReports, self::GenerateForecasts, self::ViewProcessReviews,
             self::CreateProcessReview, self::ApproveProcessReview, self::ImplementProcessReview => 'Records & Analysis',

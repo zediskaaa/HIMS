@@ -161,12 +161,16 @@
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 text-right">
+                                        @can(\App\Enums\Permission::PrintWarehouseLabels->value)
                                         <form method="POST" action="{{ route('inventory.storage-locations.label', $loc) }}" class="inline-block">
                                             @csrf
                                             <button type="submit" title="Print location barcode label" class="rounded border border-neutral-300 p-1 text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900">
                                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                                             </button>
                                         </form>
+                                        @else
+                                            <span class="text-xs text-neutral-400">Read only</span>
+                                        @endcan
                                     </td>
                                 </tr>
                             @empty
@@ -187,6 +191,7 @@
         </div>
 
         {{-- Add Storage Location Modal --}}
+        @can(\App\Enums\Permission::ManageWarehouseTopology->value)
         <div x-show="showCreateModal" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/60 p-4 sm:items-center" x-cloak style="display: none;">
             <div class="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl" @click.away="showCreateModal = false">
                 <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
@@ -309,5 +314,6 @@
                 </form>
             </div>
         </div>
+        @endcan
     </div>
 </x-app-layout>

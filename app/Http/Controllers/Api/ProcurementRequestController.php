@@ -16,7 +16,11 @@ class ProcurementRequestController extends Controller implements HasMiddleware
 {
     public static function middleware(): array
     {
-        return [new Middleware('can:'.Permission::ManageProcurement->value)];
+        return [
+            new Middleware('can:'.Permission::ViewProcurement->value, only: ['index', 'show']),
+            new Middleware('can:'.Permission::CreateRequisition->value, only: ['store']),
+            new Middleware('can:'.Permission::ManageProcurement->value, only: ['update']),
+        ];
     }
 
     public function index(Request $request)

@@ -221,6 +221,7 @@
         </div>
 
         {{-- Receive Shipment Modal --}}
+        @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
         <div
             x-show="showReceiveModal"
             class="fixed inset-0 z-50 overflow-y-auto bg-neutral-900/60 p-4 sm:p-6 md:p-20"
@@ -261,10 +262,12 @@
                                 <label class="text-xs font-semibold text-neutral-500">Authorized Supplier</label>
                                 <p class="text-sm font-semibold text-neutral-800" x-text="selectedPo && selectedPo.supplier ? selectedPo.supplier.name : ''"></p>
                             </div>
+                            @can(\App\Enums\Permission::ViewProcurementSensitiveData->value)
                             <div>
                                 <label class="text-xs font-semibold text-neutral-500">Total Commitment Value</label>
                                 <p class="text-sm font-mono font-semibold text-neutral-800" x-text="selectedPo ? '₱' + Number(selectedPo.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2}) : ''"></p>
                             </div>
+                            @endcan
                         </div>
 
                         {{-- Carrier & Logistics Inputs --}}
@@ -362,6 +365,7 @@
                 </form>
             </div>
         </div>
+        @endcan
 
     </div>
 </x-app-layout>

@@ -467,8 +467,8 @@ class RoleBasedAccessTest extends TestCase
     }
 
     /**
-     * Auditor holds read-only oversight across all submodules, exclusive audit trail
-     * access, compliance review, and Maker-Checker CAPA review approval, but no operational writes.
+     * Auditor holds read-only oversight across all submodules and the audit trail,
+     * but cannot verify evidence, approve reviews, or perform operational writes.
      */
     public function test_auditor_has_comprehensive_read_access_and_audit_rights(): void
     {
@@ -482,10 +482,11 @@ class RoleBasedAccessTest extends TestCase
         $this->actingAs($auditor)->get('/inventory/logistics')->assertStatus(200);
         $this->actingAs($auditor)->get('/reviews')->assertStatus(200);
 
-        // Exclusive / authorized Audit capabilities
+        // Audit access is observational. Evidence verification and workflow
+        // approval would compromise independence and are deliberately withheld.
         $this->assertTrue($auditor->can(Permission::ViewAuditTrail->value));
-        $this->assertTrue($auditor->can(Permission::ReviewSupplierCompliance->value));
-        $this->assertTrue($auditor->can(Permission::ApproveProcessReview->value));
+        $this->assertFalse($auditor->can(Permission::ReviewSupplierCompliance->value));
+        $this->assertFalse($auditor->can(Permission::ApproveProcessReview->value));
 
         // Forbidden operational mutations
         $this->actingAs($auditor)->post('/inventory/suppliers', ['name' => 'Auditor Vendor'])->assertForbidden();

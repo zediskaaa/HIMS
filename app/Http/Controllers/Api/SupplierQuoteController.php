@@ -16,7 +16,10 @@ class SupplierQuoteController extends Controller implements HasMiddleware
 {
     public static function middleware(): array
     {
-        return [new Middleware('can:'.Permission::ManageProcurement->value)];
+        return [
+            new Middleware('can:'.Permission::ViewProcurementSensitiveData->value, only: ['index', 'show']),
+            new Middleware('can:'.Permission::ManageSourcing->value, only: ['store', 'update']),
+        ];
     }
 
     public function index(Request $request)

@@ -13,6 +13,7 @@ use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\View\View;
@@ -40,11 +41,14 @@ class InventoryController extends Controller implements HasMiddleware
         ];
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
-        $totalSuppliers = Supplier::count();
-        $activeSuppliers = Supplier::where('status', 'active')->count();
-        $inactiveSuppliers = Supplier::where('status', 'inactive')->count();
+        $canViewSuppliers = $request->user()->can(Permission::ViewSuppliers->value);
+        $canViewProcurementFinancials = $request->user()->can(Permission::ViewProcurementSensitiveData->value);
+
+        $totalSuppliers = $canViewSuppliers ? Supplier::count() : null;
+        $activeSuppliers = $canViewSuppliers ? Supplier::where('status', 'active')->count() : null;
+        $inactiveSuppliers = $canViewSuppliers ? Supplier::where('status', 'inactive')->count() : null;
         $totalItems = InventoryItem::count();
         $storageLocations = StorageLocation::count();
         $recentMovements = StockMovement::with(['item', 'fromLocation', 'toLocation'])
@@ -53,13 +57,17 @@ class InventoryController extends Controller implements HasMiddleware
             ->take(6)
             ->get();
 
-        $pendingPurchaseOrders = PurchaseOrder::with(['supplier', 'item'])
-            ->whereIn('status', ['draft', 'pending', 'submitted', 'approved'])
-            ->latest('requested_at')
-            ->take(5)
-            ->get();
+        $pendingPurchaseOrders = $canViewProcurementFinancials
+            ? PurchaseOrder::with(['supplier', 'item'])
+                ->whereIn('status', ['draft', 'pending', 'submitted', 'approved'])
+                ->latest('requested_at')
+                ->take(5)
+                ->get()
+            : collect();
 
-        $pendingPoCount = PurchaseOrder::whereIn('status', ['draft', 'pending', 'submitted', 'approved'])->count();
+        $pendingPoCount = $canViewProcurementFinancials
+            ? PurchaseOrder::whereIn('status', ['draft', 'pending', 'submitted', 'approved'])->count()
+            : null;
 
         // Batches inside their item's expiry alert window, or already expired.
         $expiringBatches = ItemBatch::with('item')
@@ -70,7 +78,7 @@ class InventoryController extends Controller implements HasMiddleware
             ->take(5)
             ->get();
 
-        return view('dashboard', array_merge($this->liveSnapshot(), compact(
+        return view('dashboard', array_merge($this->liveSnapshot($request), compact(
             'totalSuppliers',
             'activeSuppliers',
             'inactiveSuppliers',
@@ -90,18 +98,18 @@ class InventoryController extends Controller implements HasMiddleware
      * markup stays defined in exactly one Blade partial, plus the counters
      * that sit in the stat tiles above it.
      */
-    public function live(): JsonResponse
+    public function live(Request $request): JsonResponse
     {
-        $snapshot = $this->liveSnapshot();
+        $snapshot = $this->liveSnapshot($request);
 
-        return response()->json([
+        return response()->json(array_filter([
             'alertsHtml' => view('inventory.partials.alerts-table', $snapshot)->render(),
             'openAlertCount' => $snapshot['openAlertCount'],
             'lowStockItems' => $snapshot['lowStockItems'],
             'outOfStockItems' => $snapshot['outOfStockItems'],
             'totalOnHand' => $snapshot['totalOnHand'],
             'totalInventoryValue' => $snapshot['totalInventoryValue'],
-        ]);
+        ], fn (mixed $value): bool => $value !== null));
     }
 
     /**
@@ -112,7 +120,7 @@ class InventoryController extends Controller implements HasMiddleware
      *
      * @return array<string, mixed>
      */
-    private function liveSnapshot(): array
+    private function liveSnapshot(Request $request): array
     {
         // Alerts still describing a live condition, worst severity first.
         $activeAlerts = StockAlert::with(['item', 'batch', 'location'])
@@ -128,9 +136,11 @@ class InventoryController extends Controller implements HasMiddleware
             'lowStockItems' => InventoryItem::whereIn('status', ['low_stock', 'out_of_stock'])->count(),
             'outOfStockItems' => InventoryItem::where('status', 'out_of_stock')->count(),
             'totalOnHand' => (int) InventoryItem::sum('quantity_on_hand'),
-            'totalInventoryValue' => InventoryItem::get()->sum(
-                fn ($item) => (float) $item->quantity_on_hand * (float) $item->unit_cost
-            ),
+            'totalInventoryValue' => $request->user()->can(Permission::ViewProcurementSensitiveData->value)
+                ? InventoryItem::get()->sum(
+                    fn ($item) => (float) $item->quantity_on_hand * (float) $item->unit_cost
+                )
+                : null,
         ];
     }
 

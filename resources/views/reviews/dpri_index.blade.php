@@ -108,6 +108,7 @@
             </div>
 
             {{-- New Reference Price Modal --}}
+            @can(\App\Enums\Permission::CreateProcessReview->value)
             <div x-show="newModal" x-cloak class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/60 p-4 sm:items-center">
                 <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
                     <h3 class="text-lg font-bold text-neutral-900">Register DPRI Reference Benchmark</h3>
@@ -153,6 +154,7 @@
                     </form>
                 </div>
             </div>
+            @endcan
 
         </div>
     </div>

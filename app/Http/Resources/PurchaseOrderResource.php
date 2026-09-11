@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\Permission;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class PurchaseOrderResource extends JsonResource
@@ -22,10 +23,12 @@ class PurchaseOrderResource extends JsonResource
                 'name' => $this->item->name,
             ] : null,
             'quantity' => $this->quantity,
-            'unit_cost' => $this->unit_cost,
-            'total_amount' => $this->total_amount,
             'status' => $this->status,
-            'notes' => $this->notes,
+            $this->mergeWhen($request->user()?->can(Permission::ViewProcurementSensitiveData->value), [
+                'unit_cost' => $this->unit_cost,
+                'total_amount' => $this->total_amount,
+                'notes' => $this->notes,
+            ]),
             'requested_at' => $this->requested_at,
             'received_at' => $this->received_at,
             'created_at' => $this->created_at,

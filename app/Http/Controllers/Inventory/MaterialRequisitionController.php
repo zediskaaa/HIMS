@@ -22,7 +22,7 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
     {
         return [
             'auth:web,admin,super_admin',
-            new Middleware('can:'.Permission::CreateRequisition->value, only: ['store', 'cancel', 'acknowledge']),
+            new Middleware('can:'.Permission::CreateRequisition->value, only: ['store', 'acknowledge']),
             new Middleware('can:'.Permission::ApproveRequisition->value, only: ['approve', 'reject']),
             new Middleware('can:'.Permission::IssueStock->value, only: ['issue']),
             new Middleware('can:'.Permission::ViewInventory->value, only: ['index', 'show']),
@@ -166,6 +166,12 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
 
     public function cancel(Request $request, MaterialRequisition $requisition): RedirectResponse
     {
+        abort_unless(
+            $request->user()->can(Permission::CreateRequisition->value)
+                || $request->user()->can(Permission::ApproveRequisition->value),
+            403
+        );
+
         $validated = $request->validate([
             'cancellation_reason' => ['nullable', 'string', 'max:500'],
         ]);

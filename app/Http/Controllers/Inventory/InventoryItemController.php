@@ -49,35 +49,57 @@ class InventoryItemController extends Controller implements HasMiddleware
 
     public function index(): View
     {
-        $items = InventoryItem::with(['supplier', 'category', 'defaultLocation'])->latest()->get();
-        $eligibleSuppliers = Supplier::procurementEligible()->orderBy('name')->get();
-        $unavailableSuppliers = Supplier::query()
-            ->whereNotIn('id', $eligibleSuppliers->modelKeys())
-            ->orderBy('name')
-            ->get()
-            ->each(function (Supplier $supplier): void {
-                $supplier->setAttribute('eligibility_reason', match (true) {
-                    $supplier->status->value !== 'active' => $supplier->status->label(),
-                    $supplier->effectiveAccreditationStatus()->value !== 'approved' => $supplier->effectiveAccreditationStatus()->label().' accreditation',
-                    default => 'Compliance action required',
-                });
-            });
-        $categories = ItemCategory::active()
-            ->with('parent')
-            ->orderBy('name')
-            ->get()
-            ->mapWithKeys(fn (ItemCategory $category) => [$category->id => $category->fullPath()]);
-        $locations = StorageLocation::active()
-            ->with('parent')
-            ->orderBy('name')
-            ->get()
-            ->mapWithKeys(fn (StorageLocation $location) => [$location->id => $location->fullPath()]);
-        $unitOptions = InventoryItem::query()
-            ->whereNotNull('unit')
-            ->where('unit', '!=', '')
-            ->distinct()
-            ->orderBy('unit')
-            ->pluck('unit');
+        $user = request()->user();
+        $canManageItems = $user->can(Permission::ManageItems->value);
+        $canViewSuppliers = $user->can(Permission::ViewSuppliers->value);
+
+        $items = InventoryItem::query()
+            ->with(array_filter([
+                $canViewSuppliers ? 'supplier' : null,
+                'category',
+                'defaultLocation',
+            ]))
+            ->latest()
+            ->get();
+
+        $eligibleSuppliers = $canManageItems
+            ? Supplier::procurementEligible()->orderBy('name')->get()
+            : collect();
+        $unavailableSuppliers = $canManageItems
+            ? Supplier::query()
+                ->whereNotIn('id', $eligibleSuppliers->modelKeys())
+                ->orderBy('name')
+                ->get()
+                ->each(function (Supplier $supplier): void {
+                    $supplier->setAttribute('eligibility_reason', match (true) {
+                        $supplier->status->value !== 'active' => $supplier->status->label(),
+                        $supplier->effectiveAccreditationStatus()->value !== 'approved' => $supplier->effectiveAccreditationStatus()->label().' accreditation',
+                        default => 'Compliance action required',
+                    });
+                })
+            : collect();
+        $categories = $canManageItems
+            ? ItemCategory::active()
+                ->with('parent')
+                ->orderBy('name')
+                ->get()
+                ->mapWithKeys(fn (ItemCategory $category) => [$category->id => $category->fullPath()])
+            : collect();
+        $locations = $canManageItems
+            ? StorageLocation::active()
+                ->with('parent')
+                ->orderBy('name')
+                ->get()
+                ->mapWithKeys(fn (StorageLocation $location) => [$location->id => $location->fullPath()])
+            : collect();
+        $unitOptions = $canManageItems
+            ? InventoryItem::query()
+                ->whereNotNull('unit')
+                ->where('unit', '!=', '')
+                ->distinct()
+                ->orderBy('unit')
+                ->pluck('unit')
+            : collect();
 
         return view('inventory.items.index', compact(
             'categories',

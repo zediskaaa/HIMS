@@ -24,7 +24,7 @@ class InventoryItemController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('can:'.Permission::ViewInventory->value, only: ['index', 'show']),
-            new Middleware('can:'.Permission::ManageItems->value, only: ['store', 'update', 'destroy']),
+            new Middleware('can:'.Permission::ManageItems->value, only: ['store', 'update']),
         ];
     }
 
@@ -82,24 +82,5 @@ class InventoryItemController extends Controller implements HasMiddleware
         });
 
         return new InventoryItemResource($inventory_item);
-    }
-
-    public function destroy(Request $request, InventoryItem $inventory_item)
-    {
-        DB::transaction(function () use ($request, $inventory_item): void {
-            $snapshot = Arr::only($inventory_item->getAttributes(), ['sku', 'name', 'unit', 'status']);
-            $reference = $inventory_item->sku;
-            $inventory_item->delete();
-            $this->audit->log(
-                AuditAction::DeletedInventoryItem,
-                $request->user(),
-                'Deleted an inventory item.',
-                $inventory_item,
-                $reference,
-                oldValues: $snapshot,
-            );
-        });
-
-        return response()->json(null, 204);
     }
 }

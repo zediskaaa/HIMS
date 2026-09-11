@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\Permission;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class InventoryItemResource extends JsonResource
@@ -26,13 +27,17 @@ class InventoryItemResource extends JsonResource
             'quantity_on_hand' => $this->quantity_on_hand,
             'reserved_quantity' => $this->reserved_quantity,
             'reorder_level' => $this->reorder_level,
-            'unit_cost' => $this->unit_cost,
-            'total_value' => $this->total_value,
-            'supplier_id' => $this->supplier_id,
-            'supplier' => $this->relationLoaded('supplier') && $this->supplier ? [
-                'id' => $this->supplier->id,
-                'name' => $this->supplier->name,
-            ] : null,
+            $this->mergeWhen($request->user()?->can(Permission::ViewProcurementSensitiveData->value), [
+                'unit_cost' => $this->unit_cost,
+                'total_value' => $this->total_value,
+            ]),
+            $this->mergeWhen($request->user()?->can(Permission::ViewSuppliers->value), [
+                'supplier_id' => $this->supplier_id,
+                'supplier' => $this->relationLoaded('supplier') && $this->supplier ? [
+                    'id' => $this->supplier->id,
+                    'name' => $this->supplier->name,
+                ] : null,
+            ]),
             'warehouse_name' => $this->warehouse_name,
             'batch_number' => $this->batch_number,
             'expiry_date' => optional($this->expiry_date)->toDateString(),

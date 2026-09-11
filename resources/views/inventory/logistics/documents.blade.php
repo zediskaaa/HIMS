@@ -7,10 +7,12 @@
                 <p class="text-sm text-neutral-600">Secure SHA-256 cryptographic verification, National Archives (NAP) retention compliance, and non-destructive versioning.</p>
             </div>
             <div class="flex items-center gap-2" x-data>
+                @can(\App\Enums\Permission::ManageLogisticsRecords->value)
                 <button @click="$dispatch('open-upload-modal')" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                     Upload Document
                 </button>
+                @endcan
             </div>
         </div>
     </x-slot>
@@ -223,6 +225,7 @@
             </div>
 
             {{-- Upload Modal --}}
+            @can(\App\Enums\Permission::ManageLogisticsRecords->value)
             <div x-show="uploadModalOpen" style="display: none;" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
                 <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
                     <div x-show="uploadModalOpen" @click="uploadModalOpen = false" class="fixed inset-0 bg-neutral-900/60 transition-opacity"></div>
@@ -302,8 +305,10 @@
                     </div>
                 </div>
             </div>
+            @endcan
 
             {{-- Verify Document Modal --}}
+            @can(\App\Enums\Permission::VerifyLogisticsDocuments->value)
             <div x-show="verifyModalOpen" style="display: none;" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
                 <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
                     <div x-show="verifyModalOpen" @click="verifyModalOpen = false" class="fixed inset-0 bg-neutral-900/60 transition-opacity"></div>
@@ -341,8 +346,10 @@
                     </div>
                 </div>
             </div>
+            @endcan
 
             {{-- Supersede Version Modal --}}
+            @can(\App\Enums\Permission::ManageLogisticsRecords->value)
             <div x-show="supersedeModalOpen" style="display: none;" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
                 <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
                     <div x-show="supersedeModalOpen" @click="supersedeModalOpen = false" class="fixed inset-0 bg-neutral-900/60 transition-opacity"></div>
@@ -378,6 +385,7 @@
                     </div>
                 </div>
             </div>
+            @endcan
 
         </div>
     </div>

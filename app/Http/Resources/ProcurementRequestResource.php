@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\Permission;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class ProcurementRequestResource extends JsonResource
@@ -12,7 +13,6 @@ class ProcurementRequestResource extends JsonResource
             'id' => $this->id,
             'request_number' => $this->request_number,
             'title' => $this->title,
-            'description' => $this->description,
             'item' => $this->relationLoaded('item') && $this->item ? new InventoryItemResource($this->item) : null,
             'requested_quantity' => $this->requested_quantity,
             'priority' => $this->priority,
@@ -23,10 +23,13 @@ class ProcurementRequestResource extends JsonResource
                 'id' => $this->supplier->id,
                 'name' => $this->supplier->name,
             ] : null,
-            'approved_by' => $this->approved_by,
-            'approval_notes' => $this->approval_notes,
-            'evaluation_score' => $this->evaluation_score,
-            'evaluation_status' => $this->evaluation_status,
+            $this->mergeWhen($request->user()?->can(Permission::ViewProcurementSensitiveData->value), [
+                'description' => $this->description,
+                'approved_by' => $this->approved_by,
+                'approval_notes' => $this->approval_notes,
+                'evaluation_score' => $this->evaluation_score,
+                'evaluation_status' => $this->evaluation_status,
+            ]),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

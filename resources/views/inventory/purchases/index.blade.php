@@ -115,17 +115,17 @@
             {{-- Navigation Tabs --}}
             <div class="border-b border-neutral-200">
                 <nav class="-mb-px flex space-x-6 overflow-x-auto text-sm font-medium">
-                    @canany(['create_requisition', 'manage_sourcing', 'issue_purchase_order', 'manage_procurement'])
+                    @canany(['view_procurement_sensitive_data', 'create_requisition', 'manage_sourcing', 'issue_purchase_order', 'manage_procurement'])
                     <button @click="activeTab = 'enterprise_s2p'" :class="activeTab === 'enterprise_s2p' ? 'border-primary-600 text-primary-600 border-b-2 font-semibold' : 'text-neutral-500 hover:text-neutral-700'" class="whitespace-nowrap py-3 px-1">
                         Enterprise Source-to-Pay Workspace
                     </button>
                     @endcanany
-                    @canany(['manage_sourcing', 'evaluate_bids'])
+                    @canany(['view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids'])
                     <button @click="activeTab = 'sourcing_rfqs'" :class="activeTab === 'sourcing_rfqs' ? 'border-primary-600 text-primary-600 border-b-2 font-semibold' : 'text-neutral-500 hover:text-neutral-700'" class="whitespace-nowrap py-3 px-1">
                         Sourcing Events &amp; RFQs ({{ $rfqs->count() }})
                     </button>
                     @endcanany
-                    @canany(['evaluate_bids', 'award_procurement'])
+                    @canany(['view_procurement_sensitive_data', 'evaluate_bids', 'award_procurement'])
                     <button @click="activeTab = 'evaluations'" :class="activeTab === 'evaluations' ? 'border-primary-600 text-primary-600 border-b-2 font-semibold' : 'text-neutral-500 hover:text-neutral-700'" class="whitespace-nowrap py-3 px-1">
                         Comparative Evaluation &amp; Landed Cost Matrix
                     </button>
@@ -152,7 +152,7 @@
             </div>
 
             {{-- ======================================================== TAB 1: Enterprise S2P Workspace --}}
-            @canany(['create_requisition', 'manage_sourcing', 'issue_purchase_order', 'manage_procurement'])
+            @canany(['view_procurement_sensitive_data', 'create_requisition', 'manage_sourcing', 'issue_purchase_order', 'manage_procurement'])
             <div x-show="activeTab === 'enterprise_s2p'" class="space-y-6">
                 @can('create_requisition')
                 {{-- Department Requisition Intake with Synchronous Budget Soft Commitment --}}
@@ -422,7 +422,7 @@
             @endcanany
 
             {{-- ======================================================== TAB 2: Sourcing Events & RFQs --}}
-            @canany(['manage_sourcing', 'evaluate_bids'])
+            @canany(['view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids'])
             <div x-show="activeTab === 'sourcing_rfqs'" class="space-y-6">
                 @can('manage_sourcing')
                 {{-- Create RFQ Package Card --}}
@@ -615,7 +615,7 @@
             @endcanany
 
             {{-- ======================================================== TAB 3: Comparative Evaluation & Landed Cost Matrix --}}
-            @canany(['evaluate_bids', 'award_procurement'])
+            @canany(['view_procurement_sensitive_data', 'evaluate_bids', 'award_procurement'])
             <div x-show="activeTab === 'evaluations'" class="space-y-6">
                 <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
                     <div class="flex items-center justify-between border-b border-neutral-100 pb-4">
@@ -953,8 +953,10 @@
                                     <th class="px-3.5 py-3">Supplier Counterparty</th>
                                     <th class="px-3.5 py-3">Line Items &amp; Qty</th>
                                     <th class="px-3.5 py-3">Cost Center</th>
+                                    @can('view_procurement_sensitive_data')
                                     <th class="px-3.5 py-3">Commercial Terms</th>
                                     <th class="px-3.5 py-3">Total Encumbered</th>
+                                    @endcan
                                     <th class="px-3.5 py-3">Status</th>
                                     <th class="px-3.5 py-3">Actions</th>
                                 </tr>
@@ -968,7 +970,9 @@
                                         </td>
                                         <td class="px-3.5 py-3">
                                             <p class="font-semibold text-neutral-900">{{ $po->supplier?->name }}</p>
+                                            @can('view_supplier_sensitive_data')
                                             <p class="text-[11px] text-neutral-500">{{ $po->supplier?->email ?? $po->supplier?->phone }}</p>
+                                            @endcan
                                         </td>
                                         <td class="px-3.5 py-3">
                                             @if($po->lines->isNotEmpty())
@@ -986,11 +990,13 @@
                                                 <span class="text-xs text-neutral-400">General Fund</span>
                                             @endif
                                         </td>
+                                        @can('view_procurement_sensitive_data')
                                         <td class="px-3.5 py-3">
                                             <span class="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] font-mono text-neutral-700">{{ $po->payment_terms ?: 'Net 30' }}</span>
                                             <span class="rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-mono text-blue-700">{{ $po->incoterms ?: 'DDP' }}</span>
                                         </td>
                                         <td class="px-3.5 py-3 font-bold text-neutral-900">₱{{ number_format($po->total_amount, 2) }}</td>
+                                        @endcan
                                         <td class="px-3.5 py-3">
                                             @php
                                                 $poStatusClasses = match($po->status) {
@@ -1330,14 +1336,16 @@
                                     <th class="px-3 py-2">Supplier</th>
                                     <th class="px-3 py-2">Item</th>
                                     <th class="px-3 py-2">Quantity</th>
+                                    @can('view_procurement_sensitive_data')
                                     <th class="px-3 py-2">Unit cost</th>
+                                    @endcan
                                     <th class="px-3 py-2">Status</th>
                                     <th class="px-3 py-2">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="purchase-orders-table-body" class="divide-y divide-[var(--border)]">
                                 <tr>
-                                    <td colspan="7" class="px-3 py-4 text-[var(--muted)]">Loading purchase orders from API...</td>
+                                    <td colspan="{{ auth()->user()?->can('view_procurement_sensitive_data') ? 7 : 6 }}" class="px-3 py-4 text-[var(--muted)]">Loading purchase orders from API...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1482,7 +1490,7 @@
                 return '<span class="text-xs text-[var(--muted)]">Approved</span>';
             }
 
-            @can(\App\Enums\Permission::ManageProcurement->value)
+            @can(\App\Enums\Permission::ApproveRequisition->value)
                 return `
                     <form method="POST" action="/inventory/purchases/requests/${request.id}/approve"
                           class="inline"
@@ -1543,7 +1551,7 @@
                 return '<span class="text-sm text-[var(--muted)]">Received</span>';
             }
 
-            @can(\App\Enums\Permission::RecordMovements->value)
+            @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
                 return `
                     <form method="POST" action="/inventory/purchases/${order.id}/receive"
                           data-confirm-title="Confirm purchase receipt"
@@ -1577,7 +1585,7 @@
                 const items = payload.data || [];
 
                 if (items.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" class="px-3 py-4 text-[var(--muted)]">No purchase orders found via API.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="{{ auth()->user()?->can('view_procurement_sensitive_data') ? 7 : 6 }}" class="px-3 py-4 text-[var(--muted)]">No purchase orders found via API.</td></tr>`;
                 } else {
                     tbody.innerHTML = items.map(order => `
                         <tr>
@@ -1585,7 +1593,9 @@
                             <td class="px-3 py-2">${order.supplier ? escapeHtml(order.supplier.name) : '-'}</td>
                             <td class="px-3 py-2">${order.item ? escapeHtml(order.item.name) : '-'}</td>
                             <td class="px-3 py-2">${order.quantity}</td>
+                            @can('view_procurement_sensitive_data')
                             <td class="px-3 py-2">${formatCurrency(order.unit_cost)}</td>
+                            @endcan
                             <td class="px-3 py-2">${renderOrderStatus(order.status)}</td>
                             <td class="px-3 py-2">${renderReceiveForm(order)}</td>
                         </tr>

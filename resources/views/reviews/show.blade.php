@@ -56,6 +56,7 @@
                     {{-- Governance Action Bar --}}
                     <div class="flex items-center gap-2">
                         @if($review->isDraft())
+                            @can(\App\Enums\Permission::CreateProcessReview->value)
                             <form action="{{ route('reviews.submit', $review) }}" method="POST">
                                 @csrf
                                 <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition">
@@ -63,7 +64,9 @@
                                     Submit for BAC Approval
                                 </button>
                             </form>
+                            @endcan
                         @elseif($review->isSubmitted())
+                            @can(\App\Enums\Permission::ApproveProcessReview->value)
                             @if($review->canBeApprovedBy(auth()->user()))
                                 <form action="{{ route('reviews.approve', $review) }}" method="POST">
                                     @csrf
@@ -80,6 +83,7 @@
                                     Maker-Checker: Pending approval from BAC / Administrator.
                                 </div>
                             @endif
+                            @endcan
                         @endif
                     </div>
                 </div>
@@ -540,6 +544,7 @@
 
             {{-- TAB 6: QUALITATIVE CONTEXT & NARRATIVE --}}
             <div x-show="activeTab === 'context'" class="space-y-6">
+                @can(\App\Enums\Permission::CreateProcessReview->value)
                 <form action="{{ route('reviews.update', $review) }}" method="POST" class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm space-y-5">
                     @csrf
                     @method('PUT')
@@ -573,9 +578,17 @@
                         </div>
                     @endif
                 </form>
+                @else
+                    <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm space-y-5">
+                        <div><p class="text-sm font-semibold text-neutral-800">Review Title</p><p class="mt-1 text-sm text-neutral-700">{{ $review->title }}</p></div>
+                        <div><p class="text-sm font-semibold text-neutral-800">Qualitative &amp; Environmental Factors</p><p class="mt-1 whitespace-pre-line text-sm text-neutral-700">{{ $review->qualitative_context ?: 'No qualitative context recorded.' }}</p></div>
+                        <div><p class="text-sm font-semibold text-neutral-800">Executive Summary Narrative</p><p class="mt-1 whitespace-pre-line text-sm text-neutral-700">{{ $review->executive_summary ?: 'No executive summary recorded.' }}</p></div>
+                    </div>
+                @endcan
             </div>
 
             {{-- Rejection Modal --}}
+            @can(\App\Enums\Permission::ApproveProcessReview->value)
             <div x-show="rejectModal" x-cloak class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/60 p-4 sm:items-center">
                 <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
                     <h3 class="text-lg font-bold text-neutral-900">Return Review to Draft (Rejection)</h3>
@@ -591,8 +604,10 @@
                     </form>
                 </div>
             </div>
+            @endcan
 
             {{-- Implementation Execution Modal --}}
+            @can(\App\Enums\Permission::ImplementProcessReview->value)
             <div x-show="implementModal" x-cloak class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/60 p-4 sm:items-center">
                 <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
                     <h3 class="text-lg font-bold text-neutral-900">Execute Intervention: <span x-text="implementTitle"></span></h3>
@@ -608,6 +623,7 @@
                     </form>
                 </div>
             </div>
+            @endcan
 
         </div>
     </div>

@@ -7,10 +7,12 @@
                 <p class="text-sm text-neutral-600">Inbound logistics monitoring, GS1 SSCC validation, WHO GDP cold-chain thermal loggers, and dock arrival handoffs.</p>
             </div>
             <div class="flex items-center gap-2" x-data>
+                @can(\App\Enums\Permission::ManageLogisticsRecords->value)
                 <button @click="$dispatch('open-shipment-modal')" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     Register Inbound Shipment
                 </button>
+                @endcan
             </div>
         </div>
     </x-slot>
@@ -193,6 +195,7 @@
                                     </td>
 
                                     <td class="px-6 py-4 text-right">
+                                        @can(\App\Enums\Permission::ManageLogisticsRecords->value)
                                         @if(!$shipment->isDelivered())
                                             <button @click="selectedShipment = {{ $shipment->id }}; selectedShipmentNumber = '{{ $shipment->shipment_number }}'; isColdChain = {{ $shipment->is_cold_chain ? 'true' : 'false' }}; dockModalOpen = true"
                                                     class="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700">
@@ -202,6 +205,9 @@
                                         @else
                                             <span class="text-xs text-neutral-400">Docked</span>
                                         @endif
+                                        @else
+                                            <span class="text-xs text-neutral-400">Read only</span>
+                                        @endcan
                                     </td>
                                 </tr>
                             @empty
@@ -223,6 +229,7 @@
             </div>
 
             {{-- Register Inbound Shipment Modal --}}
+            @can(\App\Enums\Permission::ManageLogisticsRecords->value)
             <div x-show="shipmentModalOpen" style="display: none;" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
                 <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
                     <div x-show="shipmentModalOpen" @click="shipmentModalOpen = false" class="fixed inset-0 bg-neutral-900/60 transition-opacity"></div>
@@ -394,6 +401,7 @@
                     </div>
                 </div>
             </div>
+            @endcan
 
         </div>
     </div>

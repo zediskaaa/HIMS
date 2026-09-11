@@ -22,12 +22,16 @@
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), $dashboardTitle => null]"
     >
         <x-slot:actions>
+            @canany([\App\Enums\Permission::IssueStock->value, \App\Enums\Permission::RecordMovements->value, \App\Enums\Permission::TransferStock->value])
             <x-ui.button variant="secondary" icon="arrows-right-left" :href="route('inventory.stock-movements')">
                 Record movement
             </x-ui.button>
+            @endcanany
+            @can(\App\Enums\Permission::ManageItems->value)
             <x-ui.button variant="primary" icon="plus" :href="route('inventory.items')">
                 New item
             </x-ui.button>
+            @endcan
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -77,6 +81,7 @@
             <x-slot:hint><span data-stat-hint>{{ $openAlertCount > 0 ? 'Awaiting acknowledgement' : 'Nothing outstanding' }}</span></x-slot:hint>
         </x-ui.stat>
 
+        @can(\App\Enums\Permission::ViewProcurementSensitiveData->value)
         <x-ui.stat
             label="Inventory value"
             :value="'₱'.number_format($totalInventoryValue, 2)"
@@ -85,6 +90,7 @@
             :hint="number_format($storageLocations).' storage locations'"
             :href="route('inventory.reports')"
         />
+        @endcan
     </div>
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {{-- Stock alerts --}}
@@ -167,12 +173,12 @@
         <x-ui.card title="Operational snapshot">
             <dl class="divide-y divide-neutral-100">
                 @foreach (array_merge(
-                    auth()->user()->can(\App\Enums\Permission::ManageSuppliers->value) ? [
+                    auth()->user()->can(\App\Enums\Permission::ViewSuppliers->value) ? [
                         ['Suppliers', number_format($totalSuppliers), 'text-neutral-900'],
                         ['Active suppliers', number_format($activeSuppliers), 'text-success-700'],
                     ] : [],
                     [['Storage locations', number_format($storageLocations), 'text-neutral-900']],
-                    auth()->user()->can(\App\Enums\Permission::ManageProcurement->value) ? [
+                    auth()->user()->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ? [
                         ['Pending purchase orders', number_format($pendingPoCount), $pendingPoCount > 0 ? 'text-warning-700' : 'text-neutral-900'],
                     ] : [],
                     [['Out of stock', number_format($outOfStockItems), $outOfStockItems > 0 ? 'text-danger-700' : 'text-neutral-900']],
@@ -190,7 +196,7 @@
         {{-- Pending purchase orders. Hidden without manage_procurement: the
              card's "View all" leads to a screen that would refuse them, and
              the rows name suppliers and amounts they have no business in. --}}
-        @can(\App\Enums\Permission::ManageProcurement->value)
+        @can(\App\Enums\Permission::ViewProcurementSensitiveData->value)
         <x-ui.card :padding="false">
             <x-slot:header>
                 <h2 class="text-sm font-semibold text-neutral-900">Pending purchase orders</h2>
@@ -293,11 +299,13 @@
                             title="No stock movements yet"
                             message="Recorded stock in, stock out and transfers will appear here."
                         >
-                            <x-slot:action>
-                                <x-ui.button size="sm" icon="plus" :href="route('inventory.stock-movements')">
-                                    Record movement
-                                </x-ui.button>
-                            </x-slot:action>
+                            @canany([\App\Enums\Permission::IssueStock->value, \App\Enums\Permission::RecordMovements->value, \App\Enums\Permission::TransferStock->value])
+                                <x-slot:action>
+                                    <x-ui.button size="sm" icon="plus" :href="route('inventory.stock-movements')">
+                                        Record movement
+                                    </x-ui.button>
+                                </x-slot:action>
+                            @endcanany
                         </x-ui.table.empty>
                     @endforelse
                 </tbody>

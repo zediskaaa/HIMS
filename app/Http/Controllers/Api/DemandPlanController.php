@@ -18,7 +18,7 @@ class DemandPlanController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('can:'.Permission::ViewReports->value, only: ['index', 'show']),
-            new Middleware('can:'.Permission::GenerateForecasts->value, only: ['store', 'update', 'destroy']),
+            new Middleware('can:'.Permission::GenerateForecasts->value, only: ['store', 'update']),
         ];
     }
 
@@ -48,12 +48,5 @@ class DemandPlanController extends Controller implements HasMiddleware
         $demand_plan->update($request->validated());
 
         return new DemandPlanResource($demand_plan);
-    }
-
-    public function destroy(DemandPlan $demand_plan)
-    {
-        $demand_plan->delete();
-
-        return response()->json(null, 204);
     }
 }

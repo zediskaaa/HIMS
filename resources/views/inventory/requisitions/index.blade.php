@@ -283,6 +283,7 @@
         </div>
 
         {{-- NEW STORE REQUISITION MODAL --}}
+        @can(\App\Enums\Permission::CreateRequisition->value)
         <div x-show="newRequisitionModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" style="display: none;"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0"
@@ -306,8 +307,9 @@
                                 <div>
                                     <h3 class="text-lg font-bold text-neutral-900">Create Material Store Requisition</h3>
                                     <p class="text-xs text-neutral-500">Request clinical and medical supplies from central inventory storage.</p>
-                                </div>
-                            </div>
+        </div>
+        @endcan
+    </div>
 
                             <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>

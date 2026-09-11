@@ -512,7 +512,7 @@ class SupplierManagementTest extends TestCase
         $this->assertDatabaseHas('suppliers', ['id' => $supplier->id]);
     }
 
-    public function test_procurement_apis_require_procurement_permission_and_do_not_expose_destructive_history_routes(): void
+    public function test_procurement_apis_apply_summary_and_sensitive_read_permissions_without_destructive_routes(): void
     {
         $viewer = User::factory()->viewer()->create();
         $manager = $this->manager();
@@ -531,10 +531,13 @@ class SupplierManagementTest extends TestCase
             'quantity' => 5, 'unit_cost' => 20, 'total_amount' => 100, 'status' => 'pending',
         ]);
 
-        foreach (['procurement-requests', 'supplier-quotes', 'purchase-orders'] as $resource) {
-            $this->actingAs($viewer)->getJson("/api/v1/{$resource}")->assertForbidden();
+        foreach (['procurement-requests', 'purchase-orders'] as $resource) {
+            $this->actingAs($viewer)->getJson("/api/v1/{$resource}")->assertOk();
             $this->actingAs($viewer)->postJson("/api/v1/{$resource}", [])->assertForbidden();
         }
+
+        $this->actingAs($viewer)->getJson('/api/v1/supplier-quotes')->assertForbidden();
+        $this->actingAs($viewer)->postJson('/api/v1/supplier-quotes', [])->assertForbidden();
 
         foreach ([
             "procurement-requests/{$request->id}",

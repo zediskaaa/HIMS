@@ -55,7 +55,7 @@
                     @endif
 
                     {{-- Cancel Action --}}
-                    @if(in_array($requisition->status, ['submitted', 'pending_approval', 'approved'], true) && (auth()->id() === $requisition->requesting_user_id || auth()->user()->can(\App\Enums\Permission::ApproveRequisition->value)))
+                    @if(in_array($requisition->status, ['submitted', 'pending_approval', 'approved'], true) && ((auth()->id() === $requisition->requesting_user_id && auth()->user()->can(\App\Enums\Permission::CreateRequisition->value)) || auth()->user()->can(\App\Enums\Permission::ApproveRequisition->value)))
                         <button type="button" @click="cancelModalOpen = true" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 transition">
                             Cancel Requisition
                         </button>
@@ -72,7 +72,7 @@
                     @endif
 
                     {{-- Acknowledge Action Button --}}
-                    @if($requisition->status === 'issued' && auth()->id() === $requisition->requesting_user_id)
+                    @if($requisition->status === 'issued' && auth()->id() === $requisition->requesting_user_id && auth()->user()->can(\App\Enums\Permission::CreateRequisition->value))
                         <button type="button" @click="ackModalOpen = true" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -361,6 +361,7 @@
         </div>
 
         {{-- ISSUE GOODS MODAL --}}
+        @can(\App\Enums\Permission::IssueStock->value)
         <div x-show="issueModalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0"
@@ -418,7 +419,10 @@
             </div>
         </div>
 
+        @endcan
+
         {{-- HANDOVER ACKNOWLEDGMENT MODAL --}}
+        @can(\App\Enums\Permission::CreateRequisition->value)
         <div x-show="ackModalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0"
@@ -463,7 +467,10 @@
                     </form>
                 </div>
             </div>
+        @endcan
+
         {{-- REJECT REQUISITION MODAL --}}
+        @can(\App\Enums\Permission::ApproveRequisition->value)
         <div x-show="rejectModalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0"
@@ -510,7 +517,10 @@
             </div>
         </div>
 
+        @endcan
+
         {{-- CANCEL REQUISITION MODAL --}}
+        @if((auth()->id() === $requisition->requesting_user_id && auth()->user()->can(\App\Enums\Permission::CreateRequisition->value)) || auth()->user()->can(\App\Enums\Permission::ApproveRequisition->value))
         <div x-show="cancelModalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0"
@@ -556,5 +566,6 @@
                 </div>
             </div>
         </div>
+        @endif
     </div>
 </x-app-layout>

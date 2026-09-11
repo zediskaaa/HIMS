@@ -6,7 +6,6 @@ use App\Enums\ApprovalChainType;
 use App\Enums\Permission;
 use App\Enums\ProcurementMethod;
 use App\Enums\RequisitionStatus;
-use App\Enums\RfqBiddingType;
 use App\Enums\RfqStatus;
 use App\Http\Controllers\Controller;
 use App\Models\ApprovalChain;
@@ -74,11 +73,6 @@ class ProcurementController extends Controller implements HasMiddleware
         $enterpriseRequests = PurchaseRequest::with(['requester', 'costCenter', 'lines.item'])
             ->latest('id')
             ->get();
-
-        // Auto-close bidding window for published RFQs whose submission deadline has elapsed
-        SourcingRfq::where('status', RfqStatus::Published->value)
-            ->where('submission_deadline', '<=', now())
-            ->update(['status' => RfqStatus::BiddingClosed->value]);
 
         // Sourcing RFQs
         $rfqs = SourcingRfq::with(['lines.item', 'quotes.supplier', 'quotes.lines', 'invitations.supplier', 'evaluations'])
@@ -203,7 +197,7 @@ class ProcurementController extends Controller implements HasMiddleware
                 ->withErrors(['budget' => "Budget limit exceeded for Cost Center '{$costCenter->name}'. Available uncommitted budget is insufficient."]);
         }
 
-        DB::transaction(function () use ($validated, $costCenter, $totalAmount, $request) {
+        DB::transaction(function () use ($validated, $costCenter, $totalAmount) {
             $pr = PurchaseRequest::create([
                 'pr_number' => 'PR-'.now()->format('Ymd').'-'.str_pad((string) mt_rand(1000, 9999), 4, '0', STR_PAD_LEFT),
                 'title' => $validated['title'],

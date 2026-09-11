@@ -40,8 +40,22 @@ class SupplierController extends Controller implements HasMiddleware
     {
         return [
             'auth:web,admin,super_admin',
-            new Middleware('can:'.Permission::ViewSuppliers->value, only: ['index', 'show', 'downloadDocument']),
-            new Middleware('can:'.Permission::ManageSuppliers->value, only: ['store', 'update', 'addContact', 'deleteContact', 'uploadDocument', 'deleteDocument', 'attachProduct', 'updateProductPrice', 'detachProduct', 'createContract', 'updateContract']),
+            new Middleware('can:'.Permission::ViewSuppliers->value, only: ['index', 'show']),
+            new Middleware('can:'.Permission::ViewSupplierSensitiveData->value, only: ['downloadDocument']),
+            new Middleware('can:'.Permission::ManageSuppliers->value, only: [
+                'store',
+                'update',
+                'addContact',
+                'deleteContact',
+                'uploadDocument',
+                'deleteDocument',
+                'addProduct',
+                'deactivateProduct',
+                'reactivateProduct',
+                'addPrice',
+                'addContract',
+                'updateContract',
+            ]),
             new Middleware('can:'.Permission::ReviewSupplierCompliance->value, only: ['submitForReview', 'verifyDocument']),
             new Middleware('can:'.Permission::ApproveSuppliers->value, only: ['approve', 'reject', 'suspend', 'inactivate', 'reactivate']),
         ];

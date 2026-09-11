@@ -153,6 +153,7 @@
             </div>
 
             {{-- Main Two-Column Layout --}}
+            @can(\App\Enums\Permission::ViewLogisticsSensitiveData->value)
             <div class="grid gap-6 lg:grid-cols-12">
                 {{-- Left Section (8 cols): Shipments and IARs --}}
                 <div class="space-y-6 lg:col-span-8">
@@ -408,6 +409,11 @@
                     </div>
                 </div>
             </div>
+            @else
+                <x-ui.alert variant="info" title="Summary access only">
+                    Detailed shipment identifiers, logistics documents, inspection reports, and chain-of-custody evidence are restricted to operational and audit roles.
+                </x-ui.alert>
+            @endcan
 
         </div>
     </div>

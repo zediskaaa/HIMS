@@ -1,7 +1,11 @@
+@php
+    $canViewFinancialData = auth()->user()->can(\App\Enums\Permission::ViewProcurementSensitiveData->value);
+@endphp
+
 <x-app-layout>
     <x-ui.page-header
         title="Reports & Analytics"
-        :subtitle="'Inventory valuation, stock status, procurement spend and movement history for the '.$period['days'].'-day window ending '.$period['to']->format('M d, Y').'.'"
+        :subtitle="($canViewFinancialData ? 'Inventory valuation, stock status, procurement spend and movement history' : 'Stock status and movement history').' for the '.$period['days'].'-day window ending '.$period['to']->format('M d, Y').'.'"
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Reports' => null]">
         <x-slot name="actions">
             {{-- Print rather than a CSV export: the panel and the hospital both
@@ -52,12 +56,14 @@
             tone="primary"
             :hint="number_format($summary['units_on_hand']).' units on hand'" />
 
+        @if ($canViewFinancialData)
         <x-ui.stat
             label="Stock valuation"
             :value="'₱'.number_format($summary['stock_value'], 2)"
             icon="chart-bar"
             tone="neutral"
             hint="Units on hand × unit cost." />
+        @endif
 
         <x-ui.stat
             label="Needs attention"
@@ -116,7 +122,10 @@
                         </div>
 
                         <p class="mt-1 text-xs text-neutral-500">
-                            {{ number_format($bucket['units']) }} units &middot; ₱{{ number_format($bucket['value'], 2) }}
+                            {{ number_format($bucket['units']) }} units
+                            @if ($canViewFinancialData)
+                                &middot; ₱{{ number_format($bucket['value'], 2) }}
+                            @endif
                         </p>
                     </div>
                 @endforeach
@@ -132,7 +141,10 @@
                         <span class="text-xs font-normal">units</span>
                     </p>
                     <p class="text-xs text-danger-700">
-                        {{ $expiry['expired']['batches'] }} batches &middot; ₱{{ number_format($expiry['expired']['value'], 2) }}
+                        {{ $expiry['expired']['batches'] }} batches
+                        @if ($canViewFinancialData)
+                            &middot; ₱{{ number_format($expiry['expired']['value'], 2) }}
+                        @endif
                     </p>
                 </div>
 
@@ -143,7 +155,10 @@
                         <span class="text-xs font-normal">units</span>
                     </p>
                     <p class="text-xs text-warning-700">
-                        {{ $expiry['expiring_soon']['batches'] }} batches &middot; ₱{{ number_format($expiry['expiring_soon']['value'], 2) }}
+                        {{ $expiry['expiring_soon']['batches'] }} batches
+                        @if ($canViewFinancialData)
+                            &middot; ₱{{ number_format($expiry['expiring_soon']['value'], 2) }}
+                        @endif
                     </p>
                 </div>
             </div>
@@ -187,10 +202,12 @@
                     <dt class="text-neutral-600">Units consumed</dt>
                     <dd class="font-semibold tabular-nums text-neutral-900">&minus;{{ number_format($movementTotals['units_out']) }}</dd>
                 </div>
+                @if ($canViewFinancialData)
                 <div class="flex items-center justify-between gap-3">
                     <dt class="text-neutral-600">Consumption value</dt>
                     <dd class="font-semibold tabular-nums text-neutral-900">₱{{ number_format($movementTotals['consumption_value'], 2) }}</dd>
                 </div>
+                @endif
                 <div class="flex items-center justify-between gap-3 border-t border-neutral-200 pt-3">
                     <dt class="text-neutral-600">Transfers</dt>
                     <dd class="tabular-nums text-neutral-700">{{ number_format($movementTotals['transfers']) }}</dd>
@@ -220,8 +237,10 @@
                     <x-ui.table.th>Category</x-ui.table.th>
                     <x-ui.table.th numeric>Items</x-ui.table.th>
                     <x-ui.table.th numeric>Units</x-ui.table.th>
-                    <x-ui.table.th numeric>Value</x-ui.table.th>
-                    <x-ui.table.th numeric>Share</x-ui.table.th>
+                    @if ($canViewFinancialData)
+                        <x-ui.table.th numeric>Value</x-ui.table.th>
+                        <x-ui.table.th numeric>Share</x-ui.table.th>
+                    @endif
                 </x-ui.table.head>
                 <tbody>
                     @forelse ($valuationByCategory as $row)
@@ -229,16 +248,18 @@
                             <x-ui.table.td>{{ $row->category }}</x-ui.table.td>
                             <x-ui.table.td numeric muted>{{ number_format($row->items) }}</x-ui.table.td>
                             <x-ui.table.td numeric muted>{{ number_format($row->units) }}</x-ui.table.td>
-                            <x-ui.table.td numeric>₱{{ number_format($row->value, 2) }}</x-ui.table.td>
-                            <x-ui.table.td numeric muted>
-                                {{ $summary['stock_value'] > 0
-                                    ? round(($row->value / $summary['stock_value']) * 100).'%'
-                                    : '—' }}
-                            </x-ui.table.td>
+                            @if ($canViewFinancialData)
+                                <x-ui.table.td numeric>₱{{ number_format($row->value, 2) }}</x-ui.table.td>
+                                <x-ui.table.td numeric muted>
+                                    {{ $summary['stock_value'] > 0
+                                        ? round(($row->value / $summary['stock_value']) * 100).'%'
+                                        : '—' }}
+                                </x-ui.table.td>
+                            @endif
                         </x-ui.table.row>
                     @empty
                         <x-ui.table.empty
-                            :colspan="5"
+                            :colspan="$canViewFinancialData ? 5 : 3"
                             icon="cube"
                             title="No items yet"
                             message="Add inventory items and the valuation fills in." />
@@ -253,7 +274,9 @@
                     <x-ui.table.th>Location</x-ui.table.th>
                     <x-ui.table.th numeric>Items</x-ui.table.th>
                     <x-ui.table.th numeric>Units</x-ui.table.th>
-                    <x-ui.table.th numeric>Value</x-ui.table.th>
+                    @if ($canViewFinancialData)
+                        <x-ui.table.th numeric>Value</x-ui.table.th>
+                    @endif
                     <x-ui.table.th numeric>Utilisation</x-ui.table.th>
                 </x-ui.table.head>
                 <tbody>
@@ -267,7 +290,9 @@
                             </x-ui.table.td>
                             <x-ui.table.td numeric muted>{{ number_format($row['items']) }}</x-ui.table.td>
                             <x-ui.table.td numeric>{{ number_format($row['units']) }}</x-ui.table.td>
-                            <x-ui.table.td numeric muted>₱{{ number_format($row['value'], 2) }}</x-ui.table.td>
+                            @if ($canViewFinancialData)
+                                <x-ui.table.td numeric muted>₱{{ number_format($row['value'], 2) }}</x-ui.table.td>
+                            @endif
                             <x-ui.table.td numeric>
                                 {{-- No capacity configured reads as unknown, not
                                      as an empty shelf. --}}
@@ -288,7 +313,7 @@
                         </x-ui.table.row>
                     @empty
                         <x-ui.table.empty
-                            :colspan="5"
+                            :colspan="$canViewFinancialData ? 5 : 4"
                             icon="building-storefront"
                             title="No stock in any location"
                             message="Record a stock in and the location balances appear here." />
@@ -300,6 +325,7 @@
 
     {{-- ------------------------------------------------ 4. expense reports --}}
 
+    @if ($canViewFinancialData)
     <x-ui.card
         title="Procurement Expense"
         :subtitle="'Purchase orders raised in the last '.$period['days'].' days, plus everything still outstanding.'">
@@ -382,6 +408,7 @@
             </tbody>
         </x-ui.table>
     </x-ui.card>
+    @endif
 
     {{-- --------------------------------------------- 5. movement history --}}
 
@@ -392,7 +419,9 @@
                     <x-ui.table.th>Type</x-ui.table.th>
                     <x-ui.table.th numeric>Movements</x-ui.table.th>
                     <x-ui.table.th numeric>Units</x-ui.table.th>
-                    <x-ui.table.th numeric>Value</x-ui.table.th>
+                    @if ($canViewFinancialData)
+                        <x-ui.table.th numeric>Value</x-ui.table.th>
+                    @endif
                 </x-ui.table.head>
                 <tbody>
                     {{-- Every type is listed even at zero. A type that vanishes
@@ -405,7 +434,9 @@
                             </x-ui.table.td>
                             <x-ui.table.td numeric>{{ number_format($row['movements']) }}</x-ui.table.td>
                             <x-ui.table.td numeric muted>{{ number_format($row['units']) }}</x-ui.table.td>
-                            <x-ui.table.td numeric muted>₱{{ number_format($row['value'], 2) }}</x-ui.table.td>
+                            @if ($canViewFinancialData)
+                                <x-ui.table.td numeric muted>₱{{ number_format($row['value'], 2) }}</x-ui.table.td>
+                            @endif
                         </x-ui.table.row>
                     @endforeach
                 </tbody>
@@ -418,7 +449,9 @@
                     <x-ui.table.th>Item</x-ui.table.th>
                     <x-ui.table.th numeric>Consumed</x-ui.table.th>
                     <x-ui.table.th numeric>On Hand</x-ui.table.th>
-                    <x-ui.table.th numeric>Value</x-ui.table.th>
+                    @if ($canViewFinancialData)
+                        <x-ui.table.th numeric>Value</x-ui.table.th>
+                    @endif
                 </x-ui.table.head>
                 <tbody>
                     @forelse ($topConsumedItems as $row)
@@ -434,11 +467,13 @@
                                 <span class="block text-xs font-normal text-neutral-400">{{ $row->unit ?? 'units' }}</span>
                             </x-ui.table.td>
                             <x-ui.table.td numeric muted>{{ number_format($row->on_hand) }}</x-ui.table.td>
-                            <x-ui.table.td numeric muted>₱{{ number_format($row->value, 2) }}</x-ui.table.td>
+                            @if ($canViewFinancialData)
+                                <x-ui.table.td numeric muted>₱{{ number_format($row->value, 2) }}</x-ui.table.td>
+                            @endif
                         </x-ui.table.row>
                     @empty
                         <x-ui.table.empty
-                            :colspan="4"
+                            :colspan="$canViewFinancialData ? 4 : 3"
                             icon="arrows-right-left"
                             title="Nothing consumed in this window"
                             message="Stock out and issuance movements are what this counts." />
