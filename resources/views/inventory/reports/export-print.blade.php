@@ -347,15 +347,14 @@
     {{-- Floating Print Actions Bar (Hidden on Print) --}}
     <div class="no-print-bar">
         <h1>
-            <span>📋</span>
             <span>HIMS Institutional Report Preview & Export</span>
         </h1>
         <div class="btn-group">
             <button type="button" class="btn btn-primary" onclick="window.print()">
-                🖨️ Print / Save as PDF
+                Print / Save as PDF
             </button>
             <button type="button" class="btn btn-secondary" onclick="window.close()">
-                ✕ Close
+                Close
             </button>
         </div>
     </div>

@@ -63,6 +63,17 @@
                                     @can(\App\Enums\Permission::ViewReports->value)
                                         <a href="{{ route('inventory.reports') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Inventory Reports</a>
                                     @endcan
+                                    @canany([\App\Enums\Permission::ManageItems->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ManageSuppliers->value])
+                                        <a href="{{ route('inventory.import.index') }}" class="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50">
+                                            <span class="flex items-center gap-1.5">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                                                </svg>
+                                                <span>Import Data</span>
+                                            </span>
+                                            <span class="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">CSV/XLS</span>
+                                        </a>
+                                    @endcanany
                                 </div>
                                 @endcan
 
@@ -180,6 +191,11 @@
                             {{ __('Purchase Orders') }}
                         </x-responsive-nav-link>
                     @endcan
+                    @canany([\App\Enums\Permission::ManageItems->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ManageSuppliers->value])
+                        <x-responsive-nav-link :href="route('inventory.import.index')" :active="request()->routeIs('inventory.import.*')">
+                            {{ __('Import Data (CSV/Excel/JSON)') }}
+                        </x-responsive-nav-link>
+                    @endcanany
                     @can(\App\Enums\Permission::ViewLogisticsRecords->value)
                         <x-responsive-nav-link :href="route('inventory.logistics')" :active="request()->routeIs('inventory.logistics')">
                             {{ __('Document Tracking & Logistics') }}

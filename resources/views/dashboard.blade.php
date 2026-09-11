@@ -27,6 +27,11 @@
                 Record movement
             </x-ui.button>
             @endcanany
+            @canany([\App\Enums\Permission::ManageItems->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ManageSuppliers->value])
+            <x-ui.button variant="secondary" icon="arrow-up-tray" :href="route('inventory.import.index')">
+                Import data
+            </x-ui.button>
+            @endcanany
             @can(\App\Enums\Permission::ManageItems->value)
             <x-ui.button variant="primary" icon="plus" :href="route('inventory.items')">
                 New item

@@ -123,7 +123,7 @@
                             <option value="90">Last 90 days</option>
                             <option value="365">Last 12 months</option>
                             <option value="all">All time</option>
-                            <option value="custom">📅 Custom Date Range...</option>
+                            <option value="custom">Custom Date Range...</option>
                         </select>
                     </div>
 
@@ -274,25 +274,21 @@
                             <button type="button" @click="format = 'pdf'"
                                     :class="format === 'pdf' ? 'bg-primary-600 text-white font-semibold' : 'text-neutral-700 hover:text-neutral-900'"
                                     class="px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all">
-                                <span>🖨️</span>
                                 <span>PDF / Print</span>
                             </button>
                             <button type="button" @click="format = 'excel'"
                                     :class="format === 'excel' ? 'bg-primary-600 text-white font-semibold' : 'text-neutral-700 hover:text-neutral-900'"
                                     class="px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all">
-                                <span>📊</span>
                                 <span>Excel (.xls)</span>
                             </button>
                             <button type="button" @click="format = 'csv'"
                                     :class="format === 'csv' ? 'bg-primary-600 text-white font-semibold' : 'text-neutral-700 hover:text-neutral-900'"
                                     class="px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all">
-                                <span>📄</span>
                                 <span>CSV</span>
                             </button>
                             <button type="button" @click="format = 'json'"
                                     :class="format === 'json' ? 'bg-primary-600 text-white font-semibold' : 'text-neutral-700 hover:text-neutral-900'"
                                     class="px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all">
-                                <span>⚙️</span>
                                 <span>JSON</span>
                             </button>
                         </div>

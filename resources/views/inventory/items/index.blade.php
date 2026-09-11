@@ -37,6 +37,9 @@
                             @endif
                         </x-ui.button>
                     @endcan
+                    @canany([\App\Enums\Permission::ManageItems->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ManageSuppliers->value])
+                        <x-ui.button variant="secondary" :href="route('inventory.import.index')" icon="arrow-up-tray">Import Data</x-ui.button>
+                    @endcanany
                 </div>
             </x-ui.card>
 

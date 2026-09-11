@@ -9,6 +9,7 @@ use App\Http\Controllers\Inventory\ConsignmentController;
 use App\Http\Controllers\Inventory\CycleCountController;
 use App\Http\Controllers\Inventory\DemandForecastController;
 use App\Http\Controllers\Inventory\GoodsReceiptController;
+use App\Http\Controllers\Inventory\ImportController;
 use App\Http\Controllers\Inventory\InventoryController;
 use App\Http\Controllers\Inventory\InventoryItemController;
 use App\Http\Controllers\Inventory\LogisticsController;
@@ -191,6 +192,12 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::get('/inventory/alerts', [InventoryController::class, 'alerts'])->name('inventory.alerts');
     Route::get('/inventory/reports', [ReportController::class, 'index'])->name('inventory.reports');
     Route::get('/inventory/reports/generate', [ReportController::class, 'generate'])->name('inventory.reports.generate');
+
+    // Data Import System (CSV, Excel, JSON)
+    Route::get('/inventory/import', [ImportController::class, 'index'])->name('inventory.import.index');
+    Route::get('/inventory/import/template', [ImportController::class, 'downloadTemplate'])->name('inventory.import.template');
+    Route::post('/inventory/import/preview', [ImportController::class, 'preview'])->name('inventory.import.preview');
+    Route::post('/inventory/import/commit', [ImportController::class, 'commit'])->name('inventory.import.commit');
 
     // Demand Forecasting. Reading the forecast needs view_reports; saving a
     // plan needs generate_forecasts. Both are declared on the controller.
