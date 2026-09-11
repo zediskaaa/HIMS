@@ -1,11 +1,51 @@
 @php
     $canViewFinancialData = auth()->user()->can(\App\Enums\Permission::ViewProcurementSensitiveData->value);
+    $dashboardQuery = array_filter([
+        'period' => $currentPeriod,
+        'days' => $period['days'],
+        'from' => $currentFrom,
+        'to' => $currentTo,
+        ...$activeFilters,
+    ], fn ($value) => $value !== null && $value !== '');
+    $drilldownUrl = function (string $type, string|int|null $value = null) use ($activeFilters, $dashboardQuery): string {
+        $parameters = [
+            ...$dashboardQuery,
+            'format' => 'json',
+            'report_type' => match ($type) {
+                'stock_status' => 'stock_status',
+                'movement_type' => 'movement_history',
+                'supplier' => 'procurement_expense',
+                default => 'expiry_exposure',
+            },
+        ];
+
+        unset($parameters['stock_status']);
+
+        if ($type === 'stock_status') {
+            $parameters['status'] = $value ?? ($activeFilters['stock_status'] ?? null);
+        } elseif ($type === 'movement_type') {
+            $parameters['movement_type'] = $value ?? ($activeFilters['movement_type'] ?? null);
+        } elseif ($type === 'supplier') {
+            $parameters['supplier_id'] = $value;
+        }
+
+        return route('inventory.reports.generate', array_filter(
+            $parameters,
+            fn ($parameter) => $parameter !== null && $parameter !== ''
+        ));
+    };
+    $expiryRiskUnits = $expiry['expired']['units'] + $expiry['expiring_soon']['units'];
+    $periodContext = $currentPeriod === 'all'
+        ? 'all available history through '.$period['to']->format('M d, Y')
+        : (!empty($period['is_custom'])
+            ? 'the custom date range '.$period['from']->format('M d, Y').' to '.$period['to']->format('M d, Y')
+            : 'the '.$period['days'].'-day window ending '.$period['to']->format('M d, Y'));
 @endphp
 
 <x-app-layout>
     <x-ui.page-header
         title="Reports & Analytics"
-        :subtitle="($canViewFinancialData ? 'Inventory valuation, stock status, procurement spend and movement history' : 'Stock status and movement history').' for the '.(!empty($period['is_custom']) ? 'custom date range '.$period['from']->format('M d, Y').' — '.$period['to']->format('M d, Y') : $period['days'].'-day window ending '.$period['to']->format('M d, Y')).'.'"
+        :subtitle="($canViewFinancialData ? 'Inventory valuation, stock status, procurement spend and movement history' : 'Stock status and movement history').' for '.$periodContext.'.'"
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Reports' => null]">
         <x-slot name="actions">
             {{-- Dashboard Timeline Filter Dropdown --}}
@@ -18,7 +58,7 @@
                     today: '{{ now()->format('Y-m-d') }}'
                  })"
                  x-cloak
-                 class="relative inline-block text-left print:hidden">
+                 class="hidden">
                 <button type="button" @click="isOpen = !isOpen"
                         class="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-md border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 hover:text-neutral-900 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary-500">
                     <x-ui.icon name="calendar" class="w-4 h-4 text-primary-600 shrink-0" />
@@ -136,12 +176,116 @@
         </x-slot>
     </x-ui.page-header>
 
+    <form method="GET" action="{{ route('inventory.reports') }}"
+          x-data="{ period: @js($currentPeriod) }"
+          class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm print:hidden">
+        <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <h2 class="text-sm font-semibold text-neutral-900">Analytics filters</h2>
+                <p class="mt-0.5 text-xs text-neutral-500">
+                    Date filters apply to movements and procurement. Category, location, and stock status apply to the current inventory snapshot.
+                </p>
+            </div>
+            @if ($activeFilters !== [] || $currentPeriod !== '30')
+                <a href="{{ route('inventory.reports') }}" class="text-xs font-semibold text-primary-700 hover:text-primary-800">Clear all</a>
+            @endif
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <label class="text-xs font-medium text-neutral-700">
+                <span class="mb-1 block">Reporting period</span>
+                <select name="period" x-model="period" class="w-full rounded-lg border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500">
+                    @foreach ($periodOptions as $value => $label)
+                        <option value="{{ $value }}" @selected($currentPeriod === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+
+            <label class="text-xs font-medium text-neutral-700">
+                <span class="mb-1 block">Category</span>
+                <select name="category_id" class="w-full rounded-lg border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500">
+                    <option value="">All categories</option>
+                    @foreach ($categories as $category)
+                        <option value="{{ $category->id }}" @selected((string) ($activeFilters['category_id'] ?? '') === (string) $category->id)>{{ $category->name }}</option>
+                    @endforeach
+                </select>
+            </label>
+
+            <label class="text-xs font-medium text-neutral-700">
+                <span class="mb-1 block">Storage location</span>
+                <select name="storage_location_id" class="w-full rounded-lg border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500">
+                    <option value="">All locations</option>
+                    @foreach ($locations as $location)
+                        <option value="{{ $location->id }}" @selected((string) ($activeFilters['storage_location_id'] ?? '') === (string) $location->id)>{{ $location->name }}</option>
+                    @endforeach
+                </select>
+            </label>
+
+            <label class="text-xs font-medium text-neutral-700">
+                <span class="mb-1 block">Stock status</span>
+                <select name="stock_status" class="w-full rounded-lg border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500">
+                    <option value="">All statuses</option>
+                    <option value="in_stock" @selected(($activeFilters['stock_status'] ?? '') === 'in_stock')>In stock</option>
+                    <option value="low_stock" @selected(($activeFilters['stock_status'] ?? '') === 'low_stock')>Low stock</option>
+                    <option value="out_of_stock" @selected(($activeFilters['stock_status'] ?? '') === 'out_of_stock')>Out of stock</option>
+                </select>
+            </label>
+
+            <label class="text-xs font-medium text-neutral-700">
+                <span class="mb-1 block">Movement type</span>
+                <select name="movement_type" class="w-full rounded-lg border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500">
+                    <option value="">All movement types</option>
+                    @foreach ($movementTypes as $movementType)
+                        <option value="{{ $movementType->value }}" @selected(($activeFilters['movement_type'] ?? '') === $movementType->value)>{{ $movementType->label() }}</option>
+                    @endforeach
+                </select>
+            </label>
+
+            @if ($canViewFinancialData)
+                <label class="text-xs font-medium text-neutral-700">
+                    <span class="mb-1 block">Supplier</span>
+                    <select name="supplier_id" class="w-full rounded-lg border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500">
+                        <option value="">All suppliers</option>
+                        @foreach ($suppliers as $supplier)
+                            <option value="{{ $supplier->id }}" @selected((string) ($activeFilters['supplier_id'] ?? '') === (string) $supplier->id)>{{ $supplier->name }}</option>
+                        @endforeach
+                    </select>
+                </label>
+            @endif
+        </div>
+
+        <div x-show="period === 'custom'" x-cloak class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-xl">
+            <label class="text-xs font-medium text-neutral-700">
+                <span class="mb-1 block">From</span>
+                <input type="date" name="from" value="{{ $currentFrom }}" max="{{ now()->format('Y-m-d') }}"
+                       :required="period === 'custom'"
+                       class="w-full rounded-lg border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500">
+            </label>
+            <label class="text-xs font-medium text-neutral-700">
+                <span class="mb-1 block">To</span>
+                <input type="date" name="to" value="{{ $currentTo }}" max="{{ now()->format('Y-m-d') }}"
+                       :required="period === 'custom'"
+                       class="w-full rounded-lg border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500">
+            </label>
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+            <x-ui.button type="submit" icon="funnel">Apply filters</x-ui.button>
+            <span class="text-xs text-neutral-500">Chart bars are clickable and open the matching source records.</span>
+        </div>
+    </form>
+
     {{-- ------------------------------------------------ Report Configuration & Generation Overlay Modal --}}
     <div id="report-generator"
          x-data="reportGenerator({
              initialPeriod: '{{ $currentPeriod }}',
              initialFrom: '{{ $currentFrom ?? $period['from']->format('Y-m-d') }}',
              initialTo: '{{ $currentTo ?? $period['to']->format('Y-m-d') }}',
+             initialCategoryId: @js((string) ($activeFilters['category_id'] ?? '')),
+             initialLocationId: @js((string) ($activeFilters['storage_location_id'] ?? '')),
+             initialSupplierId: @js((string) ($activeFilters['supplier_id'] ?? '')),
+             initialMovementType: @js($activeFilters['movement_type'] ?? ''),
+             initialStockStatus: @js($activeFilters['stock_status'] ?? 'all'),
              initialReportType: 'stock_status',
              generateUrl: '{{ route('inventory.reports.generate') }}',
              dashboardUrl: '{{ route('inventory.reports') }}',
@@ -527,13 +671,13 @@
 
     {{-- ------------------------------------------------ 1. inventory summary --}}
 
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <x-ui.stat
-            label="Items in catalogue"
+            label="Total items"
             :value="number_format($summary['items'])"
             icon="cube"
             tone="primary"
-            :hint="number_format($summary['units_on_hand']).' units on hand'" />
+            :hint="number_format($summary['units_on_hand']).' units in the current filtered snapshot'" />
 
         @if ($canViewFinancialData)
         <x-ui.stat
@@ -541,29 +685,51 @@
             :value="'₱'.number_format($summary['stock_value'], 2)"
             icon="chart-bar"
             tone="neutral"
-            hint="Units on hand × unit cost." />
+            hint="Filtered units on hand × unit cost." />
         @endif
 
         <x-ui.stat
-            label="Needs attention"
+            label="Low / out of stock"
             :value="number_format($summary['needs_attention'])"
             icon="exclamation-triangle"
             :tone="$summary['needs_attention'] > 0 ? 'warning' : 'success'"
-            hint="At or below reorder level, or out of stock."
-            :href="route('inventory.alerts')" />
+            hint="At or below reorder level, or out of stock." />
 
         <x-ui.stat
             label="Reserved units"
             :value="number_format($summary['reserved_units'])"
             icon="clipboard-document-list"
             tone="neutral"
-            hint="Committed elsewhere — not available to issue." />
+            hint="Committed elsewhere and unavailable to issue." />
+
+        <x-ui.stat
+            label="Expiry risk units"
+            :value="number_format($expiryRiskUnits)"
+            icon="calendar"
+            :tone="$expiryRiskUnits > 0 ? 'warning' : 'success'"
+            :hint="number_format($expiry['expired']['batches'] + $expiry['expiring_soon']['batches']).' affected batches'" />
+
+        <x-ui.stat
+            label="Stock movements"
+            :value="number_format($movementTotals['movements'])"
+            icon="arrows-right-left"
+            tone="neutral"
+            :hint="$period['description']" />
+
+        @if ($canViewFinancialData)
+        <x-ui.stat
+            label="Procurement spending"
+            :value="'₱'.number_format($spend['ordered']['value'], 2)"
+            icon="truck"
+            tone="neutral"
+            :hint="number_format($spend['ordered']['orders']).' purchase orders in period'" />
+        @endif
     </div>
 
     {{-- --------------------------------------------------- 2. stock status & executive health overview --}}
 
     <div class="grid gap-4 lg:grid-cols-3">
-        <x-ui.card title="Stock Status" subtitle="Every item, bucketed by how much is left.">
+        <x-ui.card title="Inventory Health" subtitle="Current item count by stock status. Select a bar to inspect its records.">
             @php
                 $bars = [
                     'in_stock' => ['label' => 'In stock', 'variant' => 'success', 'bar' => 'bg-success-500'],
@@ -572,7 +738,7 @@
                 ];
             @endphp
 
-            <dl class="space-y-4">
+            <div class="space-y-4">
                 @foreach ($bars as $key => $bar)
                     @php
                         $bucket = $stockStatus[$key];
@@ -580,19 +746,24 @@
                             ? round(($bucket['items'] / $summary['items']) * 100)
                             : 0;
                     @endphp
-                    <div>
+                    <button type="button"
+                       data-drilldown-url="{{ $drilldownUrl('stock_status', $key) }}"
+                       data-drilldown-title="Inventory Health — {{ $bar['label'] }}"
+                       x-on:click.prevent="$dispatch('open-chart-drilldown', { url: $el.dataset.drilldownUrl, title: $el.dataset.drilldownTitle })"
+                       class="group block w-full rounded-lg p-2 text-left transition hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                       aria-label="View {{ $bar['label'] }} inventory records">
                         <div class="flex items-center justify-between gap-3">
-                            <dt>
+                            <span>
                                 <x-ui.badge :variant="$bar['variant']" dot>{{ $bar['label'] }}</x-ui.badge>
-                            </dt>
-                            <dd class="text-sm font-semibold tabular-nums text-neutral-900">
+                            </span>
+                            <span class="text-sm font-semibold tabular-nums text-neutral-900">
                                 {{ number_format($bucket['items']) }}
                                 <span class="text-xs font-normal text-neutral-500">({{ $share }}%)</span>
-                            </dd>
+                            </span>
                         </div>
 
-                        <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
-                            <div class="h-full rounded-full {{ $bar['bar'] }}" style="width: {{ $share }}%"></div>
+                        <div class="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-neutral-100" aria-hidden="true">
+                            <div class="h-full rounded-full {{ $bar['bar'] }} transition-all group-hover:brightness-90" style="width: {{ $share }}%"></div>
                         </div>
 
                         <p class="mt-1 text-xs text-neutral-500">
@@ -601,9 +772,9 @@
                                 &middot; ₱{{ number_format($bucket['value'], 2) }}
                             @endif
                         </p>
-                    </div>
+                    </button>
                 @endforeach
-            </dl>
+            </div>
         </x-ui.card>
 
         <x-ui.card title="Expiry Exposure" subtitle="Batches still holding stock, valued at risk.">
@@ -667,38 +838,33 @@
             @endif
         </x-ui.card>
 
-        <x-ui.card title="Movement Summary" :subtitle="'Recorded in the last '.$period['days'].' days.'">
-            <dl class="space-y-3 text-sm">
-                <div class="flex items-center justify-between gap-3">
-                    <dt class="text-neutral-600">Movements recorded</dt>
-                    <dd class="font-semibold tabular-nums text-neutral-900">{{ number_format($movementTotals['movements']) }}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                    <dt class="text-neutral-600">Units received in</dt>
-                    <dd class="font-semibold tabular-nums text-success-700">+{{ number_format($movementTotals['units_in']) }}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                    <dt class="text-neutral-600">Units consumed</dt>
-                    <dd class="font-semibold tabular-nums text-neutral-900">&minus;{{ number_format($movementTotals['units_out']) }}</dd>
-                </div>
-                @if ($canViewFinancialData)
-                <div class="flex items-center justify-between gap-3">
-                    <dt class="text-neutral-600">Consumption value</dt>
-                    <dd class="font-semibold tabular-nums text-neutral-900">₱{{ number_format($movementTotals['consumption_value'], 2) }}</dd>
-                </div>
-                @endif
-                <div class="flex items-center justify-between gap-3 border-t border-neutral-200 pt-3">
-                    <dt class="text-neutral-600">Transfers</dt>
-                    <dd class="tabular-nums text-neutral-700">{{ number_format($movementTotals['transfers']) }}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                    <dt class="text-neutral-600">Units disposed</dt>
-                    <dd class="tabular-nums text-neutral-700">{{ number_format($movementTotals['disposals']) }}</dd>
-                </div>
-            </dl>
+        <x-ui.card title="Movement Activity" :subtitle="$period['description'].' Select a bar to inspect its ledger rows.'">
+            @php $movementMax = max(1, (int) $movementsByType->max('movements')); @endphp
+            <div class="max-h-72 space-y-2 overflow-y-auto pr-1">
+                @foreach ($movementsByType as $row)
+                    @php $movementShare = round(($row['movements'] / $movementMax) * 100); @endphp
+                    <button type="button"
+                       data-drilldown-url="{{ $drilldownUrl('movement_type', $row['type']->value) }}"
+                       data-drilldown-title="Movement Activity — {{ $row['type']->label() }}"
+                       x-on:click.prevent="$dispatch('open-chart-drilldown', { url: $el.dataset.drilldownUrl, title: $el.dataset.drilldownTitle })"
+                       class="group block w-full rounded-lg p-2 text-left transition hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                       aria-label="View {{ $row['type']->label() }} movement records">
+                        <div class="flex items-center justify-between gap-3 text-xs">
+                            <span class="truncate font-medium text-neutral-700">{{ $row['type']->label() }}</span>
+                            <span class="shrink-0 font-semibold tabular-nums text-neutral-900">
+                                {{ number_format($row['movements']) }}
+                                <span class="font-normal text-neutral-500">· {{ number_format($row['units']) }} units</span>
+                            </span>
+                        </div>
+                        <div class="mt-1.5 h-2.5 overflow-hidden rounded-full bg-neutral-100" aria-hidden="true">
+                            <div class="h-full rounded-full bg-primary-500 transition-all group-hover:bg-primary-600" style="width: {{ $movementShare }}%"></div>
+                        </div>
+                    </button>
+                @endforeach
+            </div>
 
             <p class="mt-4 border-t border-neutral-200 pt-3 text-xs text-neutral-500">
-                Consumed counts stock out and issuance only. Transfers relocate stock between zones without consumption.
+                Counts and units come directly from the filtered stock movement ledger; zero means no matching event occurred.
             </p>
         </x-ui.card>
     </div>
@@ -904,74 +1070,53 @@
                 </p>
             </x-ui.card>
 
-            <x-ui.card title="Spend by Supplier" :subtitle="'Top vendors in the last '.$period['days'].' days.'" :padding="false">
-                <x-ui.table :sticky-header="false">
-                    <x-ui.table.head>
-                        <x-ui.table.th class="px-3 py-2.5">Supplier</x-ui.table.th>
-                        <x-ui.table.th numeric class="px-3 py-2.5">Orders</x-ui.table.th>
-                        <x-ui.table.th numeric class="px-3 py-2.5">Received</x-ui.table.th>
-                        <x-ui.table.th numeric class="px-3 py-2.5">Fulfilment</x-ui.table.th>
-                        <x-ui.table.th numeric class="px-3 py-2.5">Value</x-ui.table.th>
-                    </x-ui.table.head>
-                    <tbody>
-                        @forelse ($spendBySupplier as $row)
-                            @php $rate = $row->orders > 0 ? round(($row->received_orders / $row->orders) * 100) : 0; @endphp
-                            <x-ui.table.row>
-                                <x-ui.table.td class="px-3 py-2.5">
-                                    <span class="font-medium text-neutral-900">{{ $row->supplier }}</span>
-                                </x-ui.table.td>
-                                <x-ui.table.td numeric muted class="px-3 py-2.5">{{ number_format($row->orders) }}</x-ui.table.td>
-                                <x-ui.table.td numeric muted class="px-3 py-2.5">{{ number_format($row->received_orders) }}</x-ui.table.td>
-                                <x-ui.table.td numeric class="px-3 py-2.5">
-                                    <x-ui.badge :variant="$rate >= 80 ? 'success' : ($rate >= 40 ? 'warning' : 'neutral')">
-                                        {{ $rate }}%
-                                    </x-ui.badge>
-                                </x-ui.table.td>
-                                <x-ui.table.td numeric class="px-3 py-2.5 font-medium">₱{{ number_format($row->value, 2) }}</x-ui.table.td>
-                            </x-ui.table.row>
-                        @empty
-                            <x-ui.table.empty
-                                :colspan="5"
-                                icon="truck"
-                                title="No purchase orders in this window"
-                                message="Raise one under Requisitions &amp; POs and the spend appears here." />
-                        @endforelse
-                    </tbody>
-                </x-ui.table>
+            <x-ui.card title="Procurement Spend by Supplier" :subtitle="$period['description'].' Select a bar to inspect its purchase orders.'">
+                @php $supplierSpendMax = max(1, (float) $spendBySupplier->max('value')); @endphp
+                <div class="space-y-2">
+                    @forelse ($spendBySupplier as $row)
+                        @php
+                            $rate = $row->orders > 0 ? round(($row->received_orders / $row->orders) * 100) : 0;
+                            $spendShare = round(((float) $row->value / $supplierSpendMax) * 100);
+                        @endphp
+                        @if ($row->supplier_id)
+                            <button type="button"
+                               data-drilldown-url="{{ $drilldownUrl('supplier', $row->supplier_id) }}"
+                               data-drilldown-title="Procurement Spend — {{ $row->supplier }}"
+                               x-on:click.prevent="$dispatch('open-chart-drilldown', { url: $el.dataset.drilldownUrl, title: $el.dataset.drilldownTitle })"
+                               class="group block w-full rounded-lg p-2 text-left transition hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                               aria-label="View purchase orders for {{ $row->supplier }}">
+                                <div class="flex items-center justify-between gap-3 text-sm">
+                                    <span class="truncate font-medium text-neutral-800">{{ $row->supplier }}</span>
+                                    <span class="shrink-0 font-semibold tabular-nums text-neutral-900">₱{{ number_format($row->value, 2) }}</span>
+                                </div>
+                                <div class="mt-1.5 h-2.5 overflow-hidden rounded-full bg-neutral-100" aria-hidden="true">
+                                    <div class="h-full rounded-full bg-primary-500 transition-all group-hover:bg-primary-600" style="width: {{ $spendShare }}%"></div>
+                                </div>
+                                <p class="mt-1 text-xs text-neutral-500">{{ number_format($row->orders) }} orders · {{ $rate }}% received</p>
+                            </button>
+                        @else
+                            <div class="rounded-lg p-2">
+                                <div class="flex items-center justify-between gap-3 text-sm">
+                                    <span class="truncate font-medium text-neutral-800">{{ $row->supplier }}</span>
+                                    <span class="shrink-0 font-semibold tabular-nums text-neutral-900">₱{{ number_format($row->value, 2) }}</span>
+                                </div>
+                                <div class="mt-1.5 h-2.5 overflow-hidden rounded-full bg-neutral-100" aria-hidden="true">
+                                    <div class="h-full rounded-full bg-neutral-400" style="width: {{ $spendShare }}%"></div>
+                                </div>
+                                <p class="mt-1 text-xs text-neutral-500">Unassigned orders cannot open a supplier record.</p>
+                            </div>
+                        @endif
+                    @empty
+                        <p class="py-8 text-center text-sm text-neutral-500">No purchase orders match this period and supplier filter.</p>
+                    @endforelse
+                </div>
             </x-ui.card>
         </div>
         @endif
 
         {{-- Tab 3: Movements & Consumption --}}
         <div x-show="activeTab === 'movements'" x-cloak class="space-y-6 print:!block">
-            <div class="grid gap-4 lg:grid-cols-2">
-                <x-ui.card title="Activity by Movement Type" :subtitle="'Last '.$period['days'].' days.'" :padding="false">
-                    <x-ui.table :sticky-header="false">
-                        <x-ui.table.head>
-                            <x-ui.table.th class="px-3 py-2.5">Type</x-ui.table.th>
-                            <x-ui.table.th numeric class="px-3 py-2.5">Movements</x-ui.table.th>
-                            <x-ui.table.th numeric class="px-3 py-2.5">Units</x-ui.table.th>
-                            @if ($canViewFinancialData)
-                                <x-ui.table.th numeric class="px-3 py-2.5">Value</x-ui.table.th>
-                            @endif
-                        </x-ui.table.head>
-                        <tbody>
-                            @foreach ($movementsByType as $row)
-                                <x-ui.table.row :class="$row['movements'] === 0 ? 'opacity-60' : ''">
-                                    <x-ui.table.td class="px-3 py-2.5">
-                                        <x-ui.badge :status="$row['type']->value">{{ $row['type']->label() }}</x-ui.badge>
-                                    </x-ui.table.td>
-                                    <x-ui.table.td numeric class="px-3 py-2.5 font-medium">{{ number_format($row['movements']) }}</x-ui.table.td>
-                                    <x-ui.table.td numeric muted class="px-3 py-2.5">{{ number_format($row['units']) }}</x-ui.table.td>
-                                    @if ($canViewFinancialData)
-                                        <x-ui.table.td numeric muted class="px-3 py-2.5">₱{{ number_format($row['value'], 2) }}</x-ui.table.td>
-                                    @endif
-                                </x-ui.table.row>
-                            @endforeach
-                        </tbody>
-                    </x-ui.table>
-                </x-ui.card>
-
+            <div>
                 <x-ui.card title="Most Consumed Items" subtitle="By units issued or taken out." :padding="false">
                     <x-ui.table :sticky-header="false">
                         <x-ui.table.head>
@@ -1133,7 +1278,460 @@
         Every figure is read live from the same records the operational screens use.
     </p>
 
+    <div
+        x-data="chartDrilldownModal()"
+        x-on:open-chart-drilldown.window="openDrilldown($event.detail)"
+        x-on:keydown.escape.window="if (isOpen) closeModal()"
+        class="print:hidden"
+    >
+        <div
+            x-show="isOpen"
+            x-cloak
+            x-transition.opacity.duration.150ms
+            class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chart-drilldown-modal-title"
+            :aria-busy="loading"
+        >
+            <button
+                type="button"
+                tabindex="-1"
+                class="fixed inset-0 cursor-default bg-neutral-900/55"
+                aria-label="Close chart details"
+                x-on:click="closeModal()"
+                x-on:wheel.prevent
+                x-on:touchmove.prevent
+            ></button>
+
+            <section
+                x-show="isOpen"
+                x-transition
+                class="relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-2xl sm:max-h-[calc(100dvh-3rem)]"
+            >
+                <header class="flex shrink-0 items-start justify-between gap-4 border-b border-neutral-200 px-4 py-4 sm:px-6">
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-primary-700">Chart drill-down</p>
+                        <h2 id="chart-drilldown-modal-title" class="mt-1 break-words text-base font-semibold text-neutral-900 sm:text-lg" x-text="title"></h2>
+                        <p class="mt-1 text-xs text-neutral-500" x-show="!loading && !errorMessage" x-text="resultSummary"></p>
+                    </div>
+                    <button
+                        x-ref="closeButton"
+                        type="button"
+                        x-on:click="closeModal()"
+                        class="-m-1 inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-md text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    >
+                        <span class="sr-only">Close chart details</span>
+                        <x-ui.icon name="x-mark" class="h-5 w-5" />
+                    </button>
+                </header>
+
+                <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain overflow-x-hidden p-4 sm:p-6">
+                    <div x-show="loading" class="flex min-h-48 items-center justify-center" role="status" aria-live="polite">
+                        <x-ui.loader label="Loading drill-down records..." size="lg" />
+                    </div>
+
+                    <div
+                        x-show="!loading && errorMessage"
+                        class="flex min-h-48 flex-col items-center justify-center rounded-lg border border-danger-200 bg-danger-50 p-6 text-center"
+                        role="alert"
+                    >
+                        <x-ui.icon name="exclamation-triangle" class="h-8 w-8 text-danger-600" />
+                        <p class="mt-3 text-sm font-semibold text-danger-800">Unable to load chart details</p>
+                        <p class="mt-1 max-w-lg text-sm text-danger-700" x-text="errorMessage"></p>
+                        <button
+                            type="button"
+                            x-on:click="retry()"
+                            class="mt-4 inline-flex min-h-10 items-center justify-center rounded-md border border-danger-300 bg-white px-4 py-2 text-sm font-semibold text-danger-700 hover:bg-danger-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-500"
+                        >
+                            Try again
+                        </button>
+                    </div>
+
+                    <div
+                        x-show="!loading && !errorMessage && rowCount === 0"
+                        class="flex min-h-48 flex-col items-center justify-center rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-6 text-center"
+                        role="status"
+                    >
+                        <x-ui.icon name="chart-bar" class="h-8 w-8 text-neutral-400" />
+                        <p class="mt-3 text-sm font-semibold text-neutral-800">No data found</p>
+                        <p class="mt-1 max-w-lg text-sm text-neutral-500">No records match the selected chart value and active filters.</p>
+                    </div>
+
+                    <div x-show="!loading && !errorMessage && rowCount > 0" class="space-y-3.5">
+                        {{-- Controls Bar: Search & View Switcher --}}
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 pb-1">
+                            <div class="flex items-center gap-2">
+                                <div class="relative w-full sm:w-64">
+                                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-neutral-400">
+                                        <x-ui.icon name="magnifying-glass" class="h-3.5 w-3.5" />
+                                    </span>
+                                    <input
+                                        type="text"
+                                        x-model="searchQuery"
+                                        placeholder="Search drill-down records..."
+                                        class="w-full rounded-lg border border-neutral-300 py-1.5 pl-8 pr-3 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 shadow-2xs"
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    x-show="searchQuery"
+                                    x-on:click="searchQuery = ''"
+                                    class="text-xs text-neutral-500 hover:text-neutral-800 underline shrink-0"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+
+                            <div class="flex items-center justify-between sm:justify-end gap-2.5">
+                                <p x-show="searchQuery && filteredRows.length !== rowCount" class="text-xs text-neutral-500">
+                                    Showing <span class="font-bold text-neutral-800" x-text="filteredRows.length"></span> of <span x-text="rowCount"></span>
+                                </p>
+                                <p x-show="!searchQuery && rowCount > visibleRows.length" class="text-xs text-neutral-500">
+                                    Showing first <span x-text="visibleRows.length"></span> records
+                                </p>
+
+                                {{-- View Switcher: Cards vs Table --}}
+                                <div class="inline-flex rounded-lg border border-neutral-200 bg-neutral-100 p-0.5 text-xs font-semibold shrink-0">
+                                    <button
+                                        type="button"
+                                        x-on:click="viewMode = 'cards'"
+                                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition"
+                                        :class="viewMode === 'cards' ? 'bg-white text-primary-700 shadow-2xs font-bold' : 'text-neutral-600 hover:text-neutral-900'"
+                                        title="Card stream (Fully responsive, zero horizontal scroll)"
+                                    >
+                                        <x-ui.icon name="squares-2x2" class="w-3.5 h-3.5" />
+                                        <span class="hidden sm:inline">Cards</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        x-on:click="viewMode = 'table'"
+                                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition"
+                                        :class="viewMode === 'table' ? 'bg-white text-primary-700 shadow-2xs font-bold' : 'text-neutral-600 hover:text-neutral-900'"
+                                        title="Table view (Compact fit, zero horizontal scroll)"
+                                    >
+                                        <x-ui.icon name="table-cells" class="w-3.5 h-3.5" />
+                                        <span class="hidden sm:inline">Table</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Empty Search Results Notice --}}
+                        <div
+                            x-show="searchQuery && filteredRows.length === 0"
+                            class="rounded-xl border border-neutral-200 bg-neutral-50 p-6 text-center text-xs text-neutral-500"
+                        >
+                            No drill-down records match "<span class="font-semibold text-neutral-700" x-text="searchQuery"></span>".
+                        </div>
+
+                        {{-- VIEW 1: Responsive Cards Stream (Zero Horizontal Bar) --}}
+                        <div
+                            x-show="viewMode === 'cards' && filteredRows.length > 0"
+                            class="space-y-3 w-full overflow-x-hidden max-h-[calc(100dvh-16rem)] overflow-y-auto pr-0.5"
+                        >
+                            <template x-for="(row, rowIndex) in filteredRows" :key="row.id ?? rowIndex">
+                                <article class="rounded-xl border border-neutral-200 bg-white p-4 shadow-2xs hover:border-neutral-300 hover:shadow-xs transition space-y-3">
+                                    {{-- Card Top: Primary Ref / PO / ID + Badge + Date --}}
+                                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 pb-2.5">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <template x-if="getPrimaryRef(row)">
+                                                <span class="inline-flex items-center gap-1 rounded-md bg-neutral-100 px-2.5 py-1 text-xs font-mono font-bold text-neutral-800 border border-neutral-200">
+                                                    <span class="text-[10px] uppercase font-semibold text-neutral-400" x-text="getPrimaryRefLabel(row)"></span>
+                                                    <span x-text="getPrimaryRef(row)"></span>
+                                                </span>
+                                            </template>
+                                            <template x-if="getBadge(row)">
+                                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize" :class="getBadgeClass(row)" x-text="getBadge(row)"></span>
+                                            </template>
+                                        </div>
+
+                                        <template x-if="getDateValue(row)">
+                                            <span class="text-xs text-neutral-500 tabular-nums flex items-center gap-1.5 shrink-0">
+                                                <x-ui.icon name="clock" class="w-3.5 h-3.5 text-neutral-400" />
+                                                <span x-text="getDateValue(row)"></span>
+                                            </span>
+                                        </template>
+                                    </div>
+
+                                    {{-- Card Title: Item Description / Name & SKU --}}
+                                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                                        <h4 class="text-sm font-bold text-neutral-900 leading-snug break-words" x-text="getItemTitle(row, rowIndex)"></h4>
+                                        <template x-if="getSku(row)">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-semibold text-neutral-600 bg-neutral-100 border border-neutral-200 shrink-0" x-text="'SKU: ' + getSku(row)"></span>
+                                        </template>
+                                    </div>
+
+                                    {{-- Card Attributes Grid: 2 cols on mobile, 3 on tablet, 4 on desktop, 100% width, ZERO horizontal scroll --}}
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
+                                        <template x-for="[column, label] in getGridAttributes(row)" :key="column">
+                                            <div class="rounded-lg bg-neutral-50/90 p-2.5 border border-neutral-200/70">
+                                                <span class="block text-[10px] font-semibold uppercase tracking-wider text-neutral-400 truncate" x-text="label"></span>
+                                                <span
+                                                    class="mt-0.5 block font-semibold break-words"
+                                                    :class="isFinancialColumn(column) ? 'text-primary-700 font-bold tabular-nums font-mono text-xs' : (isNumericColumn(column) ? 'text-neutral-900 font-bold tabular-nums' : 'text-neutral-800')"
+                                                    x-text="formatCell(column, label, row[column])"
+                                                ></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </article>
+                            </template>
+                        </div>
+
+                        {{-- VIEW 2: Compact Table View (Strict Table-Fixed, Overflow-X-Hidden, Zero Horizontal Scroll) --}}
+                        <div
+                            x-show="viewMode === 'table' && filteredRows.length > 0"
+                            class="w-full overflow-x-hidden overflow-y-auto max-h-[calc(100dvh-16rem)] rounded-xl border border-neutral-200"
+                        >
+                            <table class="w-full divide-y divide-neutral-200 text-xs table-fixed">
+                                <thead class="sticky top-0 z-10 bg-neutral-50 shadow-2xs">
+                                    <tr>
+                                        <template x-for="([column, label]) in columnEntries" :key="column">
+                                            <th
+                                                scope="col"
+                                                class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-neutral-600 break-words leading-tight"
+                                                :class="isNumericColumn(column) ? 'text-right' : 'text-left'"
+                                                x-text="label"
+                                            ></th>
+                                        </template>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-neutral-100 bg-white">
+                                    <template x-for="(row, rowIndex) in filteredRows" :key="row.id ?? rowIndex">
+                                        <tr class="hover:bg-neutral-50/80 transition-colors">
+                                            <template x-for="([column, label]) in columnEntries" :key="column">
+                                                <td
+                                                    class="px-3 py-2.5 text-neutral-700 break-words leading-normal"
+                                                    :class="isFinancialColumn(column) ? 'text-right font-mono font-bold text-primary-700' : (isNumericColumn(column) ? 'text-right tabular-nums font-medium' : 'text-left')"
+                                                    x-text="formatCell(column, label, row[column])"
+                                                ></td>
+                                            </template>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
     <script>
+        function chartDrilldownModal() {
+            return {
+                isOpen: false,
+                loading: false,
+                title: 'Chart details',
+                report: null,
+                errorMessage: '',
+                lastRequest: null,
+                abortController: null,
+                requestSequence: 0,
+                returnFocusTo: null,
+                displayLimit: 100,
+                viewMode: 'cards',
+                searchQuery: '',
+
+                get rows() {
+                    return Array.isArray(this.report?.data) ? this.report.data : [];
+                },
+
+                get visibleRows() {
+                    return this.rows.slice(0, this.displayLimit);
+                },
+
+                get filteredRows() {
+                    const query = this.searchQuery.trim().toLowerCase();
+                    if (!query) return this.visibleRows;
+                    return this.visibleRows.filter(row => {
+                        return Object.values(row).some(val =>
+                            val !== null && val !== undefined && String(val).toLowerCase().includes(query)
+                        );
+                    });
+                },
+
+                get rowCount() {
+                    return this.rows.length;
+                },
+
+                get columnEntries() {
+                    return Object.entries(this.report?.columns || {});
+                },
+
+                get resultSummary() {
+                    const noun = this.rowCount === 1 ? 'record' : 'records';
+                    return `${this.rowCount.toLocaleString()} matching ${noun} using the active filters and reporting period.`;
+                },
+
+                isFinancialColumn(column) {
+                    return ['unit_cost', 'total_value', 'total_amount', 'risk_value', 'value', 'amount'].includes(column) ||
+                           (this.report?.columns?.[column] || '').includes('₱');
+                },
+
+                isNumericColumn(column) {
+                    return ['quantity_on_hand', 'reserved_quantity', 'available_quantity', 'reorder_level', 'unit_cost', 'total_value', 'quantity', 'value', 'units', 'risk_value', 'total_amount', 'days_remaining'].includes(column);
+                },
+
+                getPrimaryRef(row) {
+                    return row.reference_number || row.po_number || row.batch || '';
+                },
+
+                getPrimaryRefLabel(row) {
+                    if (row.reference_number) return 'Ref #';
+                    if (row.po_number) return 'PO #';
+                    if (row.batch) return 'Batch #';
+                    return 'ID';
+                },
+
+                getBadge(row) {
+                    return row.movement_type || row.status || '';
+                },
+
+                getBadgeClass(row) {
+                    const val = String(this.getBadge(row)).toLowerCase();
+                    if (val.includes('stock_in') || val.includes('in_stock') || val.includes('received') || val.includes('approved') || val.includes('complete')) {
+                        return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+                    }
+                    if (val.includes('low_stock') || val.includes('expiring') || val.includes('pending') || val.includes('issued')) {
+                        return 'bg-amber-50 text-amber-700 border border-amber-200';
+                    }
+                    if (val.includes('out_of_stock') || val.includes('expired') || val.includes('damage') || val.includes('loss') || val.includes('reject')) {
+                        return 'bg-rose-50 text-rose-700 border border-rose-200';
+                    }
+                    if (val.includes('adjustment') || val.includes('transfer')) {
+                        return 'bg-primary-50 text-primary-700 border border-primary-200';
+                    }
+                    return 'bg-neutral-100 text-neutral-700 border border-neutral-200';
+                },
+
+                getItemTitle(row, index) {
+                    return row.item_description || row.name || row.item || row.supplier || ('Record #' + (index + 1));
+                },
+
+                getSku(row) {
+                    return row.sku || '';
+                },
+
+                getDateValue(row) {
+                    return row.occurred_at || row.date || row.expiry_date || '';
+                },
+
+                getGridAttributes(row) {
+                    const excludedCols = new Set([
+                        'item_description', 'name', 'item', 'sku', 'reference_number', 'po_number', 'occurred_at', 'date'
+                    ]);
+                    if (this.getBadge(row)) {
+                        excludedCols.add('movement_type');
+                        excludedCols.add('status');
+                    }
+                    return this.columnEntries.filter(([col]) => !excludedCols.has(col));
+                },
+
+                savedScrollY: null,
+
+                async openDrilldown(request) {
+                    if (!request?.url) return;
+
+                    this.lastRequest = request;
+                    this.returnFocusTo = document.activeElement;
+                    this.savedScrollY = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+                    this.title = request.title || 'Chart details';
+                    this.report = null;
+                    this.errorMessage = '';
+                    this.searchQuery = '';
+                    this.loading = true;
+                    this.isOpen = true;
+
+                    this.abortController?.abort();
+                    this.abortController = new AbortController();
+                    const sequence = ++this.requestSequence;
+
+                    this.$nextTick(() => {
+                        this.$refs.closeButton?.focus({ preventScroll: true });
+                        if (typeof this.savedScrollY === 'number' && Math.abs((window.pageYOffset || document.documentElement.scrollTop || 0) - this.savedScrollY) > 2) {
+                            window.scrollTo({ top: this.savedScrollY, behavior: 'instant' });
+                        }
+                    });
+
+                    try {
+                        const response = await fetch(request.url, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            signal: this.abortController.signal,
+                        });
+
+                        if (!response.ok) {
+                            let message = 'The drill-down records could not be retrieved.';
+                            try {
+                                const payload = await response.json();
+                                message = payload.message || message;
+                            } catch (error) {
+                                // Keep the safe fallback for a non-JSON server response.
+                            }
+                            throw new Error(message);
+                        }
+
+                        const report = await response.json();
+                        if (sequence !== this.requestSequence) return;
+
+                        this.report = report;
+                    } catch (error) {
+                        if (error.name === 'AbortError' || sequence !== this.requestSequence) return;
+                        this.errorMessage = error.message || 'The drill-down records could not be retrieved.';
+                    } finally {
+                        if (sequence === this.requestSequence) this.loading = false;
+                    }
+                },
+
+                retry() {
+                    if (this.lastRequest) this.openDrilldown(this.lastRequest);
+                },
+
+                closeModal() {
+                    ++this.requestSequence;
+                    this.abortController?.abort();
+                    this.abortController = null;
+                    this.loading = false;
+                    this.isOpen = false;
+                    this.searchQuery = '';
+
+                    const focusTarget = this.returnFocusTo;
+                    const targetScroll = this.savedScrollY;
+                    this.returnFocusTo = null;
+
+                    this.$nextTick(() => {
+                        if (typeof targetScroll === 'number') {
+                            window.scrollTo({ top: targetScroll, behavior: 'instant' });
+                        }
+                        if (focusTarget && focusTarget.isConnected) {
+                            focusTarget.focus({ preventScroll: true });
+                        }
+                    });
+                },
+
+                formatCell(column, label, value) {
+                    if (value === null || value === undefined || value === '') return '—';
+                    if (!this.isNumericColumn(column) || Number.isNaN(Number(value))) return String(value);
+
+                    const number = Number(value);
+                    if (label.includes('₱')) {
+                        return new Intl.NumberFormat('en-PH', {
+                            style: 'currency',
+                            currency: 'PHP',
+                        }).format(number);
+                    }
+
+                    return new Intl.NumberFormat('en-PH', {
+                        maximumFractionDigits: Number.isInteger(number) ? 0 : 2,
+                    }).format(number);
+                },
+            };
+        }
+
         function reportGenerator(config) {
             return {
                 isOpen: false,
@@ -1141,11 +1739,11 @@
                 period: config.initialPeriod || '30',
                 fromDate: config.initialFrom || '',
                 toDate: config.initialTo || '',
-                categoryId: '',
-                locationId: '',
-                supplierId: '',
-                movementType: '',
-                status: 'all',
+                categoryId: config.initialCategoryId || '',
+                locationId: config.initialLocationId || '',
+                supplierId: config.initialSupplierId || '',
+                movementType: config.initialMovementType || '',
+                status: config.initialStockStatus || 'all',
                 sortBy: 'name',
                 sortDir: 'asc',
                 format: 'pdf',
@@ -1163,12 +1761,10 @@
                     this.isOpen = true;
                     this.errorMessage = '';
                     this.successMessage = '';
-                    document.body.classList.add('overflow-hidden');
                 },
 
                 closeModal() {
                     this.isOpen = false;
-                    document.body.classList.remove('overflow-hidden');
                 },
 
                 onPeriodChange() {
@@ -1363,6 +1959,12 @@
                         params.set('period', this.period);
                         params.set('days', this.period === 'all' ? '365' : this.period);
                     }
+
+                    if (this.categoryId) params.set('category_id', this.categoryId);
+                    if (this.locationId) params.set('storage_location_id', this.locationId);
+                    if (this.supplierId) params.set('supplier_id', this.supplierId);
+                    if (this.movementType) params.set('movement_type', this.movementType);
+                    if (this.status && this.status !== 'all') params.set('stock_status', this.status);
 
                     window.location.href = config.dashboardUrl + '?' + params.toString();
                 },

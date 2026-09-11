@@ -124,7 +124,6 @@ class InventoryReportTest extends TestCase
             ->assertDontSee('Procurement &amp; Spending', false);
     }
 
-
     /**
      * The gate moved from InventoryController to ReportController when the
      * screen was split out, so assert it followed rather than assuming it did.
@@ -1029,6 +1028,197 @@ class InventoryReportTest extends TestCase
         }
     }
 
+    public function test_dashboard_filters_use_location_balances_for_kpis_and_stock_status(): void
+    {
+        $main = $this->location('Main Pharmacy', 'MAIN-PH');
+        $ward = $this->location('Ward Store', 'WARD-ST');
+        $category = ItemCategory::create(['name' => 'Medicines', 'code' => 'MED']);
+        $item = $this->stockedItem('Filtered Medicine', 'MED-FILTER', 100, 10.00, 50, category: $category);
+
+        ItemStockLevel::create([
+            'item_id' => $item->id,
+            'storage_location_id' => $main->id,
+            'quantity' => 30,
+            'reserved_quantity' => 5,
+        ]);
+        ItemStockLevel::create([
+            'item_id' => $item->id,
+            'storage_location_id' => $ward->id,
+            'quantity' => 70,
+            'reserved_quantity' => 15,
+        ]);
+
+        $report = $this->reports()->build(30, filters: [
+            'category_id' => $category->id,
+            'storage_location_id' => $main->id,
+        ]);
+
+        $this->assertSame(1, $report['summary']['items']);
+        $this->assertSame(30, $report['summary']['units_on_hand']);
+        $this->assertSame(5, $report['summary']['reserved_units']);
+        $this->assertSame(300.0, $report['summary']['stock_value']);
+        $this->assertSame(1, $report['stockStatus']['low_stock']['items']);
+        $this->assertSame(30, $report['stockByLocation']->sole()['units']);
+    }
+
+    public function test_chart_drilldown_matches_the_active_period_category_location_and_movement_type(): void
+    {
+        $reader = $this->reader();
+        $main = $this->location('Main Pharmacy', 'MAIN-PH');
+        $ward = $this->location('Ward Store', 'WARD-ST');
+        $medicine = ItemCategory::create(['name' => 'Medicines', 'code' => 'MED']);
+        $supply = ItemCategory::create(['name' => 'Supplies', 'code' => 'SUP']);
+        $matching = $this->stockedItem('Matching Medicine', 'MED-MATCH', 40, 5.00, location: $main, category: $medicine);
+        $other = $this->stockedItem('Other Supply', 'SUP-OTHER', 40, 5.00, location: $ward, category: $supply);
+
+        foreach ([
+            [$matching, $main, MovementType::Issuance, now()->subDay()],
+            [$matching, $main, MovementType::StockIn, now()->subDay()],
+            [$other, $ward, MovementType::Issuance, now()->subDay()],
+            [$matching, $main, MovementType::Issuance, now()->subDays(90)],
+        ] as [$item, $location, $type, $movedAt]) {
+            StockMovement::create([
+                'item_id' => $item->id,
+                'from_location_id' => $location->id,
+                'movement_type' => $type,
+                'quantity' => 4,
+                'unit_cost' => 5.00,
+                'moved_at' => $movedAt,
+            ]);
+        }
+
+        $page = $this->actingAs($reader)->get('/inventory/reports?period=30'
+            .'&category_id='.$medicine->id
+            .'&storage_location_id='.$main->id
+            .'&movement_type=issuance');
+
+        $page->assertOk()
+            ->assertSee('open-chart-drilldown', false)
+            ->assertSee('chartDrilldownModal()', false)
+            ->assertSee('Loading drill-down records...')
+            ->assertSee('No data found')
+            ->assertSee('x-on:keydown.escape.window="if (isOpen) closeModal()"', false)
+            ->assertSee('aria-label="Close chart details"', false)
+            ->assertSee('this.abortController?.abort();', false)
+            ->assertDontSee('id="chart-drilldown"', false);
+
+        $this->assertSame(1, preg_match_all('/id="chart-drilldown-modal-title"/', $page->getContent()));
+
+        preg_match_all('/data-drilldown-url="([^"]+)"/', $page->getContent(), $matches);
+        $movementUrl = collect($matches[1] ?? [])
+            ->map(fn (string $url) => html_entity_decode($url, ENT_QUOTES | ENT_HTML5))
+            ->first(fn (string $url) => str_contains($url, 'report_type=movement_history'));
+
+        $this->assertNotNull($movementUrl);
+        parse_str((string) parse_url($movementUrl, PHP_URL_QUERY), $query);
+        $this->assertSame('30', $query['period']);
+        $this->assertSame((string) $medicine->id, $query['category_id']);
+        $this->assertSame((string) $main->id, $query['storage_location_id']);
+        $this->assertSame('issuance', $query['movement_type']);
+
+        $this->actingAs($reader)->getJson($movementUrl)
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.item', 'Matching Medicine')
+            ->assertJsonMissing(['item' => 'Other Supply']);
+    }
+
+    public function test_empty_and_large_filtered_dashboard_datasets_render_without_fabricated_values(): void
+    {
+        $emptyCategory = ItemCategory::create(['name' => 'Empty Category', 'code' => 'EMPTY']);
+
+        $this->actingAs($this->reader())
+            ->getJson('/inventory/reports/generate?report_type=stock_status&format=json&period=30&category_id='.$emptyCategory->id)
+            ->assertOk()
+            ->assertJsonCount(0, 'data')
+            ->assertJsonPath('is_empty', true);
+
+        $now = now();
+        $rows = collect(range(1, 150))->map(fn (int $index) => [
+            'name' => 'Scale Item '.$index,
+            'sku' => 'SCALE-'.$index,
+            'quantity_on_hand' => 2,
+            'reserved_quantity' => 1,
+            'reorder_level' => 0,
+            'unit_cost' => 3,
+            'status' => 'in_stock',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ])->all();
+        InventoryItem::insert($rows);
+
+        $response = $this->actingAs($this->reader())
+            ->getJson('/inventory/reports/generate?report_type=stock_status&format=json&period=30&status=in_stock');
+
+        $response->assertOk()
+            ->assertJsonCount(150, 'data')
+            ->assertJsonFragment(['name' => 'Scale Item 1']);
+
+        $this->actingAs($this->reader())
+            ->get('/inventory/reports')
+            ->assertOk()
+            ->assertSee('displayLimit: 100', false)
+            ->assertSee('overflow-y-auto overscroll-contain', false);
+    }
+
+    public function test_chart_drilldown_modal_provides_responsive_card_and_table_views_without_horizontal_scrollbars(): void
+    {
+        $this->actingAs($this->reader())
+            ->get('/inventory/reports')
+            ->assertOk()
+            ->assertSee("viewMode: 'cards'", false)
+            ->assertSee('Search drill-down records...', false)
+            ->assertSee("viewMode === 'cards'", false)
+            ->assertSee("viewMode === 'table'", false)
+            ->assertSee('overflow-x-hidden', false)
+            ->assertSee('table-fixed', false);
+    }
+
+    public function test_chart_drilldown_modal_preserves_page_scroll_position_and_prevents_scroll_to_top(): void
+    {
+        $this->actingAs($this->reader())
+            ->get('/inventory/reports')
+            ->assertOk()
+            ->assertSee('savedScrollY: null', false)
+            ->assertSee('preventScroll: true', false)
+            ->assertSee('x-on:wheel.prevent', false)
+            ->assertSee('x-on:touchmove.prevent', false)
+            ->assertDontSee("classList.add('overflow-hidden')", false)
+            ->assertDontSee("classList.remove('overflow-hidden')", false);
+    }
+
+    public function test_supplier_spend_drilldown_remains_financially_authorized(): void
+    {
+        $supplier = Supplier::create(['name' => 'Protected Vendor', 'status' => 'active']);
+
+        $this->actingAs(User::factory()->viewer()->create())
+            ->getJson('/inventory/reports/generate?report_type=procurement_expense&format=json&period=30&supplier_id='.$supplier->id)
+            ->assertForbidden();
+    }
+
+    public function test_api_dashboard_uses_the_same_kpi_calculations_as_reports(): void
+    {
+        InventoryItem::create([
+            'name' => 'API KPI Item',
+            'sku' => 'API-KPI-1',
+            'quantity_on_hand' => 8,
+            'reserved_quantity' => 3,
+            'reorder_level' => 10,
+            'unit_cost' => 12.50,
+            'total_value' => 999999,
+            'status' => 'in_stock',
+        ]);
+
+        $this->actingAs($this->reader())
+            ->getJson('/api/v1/dashboard-summary')
+            ->assertOk()
+            ->assertJsonPath('total_items', 1)
+            ->assertJsonPath('total_on_hand', 8)
+            ->assertJsonPath('reserved_units', 3)
+            ->assertJsonPath('low_stock_items', 1)
+            ->assertJsonPath('total_inventory_value', 100);
+    }
+
     public function test_the_screen_renders_only_one_generate_report_header_button_and_configuration_modal(): void
     {
         $response = $this->actingAs($this->reader())
@@ -1069,6 +1259,3 @@ class InventoryReportTest extends TestCase
             ->assertSee('Cancel', false);
     }
 }
-
-
-

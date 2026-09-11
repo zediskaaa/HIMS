@@ -183,32 +183,7 @@
         </x-ui.card>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {{-- Demand forecast: stubbed until the Node service is wired up --}}
-        <x-ui.card class="lg:col-span-2">
-            <x-slot:header>
-                <h2 class="text-sm font-semibold text-neutral-900">Stock demand forecast</h2>
-                <p class="mt-0.5 text-xs text-neutral-500">Projected consumption over the next 90 days</p>
-            </x-slot:header>
-
-            <x-slot:actions>
-                <x-ui.badge variant="neutral">Not connected</x-ui.badge>
-            </x-slot:actions>
-
-            <div class="flex flex-col items-center justify-center gap-2 py-12 rounded-md
-                        border border-dashed border-neutral-300 bg-neutral-50">
-                <span class="flex items-center justify-center w-10 h-10 rounded-full bg-white
-                             border border-neutral-200 text-neutral-400">
-                    <x-ui.icon name="chart-bar" class="w-5 h-5" />
-                </span>
-                <p class="text-sm font-medium text-neutral-700">Forecasting service not connected</p>
-                <p class="max-w-sm text-xs text-center text-neutral-500">
-                    Charts will render here once the forecasting service is available. Historical
-                    movement data is already being recorded.
-                </p>
-            </div>
-        </x-ui.card>
-
+    <div>
         {{-- Operational snapshot. The supplier and purchase-order figures are
              procurement's business, so an account without it sees the stock
              lines only rather than counts it cannot act on. --}}

@@ -5,13 +5,13 @@ namespace App\Http\Controllers\Inventory;
 use App\Enums\AlertStatus;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\InventoryItem;
 use App\Models\ItemBatch;
 use App\Models\PurchaseOrder;
 use App\Models\StockAlert;
 use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
+use App\Services\InventoryReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -20,6 +20,8 @@ use Illuminate\View\View;
 
 class InventoryController extends Controller implements HasMiddleware
 {
+    public function __construct(private readonly InventoryReportService $reports) {}
+
     /**
      * The read-only screens, each gated on what it actually shows.
      *
@@ -51,7 +53,6 @@ class InventoryController extends Controller implements HasMiddleware
         $totalSuppliers = $canViewSuppliers ? Supplier::count() : null;
         $activeSuppliers = $canViewSuppliers ? Supplier::where('status', 'active')->count() : null;
         $inactiveSuppliers = $canViewSuppliers ? Supplier::where('status', 'inactive')->count() : null;
-        $totalItems = InventoryItem::count();
         $storageLocations = StorageLocation::count();
         $recentMovements = StockMovement::with(['item', 'fromLocation', 'toLocation'])
             ->latest('moved_at')
@@ -84,7 +85,6 @@ class InventoryController extends Controller implements HasMiddleware
             'totalSuppliers',
             'activeSuppliers',
             'inactiveSuppliers',
-            'totalItems',
             'storageLocations',
             'recentMovements',
             'pendingPurchaseOrders',
@@ -125,6 +125,8 @@ class InventoryController extends Controller implements HasMiddleware
     private function liveSnapshot(?Request $request = null): array
     {
         $request ??= request();
+        $stockStatus = $this->reports->stockStatus();
+        $summary = $this->reports->summary($stockStatus);
 
         // Alerts still describing a live condition, worst severity first.
         $activeAlerts = StockAlert::with(['item', 'batch', 'location'])
@@ -137,13 +139,12 @@ class InventoryController extends Controller implements HasMiddleware
         return [
             'activeAlerts' => $activeAlerts,
             'openAlertCount' => StockAlert::where('status', AlertStatus::Open)->count(),
-            'lowStockItems' => InventoryItem::whereIn('status', ['low_stock', 'out_of_stock'])->count(),
-            'outOfStockItems' => InventoryItem::where('status', 'out_of_stock')->count(),
-            'totalOnHand' => (int) InventoryItem::sum('quantity_on_hand'),
+            'totalItems' => $summary['items'],
+            'lowStockItems' => $summary['needs_attention'],
+            'outOfStockItems' => $stockStatus['out_of_stock']['items'],
+            'totalOnHand' => $summary['units_on_hand'],
             'totalInventoryValue' => $request->user()->can(Permission::ViewProcurementSensitiveData->value)
-                ? InventoryItem::get()->sum(
-                    fn ($item) => (float) $item->quantity_on_hand * (float) $item->unit_cost
-                )
+                ? $summary['stock_value']
                 : null,
         ];
     }

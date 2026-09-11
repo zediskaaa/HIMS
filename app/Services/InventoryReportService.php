@@ -79,7 +79,7 @@ class InventoryReportService
      *
      * @return array<string, mixed>
      */
-    public function build(int $days = self::DEFAULT_PERIOD_DAYS, ?Carbon $from = null, ?Carbon $to = null): array
+    public function build(int $days = self::DEFAULT_PERIOD_DAYS, ?Carbon $from = null, ?Carbon $to = null, array $filters = []): array
     {
         if ($from && $to) {
             $since = $from;
@@ -94,7 +94,7 @@ class InventoryReportService
             ];
         } else {
             $days = max(1, min(365, $days));
-            $since = now()->subDays($days);
+            $since = $days === 1 ? now()->startOfDay() : now()->subDays($days)->startOfDay();
             $until = now();
             $period = [
                 'days' => $days,
@@ -105,22 +105,29 @@ class InventoryReportService
             ];
         }
 
-        $stockStatus = $this->stockStatus();
-        $movementsByType = $this->movementsByType($since, $until);
+        $categoryId = ! empty($filters['category_id']) ? (int) $filters['category_id'] : null;
+        $locationId = ! empty($filters['storage_location_id']) ? (int) $filters['storage_location_id'] : null;
+        $supplierId = ! empty($filters['supplier_id']) ? (int) $filters['supplier_id'] : null;
+        $movementType = ! empty($filters['movement_type']) ? (string) $filters['movement_type'] : null;
+        $stockStatusFilter = ! empty($filters['stock_status']) ? (string) $filters['stock_status'] : null;
+
+        $stockStatus = $this->stockStatus($categoryId, $locationId, $stockStatusFilter);
+        $movementsByType = $this->movementsByType($since, $until, $movementType, $locationId, $categoryId);
 
         return [
             'period' => $period,
             'summary' => $this->summary($stockStatus),
             'stockStatus' => $stockStatus,
-            'expiry' => $this->expiryExposure(),
-            'valuationByCategory' => $this->valuationByCategory(),
-            'stockByLocation' => $this->stockByLocation(),
-            'spend' => $this->procurementSpend($since, $until),
-            'spendBySupplier' => $this->spendBySupplier($since, $until),
+            'expiry' => $this->expiryExposure($categoryId, $locationId),
+            'valuationByCategory' => $this->valuationByCategory($categoryId, $locationId, $stockStatusFilter),
+            'stockByLocation' => $this->stockByLocation($categoryId, $locationId, $stockStatusFilter),
+            'spend' => $this->procurementSpend($since, $until, $supplierId),
+            'spendBySupplier' => $this->spendBySupplier($since, $until, $supplierId),
             'movementsByType' => $movementsByType,
             'movementTotals' => $this->movementTotals($movementsByType),
-            'topConsumedItems' => $this->topConsumedItems($since, $until),
-            'recentMovements' => $this->recentMovements($since, 15, $until),
+            'topConsumedItems' => $this->topConsumedItems($since, $until, $categoryId, $locationId),
+            'recentMovements' => $this->recentMovements($since, 15, $until, $movementType, $locationId, $categoryId),
+            'activeFilters' => $filters,
         ];
     }
 
@@ -128,28 +135,88 @@ class InventoryReportService
      * The headline tiles: catalogue size, units held, what it is worth, and
      * how many items are asking for attention.
      *
-     * @param  array<string, array{items: int, units: int, value: float}>  $stockStatus
+     * @param  array<string, array{items: int, units: int, reserved: int, value: float}>  $stockStatus
      * @return array<string, mixed>
      */
     public function summary(?array $stockStatus = null): array
     {
         $stockStatus ??= $this->stockStatus();
 
-        $totals = InventoryItem::query()
-            ->selectRaw('count(*) as items')
-            ->selectRaw('coalesce(sum(quantity_on_hand), 0) as units')
-            ->selectRaw('coalesce(sum(reserved_quantity), 0) as reserved')
-            ->selectRaw('coalesce(sum(quantity_on_hand * coalesce(unit_cost, 0)), 0) as value')
-            ->toBase()
-            ->first();
-
         return [
-            'items' => (int) ($totals->items ?? 0),
-            'units_on_hand' => (int) ($totals->units ?? 0),
-            'reserved_units' => (int) ($totals->reserved ?? 0),
-            'stock_value' => (float) ($totals->value ?? 0),
+            'items' => (int) collect($stockStatus)->sum('items'),
+            'units_on_hand' => (int) collect($stockStatus)->sum('units'),
+            'reserved_units' => (int) collect($stockStatus)->sum('reserved'),
+            'stock_value' => (float) collect($stockStatus)->sum('value'),
             'needs_attention' => $stockStatus['low_stock']['items'] + $stockStatus['out_of_stock']['items'],
         ];
+    }
+
+    /**
+     * Current inventory balances at catalogue or location scope.
+     *
+     * The cached item rollups are correct for the whole hospital. A location
+     * filter must instead aggregate item_stock_levels so quantities, reserved
+     * units, status buckets, and valuation all describe that exact location.
+     *
+     * @return Collection<int, object>
+     */
+    private function inventorySnapshot(?int $categoryId = null, ?int $locationId = null): Collection
+    {
+        $query = InventoryItem::query()
+            ->leftJoin('item_categories', 'item_categories.id', '=', 'inventory_items.category_id')
+            ->when($categoryId, fn ($builder) => $builder->where('inventory_items.category_id', $categoryId));
+
+        if ($locationId) {
+            return $query
+                ->join('item_stock_levels', 'item_stock_levels.item_id', '=', 'inventory_items.id')
+                ->where('item_stock_levels.storage_location_id', $locationId)
+                ->select([
+                    'inventory_items.id',
+                    'inventory_items.sku',
+                    'inventory_items.name',
+                    'inventory_items.unit',
+                    'inventory_items.reorder_level',
+                    'inventory_items.unit_cost',
+                ])
+                ->selectRaw("coalesce(item_categories.name, 'Uncategorised') as category")
+                ->selectRaw('coalesce(sum(item_stock_levels.quantity), 0) as quantity_on_hand')
+                ->selectRaw('coalesce(sum(item_stock_levels.reserved_quantity), 0) as reserved_quantity')
+                ->groupBy(
+                    'inventory_items.id',
+                    'inventory_items.sku',
+                    'inventory_items.name',
+                    'inventory_items.unit',
+                    'inventory_items.reorder_level',
+                    'inventory_items.unit_cost',
+                    'item_categories.name'
+                )
+                ->toBase()
+                ->get();
+        }
+
+        return $query
+            ->select([
+                'inventory_items.id',
+                'inventory_items.sku',
+                'inventory_items.name',
+                'inventory_items.unit',
+                'inventory_items.reorder_level',
+                'inventory_items.unit_cost',
+                'inventory_items.quantity_on_hand',
+                'inventory_items.reserved_quantity',
+            ])
+            ->selectRaw("coalesce(item_categories.name, 'Uncategorised') as category")
+            ->toBase()
+            ->get();
+    }
+
+    private function stockStatusKey(int $quantity, int $reorderLevel): string
+    {
+        return match (true) {
+            $quantity <= 0 => 'out_of_stock',
+            $reorderLevel > 0 && $quantity <= $reorderLevel => 'low_stock',
+            default => 'in_stock',
+        };
     }
 
     /**
@@ -161,27 +228,27 @@ class InventoryReportService
      * by hand and never moved still reads whatever it was created with — the
      * report would then disagree with the item screen sitting next to it.
      *
-     * @return array<string, array{items: int, units: int, value: float}>
+     * @return array<string, array{items: int, units: int, reserved: int, value: float}>
      */
-    public function stockStatus(): array
+    public function stockStatus(?int $categoryId = null, ?int $locationId = null, ?string $statusFilter = null): array
     {
         $buckets = [
-            'in_stock' => ['items' => 0, 'units' => 0, 'value' => 0.0],
-            'low_stock' => ['items' => 0, 'units' => 0, 'value' => 0.0],
-            'out_of_stock' => ['items' => 0, 'units' => 0, 'value' => 0.0],
+            'in_stock' => ['items' => 0, 'units' => 0, 'reserved' => 0, 'value' => 0.0],
+            'low_stock' => ['items' => 0, 'units' => 0, 'reserved' => 0, 'value' => 0.0],
+            'out_of_stock' => ['items' => 0, 'units' => 0, 'reserved' => 0, 'value' => 0.0],
         ];
 
-        InventoryItem::query()
-            ->select(['id', 'quantity_on_hand', 'reorder_level', 'unit_cost'])
-            ->each(function (InventoryItem $item) use (&$buckets) {
-                $key = match (true) {
-                    $item->isOutOfStock() => 'out_of_stock',
-                    $item->isLowStock() => 'low_stock',
-                    default => 'in_stock',
-                };
+        $this->inventorySnapshot($categoryId, $locationId)
+            ->each(function (object $item) use (&$buckets, $statusFilter) {
+                $key = $this->stockStatusKey((int) $item->quantity_on_hand, (int) $item->reorder_level);
+
+                if ($statusFilter && $statusFilter !== $key) {
+                    return;
+                }
 
                 $buckets[$key]['items']++;
                 $buckets[$key]['units'] += (int) $item->quantity_on_hand;
+                $buckets[$key]['reserved'] += (int) $item->reserved_quantity;
                 $buckets[$key]['value'] += (int) $item->quantity_on_hand * (float) $item->unit_cost;
             });
 
@@ -197,13 +264,20 @@ class InventoryReportService
      *
      * @return array<string, mixed>
      */
-    public function expiryExposure(): array
+    public function expiryExposure(?int $categoryId = null, ?int $locationId = null): array
     {
+        $stockLevelScope = fn ($query) => $query->when(
+            $locationId,
+            fn ($locationQuery) => $locationQuery->where('storage_location_id', $locationId)
+        );
+
         $batches = ItemBatch::query()
             ->active()
             ->whereNotNull('expiry_date')
             ->with('item')
-            ->withSum('stockLevels as units_on_hand', 'quantity')
+            ->withSum(['stockLevels as units_on_hand' => $stockLevelScope], 'quantity')
+            ->when($categoryId, fn ($query) => $query->whereHas('item', fn ($itemQuery) => $itemQuery->where('category_id', $categoryId)))
+            ->when($locationId, fn ($query) => $query->whereHas('stockLevels', $stockLevelScope))
             ->fefo()
             ->get()
             ->filter(fn (ItemBatch $batch) => (int) $batch->units_on_hand > 0);
@@ -237,20 +311,19 @@ class InventoryReportService
      *
      * @return Collection<int, object>
      */
-    public function valuationByCategory(): Collection
+    public function valuationByCategory(?int $categoryId = null, ?int $locationId = null, ?string $statusFilter = null): Collection
     {
-        return InventoryItem::query()
-            ->leftJoin('item_categories', 'item_categories.id', '=', 'inventory_items.category_id')
-            ->selectRaw("coalesce(item_categories.name, 'Uncategorised') as category")
-            ->selectRaw('count(*) as items')
-            ->selectRaw('coalesce(sum(inventory_items.quantity_on_hand), 0) as units')
-            ->selectRaw('coalesce(sum(inventory_items.quantity_on_hand * coalesce(inventory_items.unit_cost, 0)), 0) as value')
-            // Grouped on the column rather than the alias: every uncategorised
-            // item has a null name, so they all fall into one bucket anyway.
-            ->groupBy('item_categories.id', 'item_categories.name')
-            ->orderByDesc('value')
-            ->toBase()
-            ->get();
+        return $this->inventorySnapshot($categoryId, $locationId)
+            ->filter(fn (object $item) => ! $statusFilter || $this->stockStatusKey((int) $item->quantity_on_hand, (int) $item->reorder_level) === $statusFilter)
+            ->groupBy('category')
+            ->map(fn (Collection $items, string $category) => (object) [
+                'category' => $category,
+                'items' => $items->count(),
+                'units' => (int) $items->sum('quantity_on_hand'),
+                'value' => (float) $items->sum(fn (object $item) => (int) $item->quantity_on_hand * (float) $item->unit_cost),
+            ])
+            ->sortByDesc('value')
+            ->values();
     }
 
     /**
@@ -258,11 +331,20 @@ class InventoryReportService
      *
      * @return Collection<int, array<string, mixed>>
      */
-    public function stockByLocation(): Collection
+    public function stockByLocation(?int $categoryId = null, ?int $locationId = null, ?string $statusFilter = null): Collection
     {
+        $allowedItemIds = $statusFilter
+            ? $this->inventorySnapshot($categoryId, $locationId)
+                ->filter(fn (object $item) => $this->stockStatusKey((int) $item->quantity_on_hand, (int) $item->reorder_level) === $statusFilter)
+                ->pluck('id')
+            : null;
+
         return ItemStockLevel::query()
             ->join('storage_locations', 'storage_locations.id', '=', 'item_stock_levels.storage_location_id')
             ->join('inventory_items', 'inventory_items.id', '=', 'item_stock_levels.item_id')
+            ->when($categoryId, fn ($query) => $query->where('inventory_items.category_id', $categoryId))
+            ->when($locationId, fn ($query) => $query->where('storage_locations.id', $locationId))
+            ->when($allowedItemIds !== null, fn ($query) => $query->whereIn('inventory_items.id', $allowedItemIds))
             ->selectRaw('storage_locations.name as location')
             ->selectRaw('storage_locations.code as code')
             ->selectRaw('storage_locations.capacity as capacity')
@@ -300,7 +382,7 @@ class InventoryReportService
      *
      * @return array<string, mixed>
      */
-    public function procurementSpend(Carbon $since, ?Carbon $until = null): array
+    public function procurementSpend(Carbon $since, ?Carbon $until = null, ?int $supplierId = null): array
     {
         $totals = fn ($query) => $query
             ->selectRaw('count(*) as orders')
@@ -310,12 +392,16 @@ class InventoryReportService
 
         $ordered = $totals(PurchaseOrder::query()
             ->where('requested_at', '>=', $since)
+            ->when($supplierId, fn ($query) => $query->where('supplier_id', $supplierId))
             ->when($until, fn ($q) => $q->where('requested_at', '<=', $until)));
         $received = $totals(PurchaseOrder::query()
             ->where('status', 'received')
             ->where('received_at', '>=', $since)
+            ->when($supplierId, fn ($query) => $query->where('supplier_id', $supplierId))
             ->when($until, fn ($q) => $q->where('received_at', '<=', $until)));
-        $outstanding = $totals(PurchaseOrder::query()->whereNotIn('status', ['received', 'cancelled']));
+        $outstanding = $totals(PurchaseOrder::query()
+            ->when($supplierId, fn ($query) => $query->where('supplier_id', $supplierId))
+            ->whereNotIn('status', ['received', 'cancelled']));
 
         $orderCount = (int) ($ordered->orders ?? 0);
 
@@ -340,17 +426,19 @@ class InventoryReportService
      *
      * @return Collection<int, object>
      */
-    public function spendBySupplier(Carbon $since, ?Carbon $until = null): Collection
+    public function spendBySupplier(Carbon $since, ?Carbon $until = null, ?int $supplierId = null): Collection
     {
         return PurchaseOrder::query()
             ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_orders.supplier_id')
             ->where('purchase_orders.requested_at', '>=', $since)
             ->when($until, fn ($q) => $q->where('purchase_orders.requested_at', '<=', $until))
+            ->when($supplierId, fn ($query) => $query->where('purchase_orders.supplier_id', $supplierId))
+            ->selectRaw('purchase_orders.supplier_id as supplier_id')
             ->selectRaw("coalesce(suppliers.name, 'Unassigned') as supplier")
             ->selectRaw('count(*) as orders')
             ->selectRaw("coalesce(sum(case when purchase_orders.status = 'received' then 1 else 0 end), 0) as received_orders")
             ->selectRaw('coalesce(sum(purchase_orders.total_amount), 0) as value')
-            ->groupBy('suppliers.id', 'suppliers.name')
+            ->groupBy('purchase_orders.supplier_id', 'suppliers.id', 'suppliers.name')
             ->orderByDesc('value')
             ->limit(10)
             ->toBase()
@@ -366,11 +454,16 @@ class InventoryReportService
      *
      * @return Collection<int, array<string, mixed>>
      */
-    public function movementsByType(Carbon $since, ?Carbon $until = null): Collection
+    public function movementsByType(Carbon $since, ?Carbon $until = null, ?string $movementType = null, ?int $locationId = null, ?int $categoryId = null): Collection
     {
         $rows = StockMovement::query()
             ->where('moved_at', '>=', $since)
             ->when($until, fn ($q) => $q->where('moved_at', '<=', $until))
+            ->when($movementType, fn ($query) => $query->where('movement_type', $movementType))
+            ->when($categoryId, fn ($query) => $query->whereHas('item', fn ($itemQuery) => $itemQuery->where('category_id', $categoryId)))
+            ->when($locationId, fn ($query) => $query->where(fn ($locationQuery) => $locationQuery
+                ->where('from_location_id', $locationId)
+                ->orWhere('to_location_id', $locationId)))
             ->selectRaw('movement_type')
             ->selectRaw('count(*) as movements')
             ->selectRaw('coalesce(sum(quantity), 0) as units')
@@ -380,7 +473,11 @@ class InventoryReportService
             ->get()
             ->keyBy('movement_type');
 
-        return collect(MovementType::cases())->map(fn (MovementType $type) => [
+        $types = $movementType
+            ? collect(MovementType::cases())->where('value', $movementType)
+            : collect(MovementType::cases());
+
+        return $types->map(fn (MovementType $type) => [
             'type' => $type,
             'movements' => (int) ($rows[$type->value]->movements ?? 0),
             'units' => (int) ($rows[$type->value]->units ?? 0),
@@ -422,13 +519,18 @@ class InventoryReportService
      *
      * @return Collection<int, object>
      */
-    public function topConsumedItems(Carbon $since, ?Carbon $until = null): Collection
+    public function topConsumedItems(Carbon $since, ?Carbon $until = null, ?int $categoryId = null, ?int $locationId = null): Collection
     {
-        return StockMovement::query()
+        $rows = StockMovement::query()
             ->join('inventory_items', 'inventory_items.id', '=', 'stock_movements.item_id')
             ->whereIn('stock_movements.movement_type', MovementType::consumptionValues())
             ->where('stock_movements.moved_at', '>=', $since)
             ->when($until, fn ($q) => $q->where('stock_movements.moved_at', '<=', $until))
+            ->when($categoryId, fn ($query) => $query->where('inventory_items.category_id', $categoryId))
+            ->when($locationId, fn ($query) => $query->where(fn ($locationQuery) => $locationQuery
+                ->where('stock_movements.from_location_id', $locationId)
+                ->orWhere('stock_movements.to_location_id', $locationId)))
+            ->selectRaw('inventory_items.id as item_id')
             ->selectRaw('inventory_items.name as item')
             ->selectRaw('inventory_items.sku as sku')
             ->selectRaw('inventory_items.unit as unit')
@@ -443,6 +545,19 @@ class InventoryReportService
             ->limit(10)
             ->toBase()
             ->get();
+
+        if ($locationId && $rows->isNotEmpty()) {
+            $onHandByItem = ItemStockLevel::query()
+                ->where('storage_location_id', $locationId)
+                ->whereIn('item_id', $rows->pluck('item_id'))
+                ->selectRaw('item_id, coalesce(sum(quantity), 0) as on_hand')
+                ->groupBy('item_id')
+                ->pluck('on_hand', 'item_id');
+
+            $rows->each(fn (object $row) => $row->on_hand = (int) ($onHandByItem[$row->item_id] ?? 0));
+        }
+
+        return $rows;
     }
 
     /**
@@ -454,12 +569,17 @@ class InventoryReportService
      *
      * @return Collection<int, StockMovement>
      */
-    public function recentMovements(Carbon $since, int $limit = 15, ?Carbon $until = null): Collection
+    public function recentMovements(Carbon $since, int $limit = 15, ?Carbon $until = null, ?string $movementType = null, ?int $locationId = null, ?int $categoryId = null): Collection
     {
         return StockMovement::query()
             ->with(['item', 'fromLocation', 'toLocation', 'user', 'reference'])
             ->where('moved_at', '>=', $since)
             ->when($until, fn ($q) => $q->where('moved_at', '<=', $until))
+            ->when($movementType, fn ($query) => $query->where('movement_type', $movementType))
+            ->when($categoryId, fn ($query) => $query->whereHas('item', fn ($itemQuery) => $itemQuery->where('category_id', $categoryId)))
+            ->when($locationId, fn ($query) => $query->where(fn ($locationQuery) => $locationQuery
+                ->where('from_location_id', $locationId)
+                ->orWhere('to_location_id', $locationId)))
             ->latest('moved_at')
             ->latest('id')
             ->limit($limit)
@@ -568,15 +688,15 @@ class InventoryReportService
         ];
 
         return match ($reportType) {
-            'stock_status' => $this->generateStockStatusReport($meta, $categoryId, $status, $sortBy, $sortDir, $canViewFinancial),
-            'valuation' => $this->generateValuationReport($meta, $categoryId, $sortBy, $sortDir, $canViewFinancial),
-            'stock_by_location' => $this->generateStockByLocationReport($meta, $locationId, $sortBy, $sortDir, $canViewFinancial),
+            'stock_status' => $this->generateStockStatusReport($meta, $categoryId, $locationId, $status, $sortBy, $sortDir, $canViewFinancial),
+            'valuation' => $this->generateValuationReport($meta, $categoryId, $locationId, $status, $sortBy, $sortDir, $canViewFinancial),
+            'stock_by_location' => $this->generateStockByLocationReport($meta, $categoryId, $locationId, $status, $sortBy, $sortDir, $canViewFinancial),
             'expiry_exposure' => $this->generateExpiryExposureReport($meta, $locationId, $categoryId, $sortBy, $sortDir, $canViewFinancial),
             'movement_history' => $this->generateMovementHistoryReport($meta, $from, $to, $movementType, $locationId, $categoryId, $sortBy, $sortDir, $canViewFinancial),
             'procurement_expense' => $this->generateProcurementExpenseReport($meta, $from, $to, $supplierId, $status, $sortBy, $sortDir, $canViewFinancial),
             'spend_by_supplier' => $this->generateSpendBySupplierReport($meta, $from, $to, $supplierId, $sortBy, $sortDir, $canViewFinancial),
-            'most_consumed' => $this->generateMostConsumedReport($meta, $from, $to, $categoryId, $sortBy, $sortDir, $canViewFinancial),
-            'movements_by_type' => $this->generateMovementsByTypeReport($meta, $from, $to, $movementType, $sortBy, $sortDir, $canViewFinancial),
+            'most_consumed' => $this->generateMostConsumedReport($meta, $from, $to, $categoryId, $locationId, $sortBy, $sortDir, $canViewFinancial),
+            'movements_by_type' => $this->generateMovementsByTypeReport($meta, $from, $to, $movementType, $locationId, $categoryId, $sortBy, $sortDir, $canViewFinancial),
             default => $this->generateAllReports($meta, $from, $to, $categoryId, $locationId, $supplierId, $movementType, $status, $sortBy, $sortDir, $canViewFinancial),
         };
     }
@@ -584,41 +704,24 @@ class InventoryReportService
     /**
      * Stock Status Report generation.
      */
-    protected function generateStockStatusReport(array $meta, ?int $categoryId, ?string $statusFilter, ?string $sortBy, string $sortDir, bool $canViewFinancial): array
+    protected function generateStockStatusReport(array $meta, ?int $categoryId, ?int $locationId, ?string $statusFilter, ?string $sortBy, string $sortDir, bool $canViewFinancial): array
     {
-        $itemsQuery = InventoryItem::query()
-            ->with('category')
-            ->when($categoryId, fn ($q) => $q->where('category_id', $categoryId));
+        $items = $this->inventorySnapshot($categoryId, $locationId);
 
-        $items = $itemsQuery->get();
-
-        $bucketCounts = [
-            'in_stock' => ['items' => 0, 'units' => 0, 'value' => 0.0],
-            'low_stock' => ['items' => 0, 'units' => 0, 'value' => 0.0],
-            'out_of_stock' => ['items' => 0, 'units' => 0, 'value' => 0.0],
-        ];
-
-        $classified = $items->map(function (InventoryItem $item) use (&$bucketCounts) {
-            $statusKey = match (true) {
-                $item->isOutOfStock() => 'out_of_stock',
-                $item->isLowStock() => 'low_stock',
-                default => 'in_stock',
-            };
+        $classified = $items->map(function (object $item) {
+            $statusKey = $this->stockStatusKey((int) $item->quantity_on_hand, (int) $item->reorder_level);
 
             $units = (int) $item->quantity_on_hand;
             $unitCost = (float) $item->unit_cost;
             $val = $units * $unitCost;
 
-            $bucketCounts[$statusKey]['items']++;
-            $bucketCounts[$statusKey]['units'] += $units;
-            $bucketCounts[$statusKey]['value'] += $val;
-
             return [
                 'id' => $item->id,
                 'sku' => $item->sku,
                 'name' => $item->name,
-                'category' => $item->category?->name ?? 'Uncategorised',
+                'category' => $item->category,
                 'quantity_on_hand' => $units,
+                'reserved_quantity' => (int) $item->reserved_quantity,
                 'reorder_level' => (int) $item->reorder_level,
                 'unit' => $item->unit ?? 'unit',
                 'unit_cost' => $unitCost,
@@ -650,6 +753,7 @@ class InventoryReportService
             'name' => 'Item Description',
             'category' => 'Category',
             'quantity_on_hand' => 'Units On Hand',
+            'reserved_quantity' => 'Reserved Units',
             'reorder_level' => 'Reorder Level',
         ];
         if ($canViewFinancial) {
@@ -663,9 +767,9 @@ class InventoryReportService
 
         $summary = [
             'Total Items' => $classified->count(),
-            'In Stock Items' => $bucketCounts['in_stock']['items'],
-            'Low Stock Items' => $bucketCounts['low_stock']['items'],
-            'Out of Stock Items' => $bucketCounts['out_of_stock']['items'],
+            'In Stock Items' => $classified->where('status_key', 'in_stock')->count(),
+            'Low Stock Items' => $classified->where('status_key', 'low_stock')->count(),
+            'Out of Stock Items' => $classified->where('status_key', 'out_of_stock')->count(),
             'Total Units' => $totalUnits,
         ];
         if ($canViewFinancial) {
@@ -677,6 +781,7 @@ class InventoryReportService
             'name' => $classified->count().' items',
             'category' => '-',
             'quantity_on_hand' => $totalUnits,
+            'reserved_quantity' => (int) $classified->sum('reserved_quantity'),
             'reorder_level' => '-',
             'unit_cost' => '-',
             'total_value' => $canViewFinancial ? '₱'.number_format($totalVal, 2) : '-',
@@ -697,18 +802,9 @@ class InventoryReportService
     /**
      * Valuation Report generation.
      */
-    protected function generateValuationReport(array $meta, ?int $categoryId, ?string $sortBy, string $sortDir, bool $canViewFinancial): array
+    protected function generateValuationReport(array $meta, ?int $categoryId, ?int $locationId, ?string $statusFilter, ?string $sortBy, string $sortDir, bool $canViewFinancial): array
     {
-        $rows = InventoryItem::query()
-            ->leftJoin('item_categories', 'item_categories.id', '=', 'inventory_items.category_id')
-            ->when($categoryId, fn ($q) => $q->where('inventory_items.category_id', $categoryId))
-            ->selectRaw("coalesce(item_categories.name, 'Uncategorised') as category")
-            ->selectRaw('count(*) as items')
-            ->selectRaw('coalesce(sum(inventory_items.quantity_on_hand), 0) as units')
-            ->selectRaw('coalesce(sum(inventory_items.quantity_on_hand * coalesce(inventory_items.unit_cost, 0)), 0) as value')
-            ->groupBy('item_categories.id', 'item_categories.name')
-            ->toBase()
-            ->get();
+        $rows = $this->valuationByCategory($categoryId, $locationId, $statusFilter);
 
         $totalVal = (float) $rows->sum('value');
         $totalUnits = (int) $rows->sum('units');
@@ -776,37 +872,15 @@ class InventoryReportService
     /**
      * Stock By Location Report generation.
      */
-    protected function generateStockByLocationReport(array $meta, ?int $locationId, ?string $sortBy, string $sortDir, bool $canViewFinancial): array
+    protected function generateStockByLocationReport(array $meta, ?int $categoryId, ?int $locationId, ?string $statusFilter, ?string $sortBy, string $sortDir, bool $canViewFinancial): array
     {
-        $rows = ItemStockLevel::query()
-            ->join('storage_locations', 'storage_locations.id', '=', 'item_stock_levels.storage_location_id')
-            ->join('inventory_items', 'inventory_items.id', '=', 'item_stock_levels.item_id')
-            ->when($locationId, fn ($q) => $q->where('storage_locations.id', $locationId))
-            ->selectRaw('storage_locations.name as location')
-            ->selectRaw('storage_locations.code as code')
-            ->selectRaw('storage_locations.capacity as capacity')
-            ->selectRaw('count(distinct item_stock_levels.item_id) as items')
-            ->selectRaw('coalesce(sum(item_stock_levels.quantity), 0) as units')
-            ->selectRaw('coalesce(sum(item_stock_levels.quantity * coalesce(inventory_items.unit_cost, 0)), 0) as value')
-            ->groupBy('storage_locations.id', 'storage_locations.name', 'storage_locations.code', 'storage_locations.capacity')
-            ->toBase()
-            ->get()
-            ->map(function ($r) {
-                $units = (int) $r->units;
-                $capacity = $r->capacity !== null ? (int) $r->capacity : null;
-                $utilisation = $capacity ? round(($units / $capacity) * 100, 1) : null;
-
-                return [
-                    'location' => $r->location,
-                    'code' => $r->code,
-                    'capacity' => $capacity !== null ? $capacity : 'Uncapped',
-                    'items' => (int) $r->items,
-                    'units' => $units,
-                    'value' => (float) $r->value,
-                    'utilisation' => $utilisation !== null ? $utilisation.'%' : 'N/A',
-                    'utilisation_num' => $utilisation ?? 0,
-                ];
-            });
+        $rows = $this->stockByLocation($categoryId, $locationId, $statusFilter)
+            ->map(fn (array $row) => [
+                ...$row,
+                'capacity' => $row['capacity'] ?? 'Uncapped',
+                'utilisation' => $row['utilisation'] !== null ? $row['utilisation'].'%' : 'N/A',
+                'utilisation_num' => $row['utilisation'] ?? 0,
+            ]);
 
         // Sorting
         $rows = (match ($sortBy) {
@@ -866,14 +940,19 @@ class InventoryReportService
      */
     protected function generateExpiryExposureReport(array $meta, ?int $locationId, ?int $categoryId, ?string $sortBy, string $sortDir, bool $canViewFinancial): array
     {
+        $stockLevelScope = fn ($query) => $query->when(
+            $locationId,
+            fn ($locationQuery) => $locationQuery->where('storage_location_id', $locationId)
+        );
+
         $batchesQuery = ItemBatch::query()
             ->active()
             ->whereNotNull('expiry_date')
-            ->with(['item.category', 'stockLevels.storageLocation'])
-            ->withSum('stockLevels as units_on_hand', 'quantity')
+            ->with(['item.category', 'stockLevels' => $stockLevelScope, 'stockLevels.storageLocation'])
+            ->withSum(['stockLevels as units_on_hand' => $stockLevelScope], 'quantity')
             ->fefo()
             ->when($categoryId, fn ($q) => $q->whereHas('item', fn ($iq) => $iq->where('category_id', $categoryId)))
-            ->when($locationId, fn ($q) => $q->whereHas('stockLevels', fn ($lq) => $lq->where('storage_location_id', $locationId)));
+            ->when($locationId, fn ($q) => $q->whereHas('stockLevels', $stockLevelScope));
 
         $batches = $batchesQuery->get()->filter(fn (ItemBatch $b) => (int) $b->units_on_hand > 0);
 
@@ -1129,7 +1208,10 @@ class InventoryReportService
         })->values();
 
         $received = $orders->where('status', 'received');
-        $outstanding = PurchaseOrder::query()->whereNotIn('status', ['received', 'cancelled'])->get();
+        $outstanding = PurchaseOrder::query()
+            ->whereNotIn('status', ['received', 'cancelled'])
+            ->when($supplierId, fn ($query) => $query->where('supplier_id', $supplierId))
+            ->get();
 
         $totalOrdersCount = $orders->count();
         $totalOrderedVal = (float) $orders->sum('total_amount');
@@ -1267,7 +1349,7 @@ class InventoryReportService
     /**
      * Most Consumed Items Report generation.
      */
-    protected function generateMostConsumedReport(array $meta, Carbon $from, Carbon $to, ?int $categoryId, ?string $sortBy, string $sortDir, bool $canViewFinancial): array
+    protected function generateMostConsumedReport(array $meta, Carbon $from, Carbon $to, ?int $categoryId, ?int $locationId, ?string $sortBy, string $sortDir, bool $canViewFinancial): array
     {
         $query = StockMovement::query()
             ->join('inventory_items', 'inventory_items.id', '=', 'stock_movements.item_id')
@@ -1275,6 +1357,10 @@ class InventoryReportService
             ->where('stock_movements.moved_at', '>=', $from)
             ->where('stock_movements.moved_at', '<=', $to)
             ->when($categoryId, fn ($q) => $q->where('inventory_items.category_id', $categoryId))
+            ->when($locationId, fn ($query) => $query->where(fn ($locationQuery) => $locationQuery
+                ->where('stock_movements.from_location_id', $locationId)
+                ->orWhere('stock_movements.to_location_id', $locationId)))
+            ->selectRaw('inventory_items.id as item_id')
             ->selectRaw('inventory_items.name as item')
             ->selectRaw('inventory_items.sku as sku')
             ->selectRaw('inventory_items.unit as unit')
@@ -1285,7 +1371,20 @@ class InventoryReportService
             ->groupBy('inventory_items.id', 'inventory_items.name', 'inventory_items.sku', 'inventory_items.unit', 'inventory_items.quantity_on_hand')
             ->toBase();
 
-        $rows = $query->get()->map(fn ($r) => [
+        $rawRows = $query->get();
+
+        if ($locationId && $rawRows->isNotEmpty()) {
+            $onHandByItem = ItemStockLevel::query()
+                ->where('storage_location_id', $locationId)
+                ->whereIn('item_id', $rawRows->pluck('item_id'))
+                ->selectRaw('item_id, coalesce(sum(quantity), 0) as on_hand')
+                ->groupBy('item_id')
+                ->pluck('on_hand', 'item_id');
+
+            $rawRows->each(fn (object $row) => $row->on_hand = (int) ($onHandByItem[$row->item_id] ?? 0));
+        }
+
+        $rows = $rawRows->map(fn ($r) => [
             'item' => $r->item,
             'sku' => $r->sku,
             'unit' => $r->unit ?? 'unit',
@@ -1350,12 +1449,16 @@ class InventoryReportService
     /**
      * Movements By Type Report generation.
      */
-    protected function generateMovementsByTypeReport(array $meta, Carbon $from, Carbon $to, ?string $movementType, ?string $sortBy, string $sortDir, bool $canViewFinancial): array
+    protected function generateMovementsByTypeReport(array $meta, Carbon $from, Carbon $to, ?string $movementType, ?int $locationId, ?int $categoryId, ?string $sortBy, string $sortDir, bool $canViewFinancial): array
     {
         $rows = StockMovement::query()
             ->where('moved_at', '>=', $from)
             ->where('moved_at', '<=', $to)
             ->when($movementType, fn ($q) => $q->where('movement_type', $movementType))
+            ->when($categoryId, fn ($query) => $query->whereHas('item', fn ($itemQuery) => $itemQuery->where('category_id', $categoryId)))
+            ->when($locationId, fn ($query) => $query->where(fn ($locationQuery) => $locationQuery
+                ->where('from_location_id', $locationId)
+                ->orWhere('to_location_id', $locationId)))
             ->selectRaw('movement_type')
             ->selectRaw('count(*) as movements')
             ->selectRaw('coalesce(sum(quantity), 0) as units')
@@ -1436,13 +1539,13 @@ class InventoryReportService
      */
     protected function generateAllReports(array $meta, Carbon $from, Carbon $to, ?int $categoryId, ?int $locationId, ?int $supplierId, ?string $movementType, ?string $status, ?string $sortBy, string $sortDir, bool $canViewFinancial): array
     {
-        $stockStatus = $this->generateStockStatusReport($meta, $categoryId, $status, $sortBy, $sortDir, $canViewFinancial);
-        $valuation = $this->generateValuationReport($meta, $categoryId, $sortBy, $sortDir, $canViewFinancial);
-        $stockByLocation = $this->generateStockByLocationReport($meta, $locationId, $sortBy, $sortDir, $canViewFinancial);
+        $stockStatus = $this->generateStockStatusReport($meta, $categoryId, $locationId, $status, $sortBy, $sortDir, $canViewFinancial);
+        $valuation = $this->generateValuationReport($meta, $categoryId, $locationId, $status, $sortBy, $sortDir, $canViewFinancial);
+        $stockByLocation = $this->generateStockByLocationReport($meta, $categoryId, $locationId, $status, $sortBy, $sortDir, $canViewFinancial);
         $expiry = $this->generateExpiryExposureReport($meta, $locationId, $categoryId, $sortBy, $sortDir, $canViewFinancial);
         $movements = $this->generateMovementHistoryReport($meta, $from, $to, $movementType, $locationId, $categoryId, $sortBy, $sortDir, $canViewFinancial);
-        $consumed = $this->generateMostConsumedReport($meta, $from, $to, $categoryId, $sortBy, $sortDir, $canViewFinancial);
-        $movementsByType = $this->generateMovementsByTypeReport($meta, $from, $to, $movementType, $sortBy, $sortDir, $canViewFinancial);
+        $consumed = $this->generateMostConsumedReport($meta, $from, $to, $categoryId, $locationId, $sortBy, $sortDir, $canViewFinancial);
+        $movementsByType = $this->generateMovementsByTypeReport($meta, $from, $to, $movementType, $locationId, $categoryId, $sortBy, $sortDir, $canViewFinancial);
 
         $sections = [
             'stock_status' => [
@@ -1549,7 +1652,7 @@ class InventoryReportService
 
         return response()->streamDownload(function () use ($report) {
             $out = fopen('php://output', 'w');
-            fputs($out, "\xEF\xBB\xBF"); // UTF-8 BOM for MS Excel compatibility
+            fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM for MS Excel compatibility
 
             fputcsv($out, [$report['meta']['hospital_name'] ?? 'Dr. Jose N. Rodriguez Memorial Hospital and Sanitarium']);
             fputcsv($out, [$report['meta']['sub_title'] ?? 'Materials Management & Inventory Division']);

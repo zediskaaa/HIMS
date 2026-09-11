@@ -45,6 +45,17 @@ class ReportController extends Controller implements HasMiddleware
 
     public function index(Request $request): View
     {
+        $dashboardFilters = $request->validate([
+            'period' => ['nullable', 'string', Rule::in(array_keys(InventoryReportService::PERIOD_OPTIONS))],
+            'from' => ['nullable', 'required_if:period,custom', 'date', 'before_or_equal:today'],
+            'to' => ['nullable', 'required_if:period,custom', 'date', 'after_or_equal:from', 'before_or_equal:today'],
+            'category_id' => ['nullable', 'integer', 'exists:item_categories,id'],
+            'storage_location_id' => ['nullable', 'integer', 'exists:storage_locations,id'],
+            'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
+            'movement_type' => ['nullable', 'string', Rule::enum(MovementType::class)],
+            'stock_status' => ['nullable', 'string', Rule::in(['in_stock', 'low_stock', 'out_of_stock'])],
+        ]);
+
         $periodParam = $request->input('period');
         $fromParam = $request->input('from');
         $toParam = $request->input('to');
@@ -78,8 +89,18 @@ class ReportController extends Controller implements HasMiddleware
             $customTo = now();
         }
 
+        $activeFilters = array_filter([
+            'category_id' => $dashboardFilters['category_id'] ?? null,
+            'storage_location_id' => $dashboardFilters['storage_location_id'] ?? null,
+            'supplier_id' => $dashboardFilters['supplier_id'] ?? null,
+            'movement_type' => $dashboardFilters['movement_type'] ?? null,
+            'stock_status' => $dashboardFilters['stock_status'] ?? null,
+        ], fn ($value) => $value !== null && $value !== '');
+
+        $reportData = $this->reports->build($days, $customFrom, $customTo, $activeFilters);
+
         return view('inventory.reports.index', [
-            ...$this->reports->build($days, $customFrom, $customTo),
+            ...$reportData,
             'periodOptions' => InventoryReportService::PERIOD_OPTIONS,
             'reportTypes' => InventoryReportService::REPORT_TYPES,
             'exportFormats' => InventoryReportService::EXPORT_FORMATS,
@@ -145,4 +166,3 @@ class ReportController extends Controller implements HasMiddleware
         };
     }
 }
-
