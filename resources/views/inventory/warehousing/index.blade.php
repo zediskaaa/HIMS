@@ -193,7 +193,7 @@
                             <div class="flex items-center justify-between px-6 py-3 hover:bg-neutral-50">
                                 <div class="truncate pr-4">
                                     <div class="flex items-center gap-2">
-                                        <span class="inline-flex h-2 w-2 rounded-full @if($scan->outcome === 'accepted') bg-emerald-500 @else bg-red-500 @endif"></span>
+                                        <span class="inline-flex h-2 w-2 rounded-full @if($scan->outcome === 'accepted') bg-emerald-500 @elseif($scan->outcome === 'identified') bg-amber-500 @else bg-red-500 @endif"></span>
                                         <span class="font-mono text-xs font-semibold text-neutral-800 truncate max-w-xs">{{ $scan->raw_value }}</span>
                                     </div>
                                     <p class="text-[11px] text-neutral-500 truncate mt-0.5">

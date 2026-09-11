@@ -23,6 +23,11 @@ class WarehouseScanEvent extends Model
         return $this->belongsTo(WarehouseTask::class, 'warehouse_task_id');
     }
 
+    public function warehouseTask(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseTask::class, 'warehouse_task_id');
+    }
+
     public function scannedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'scanned_by_id');

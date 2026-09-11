@@ -153,13 +153,20 @@ class WarehouseTaskService
             $locked = WarehouseTask::lockForUpdate()->findOrFail($task->id);
             $this->assertOperator($locked, $actor);
             if ($locked->status !== WarehouseTaskStatus::InProgress) {
-                throw new DomainException('Start the task before scanning.');
+                if (in_array($locked->status, [WarehouseTaskStatus::Ready, WarehouseTaskStatus::Assigned], true)) {
+                    $this->start($locked, $actor);
+                    $locked->refresh();
+                } else {
+                    throw new DomainException('Start the task before scanning.');
+                }
             }
 
             $parsed = $this->barcodeService->parseAndResolve($rawValue);
+            // Only accepted scans advance the sequence, so an identification scan
+            // never consumes a step.
             $accepted = $locked->scans()->where('outcome', 'accepted')->count();
             $expected = $this->expectedScan($locked, $accepted);
-            [$valid, $message] = $this->validateScan($locked, $expected, $parsed);
+            [$valid, $message, $match] = $this->validateScan($locked, $expected, $parsed);
 
             $event = WarehouseScanEvent::create([
                 'scan_identifier' => 'SCN-'.Str::ulid(),
@@ -170,7 +177,11 @@ class WarehouseTaskService
                 'symbology' => $parsed['symbology'],
                 'resolved_type' => $parsed['resolved_type'],
                 'resolved_id' => $parsed['resolved_id'],
-                'outcome' => $valid ? 'accepted' : 'rejected',
+                'outcome' => match ($match) {
+                    'proceed' => 'accepted',
+                    'identify' => 'identified',
+                    default => 'rejected',
+                },
                 'message' => $message,
                 'metadata' => array_filter([
                     'gtin' => $parsed['gtin'],
@@ -184,7 +195,9 @@ class WarehouseTaskService
                 'created_at' => now(),
             ]);
 
-            if (! $valid) {
+            // A task label answers "which task am I on?", so it is recorded and
+            // acknowledged rather than escalated into an exception ticket.
+            if (! $valid && $match === 'reject') {
                 $this->raiseException($locked, $this->exceptionTypeFor($expected, $parsed), $message, $actor);
             }
 
@@ -371,49 +384,116 @@ class WarehouseTaskService
         ], $actor, $task->reference);
     }
 
-    /** @param array<string, mixed> $parsed @return array{bool,string} */
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @return array{0: bool, 1: string, 2: 'proceed'|'identify'|'reject'}
+     */
     private function validateScan(WarehouseTask $task, string $expected, array $parsed): array
     {
         if ($parsed['resolved_type'] === null) {
-            return [false, 'Unknown barcode or identifier.'];
+            return [false, "Unknown barcode or identifier: '{$parsed['raw']}'. Please verify the barcode label.", 'reject'];
+        }
+
+        // Scanning the task's own label identifies the job in hand; it is neither a
+        // step forward nor a wrong scan, so it answers with the pending prompt.
+        if ($parsed['resolved_type'] === 'task') {
+            if ((int) $parsed['resolved_id'] === (int) $task->id) {
+                return [false, "Task {$task->task_number} identified. {$this->scanPrompt($task, $expected)}", 'identify'];
+            }
+
+            return [false, "Scanned barcode for task {$parsed['normalized']}, but the active task is {$task->task_number}.", 'reject'];
         }
 
         if ($expected === 'source') {
-            $valid = $parsed['resolved_type'] === 'location' && $parsed['resolved_id'] === $task->source_location_id;
-            return [$valid, $valid ? 'Source location confirmed.' : 'Wrong source location scanned.'];
+            if ($parsed['resolved_type'] === 'location') {
+                if ((int) $parsed['resolved_id'] === (int) $task->source_location_id) {
+                    return [true, "Source location {$task->sourceLocation?->code} confirmed.", 'proceed'];
+                }
+                if ((int) $parsed['resolved_id'] === (int) $task->destination_location_id) {
+                    return [false, "Scanned destination location ({$task->destinationLocation?->code}), but Step 1 requires scanning the source location ({$task->sourceLocation?->code}) first.", 'reject'];
+                }
+                $otherLoc = StorageLocation::find($parsed['resolved_id']);
+                $otherCode = $otherLoc?->code ?? $parsed['normalized'];
+
+                return [false, "Scanned location '{$otherCode}', but expected source location '{$task->sourceLocation?->code}'.", 'reject'];
+            }
+
+            if (in_array($parsed['resolved_type'], ['item', 'batch'], true)) {
+                return [false, "Scanned product barcode ({$parsed['normalized']}). Step 1 requires scanning the source location ({$task->sourceLocation?->code}) to confirm you are at the correct shelf before picking.", 'reject'];
+            }
+
+            return [false, "Wrong source location scanned. Expected: {$task->sourceLocation?->code}.", 'reject'];
         }
 
         if ($expected === 'destination') {
-            $valid = $parsed['resolved_type'] === 'location' && $parsed['resolved_id'] === $task->destination_location_id;
-            return [$valid, $valid ? 'Destination location confirmed.' : 'Wrong destination location scanned.'];
+            if ($parsed['resolved_type'] === 'location') {
+                if ((int) $parsed['resolved_id'] === (int) $task->destination_location_id) {
+                    return [true, "Destination location {$task->destinationLocation?->code} confirmed.", 'proceed'];
+                }
+                if ((int) $parsed['resolved_id'] === (int) $task->source_location_id) {
+                    return [false, "Scanned source location ({$task->sourceLocation?->code}), but Step 3 requires scanning the destination location ({$task->destinationLocation?->code}).", 'reject'];
+                }
+                $otherLoc = StorageLocation::find($parsed['resolved_id']);
+                $otherCode = $otherLoc?->code ?? $parsed['normalized'];
+
+                return [false, "Scanned location '{$otherCode}', but expected destination location '{$task->destinationLocation?->code}'.", 'reject'];
+            }
+
+            if (in_array($parsed['resolved_type'], ['item', 'batch'], true)) {
+                return [false, "Scanned product barcode ({$parsed['normalized']}). Step 3 requires scanning the destination location ({$task->destinationLocation?->code}) to confirm putaway.", 'reject'];
+            }
+
+            return [false, "Wrong destination location scanned. Expected: {$task->destinationLocation?->code}.", 'reject'];
         }
 
-        $validItem = ($parsed['resolved_type'] === 'item' && $parsed['resolved_id'] === $task->item_id)
-            || ($parsed['resolved_type'] === 'batch' && (int) $task->item_batch_id === (int) $parsed['resolved_id']);
-        if (! $validItem) {
-            return [false, 'Wrong product or lot scanned.'];
-        }
-        if ($task->batch && $parsed['batch'] && ! in_array($parsed['batch'], [$task->batch->batch_number, $task->batch->lot_number], true)) {
-            return [false, 'The scanned GS1 lot does not match the allocated lot.'];
-        }
-        if ($task->batch?->expiry_date && $parsed['expiry'] && $parsed['expiry'] !== $task->batch->expiry_date->toDateString()) {
-            return [false, 'The scanned GS1 expiry date does not match the allocated lot.'];
-        }
-        if ($task->item->is_serial_tracked) {
-            if (! $parsed['serial']) {
-                return [false, 'A GS1 serial number is required for this serialized item.'];
+        if ($expected === 'item') {
+            if ($parsed['resolved_type'] === 'location') {
+                $scannedLoc = StorageLocation::find($parsed['resolved_id']);
+                $locCode = $scannedLoc?->code ?? $parsed['normalized'];
+
+                return [false, "Scanned location '{$locCode}'. Step 2 requires scanning the product or GS1 barcode ({$task->item?->sku}).", 'reject'];
             }
-            $serialMatches = InventorySerial::query()
-                ->where('item_id', $task->item_id)
-                ->where('serial_number', $parsed['serial'])
-                ->when($task->item_batch_id, fn ($query) => $query->where('item_batch_id', $task->item_batch_id))
-                ->exists();
-            if (! $serialMatches) {
-                return [false, 'The scanned serial number is not registered for this item and lot.'];
+
+            $validItem = ($parsed['resolved_type'] === 'item' && (int) $parsed['resolved_id'] === (int) $task->item_id)
+                || ($parsed['resolved_type'] === 'batch' && (int) $task->item_batch_id === (int) $parsed['resolved_id']);
+            if (! $validItem) {
+                return [false, "Scanned product ({$parsed['normalized']}) does not match task item ({$task->item?->sku}).", 'reject'];
             }
+            if ($task->batch && $parsed['batch'] && ! in_array($parsed['batch'], [$task->batch->batch_number, $task->batch->lot_number], true)) {
+                return [false, "The scanned GS1 lot '{$parsed['batch']}' does not match the allocated lot '{$task->batch->batch_number}'.", 'reject'];
+            }
+            if ($task->batch?->expiry_date && $parsed['expiry'] && $parsed['expiry'] !== $task->batch->expiry_date->toDateString()) {
+                return [false, "The scanned GS1 expiry date '{$parsed['expiry']}' does not match the allocated lot expiry '{$task->batch->expiry_date->toDateString()}'.", 'reject'];
+            }
+            if ($task->item->is_serial_tracked) {
+                if (! $parsed['serial']) {
+                    return [false, 'A GS1 serial number is required for this serialized item.', 'reject'];
+                }
+                $serialMatches = InventorySerial::query()
+                    ->where('item_id', $task->item_id)
+                    ->where('serial_number', $parsed['serial'])
+                    ->when($task->item_batch_id, fn ($query) => $query->where('item_batch_id', $task->item_batch_id))
+                    ->exists();
+                if (! $serialMatches) {
+                    return [false, "The scanned serial number '{$parsed['serial']}' is not registered for this item and lot.", 'reject'];
+                }
+            }
+
+            return [true, "Product and applicable lot confirmed ({$task->item?->sku}).", 'proceed'];
         }
 
-        return [true, 'Product and applicable lot confirmed.'];
+        return [false, 'All required scans are already complete.', 'reject'];
+    }
+
+    /** Operator-facing instruction for the scan step the task is waiting on. */
+    private function scanPrompt(WarehouseTask $task, string $expected): string
+    {
+        return match ($expected) {
+            'source' => trim('Now scan the source location '.($task->sourceLocation?->code ?? '')).'.',
+            'destination' => trim('Now scan the destination location '.($task->destinationLocation?->code ?? '')).'.',
+            'item' => trim('Now scan the product '.($task->item?->sku ?? '')).'.',
+            default => 'All required scans are already done; post the quantity to complete.',
+        };
     }
 
     private function expectedScan(WarehouseTask $task, int $accepted): string

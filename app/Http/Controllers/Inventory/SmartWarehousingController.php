@@ -149,7 +149,7 @@ class SmartWarehousingController extends Controller implements HasMiddleware
 
     public function scanStation(): View
     {
-        $activeTasks = WarehouseTask::with(['item', 'batch', 'sourceLocation', 'destinationLocation', 'assignedTo'])
+        $activeTasks = WarehouseTask::with(['item', 'batch', 'sourceLocation', 'destinationLocation', 'assignedTo', 'scans'])
             ->whereIn('status', ['ready', 'assigned', 'in_progress', 'partially_completed'])
             ->orderBy('priority')
             ->latest()

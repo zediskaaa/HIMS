@@ -11,6 +11,7 @@
     </x-slot>
 
     <div class="py-6"><div class="mx-auto max-w-6xl space-y-6 sm:px-6 lg:px-8">
+        @if (session('notice'))<x-ui.alert variant="info">{{ session('notice') }}</x-ui.alert>@endif
         @if ($errors->any())<x-ui.alert variant="danger" title="Action blocked"><ul class="list-disc pl-5">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></x-ui.alert>@endif
 
         <div class="grid gap-6 lg:grid-cols-3">
@@ -47,28 +48,89 @@
             @if (in_array($warehouseTask->status, [\App\Enums\WarehouseTaskStatus::Ready, \App\Enums\WarehouseTaskStatus::Assigned, \App\Enums\WarehouseTaskStatus::PartiallyCompleted], true))
                 <x-ui.card title="Begin physical work"><form method="POST" action="{{ route('inventory.warehouse-tasks.start', $warehouseTask) }}">@csrf<x-ui.button type="submit">Start task</x-ui.button></form></x-ui.card>
             @elseif ($warehouseTask->status === \App\Enums\WarehouseTaskStatus::InProgress)
-                @php($acceptedScans = $warehouseTask->scans->where('outcome', 'accepted')->count())
-                @php($scanPrompts = match($warehouseTask->task_type) {
-                    \App\Enums\WarehouseTaskType::Pack => ['Scan product / GS1 code'],
-                    \App\Enums\WarehouseTaskType::Dispatch => ['Scan dispatch source', 'Scan product / GS1 code'],
-                    default => ['Scan source location', 'Scan product / GS1 code', 'Scan destination location'],
-                })
-                @php($prompt = $scanPrompts[$acceptedScans] ?? 'Required scans complete')
+                @php
+                    $acceptedScans = $warehouseTask->scans->where('outcome', 'accepted')->count();
+                    $scanPrompts = match($warehouseTask->task_type) {
+                        \App\Enums\WarehouseTaskType::Pack => ['Scan product / GS1 code'],
+                        \App\Enums\WarehouseTaskType::Dispatch => ['Scan dispatch source', 'Scan product / GS1 code'],
+                        default => ['Scan source location', 'Scan product / GS1 code', 'Scan destination location'],
+                    };
+                    $prompt = $scanPrompts[$acceptedScans] ?? 'Required scans complete';
+
+                    $sourceVal = $warehouseTask->sourceLocation?->barcode_value ?: ($warehouseTask->sourceLocation?->code ?? '');
+                    $itemVal = $warehouseTask->item?->barcode_value ?: ($warehouseTask->item?->sku ?? '');
+                    $destVal = $warehouseTask->destinationLocation?->barcode_value ?: ($warehouseTask->destinationLocation?->code ?? '');
+
+                    $targetCode = match($acceptedScans) {
+                        0 => $sourceVal,
+                        1 => $itemVal,
+                        2 => $destVal,
+                        default => '',
+                    };
+
+                    $labelService = app(\App\Services\Warehouse\WarehouseLabelService::class);
+                    $targetQr = $targetCode ? $labelService->qrDataUri($targetCode) : null;
+                @endphp
                 <x-ui.card title="Scan verification" :subtitle="$prompt">
-                    <form method="POST" action="{{ route('inventory.warehouse-tasks.scan', $warehouseTask) }}" class="flex flex-col gap-3 sm:flex-row">@csrf
-                        <input type="text" id="task_scan_input_{{ $warehouseTask->id }}" name="scan_value" required autofocus autocomplete="off" placeholder="Scan or type the identifier" class="min-w-0 flex-1 rounded-lg border-neutral-300 font-mono" aria-label="Warehouse scan value">
-                        <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::ulid() }}">
-                        <x-ui.camera-scanner
-                            id="camera-scanner-task-{{ $warehouseTask->id }}"
-                            target-input-id="task_scan_input_{{ $warehouseTask->id }}"
-                            button-text="Scan with Camera"
-                            button-variant="secondary"
-                            :auto-submit="true"
-                            title="Verify Task Step with Camera"
-                            hint="{{ $prompt }}"
-                        />
-                        <x-ui.button type="submit">Validate scan</x-ui.button>
-                    </form>
+                    <div x-data="{ showTargetQr: false }" class="space-y-4">
+                        @if($targetCode)
+                            <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-primary-50/70 border border-primary-200 px-4 py-3">
+                                <div>
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-primary-700">Currently Waiting For (Step {{ $acceptedScans + 1 }} of {{ count($scanPrompts) }}):</span>
+                                    <div class="font-mono text-base font-extrabold text-neutral-900 mt-0.5">{{ $targetCode }}</div>
+                                </div>
+                                @if($targetQr)
+                                    <button type="button" @click="showTargetQr = true" class="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-primary-700 border border-primary-300 shadow-sm hover:bg-primary-50">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                                        Show Target QR Code
+                                    </button>
+
+                                    {{-- Target QR Modal --}}
+                                    <div x-show="showTargetQr" @click.outside="showTargetQr = false" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                                        <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl text-center">
+                                            <h3 class="text-base font-bold text-neutral-900">Scan Target QR Code</h3>
+                                            <p class="mt-1 text-xs text-neutral-500">Step {{ $acceptedScans + 1 }}: {{ $prompt }}</p>
+                                            <div class="mt-4 flex justify-center">
+                                                <img src="{{ $targetQr }}" alt="Target QR" class="h-56 w-56 rounded-xl border border-neutral-200 p-2 shadow-sm bg-white">
+                                            </div>
+                                            <p class="mt-3 font-mono text-sm font-bold text-neutral-800">{{ $targetCode }}</p>
+                                            <button type="button" @click="showTargetQr = false" class="mt-5 w-full rounded-xl bg-neutral-800 py-2 text-sm font-semibold text-white hover:bg-neutral-900">
+                                                Close QR Code
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
+
+                        <form method="POST" action="{{ route('inventory.warehouse-tasks.scan', $warehouseTask) }}" class="flex flex-col gap-3 sm:flex-row">@csrf
+                            <input type="text" id="task_scan_input_{{ $warehouseTask->id }}" name="scan_value" required autofocus autocomplete="off" placeholder="{{ $targetCode ? 'Expecting: '.$targetCode : 'Scan or type the identifier' }}" class="min-w-0 flex-1 rounded-lg border-neutral-300 font-mono" aria-label="Warehouse scan value">
+                            <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::ulid() }}">
+                            <x-ui.camera-scanner
+                                id="camera-scanner-task-{{ $warehouseTask->id }}"
+                                target-input-id="task_scan_input_{{ $warehouseTask->id }}"
+                                button-text="Scan with Camera"
+                                button-variant="secondary"
+                                :auto-submit="true"
+                                title="Verify Task Step with Camera"
+                                hint="{{ $prompt }}. Aim camera at code {{ $targetCode }}."
+                            />
+                            <x-ui.button type="submit">Validate scan</x-ui.button>
+                        </form>
+
+                        @if($targetCode)
+                            <div class="flex items-center gap-2 pt-1">
+                                <span class="text-xs text-neutral-500">Quick Test:</span>
+                                <form method="POST" action="{{ route('inventory.warehouse-tasks.scan', $warehouseTask) }}" class="inline">
+                                    @csrf
+                                    <input type="hidden" name="scan_value" value="{{ $targetCode }}">
+                                    <button type="submit" class="rounded bg-primary-100 text-primary-800 px-2.5 py-1 text-xs font-mono font-bold hover:bg-primary-200">
+                                        Scan Expected ({{ $targetCode }})
+                                    </button>
+                                </form>
+                            </div>
+                        @endif
+                    </div>
                     <p class="mt-2 text-xs text-neutral-500">Identifiers stay as text so leading zeroes, separators, lots, and serials are preserved.</p>
                 </x-ui.card>
                 <x-ui.card title="Complete quantity" subtitle="Stock posts only after all required scans succeed.">
@@ -82,7 +144,7 @@
 
         <div class="grid gap-6 lg:grid-cols-2">
             <x-ui.card title="Scan history">
-                <div class="space-y-3">@forelse ($warehouseTask->scans as $scan)<div class="rounded-lg border border-neutral-200 p-3"><div class="flex justify-between gap-2"><span class="font-mono text-sm">{{ $scan->normalized_value }}</span><x-ui.badge :status="$scan->outcome">{{ ucfirst($scan->outcome) }}</x-ui.badge></div><p class="mt-1 text-xs text-neutral-600">{{ $scan->message }} · {{ $scan->created_at?->format('M j, Y g:i A') }}</p></div>@empty<p class="text-sm text-neutral-500">No scans recorded.</p>@endforelse</div>
+                <div class="space-y-3">@forelse ($warehouseTask->scans as $scan)<div class="rounded-lg border border-neutral-200 p-3"><div class="flex justify-between gap-2"><span class="font-mono text-sm">{{ $scan->normalized_value }}</span><x-ui.badge :status="$scan->outcome" :variant="$scan->outcome === 'identified' ? 'warning' : null">{{ ucfirst($scan->outcome) }}</x-ui.badge></div><p class="mt-1 text-xs text-neutral-600">{{ $scan->message }} · {{ $scan->created_at?->format('M j, Y g:i A') }}</p></div>@empty<p class="text-sm text-neutral-500">No scans recorded.</p>@endforelse</div>
             </x-ui.card>
             <x-ui.card title="Exceptions">
                 <div class="space-y-3">@forelse ($warehouseTask->exceptions as $exception)<div class="rounded-lg border border-rose-200 bg-rose-50 p-3"><p class="font-mono text-xs font-semibold text-rose-800">{{ $exception->exception_number }}</p><p class="text-sm font-semibold text-rose-900">{{ str($exception->exception_type)->replace('_', ' ')->title() }}</p><p class="text-sm text-rose-800">{{ $exception->details }}</p>@can(\App\Enums\Permission::ResolveWarehouseExceptions->value)@if($exception->status !== 'resolved')<form method="POST" action="{{ route('inventory.warehouse-exceptions.resolve', $exception) }}" class="mt-3 space-y-2">@csrf<textarea name="resolution" required maxlength="2000" rows="2" class="w-full rounded-lg border-rose-300" placeholder="Investigation and resolution"></textarea><x-ui.button type="submit" size="sm">Resolve</x-ui.button></form>@endif @endcan</div>@empty<p class="text-sm text-neutral-500">No exceptions recorded.</p>@endforelse</div>

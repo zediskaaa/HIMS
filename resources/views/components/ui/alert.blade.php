@@ -1,6 +1,7 @@
 @props([
     'variant' => 'info',
     'title' => null,
+    'message' => null,
     'dismissible' => false,
 ])
 
@@ -25,7 +26,7 @@
         @if ($title)
             <p class="font-semibold">{{ $title }}</p>
         @endif
-        <div class="{{ $title ? 'mt-0.5' : '' }}">{{ $slot }}</div>
+        <div class="{{ $title ? 'mt-0.5' : '' }}">{{ trim($slot) !== '' ? $slot : $message }}</div>
     </div>
 
     @if ($dismissible)

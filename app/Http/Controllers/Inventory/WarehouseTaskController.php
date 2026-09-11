@@ -127,7 +127,14 @@ class WarehouseTaskController extends Controller implements HasMiddleware
         ]);
         try {
             $scan = $this->tasks->scan($warehouseTask, $validated['scan_value'], $request->user(), $validated['idempotency_key'] ?? null);
-            return back()->with($scan->outcome === 'accepted' ? 'success' : 'error', $scan->message);
+
+            // An identification scan (the task's own label) is acknowledged without
+            // being dressed up as a failure or a completed step.
+            return match ($scan->outcome) {
+                'accepted' => back()->with('success', $scan->message),
+                'identified' => back()->with('notice', $scan->message),
+                default => back()->with('error', $scan->message),
+            };
         } catch (DomainException $exception) {
             return back()->withErrors(['scan' => $exception->getMessage()]);
         }

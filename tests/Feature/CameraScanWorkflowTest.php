@@ -171,6 +171,42 @@ class CameraScanWorkflowTest extends TestCase
         $this->assertSame(WarehouseTaskStatus::Completed, $task->fresh()->status);
     }
 
+    public function test_scanning_the_task_label_identifies_the_job_without_raising_an_exception(): void
+    {
+        $operator = User::factory()->warehouseStaff()->create();
+        [$source, $destination, $item, $batch] = $this->seedTaskPrerequisites();
+
+        $service = app(WarehouseTaskService::class);
+        $task = $service->create([
+            'task_type' => WarehouseTaskType::Move,
+            'priority' => 'normal',
+            'source_location_id' => $source->id,
+            'destination_location_id' => $destination->id,
+            'item_id' => $item->id,
+            'item_batch_id' => $batch->id,
+            'requested_quantity' => 5,
+            'assigned_to_id' => $operator->id,
+        ], $operator);
+
+        $service->start($task, $operator);
+
+        $identification = $service->scan($task, $task->task_number, $operator, 'scan-task-label');
+        $this->assertSame('identified', $identification->outcome);
+        $this->assertStringContainsString($task->task_number, (string) $identification->message);
+        $this->assertStringContainsString($source->code, (string) $identification->message);
+        $this->assertDatabaseMissing('warehouse_exceptions', ['warehouse_task_id' => $task->id]);
+
+        // The identification scan must not consume a step: the source still comes first
+        // and is accepted under sequence number 1.
+        $this->assertSame('accepted', $service->scan($task, $source->barcode_value, $operator, 'scan-source')->outcome);
+        $this->assertDatabaseHas('warehouse_scan_events', [
+            'warehouse_task_id' => $task->id,
+            'raw_value' => $source->barcode_value,
+            'outcome' => 'accepted',
+            'sequence_number' => 1,
+        ]);
+    }
+
     public function test_invalid_barcode_scan_records_exception_and_error_feedback(): void
     {
         $operator = User::factory()->warehouseStaff()->create();
@@ -293,5 +329,31 @@ class CameraScanWorkflowTest extends TestCase
         $dmResult = $barcodeService->parseAndResolve(']d2010480123456789710LOT-2026-X1');
         $this->assertSame('item', $dmResult['resolved_type']);
         $this->assertSame($item->id, $dmResult['resolved_id']);
+    }
+
+    public function test_smart_warehousing_dashboard_renders_with_scan_events(): void
+    {
+        $operator = User::factory()->warehouseStaff()->create();
+        [$source, $destination, $item, $batch] = $this->seedTaskPrerequisites();
+
+        $service = app(WarehouseTaskService::class);
+        $task = $service->create([
+            'task_type' => WarehouseTaskType::Move,
+            'priority' => 'normal',
+            'source_location_id' => $source->id,
+            'destination_location_id' => $destination->id,
+            'item_id' => $item->id,
+            'item_batch_id' => $batch->id,
+            'requested_quantity' => 5,
+            'assigned_to_id' => $operator->id,
+        ], $operator);
+
+        $service->start($task, $operator);
+        $service->scan($task, $source->barcode_value, $operator);
+
+        $response = $this->actingAs($operator)->get(route('inventory.warehousing.dashboard'));
+        $response->assertOk()
+            ->assertSee('Smart Warehousing System (SWS)')
+            ->assertSee($source->barcode_value);
     }
 }
