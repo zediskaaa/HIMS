@@ -899,4 +899,19 @@ class UserManagementTest extends TestCase
         $this->actingAs(User::factory()->warehouseStaff()->create())->get('/dashboard')
             ->assertDontSee('User Management');
     }
+
+    public function test_user_management_renders_role_permissions_modal_and_compact_reference(): void
+    {
+        $admin = $this->admin();
+
+        $response = $this->actingAs($admin)->get('/admin/users');
+
+        $response->assertStatus(200)
+            ->assertSee('Role Permissions Reference')
+            ->assertSee('View Role Permissions')
+            ->assertSee('role-permissions-modal')
+            ->assertSee('Super Administrator')
+            ->assertSee('Runs the storeroom: items, procurement, forecasts.');
+    }
 }
+

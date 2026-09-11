@@ -73,9 +73,20 @@
         title="Accounts"
         :subtitle="$users->total().' '.\Illuminate\Support\Str::plural('account', $users->total())"
         :padding="false">
+        <x-slot:actions>
+            <x-ui.button
+                type="button"
+                variant="secondary"
+                size="sm"
+                icon="shield-check"
+                x-data
+                x-on:click="$dispatch('open-modal', 'role-permissions-modal')">
+                View Role Permissions
+            </x-ui.button>
+        </x-slot:actions>
 
-        {{-- Mobile card view (visible on small mobile screens) --}}
-        <div class="sm:hidden divide-y divide-neutral-200">
+        {{-- Mobile & Tablet card view (visible on screens below lg / 1024px) --}}
+        <div class="lg:hidden divide-y divide-neutral-200">
             @forelse ($users as $account)
                 @php($nameComponents = $account->nameComponents())
                 <div class="p-4 space-y-3">
@@ -131,7 +142,7 @@
                         </div>
                     </div>
 
-                    {{-- Actions on mobile: neatly arranged and fully accessible --}}
+                    {{-- Actions on mobile/tablet: neatly arranged and fully accessible --}}
                     <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-100">
                         @if (in_array($account->getKey(), $manageableAccountIds, true))
                             <x-ui.button variant="secondary" size="sm"
@@ -187,32 +198,32 @@
             @endforelse
         </div>
 
-        {{-- Desktop/Tablet table view with sticky Actions column --}}
-        <div class="hidden sm:block">
-            <x-ui.table>
+        {{-- Desktop table view (visible on screens lg / 1024px and wider) --}}
+        <div class="hidden lg:block">
+            <x-ui.table :sticky-header="false">
                 <x-ui.table.head>
-                    <x-ui.table.th>Employee ID</x-ui.table.th>
-                    <x-ui.table.th>Surname</x-ui.table.th>
-                    <x-ui.table.th>First Name</x-ui.table.th>
-                    <x-ui.table.th>Middle Name</x-ui.table.th>
-                    <x-ui.table.th>Department</x-ui.table.th>
-                    <x-ui.table.th>Contact Number</x-ui.table.th>
-                    <x-ui.table.th>Role</x-ui.table.th>
-                    <x-ui.table.th>Status</x-ui.table.th>
-                    <x-ui.table.th>Last Sign-in</x-ui.table.th>
-                    <x-ui.table.th align="right" class="hims-sticky-actions min-w-[200px]">Actions</x-ui.table.th>
+                    <x-ui.table.th class="px-3 py-3 w-24">Employee ID</x-ui.table.th>
+                    <x-ui.table.th class="px-3 py-3 min-w-[130px]">Surname</x-ui.table.th>
+                    <x-ui.table.th class="px-3 py-3 min-w-[150px]">First Name</x-ui.table.th>
+                    <x-ui.table.th class="px-3 py-3 w-24">Middle Name</x-ui.table.th>
+                    <x-ui.table.th class="px-3 py-3">Department</x-ui.table.th>
+                    <x-ui.table.th class="px-3 py-3 whitespace-nowrap">Contact Number</x-ui.table.th>
+                    <x-ui.table.th class="px-3 py-3">Role</x-ui.table.th>
+                    <x-ui.table.th class="px-3 py-3">Status</x-ui.table.th>
+                    <x-ui.table.th class="px-3 py-3 w-28">Last Sign-in</x-ui.table.th>
+                    <x-ui.table.th align="right" class="px-3 py-3 min-w-[125px]">Actions</x-ui.table.th>
                 </x-ui.table.head>
                 <tbody>
                     @forelse ($users as $account)
                         @php($nameComponents = $account->nameComponents())
                         <x-ui.table.row>
-                            <x-ui.table.td muted>
+                            <x-ui.table.td muted class="px-3 py-2.5 whitespace-nowrap">
                                 <span class="font-mono text-xs">{{ $account->employee_id ?? '—' }}</span>
                             </x-ui.table.td>
 
-                            <x-ui.table.td>
-                                <div class="flex items-center gap-2.5">
-                                    <span class="flex items-center justify-center w-8 h-8 rounded-full shrink-0
+                            <x-ui.table.td class="px-3 py-2.5">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="flex items-center justify-center w-7 h-7 rounded-full shrink-0
                                                  text-xs font-semibold
                                                  {{ $account->isActive() ? 'bg-primary-50 text-primary-700' : 'bg-neutral-100 text-neutral-400' }}">
                                         {{ $account->initials() }}
@@ -220,53 +231,58 @@
                                     <div class="min-w-0">
                                         <a href="{{ route('admin.users.show', $account) }}"
                                            title="{{ $account->name }}"
-                                           class="font-medium text-neutral-900 hover:text-primary-700 hover:underline">
+                                           class="font-medium text-neutral-900 hover:text-primary-700 hover:underline truncate block">
                                             {{ $nameComponents['surname'] ?? $account->name }}
                                         </a>
                                         @if ($account->is(auth()->user()))
-                                            <span class="ml-1 text-[11px] font-medium text-neutral-400">(you)</span>
+                                            <span class="text-[11px] font-medium text-neutral-400 block -mt-0.5">(you)</span>
                                         @endif
                                     </div>
                                 </div>
                             </x-ui.table.td>
 
-                            <x-ui.table.td>
-                                <span class="text-neutral-900">{{ $nameComponents['first_name'] ?? '—' }}</span>
-                                <span class="block text-xs text-neutral-500 truncate">{{ $account->email }}</span>
+                            <x-ui.table.td class="px-3 py-2.5 min-w-0">
+                                <span class="text-neutral-900 block truncate">{{ $nameComponents['first_name'] ?? '—' }}</span>
+                                <span class="block text-xs text-neutral-500 truncate max-w-[140px] xl:max-w-[190px]" title="{{ $account->email }}">{{ $account->email }}</span>
                             </x-ui.table.td>
 
-                            <x-ui.table.td muted>{{ $nameComponents['middle_name'] ?? '—' }}</x-ui.table.td>
+                            <x-ui.table.td muted class="px-3 py-2.5 truncate max-w-[100px]">{{ $nameComponents['middle_name'] ?? '—' }}</x-ui.table.td>
 
-                            <x-ui.table.td muted>{{ $account->department ?? '—' }}</x-ui.table.td>
+                            <x-ui.table.td muted class="px-3 py-2.5 truncate max-w-[130px]">{{ $account->department ?? '—' }}</x-ui.table.td>
 
-                            <x-ui.table.td muted>{{ $account->phone ?? '—' }}</x-ui.table.td>
+                            <x-ui.table.td muted class="px-3 py-2.5 whitespace-nowrap font-mono text-xs">{{ $account->phone ?? '—' }}</x-ui.table.td>
 
-                            <x-ui.table.td>
+                            <x-ui.table.td class="px-3 py-2.5 whitespace-nowrap">
                                 <x-ui.badge :variant="$account->isAdministrator() ? 'primary' : 'neutral'">
                                     {{ $account->role->label() }}
                                 </x-ui.badge>
                             </x-ui.table.td>
 
-                            <x-ui.table.td>
+                            <x-ui.table.td class="px-3 py-2.5">
                                 <x-ui.badge :status="$account->status->value" dot>
                                     {{ $account->status->label() }}
                                 </x-ui.badge>
                                 @if ($account->isTemporarilyLocked())
-                                    <x-ui.badge variant="warning" class="mt-1">Temporarily Locked</x-ui.badge>
-                                    <span class="mt-1 block whitespace-nowrap text-xs text-neutral-500">
-                                        Until {{ $account->login_locked_until->timezone(config('app.timezone'))->format('M d, Y g:i A') }}
+                                    <x-ui.badge variant="warning" class="mt-1">Locked</x-ui.badge>
+                                    <span class="mt-0.5 block text-[11px] text-neutral-500">
+                                        Until {{ $account->login_locked_until->timezone(config('app.timezone'))->format('M d, g:i A') }}
                                     </span>
                                 @endif
                             </x-ui.table.td>
 
-                            <x-ui.table.td muted>
-                                {{ $account->last_login_at?->format('M d, Y g:i A') ?? 'Never' }}
+                            <x-ui.table.td muted class="px-3 py-2.5 whitespace-nowrap">
+                                @if ($account->last_login_at)
+                                    <span class="block text-xs text-neutral-800">{{ $account->last_login_at->format('M d, Y') }}</span>
+                                    <span class="block text-[11px] text-neutral-400">{{ $account->last_login_at->format('g:i A') }}</span>
+                                @else
+                                    <span class="text-xs text-neutral-400">Never</span>
+                                @endif
                             </x-ui.table.td>
 
-                            <x-ui.table.td align="right" class="hims-sticky-actions min-w-[200px]">
-                                <div class="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                            <x-ui.table.td align="right" class="px-3 py-2.5 min-w-[125px]">
+                                <div class="flex items-center justify-end gap-1 whitespace-nowrap">
                                     @if (in_array($account->getKey(), $manageableAccountIds, true))
-                                        <x-ui.button variant="ghost" size="sm"
+                                        <x-ui.button variant="ghost" size="sm" class="px-2 py-1"
                                                      :href="route('admin.users.edit', $account)">
                                             Edit
                                         </x-ui.button>
@@ -281,6 +297,7 @@
                                                 <x-ui.button
                                                     type="submit"
                                                     size="sm"
+                                                    class="px-2 py-1"
                                                     data-loading-text="Unlocking account...">
                                                     Unlock
                                                 </x-ui.button>
@@ -299,6 +316,7 @@
                                                 <x-ui.button
                                                     type="submit"
                                                     size="sm"
+                                                    class="px-2 py-1"
                                                     data-loading-text="Updating account..."
                                                     :variant="$account->isActive() ? 'secondary' : 'primary'">
                                                     {{ $account->isActive() ? 'Deactivate' : 'Reactivate' }}
@@ -331,29 +349,94 @@
         @endif
     </x-ui.card>
 
-    {{-- Shown on the list itself so the role names on each row are not
-         opaque to whoever is assigning them. --}}
-    <x-ui.card title="What Each Role Can Do"
-               subtitle="Permissions are attached to roles, not to individual people.">
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {{-- Compact Role Permissions Reference --}}
+    <x-ui.card>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-start sm:items-center gap-3 min-w-0">
+                <span class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary-50 text-primary-600 shrink-0">
+                    <x-ui.icon name="shield-check" class="w-5 h-5" />
+                </span>
+                <div class="min-w-0">
+                    <h3 class="text-sm font-semibold text-neutral-900">Role Permissions Reference</h3>
+                    <p class="text-xs text-neutral-500">
+                        Permissions are attached to system roles, not individual staff accounts. View what each role is authorized to do.
+                    </p>
+                </div>
+            </div>
+            <div class="shrink-0">
+                <x-ui.button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    icon="shield-check"
+                    x-data
+                    x-on:click="$dispatch('open-modal', 'role-permissions-modal')">
+                    View Role Permissions
+                </x-ui.button>
+            </div>
+        </div>
+    </x-ui.card>
+
+    {{-- Role Permissions Interactive Modal --}}
+    <x-ui.modal name="role-permissions-modal" title="Role Capabilities & Permissions" maxWidth="2xl">
+        <div x-data="{ activeRole: '{{ \App\Enums\UserRole::SuperAdministrator->value }}' }" class="space-y-4">
+            {{-- Role selector tabs --}}
+            <div>
+                <p class="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">Select a Role</p>
+                <div class="flex flex-wrap gap-1.5 border-b border-neutral-200 pb-3">
+                    @foreach (\App\Enums\UserRole::cases() as $role)
+                        <button
+                            type="button"
+                            x-on:click="activeRole = '{{ $role->value }}'"
+                            :class="activeRole === '{{ $role->value }}'
+                                ? 'bg-primary-50 text-primary-700 border-primary-300 font-semibold shadow-xs'
+                                : 'bg-neutral-50 text-neutral-600 border-neutral-200 hover:bg-neutral-100 hover:text-neutral-900'"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs transition-colors">
+                            <span>{{ $role->label() }}</span>
+                            <span
+                                :class="activeRole === '{{ $role->value }}' ? 'bg-primary-200 text-primary-800' : 'bg-neutral-200 text-neutral-600'"
+                                class="rounded-full px-1.5 py-0.2 text-[10px] font-mono">
+                                {{ count($role->permissions()) }}
+                            </span>
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+
+            {{-- Role detail panels --}}
             @foreach (\App\Enums\UserRole::cases() as $role)
-                <div class="rounded-md border border-neutral-200 p-4">
-                    <div class="flex items-center gap-2">
-                        <x-ui.badge :variant="$role->isAdministrator() ? 'primary' : 'neutral'">
-                            {{ $role->label() }}
-                        </x-ui.badge>
+                <div x-show="activeRole === '{{ $role->value }}'" x-cloak class="space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <x-ui.badge :variant="$role->isAdministrator() ? 'primary' : 'neutral'">
+                                    {{ $role->label() }}
+                                </x-ui.badge>
+                                <span class="text-xs text-neutral-500 font-mono">{{ count($role->permissions()) }} granted permissions</span>
+                            </div>
+                            <p class="mt-1 text-xs text-neutral-600">{{ $role->description() }}</p>
+                        </div>
                     </div>
-                    <p class="mt-2 text-xs text-neutral-500">{{ $role->description() }}</p>
-                    <ul class="mt-3 space-y-1">
-                        @foreach ($role->permissions() as $permission)
-                            <li class="flex items-start gap-1.5 text-xs text-neutral-600">
-                                <x-ui.icon name="check-circle" class="w-3.5 h-3.5 mt-px shrink-0 text-success-600" />
-                                {{ $permission->label() }}
-                            </li>
-                        @endforeach
-                    </ul>
+
+                    <div>
+                        <h4 class="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2">Granted Permissions</h4>
+                        <ul class="grid gap-2 sm:grid-cols-2 text-xs text-neutral-700 max-h-[50vh] overflow-y-auto pr-1">
+                            @foreach ($role->permissions() as $permission)
+                                <li class="flex items-start gap-2 p-2 rounded-md bg-white border border-neutral-100 hover:border-neutral-200 transition-colors">
+                                    <x-ui.icon name="check-circle" class="w-4 h-4 mt-0.5 shrink-0 text-success-600" />
+                                    <span class="leading-tight">{{ $permission->label() }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
                 </div>
             @endforeach
         </div>
-    </x-ui.card>
+
+        <x-slot:footer>
+            <x-ui.button type="button" variant="secondary" x-data x-on:click="$dispatch('close-modal', 'role-permissions-modal')">
+                Close
+            </x-ui.button>
+        </x-slot:footer>
+    </x-ui.modal>
 </x-app-layout>
