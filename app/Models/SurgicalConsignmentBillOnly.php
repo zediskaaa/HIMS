@@ -54,6 +54,11 @@ class SurgicalConsignmentBillOnly extends Model
         return $this->belongsTo(StorageLocation::class, 'storage_location_id');
     }
 
+    public function storageLocation(): BelongsTo
+    {
+        return $this->belongsTo(StorageLocation::class, 'storage_location_id');
+    }
+
     public function purchaseRequest(): BelongsTo
     {
         return $this->belongsTo(PurchaseRequest::class, 'purchase_request_id');

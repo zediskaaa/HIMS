@@ -49,6 +49,11 @@ class MaterialRequisitionLine extends Model
         return $this->belongsTo(StorageLocation::class, 'storage_location_id');
     }
 
+    public function storageLocation(): BelongsTo
+    {
+        return $this->belongsTo(StorageLocation::class, 'storage_location_id');
+    }
+
     public function unfulfilledQuantity(): int
     {
         return max(0, $this->requested_quantity - $this->issued_quantity);

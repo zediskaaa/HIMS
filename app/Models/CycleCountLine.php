@@ -48,6 +48,11 @@ class CycleCountLine extends Model
         return $this->belongsTo(StorageLocation::class, 'storage_location_id');
     }
 
+    public function storageLocation(): BelongsTo
+    {
+        return $this->belongsTo(StorageLocation::class, 'storage_location_id');
+    }
+
     public function batch(): BelongsTo
     {
         return $this->belongsTo(ItemBatch::class, 'item_batch_id');

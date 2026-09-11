@@ -17,6 +17,7 @@ class WarehouseException extends Model
 
     public function task(): BelongsTo { return $this->belongsTo(WarehouseTask::class, 'warehouse_task_id'); }
     public function location(): BelongsTo { return $this->belongsTo(StorageLocation::class, 'storage_location_id'); }
+    public function storageLocation(): BelongsTo { return $this->belongsTo(StorageLocation::class, 'storage_location_id'); }
     public function item(): BelongsTo { return $this->belongsTo(InventoryItem::class); }
     public function raisedBy(): BelongsTo { return $this->belongsTo(User::class, 'raised_by_id'); }
     public function assignedTo(): BelongsTo { return $this->belongsTo(User::class, 'assigned_to_id'); }

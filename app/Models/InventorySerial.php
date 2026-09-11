@@ -13,5 +13,6 @@ class InventorySerial extends Model
     public function item(): BelongsTo { return $this->belongsTo(InventoryItem::class); }
     public function batch(): BelongsTo { return $this->belongsTo(ItemBatch::class, 'item_batch_id'); }
     public function location(): BelongsTo { return $this->belongsTo(StorageLocation::class, 'storage_location_id'); }
+    public function storageLocation(): BelongsTo { return $this->belongsTo(StorageLocation::class, 'storage_location_id'); }
     public function source(): MorphTo { return $this->morphTo(); }
 }

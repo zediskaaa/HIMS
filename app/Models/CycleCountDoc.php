@@ -42,6 +42,11 @@ class CycleCountDoc extends Model
         return $this->belongsTo(StorageLocation::class, 'storage_location_id');
     }
 
+    public function storageLocation(): BelongsTo
+    {
+        return $this->belongsTo(StorageLocation::class, 'storage_location_id');
+    }
+
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by_id');

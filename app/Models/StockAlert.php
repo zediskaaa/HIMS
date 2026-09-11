@@ -53,6 +53,11 @@ class StockAlert extends Model
         return $this->belongsTo(StorageLocation::class, 'storage_location_id');
     }
 
+    public function storageLocation(): BelongsTo
+    {
+        return $this->belongsTo(StorageLocation::class, 'storage_location_id');
+    }
+
     public function acknowledgedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'acknowledged_by');

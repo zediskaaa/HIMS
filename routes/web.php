@@ -190,6 +190,7 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::get('/inventory/stock', [InventoryController::class, 'stock'])->name('inventory.stock');
     Route::get('/inventory/alerts', [InventoryController::class, 'alerts'])->name('inventory.alerts');
     Route::get('/inventory/reports', [ReportController::class, 'index'])->name('inventory.reports');
+    Route::get('/inventory/reports/generate', [ReportController::class, 'generate'])->name('inventory.reports.generate');
 
     // Demand Forecasting. Reading the forecast needs view_reports; saving a
     // plan needs generate_forecasts. Both are declared on the controller.

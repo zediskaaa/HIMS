@@ -36,6 +36,11 @@ class IoTTelemetryLog extends Model
         return $this->belongsTo(StorageLocation::class, 'storage_location_id');
     }
 
+    public function storageLocation(): BelongsTo
+    {
+        return $this->belongsTo(StorageLocation::class, 'storage_location_id');
+    }
+
     public function isExcursion(): bool
     {
         return $this->excursion_status === 'excursion';

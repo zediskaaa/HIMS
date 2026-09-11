@@ -5,46 +5,325 @@
 <x-app-layout>
     <x-ui.page-header
         title="Reports & Analytics"
-        :subtitle="($canViewFinancialData ? 'Inventory valuation, stock status, procurement spend and movement history' : 'Stock status and movement history').' for the '.$period['days'].'-day window ending '.$period['to']->format('M d, Y').'.'"
+        :subtitle="($canViewFinancialData ? 'Inventory valuation, stock status, procurement spend and movement history' : 'Stock status and movement history').' for the '.(!empty($period['is_custom']) ? 'custom date range '.$period['from']->format('M d, Y').' — '.$period['to']->format('M d, Y') : $period['days'].'-day window ending '.$period['to']->format('M d, Y')).'.'"
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Reports' => null]">
         <x-slot name="actions">
-            {{-- Print rather than a CSV export: the panel and the hospital both
-                 want a page that can be signed, and printing needs no new route
-                 and no new dependency. --}}
             <x-ui.button variant="secondary" icon="document-text"
                          onclick="window.print()" class="print:hidden">
                 Print
             </x-ui.button>
+            <x-ui.button icon="arrow-down-tray" class="print:hidden"
+                         onclick="document.getElementById('report-generator')?.scrollIntoView({behavior: 'smooth'})">
+                Generate Report
+            </x-ui.button>
         </x-slot>
     </x-ui.page-header>
 
-    {{--
-        One window drives every dated section on the page — spend, movement
-        activity, consumption. The valuation and stock-status figures below are
-        a position as of now and deliberately ignore it: "what we hold" is not
-        a date range.
-    --}}
-    <x-ui.card class="print:hidden">
-        <form method="GET" action="{{ route('inventory.reports') }}"
-              class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div class="w-full sm:max-w-xs">
-                <x-ui.field
-                    name="days"
-                    label="Reporting Period"
-                    type="select"
-                    :value="$period['days']"
-                    :options="$periodOptions"
-                    :hint="$period['from']->format('M d, Y').' — '.$period['to']->format('M d, Y')" />
-            </div>
+    {{-- ------------------------------------------------ Integrated Full-Width Report Generator & Controls --}}
+    <div id="report-generator"
+         x-data="reportGenerator({
+             initialPeriod: '{{ $currentPeriod }}',
+             initialFrom: '{{ $currentFrom ?? $period['from']->format('Y-m-d') }}',
+             initialTo: '{{ $currentTo ?? $period['to']->format('Y-m-d') }}',
+             initialReportType: 'stock_status',
+             generateUrl: '{{ route('inventory.reports.generate') }}',
+             dashboardUrl: '{{ route('inventory.reports') }}',
+             todayDate: '{{ now()->format('Y-m-d') }}',
+             canViewFinancial: @json($canViewFinancialData)
+         })"
+         class="print:hidden">
+        <x-ui.card>
+            <div class="space-y-4">
+                {{-- Header: Title, Active Mode Badge, and Reset --}}
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-neutral-100">
+                    <div>
+                        <h2 class="text-sm font-bold text-neutral-900 flex items-center gap-2">
+                            <x-ui.icon name="document-chart-bar" class="w-4 h-4 text-primary-600" />
+                            <span>Report Generator & Timeline Controls</span>
+                        </h2>
+                        <p class="text-xs text-neutral-500 mt-0.5">
+                            Customize report parameters, filter data by real clinical records, and export across multiple formats.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2.5">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-primary-50 text-primary-700 border border-primary-100">
+                            <span class="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse"></span>
+                            <span>Live Database Aggregation</span>
+                        </span>
+                        <button type="button" @click="resetFilters()"
+                                class="text-xs text-neutral-500 hover:text-neutral-800 underline font-medium transition-colors">
+                            Reset Defaults
+                        </button>
+                    </div>
+                </div>
 
-            <div class="flex items-center gap-2 pb-0.5">
-                <x-ui.button type="submit" icon="magnifying-glass">Apply</x-ui.button>
-                @if ($period['days'] !== \App\Services\InventoryReportService::DEFAULT_PERIOD_DAYS)
-                    <x-ui.button variant="secondary" :href="route('inventory.reports')">Reset</x-ui.button>
-                @endif
+                {{-- Feedback / Alert Banners --}}
+                <div x-show="errorMessage" x-cloak
+                     class="flex items-start gap-2.5 p-3 rounded-lg bg-danger-50 border border-danger-200 text-danger-800 text-xs transition-all">
+                    <x-ui.icon name="exclamation-circle" class="w-4 h-4 text-danger-600 shrink-0 mt-0.5" />
+                    <div class="flex-1 font-medium" x-text="errorMessage"></div>
+                    <button type="button" @click="errorMessage = ''" class="text-danger-500 hover:text-danger-700">
+                        <x-ui.icon name="x-mark" class="w-3.5 h-3.5" />
+                    </button>
+                </div>
+
+                <div x-show="successMessage" x-cloak
+                     class="flex items-start gap-2.5 p-3 rounded-lg bg-success-50 border border-success-200 text-success-800 text-xs transition-all">
+                    <x-ui.icon name="check-circle" class="w-4 h-4 text-success-600 shrink-0 mt-0.5" />
+                    <div class="flex-1 font-medium" x-text="successMessage"></div>
+                    <button type="button" @click="successMessage = ''" class="text-success-500 hover:text-success-700">
+                        <x-ui.icon name="x-mark" class="w-3.5 h-3.5" />
+                    </button>
+                </div>
+
+                {{-- Row 1: Primary Controls (Scope, Timeline, Custom Date Range) --}}
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-3 lg:gap-4 items-end">
+                    {{-- 1. Report Type Selection --}}
+                    <div class="md:col-span-6 lg:col-span-4">
+                        <label class="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                            <span>1. Report Module <span class="text-danger-500">*</span></span>
+                            <span class="text-[10px] text-neutral-400 font-normal">10 modules</span>
+                        </label>
+                        <select x-model="reportType" @change="onReportTypeChange()"
+                                class="w-full text-xs font-semibold rounded-lg border-neutral-300 bg-white py-2 focus:border-primary-500 focus:ring-primary-500 shadow-sm text-neutral-900">
+                            <optgroup label="Complete Dossier">
+                                <option value="all">⭐ All Reports (Complete Hospital Dossier)</option>
+                            </optgroup>
+                            <optgroup label="Stock & Valuation">
+                                <option value="stock_status">Stock Status & Health</option>
+                                <option value="valuation">Inventory Valuation by Category</option>
+                                <option value="stock_by_location">Stock Distribution by Storage Location</option>
+                                <option value="expiry_exposure">Expiry Exposure & Risk Batches</option>
+                            </optgroup>
+                            <optgroup label="Movements & Consumption">
+                                <option value="movement_history">Stock Movement History & Ledger</option>
+                                <option value="most_consumed">Most Consumed Items (Usage Velocity)</option>
+                                <option value="movements_by_type">Activity by Movement Type</option>
+                            </optgroup>
+                            @if ($canViewFinancialData)
+                            <optgroup label="Procurement & Financial (Protected)">
+                                <option value="procurement_expense">Procurement Expense Breakdown</option>
+                                <option value="spend_by_supplier">Spend by Supplier & Fulfilment</option>
+                            </optgroup>
+                            @endif
+                        </select>
+                    </div>
+
+                    {{-- 2. Reporting Period / Timeline --}}
+                    <div class="md:col-span-6 lg:col-span-3">
+                        <label class="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                            <span>2. Timeline / Window <span class="text-danger-500">*</span></span>
+                            <span class="text-[10px] text-neutral-400 font-normal">Presets & Custom</span>
+                        </label>
+                        <select x-model="period" @change="onPeriodChange()"
+                                class="w-full text-xs font-medium rounded-lg border-neutral-300 bg-white py-2 focus:border-primary-500 focus:ring-primary-500 shadow-sm text-neutral-900">
+                            <option value="1">Today</option>
+                            <option value="7">Last 7 days</option>
+                            <option value="30">Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                            <option value="365">Last 12 months</option>
+                            <option value="all">All time</option>
+                            <option value="custom">📅 Custom Date Range...</option>
+                        </select>
+                    </div>
+
+                    {{-- 3. Custom Date Range Pickers OR Timeline Active Window Badge --}}
+                    <div class="md:col-span-12 lg:col-span-5">
+                        <div x-show="period === 'custom'" x-cloak class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs font-medium text-neutral-700 mb-1 flex items-center justify-between">
+                                    <span>From Date</span>
+                                    <span class="text-[10px] text-neutral-400 font-normal">start</span>
+                                </label>
+                                <input type="date" x-model="fromDate" max="{{ now()->format('Y-m-d') }}"
+                                       class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1.5 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-neutral-700 mb-1 flex items-center justify-between">
+                                    <span>To Date</span>
+                                    <span class="text-[10px] text-neutral-400 font-normal">end</span>
+                                </label>
+                                <input type="date" x-model="toDate" max="{{ now()->format('Y-m-d') }}"
+                                       class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1.5 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
+                            </div>
+                        </div>
+
+                        <div x-show="period !== 'custom'"
+                             class="flex items-center justify-between p-2 rounded-lg bg-neutral-50 border border-neutral-200">
+                            <div class="flex items-center gap-2">
+                                <x-ui.icon name="calendar" class="w-4 h-4 text-primary-600 shrink-0" />
+                                <div>
+                                    <div class="text-[11px] font-semibold text-neutral-800" x-text="computedWindowText"></div>
+                                    <div class="text-[10px] text-neutral-500">
+                                        <span x-show="isPointInTimeReport()">Point-in-time catalogue snapshot (Dates apply to audit/history)</span>
+                                        <span x-show="!isPointInTimeReport()">Historical transaction boundaries</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <span class="text-[10px] font-medium px-2 py-0.5 rounded bg-white border border-neutral-200 text-neutral-600">
+                                Active Window
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Row 2: Dynamic Filters & Sorting (Only applicable fields shown) --}}
+                <div class="pt-3 border-t border-neutral-100">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-neutral-700 uppercase tracking-wider flex items-center gap-1.5">
+                            <x-ui.icon name="funnel" class="w-3.5 h-3.5 text-primary-600" />
+                            <span>3. Dynamic Filters & Sorting</span>
+                        </span>
+                        <span class="text-[11px] text-neutral-400">Filters dynamically show or hide based on the active report module</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                        {{-- Category Filter --}}
+                        <div x-show="hasCategoryFilter()">
+                            <label class="block text-xs font-medium text-neutral-700 mb-1">Item Category</label>
+                            <select x-model="categoryId"
+                                    class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1.5 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
+                                <option value="">All Categories</option>
+                                @foreach ($categories as $category)
+                                    <option value="{{ $category->id }}">{{ $category->name }} ({{ $category->code }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        {{-- Storage Location Filter --}}
+                        <div x-show="hasLocationFilter()">
+                            <label class="block text-xs font-medium text-neutral-700 mb-1">Storage Location</label>
+                            <select x-model="locationId"
+                                    class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1.5 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
+                                <option value="">All Locations</option>
+                                @foreach ($locations as $location)
+                                    <option value="{{ $location->id }}">{{ $location->name }} ({{ $location->code }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        {{-- Supplier Filter --}}
+                        @if ($canViewFinancialData)
+                        <div x-show="hasSupplierFilter()">
+                            <label class="block text-xs font-medium text-neutral-700 mb-1">Supplier / Vendor</label>
+                            <select x-model="supplierId"
+                                    class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1.5 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
+                                <option value="">All Suppliers</option>
+                                @foreach ($suppliers as $supplier)
+                                    <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @endif
+
+                        {{-- Movement Type Filter --}}
+                        <div x-show="hasMovementTypeFilter()">
+                            <label class="block text-xs font-medium text-neutral-700 mb-1">Movement Type</label>
+                            <select x-model="movementType"
+                                    class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1.5 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
+                                <option value="">All Movement Types</option>
+                                @foreach ($movementTypes as $mType)
+                                    <option value="{{ $mType->value }}">{{ $mType->label() }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        {{-- Stock Status Filter --}}
+                        <div x-show="hasStockStatusFilter()">
+                            <label class="block text-xs font-medium text-neutral-700 mb-1">Stock Status</label>
+                            <select x-model="status"
+                                    class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1.5 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
+                                <option value="all">All Levels</option>
+                                <option value="in_stock">In Stock Only</option>
+                                <option value="low_stock">Low Stock Only</option>
+                                <option value="out_of_stock">Out of Stock Only</option>
+                            </select>
+                        </div>
+
+                        {{-- Dynamic Sort Field --}}
+                        <div>
+                            <label class="block text-xs font-medium text-neutral-700 mb-1">Sort By</label>
+                            <select x-model="sortBy"
+                                    class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1.5 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
+                                <template x-for="opt in currentSortOptions" :key="opt.value">
+                                    <option :value="opt.value" x-text="opt.label" :selected="opt.value === sortBy"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        {{-- Sort Direction --}}
+                        <div>
+                            <label class="block text-xs font-medium text-neutral-700 mb-1">Order</label>
+                            <select x-model="sortDir"
+                                    class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1.5 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
+                                <option value="desc">Descending (High/New)</option>
+                                <option value="asc">Ascending (Low/Old)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Row 3: Output Format & Action Bar (Full Width Footer) --}}
+                <div class="pt-3 border-t border-neutral-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-neutral-50/70 -mx-6 -mb-6 p-4 rounded-b-xl">
+                    {{-- Format Selector Pills --}}
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-neutral-700 uppercase tracking-wider hidden lg:inline mr-1">
+                            4. Format:
+                        </span>
+                        <div class="inline-flex rounded-lg border border-neutral-300 bg-white p-0.5 shadow-sm">
+                            <button type="button" @click="format = 'pdf'"
+                                    :class="format === 'pdf' ? 'bg-primary-600 text-white font-semibold' : 'text-neutral-700 hover:text-neutral-900'"
+                                    class="px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all">
+                                <span>🖨️</span>
+                                <span>PDF / Print</span>
+                            </button>
+                            <button type="button" @click="format = 'excel'"
+                                    :class="format === 'excel' ? 'bg-primary-600 text-white font-semibold' : 'text-neutral-700 hover:text-neutral-900'"
+                                    class="px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all">
+                                <span>📊</span>
+                                <span>Excel (.xls)</span>
+                            </button>
+                            <button type="button" @click="format = 'csv'"
+                                    :class="format === 'csv' ? 'bg-primary-600 text-white font-semibold' : 'text-neutral-700 hover:text-neutral-900'"
+                                    class="px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all">
+                                <span>📄</span>
+                                <span>CSV</span>
+                            </button>
+                            <button type="button" @click="format = 'json'"
+                                    :class="format === 'json' ? 'bg-primary-600 text-white font-semibold' : 'text-neutral-700 hover:text-neutral-900'"
+                                    class="px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all">
+                                <span>⚙️</span>
+                                <span>JSON</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Action Controls --}}
+                    <div class="flex items-center gap-2.5 justify-end">
+                        <button type="button" @click="applyToDashboard()"
+                                class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 shadow-sm transition-all">
+                            <x-ui.icon name="calendar" class="w-3.5 h-3.5 text-neutral-500" />
+                            <span>Apply to Dashboard</span>
+                        </button>
+
+                        <button type="button" @click="generate()" :disabled="loading"
+                                class="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all focus:ring-2 focus:ring-primary-500 focus:ring-offset-1">
+                            <template x-if="loading">
+                                <svg class="animate-spin -ml-1 mr-1 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </template>
+                            <template x-if="!loading">
+                                <x-ui.icon name="arrow-down-tray" class="w-3.5 h-3.5 text-white" />
+                            </template>
+                            <span x-text="loading ? 'Generating Report...' : (format === 'pdf' ? 'Open Printable Report' : 'Generate & Export Report')"></span>
+                        </button>
+                    </div>
+                </div>
             </div>
-        </form>
-    </x-ui.card>
+        </x-ui.card>
+    </div>
 
     {{-- ------------------------------------------------ 1. inventory summary --}}
 
@@ -653,4 +932,314 @@
         Generated {{ now()->format('M d, Y g:i A') }} for {{ auth()->user()?->name }}.
         Every figure is read live from the same records the operational screens use.
     </p>
+
+    <script>
+        function reportGenerator(config) {
+            return {
+                reportType: config.initialReportType || 'stock_status',
+                period: config.initialPeriod || '30',
+                fromDate: config.initialFrom || '',
+                toDate: config.initialTo || '',
+                categoryId: '',
+                locationId: '',
+                supplierId: '',
+                movementType: '',
+                status: 'all',
+                sortBy: 'name',
+                sortDir: 'asc',
+                format: 'pdf',
+                loading: false,
+                errorMessage: '',
+                successMessage: '',
+                computedWindowText: '',
+
+                init() {
+                    this.updateComputedWindow();
+                    this.updateSortOptions();
+                },
+
+                onPeriodChange() {
+                    this.updateComputedWindow();
+                    this.errorMessage = '';
+                },
+
+                onReportTypeChange() {
+                    this.updateSortOptions();
+                    this.errorMessage = '';
+                },
+
+                isPointInTimeReport() {
+                    return ['stock_status', 'valuation', 'stock_by_location', 'expiry_exposure'].includes(this.reportType);
+                },
+
+                hasCategoryFilter() {
+                    return ['all', 'stock_status', 'valuation', 'expiry_exposure', 'most_consumed'].includes(this.reportType);
+                },
+
+                hasLocationFilter() {
+                    return ['all', 'stock_status', 'stock_by_location', 'expiry_exposure', 'movement_history'].includes(this.reportType);
+                },
+
+                hasSupplierFilter() {
+                    return ['all', 'procurement_expense', 'spend_by_supplier'].includes(this.reportType);
+                },
+
+                hasMovementTypeFilter() {
+                    return ['all', 'movement_history', 'movements_by_type'].includes(this.reportType);
+                },
+
+                hasStockStatusFilter() {
+                    return ['all', 'stock_status'].includes(this.reportType);
+                },
+
+                get currentSortOptions() {
+                    switch (this.reportType) {
+                        case 'stock_status':
+                            return [
+                                { value: 'name', label: 'Item Description (A-Z)' },
+                                { value: 'units', label: 'Units On Hand' },
+                                { value: 'value', label: 'Stock Valuation' },
+                                { value: 'status', label: 'Stock Health Status' },
+                            ];
+                        case 'valuation':
+                            return [
+                                { value: 'value', label: 'Valuation Amount (₱)' },
+                                { value: 'name', label: 'Category Name' },
+                                { value: 'items', label: 'Catalogue Items Count' },
+                                { value: 'units', label: 'Total Units Stored' },
+                            ];
+                        case 'stock_by_location':
+                            return [
+                                { value: 'utilisation', label: 'Capacity Utilisation %' },
+                                { value: 'name', label: 'Location Name' },
+                                { value: 'units', label: 'Total Units Held' },
+                                { value: 'value', label: 'Location Valuation' },
+                            ];
+                        case 'expiry_exposure':
+                            return [
+                                { value: 'date', label: 'Expiry Date (Soonest)' },
+                                { value: 'units', label: 'At-Risk Units' },
+                                { value: 'value', label: 'Financial Risk Exposure' },
+                            ];
+                        case 'movement_history':
+                            return [
+                                { value: 'date', label: 'Movement Timestamp (Recency)' },
+                                { value: 'units', label: 'Quantity Moved' },
+                                { value: 'value', label: 'Movement Valuation' },
+                            ];
+                        case 'procurement_expense':
+                            return [
+                                { value: 'date', label: 'Order Date' },
+                                { value: 'amount', label: 'PO Total Amount' },
+                                { value: 'orders', label: 'PO Number' },
+                            ];
+                        case 'spend_by_supplier':
+                            return [
+                                { value: 'value', label: 'Total Spend Amount' },
+                                { value: 'fulfilment', label: 'Fulfilment Rate %' },
+                                { value: 'orders', label: 'Order Count' },
+                                { value: 'supplier', label: 'Supplier Name' },
+                            ];
+                        case 'most_consumed':
+                            return [
+                                { value: 'units', label: 'Units Consumed' },
+                                { value: 'movements', label: 'Consumption Events' },
+                                { value: 'value', label: 'Consumption Value' },
+                            ];
+                        case 'movements_by_type':
+                            return [
+                                { value: 'movements', label: 'Movement Count' },
+                                { value: 'units', label: 'Units Transacted' },
+                                { value: 'value', label: 'Total Value' },
+                            ];
+                        default:
+                            return [
+                                { value: 'date', label: 'Date / Recency' },
+                                { value: 'value', label: 'Financial Value' },
+                                { value: 'units', label: 'Units / Volume' },
+                            ];
+                    }
+                },
+
+                updateSortOptions() {
+                    const opts = this.currentSortOptions;
+                    if (!opts.some(o => o.value === this.sortBy)) {
+                        this.sortBy = opts[0]?.value || 'name';
+                    }
+                },
+
+                updateComputedWindow() {
+                    const daysMap = { '1': 1, '7': 7, '30': 30, '90': 90, '365': 365 };
+                    if (this.period === 'all') {
+                        this.computedWindowText = 'All Historical Records (Up to Today)';
+                    } else if (this.period === 'custom') {
+                        this.computedWindowText = `Custom: ${this.fromDate || '...'} to ${this.toDate || '...'}`;
+                    } else {
+                        const days = daysMap[this.period] || 30;
+                        this.computedWindowText = `Last ${days} days ending ${config.todayDate}`;
+                    }
+                },
+
+                resetFilters() {
+                    this.reportType = 'stock_status';
+                    this.period = '30';
+                    this.fromDate = config.initialFrom;
+                    this.toDate = config.initialTo;
+                    this.categoryId = '';
+                    this.locationId = '';
+                    this.supplierId = '';
+                    this.movementType = '';
+                    this.status = 'all';
+                    this.sortBy = 'name';
+                    this.sortDir = 'asc';
+                    this.format = 'pdf';
+                    this.errorMessage = '';
+                    this.successMessage = '';
+                    this.updateComputedWindow();
+                    this.updateSortOptions();
+                },
+
+                applyToDashboard() {
+                    this.errorMessage = '';
+                    if (this.period === 'custom') {
+                        if (!this.fromDate) {
+                            this.errorMessage = 'Please provide a start date for the custom date range.';
+                            return;
+                        }
+                        if (!this.toDate) {
+                            this.errorMessage = 'Please provide an end date for the custom date range.';
+                            return;
+                        }
+                        if (this.fromDate > this.toDate) {
+                            this.errorMessage = 'The start date cannot be later than the end date.';
+                            return;
+                        }
+                        if (this.toDate > config.todayDate) {
+                            this.errorMessage = 'The end date cannot be a future date.';
+                            return;
+                        }
+                    }
+
+                    const params = new URLSearchParams();
+                    if (this.period === 'custom') {
+                        params.set('period', 'custom');
+                        params.set('from', this.fromDate);
+                        params.set('to', this.toDate);
+                    } else {
+                        params.set('period', this.period);
+                        params.set('days', this.period === 'all' ? '365' : this.period);
+                    }
+
+                    window.location.href = config.dashboardUrl + '?' + params.toString();
+                },
+
+                async generate() {
+                    this.errorMessage = '';
+                    this.successMessage = '';
+
+                    // Validation
+                    if (['procurement_expense', 'spend_by_supplier'].includes(this.reportType) && !config.canViewFinancial) {
+                        this.errorMessage = 'You do not have permission to view or export procurement financial reports.';
+                        return;
+                    }
+
+                    if (this.period === 'custom') {
+                        if (!this.fromDate) {
+                            this.errorMessage = 'Please provide a start date for the custom date range.';
+                            return;
+                        }
+                        if (!this.toDate) {
+                            this.errorMessage = 'Please provide an end date for the custom date range.';
+                            return;
+                        }
+                        if (this.fromDate > this.toDate) {
+                            this.errorMessage = 'The start date cannot be later than the end date.';
+                            return;
+                        }
+                        if (this.toDate > config.todayDate) {
+                            this.errorMessage = 'The end date cannot be a future date.';
+                            return;
+                        }
+                    }
+
+                    this.loading = true;
+
+                    const params = new URLSearchParams();
+                    params.set('report_type', this.reportType);
+                    params.set('format', this.format);
+                    params.set('period', this.period);
+                    if (this.period === 'custom') {
+                        params.set('from', this.fromDate);
+                        params.set('to', this.toDate);
+                    } else {
+                        params.set('days', this.period === 'all' ? '3650' : this.period);
+                    }
+
+                    if (this.categoryId) params.set('category_id', this.categoryId);
+                    if (this.locationId) params.set('storage_location_id', this.locationId);
+                    if (this.supplierId) params.set('supplier_id', this.supplierId);
+                    if (this.movementType) params.set('movement_type', this.movementType);
+                    if (this.status && this.status !== 'all') params.set('status', this.status);
+                    if (this.sortBy) params.set('sort_by', this.sortBy);
+                    if (this.sortDir) params.set('sort_direction', this.sortDir);
+
+                    const url = config.generateUrl + '?' + params.toString();
+
+                    if (this.format === 'pdf' || this.format === 'print') {
+                        window.open(url, '_blank');
+                        this.loading = false;
+                        this.successMessage = 'Official report opened in print view.';
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(url, {
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Accept': this.format === 'json' ? 'application/json' : '*/*'
+                            }
+                        });
+
+                        if (!response.ok) {
+                            let errMsg = 'Failed to generate report.';
+                            try {
+                                const errData = await response.json();
+                                errMsg = errData.message || (errData.errors ? Object.values(errData.errors).flat().join(' ') : errMsg);
+                            } catch (e) {
+                                errMsg = `Error ${response.status}: ${response.statusText}`;
+                            }
+                            throw new Error(errMsg);
+                        }
+
+                        const blob = await response.blob();
+                        let filename = `hims-${this.reportType}-${new Date().toISOString().slice(0, 10)}.${this.format === 'excel' ? 'xls' : this.format}`;
+
+                        const disposition = response.headers.get('content-disposition');
+                        if (disposition && disposition.indexOf('filename=') !== -1) {
+                            const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+                            if (matches != null && matches[1]) {
+                                filename = matches[1].replace(/['"]/g, '');
+                            }
+                        }
+
+                        const blobUrl = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = blobUrl;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(blobUrl);
+                        a.remove();
+
+                        this.successMessage = `Successfully generated and downloaded ${filename}`;
+                    } catch (err) {
+                        this.errorMessage = err.message || 'An unexpected error occurred while generating the report.';
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            };
+        }
+    </script>
 </x-app-layout>
