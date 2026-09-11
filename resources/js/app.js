@@ -712,6 +712,107 @@ const startDecisionConfirmations = () => {
 startDecisionConfirmations();
 startSessionMonitor();
 
+const startAuditLocationConsent = () => {
+    const endpoint = document.body.dataset.auditLocationUrl;
+
+    if (!endpoint || !navigator.geolocation) {
+        return;
+    }
+
+    const store = async (position) => {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+            }),
+        });
+
+        if (!response.ok) throw new Error(`Location store failed with ${response.status}`);
+    };
+
+    const capture = () => {
+        navigator.geolocation.getCurrentPosition(
+            (position) => store(position).catch(() => {}),
+            () => {},
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+        );
+    };
+
+    if (navigator.permissions?.query) {
+        navigator.permissions.query({ name: 'geolocation' })
+            .then((permission) => {
+                if (permission.state === 'denied') {
+                    return;
+                }
+
+                if (permission.state === 'prompt' || permission.state === 'granted') {
+                    capture();
+                }
+
+                permission.addEventListener('change', () => {
+                    if (permission.state === 'granted') {
+                        capture();
+                    }
+                });
+            })
+            .catch(() => {
+                capture();
+            });
+        return;
+    }
+
+    capture();
+};
+
+startAuditLocationConsent();
+
+const initLoginLocationCapture = () => {
+    const form = document.querySelector('[data-login-form]');
+    if (!form || !navigator.geolocation) return;
+
+    const latInput = form.querySelector('[data-login-latitude]');
+    const lngInput = form.querySelector('[data-login-longitude]');
+    const accInput = form.querySelector('[data-login-accuracy]');
+
+    if (!latInput || !lngInput) return;
+
+    const capture = () => {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                latInput.value = position.coords.latitude;
+                lngInput.value = position.coords.longitude;
+                if (accInput) accInput.value = position.coords.accuracy;
+            },
+            () => {},
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+        );
+    };
+
+    if (navigator.permissions?.query) {
+        navigator.permissions.query({ name: 'geolocation' })
+            .then((permission) => {
+                if (permission.state === 'granted' || permission.state === 'prompt') {
+                    capture();
+                }
+            })
+            .catch(() => capture());
+    } else {
+        capture();
+    }
+};
+
+initLoginLocationCapture();
+
 /**
  * Display a server-issued login cooldown without making the browser a security
  * boundary. The next submission is always revalidated by Laravel.

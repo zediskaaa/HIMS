@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\AuditAction;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Support\AuditBrowserLocation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -12,6 +13,11 @@ use Illuminate\Support\Str;
 class AuditLogger
 {
     private const SENSITIVE_KEY_PATTERN = '/(?:password|passphrase|token|secret|otp|totp|authorization|cookie|session|api[_-]?key|private[_-]?key|file[_-]?(?:content|contents)|document[_-]?content)/i';
+
+    public function __construct(
+        private readonly AuditDeviceContextResolver $deviceContext,
+        private readonly AuditGeoIpLocator $geoIpLocator,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $oldValues
@@ -38,6 +44,9 @@ class AuditLogger
         $request = app()->bound('request') ? app(Request::class) : null;
         $eventId = (string) Str::uuid();
         $displayTimezone = (string) config('app.timezone', 'UTC');
+        $ipAddress = $request?->ip();
+        $deviceContext = $request === null ? [] : $this->deviceContext->resolve($request);
+        $locationContext = $this->locationContext($request, $ipAddress);
 
         return AuditLog::create([
             'event_id' => $eventId,
@@ -63,8 +72,10 @@ class AuditLogger
             'correlation_id' => $this->correlationId($request, $correlationId, $eventId),
             'old_values' => $this->sanitize($oldValues),
             'new_values' => $this->sanitize($newValues),
-            'ip_address' => $request?->ip(),
+            'ip_address' => $ipAddress,
             'user_agent' => $request?->userAgent(),
+            ...$deviceContext,
+            ...$locationContext,
             'occurred_at_utc' => now('UTC')->format('Y-m-d H:i:s.u'),
             'display_timezone' => $displayTimezone,
         ]);
@@ -168,5 +179,26 @@ class AuditLogger
         }
 
         return $fallback;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function locationContext(?Request $request, ?string $ipAddress): array
+    {
+        if ($request !== null && $browserLocation = AuditBrowserLocation::current($request)) {
+            return [
+                'location_city' => null,
+                'location_region' => null,
+                'location_country' => null,
+                'location_country_code' => null,
+                'location_source' => 'browser',
+                'location_latitude' => $browserLocation['latitude'],
+                'location_longitude' => $browserLocation['longitude'],
+                'location_accuracy_meters' => $browserLocation['accuracy'],
+            ];
+        }
+
+        return $this->geoIpLocator->locate($ipAddress);
     }
 }

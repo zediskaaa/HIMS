@@ -7,8 +7,10 @@ use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\User;
 use App\Services\AuthenticatorSecretService;
 use App\Services\AuthenticatorSetupService;
+use App\Support\AuditBrowserLocation;
 use App\Support\AuthenticationContext;
 use App\Support\MfaSession;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
@@ -112,5 +114,18 @@ class ProfileController extends Controller
         );
 
         return Redirect::route('profile.edit');
+    }
+
+    public function storeAuditLocation(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'accuracy' => ['required', 'numeric', 'min:0', 'max:100000'],
+        ]);
+
+        AuditBrowserLocation::store($request, $validated);
+
+        return response()->json(['stored' => true]);
     }
 }

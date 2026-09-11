@@ -161,7 +161,7 @@
                         <li><strong class="text-neutral-900">Fulfillment of Employment / Contractual Role (Sec. 12[b]):</strong> Necessary for provisioning staff login credentials, maintaining duty assignments, and executing warehouse, procurement, or pharmacy tasks.</li>
                         <li><strong class="text-neutral-900">Compliance with Legal &amp; Regulatory Obligations (Sec. 12[c]):</strong> Meeting statutory mandates of the Department of Health (DOH), Food and Drug Administration (FDA), and Commission on Audit (COA) to maintain verifiable medicine chain-of-custody.</li>
                         <li><strong class="text-neutral-900">Legitimate Interests of the Health Facility (Sec. 12[f]):</strong> Safeguarding hospital assets against theft or discrepancies, ensuring supply chain continuity, and securing internal systems.</li>
-                        <li><strong class="text-neutral-900">Security Safeguards (Sec. 20):</strong> Capturing audit events, IP addresses, and session timestamps to prevent unauthorized access and protect data integrity.</li>
+                        <li><strong class="text-neutral-900">Security Safeguards (Sec. 20):</strong> Capturing audit events, IP addresses, device and browser context, approximate IP-derived location, and session timestamps to prevent unauthorized access and protect data integrity. With the user's explicit browser permission, HIMS may instead retain rounded, device-reported coordinates for the current signed-in session and record them with subsequent audit events.</li>
                     </ul>
                 </section>
 

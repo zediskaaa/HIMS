@@ -195,7 +195,7 @@
                         Users are explicitly advised that all system activities are actively monitored and recorded:
                     </p>
                     <ul class="list-disc list-inside space-y-1.5 pl-2 text-neutral-700 text-sm sm:text-[15px]">
-                        <li>An immutable, append-only Audit Trail records the identity of the actor, employee ID, action taken, target record, old and new values, client IP address, and timestamp.</li>
+                        <li>An immutable, append-only Audit Trail records the identity of the actor, employee ID, action taken, target record, old and new values, client IP address, device and browser context, approximate IP-derived location or consented device-reported location, and timestamp.</li>
                         <li>Log records are preserved for accountability, fraud prevention, forensic investigation, and regulatory compliance.</li>
                         <li>No expectation of personal privacy exists with respect to operational transactions conducted within the hospital inventory system.</li>
                     </ul>

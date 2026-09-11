@@ -24,7 +24,7 @@
                     id="audit-search"
                     name="search"
                     type="search"
-                    placeholder="e.g. Juan, EMP-0144, 127.0.0.1"
+                    placeholder="e.g. Juan, EMP-0144, action or target"
                     autocomplete="off"
                     class="block w-full rounded-md border border-neutral-300 text-sm text-neutral-900 shadow-sm transition-colors placeholder:text-neutral-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 focus:ring-offset-0"
                     x-model="query"
@@ -193,34 +193,41 @@
                         };
                     @endphp
                     <x-ui.table.row>
-                        <x-ui.table.td>
-                            <span class="font-medium text-neutral-900">{{ $log->actor_name }}</span>
+                        <x-ui.table.td class="whitespace-nowrap">
+                            <div class="font-medium text-neutral-900">{{ $log->actor_name }}</div>
                             @if ($log->actor_employee_id)
-                                <span class="block font-mono text-xs text-neutral-500">
+                                <div class="font-mono text-xs text-neutral-500">
                                     {{ $log->actor_employee_id }}
-                                </span>
+                                </div>
+                            @endif
+                            @if ($log->actor_role)
+                                <div class="mt-0.5">
+                                    <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium bg-neutral-100 text-neutral-600">
+                                        {{ \Illuminate\Support\Str::headline($log->actor_role) }}
+                                    </span>
+                                </div>
                             @endif
                         </x-ui.table.td>
 
-                        <x-ui.table.td>
+                        <x-ui.table.td class="whitespace-nowrap">
                             <x-ui.badge :variant="$variant">{{ $log->action->label() }}</x-ui.badge>
                             <span class="mt-1 block text-xs text-neutral-500">{{ $log->event_category ?? $log->action->category() }}</span>
                         </x-ui.table.td>
 
-                        <x-ui.table.td>
+                        <x-ui.table.td class="whitespace-nowrap">
                             <span class="font-medium text-neutral-800">{{ $log->module ?? $log->action->module() }}</span>
-                            <span class="mt-1 block text-xs text-neutral-500">{{ \Illuminate\Support\Str::headline($log->source ?? 'legacy') }}</span>
+                            <span class="mt-1 block text-xs text-neutral-500">{{ \Illuminate\Support\Str::headline($log->source ?? 'user') }}</span>
                         </x-ui.table.td>
 
                         <x-ui.table.td>
-                            <span class="text-neutral-800">{{ $log->target_name ?? '-' }}</span>
+                            <span class="font-medium text-neutral-800">{{ $log->target_name ?? '—' }}</span>
                             @if ($log->target_id)
-                                <span class="block text-xs text-neutral-400">ID {{ $log->target_id }}</span>
+                                <span class="block text-xs text-neutral-400 font-mono">ID {{ $log->target_id }}</span>
                             @endif
                         </x-ui.table.td>
 
                         <x-ui.table.td>
-                            <p class="min-w-72 max-w-xl text-neutral-700">{{ $log->description }}</p>
+                            <p class="text-neutral-700 leading-relaxed">{{ $log->description }}</p>
                             @if ($log->old_values || $log->new_values)
                                 <details class="mt-1.5 text-xs text-neutral-500">
                                     <summary class="cursor-pointer font-medium text-primary-700 hover:underline">
@@ -248,24 +255,38 @@
                                     </div>
                                 </details>
                             @endif
-                            <a href="{{ route('admin.audit-logs.show', $log) }}" class="mt-2 inline-flex text-xs font-semibold text-primary-700 hover:underline">
-                                Open event details
-                            </a>
                         </x-ui.table.td>
 
-                        <x-ui.table.td muted>
+                        <x-ui.table.td muted class="whitespace-nowrap">
                             @php($displayTime = $log->displayTimestamp())
-                            <time datetime="{{ $log->authoritativeTimestamp()->toIso8601String() }}" class="whitespace-nowrap" title="{{ $displayTime->format('F j, Y, g:i:s A').' '.$log->displayTimezoneLabel() }}">
+                            <time datetime="{{ $log->authoritativeTimestamp()->toIso8601String() }}" class="block font-medium text-neutral-900" title="{{ $displayTime->format('F j, Y, g:i:s A').' '.$log->displayTimezoneLabel() }}">
                                 {{ $displayTime->format('M d, Y, g:i:s A') }}
-                                <span class="block text-xs text-neutral-400">{{ $log->displayTimezoneLabel() }}</span>
+                                <span class="block text-xs font-normal text-neutral-400">{{ $log->displayTimezoneLabel() }}</span>
                             </time>
                             <x-ui.badge :variant="($log->outcome ?? 'success') === 'success' ? 'success' : 'danger'" class="mt-1">
                                 {{ \Illuminate\Support\Str::headline($log->outcome ?? 'success') }}
                             </x-ui.badge>
                         </x-ui.table.td>
 
-                        <x-ui.table.td muted>
-                            <span class="font-mono text-xs">{{ $log->ip_address ?? '-' }}</span>
+                        <x-ui.table.td muted class="whitespace-nowrap">
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-mono text-xs text-neutral-600">{{ $log->ip_address ?? '—' }}</span>
+                                @if ($log->location_source === 'browser')
+                                    <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200" title="{{ $log->locationSummary() }} (Browser GPS)">
+                                        <x-ui.icon name="map-pin" class="h-3 w-3 text-emerald-600" />
+                                        GPS
+                                    </span>
+                                @elseif ($log->location_source === 'ip')
+                                    <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-neutral-100 text-neutral-600" title="{{ $log->locationSummary() }}">
+                                        IP
+                                    </span>
+                                @endif
+                            </div>
+                            <div class="mt-1.5">
+                                <a href="{{ route('admin.audit-logs.show', $log) }}" class="inline-flex items-center text-xs font-semibold text-primary-700 hover:text-primary-800 hover:underline">
+                                    Details &rarr;
+                                </a>
+                            </div>
                         </x-ui.table.td>
                     </x-ui.table.row>
                 @empty

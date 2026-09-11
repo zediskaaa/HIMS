@@ -7,10 +7,13 @@ use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Services\AuditGeoIpLocator;
 use App\Services\AuditLogger;
+use App\Support\AuditBrowserLocation;
 use App\Support\AuthenticationContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use LogicException;
 use Tests\TestCase;
 
@@ -79,6 +82,158 @@ class AuditTrailTest extends TestCase
         $this->assertStringContainsString('Created a new user account', $log->description);
         $this->assertArrayNotHasKey('password', $log->new_values);
         $this->assertStringNotContainsString('Password123!', json_encode($log->new_values));
+    }
+
+    public function test_new_events_capture_readable_device_and_approximate_location_context(): void
+    {
+        $actor = User::factory()->superAdministrator()->create();
+        $geoIp = \Mockery::mock(AuditGeoIpLocator::class);
+        $geoIp->shouldReceive('locate')
+            ->once()
+            ->with('8.8.8.8')
+            ->andReturn([
+                'location_city' => 'Mountain View',
+                'location_region' => 'California',
+                'location_country' => 'United States',
+                'location_country_code' => 'US',
+            ]);
+        $this->app->instance(AuditGeoIpLocator::class, $geoIp);
+
+        $this->app->instance('request', Request::create('/', 'GET', server: [
+            'REMOTE_ADDR' => '8.8.8.8',
+            'HTTP_USER_AGENT' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+        ]));
+
+        $log = app(AuditLogger::class)->log(
+            AuditAction::LoggedIn,
+            $actor,
+            'Recorded contextual activity.',
+        );
+
+        $this->assertSame('Desktop', $log->device_type);
+        $this->assertStringContainsString('Windows', $log->operating_system);
+        $this->assertStringContainsString('Chrome', $log->browser);
+        $this->assertSame('Mountain View, California, United States', $log->locationSummary());
+        $this->assertSame('US', $log->location_country_code);
+    }
+
+    public function test_audit_context_is_searchable_and_visible_to_authorized_users(): void
+    {
+        $this->auditLog([
+            'device_type' => 'Smartphone',
+            'device_name' => 'Apple iPhone',
+            'operating_system' => 'iOS 18.0',
+            'browser' => 'Mobile Safari 18.0',
+            'location_city' => 'Manila',
+            'location_region' => 'Metro Manila',
+            'location_country' => 'Philippines',
+            'location_country_code' => 'PH',
+        ]);
+        $viewer = User::factory()->superAdministrator()->create();
+
+        $this->actingAs($viewer, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get(route('admin.audit-logs.index', ['search' => 'Manila']))
+            ->assertOk()
+            ->assertSee('Recorded audit activity.')
+            ->assertDontSee('Manila, Metro Manila, Philippines')
+            ->assertDontSee('Apple iPhone');
+
+        $this->get(route('admin.audit-logs.show', AuditLog::firstOrFail()))
+            ->assertOk()
+            ->assertSee('Approximate location')
+            ->assertSee('Manila, Metro Manila, Philippines')
+            ->assertSee('Smartphone')
+            ->assertSee('Apple iPhone')
+            ->assertSee('Mobile Safari 18.0')
+            ->assertSee('Raw user agent');
+    }
+
+    public function test_browser_location_requires_authentication_and_valid_coordinates(): void
+    {
+        $this->postJson(route('profile.audit-location.store'), [
+            'latitude' => 14.5995,
+            'longitude' => 120.9842,
+            'accuracy' => 25,
+        ])->assertUnauthorized();
+
+        $user = User::factory()->warehouseStaff()->create();
+        $this->actingAs($user)
+            ->postJson(route('profile.audit-location.store'), [
+                'latitude' => 91,
+                'longitude' => 181,
+                'accuracy' => -1,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['latitude', 'longitude', 'accuracy']);
+
+        $this->postJson(route('profile.audit-location.store'), [
+            'latitude' => 14.599512,
+            'longitude' => 120.984222,
+            'accuracy' => 24.2,
+        ])->assertOk()->assertJson(['stored' => true]);
+
+        $this->assertSame([
+            'user_id' => $user->id,
+            'latitude' => 14.5995,
+            'longitude' => 120.9842,
+            'accuracy' => 25,
+            'captured_at' => now()->getTimestamp(),
+        ], session(AuditBrowserLocation::SESSION_KEY));
+    }
+
+    public function test_consented_browser_location_is_recorded_with_later_audit_events(): void
+    {
+        $actor = User::factory()->superAdministrator()->create();
+        $this->actingAs($actor, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->postJson(route('profile.audit-location.store'), [
+                'latitude' => 14.599512,
+                'longitude' => 120.984222,
+                'accuracy' => 24.2,
+            ])->assertOk();
+
+        $geoIp = \Mockery::mock(AuditGeoIpLocator::class);
+        $geoIp->shouldNotReceive('locate');
+        $this->app->instance(AuditGeoIpLocator::class, $geoIp);
+
+        $log = app(AuditLogger::class)->log(
+            AuditAction::UpdatedUser,
+            $actor,
+            'Recorded an event after location consent.',
+        );
+
+        $this->assertSame('browser', $log->location_source);
+        $this->assertSame('14.5995', $log->location_latitude);
+        $this->assertSame('120.9842', $log->location_longitude);
+        $this->assertSame(25, $log->location_accuracy_meters);
+        $this->assertSame('Device-reported (browser permission)', $log->locationSourceLabel());
+    }
+
+    public function test_audit_list_is_balanced_and_browser_location_is_requested_after_login(): void
+    {
+        $viewer = User::factory()->superAdministrator()->create();
+        $this->auditLog(['actor_name' => 'Audit Tester', 'description' => 'Tested audit list layout.']);
+
+        $response = $this->actingAs($viewer, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get(route('admin.audit-logs.index'));
+
+        $response
+            ->assertOk()
+            ->assertSee('data-audit-location-url=', false)
+            ->assertSee('Performed By')
+            ->assertSee('Action')
+            ->assertSee('Module')
+            ->assertSee('Target')
+            ->assertSee('Description')
+            ->assertSee('Date &amp; Time', false)
+            ->assertSee('IP Address')
+            ->assertDontSee('<th scope="col" class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-600 whitespace-nowrap bg-neutral-50 text-left">Origin</th>', false)
+            ->assertDontSee('<th scope="col" class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-600 whitespace-nowrap bg-neutral-50 text-left">Device</th>', false);
+
+        $script = file_get_contents(resource_path('js/app.js'));
+        $this->assertIsString($script);
+        $this->assertStringContainsString('navigator.geolocation.getCurrentPosition', $script);
+        $this->assertStringContainsString('navigator.permissions.query', $script);
+        $this->assertStringContainsString("permission.state === 'prompt'", $script);
     }
 
     public function test_updating_a_user_records_only_safe_changed_fields(): void
@@ -196,6 +351,42 @@ class AuditTrailTest extends TestCase
             'action' => AuditAction::LoggedOut->value,
             'target_name' => 'Account',
         ]);
+    }
+
+    public function test_login_captures_browser_location_coordinates_when_submitted(): void
+    {
+        $user = User::factory()->warehouseStaff()->create(['name' => 'Maria Santos']);
+        $superAdmin = User::factory()->superAdministrator()->create();
+
+        $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+            'latitude' => 14.6723,
+            'longitude' => 121.0183,
+            'accuracy' => 25,
+        ])->assertRedirect(route('dashboard', absolute: false));
+
+        $this->assertDatabaseHas('audit_logs', [
+            'user_id' => $user->id,
+            'actor_name' => 'Maria Santos',
+            'action' => AuditAction::LoggedIn->value,
+            'location_source' => 'browser',
+            'location_latitude' => '14.6723',
+            'location_longitude' => '121.0183',
+            'location_accuracy_meters' => 25,
+        ]);
+
+        $log = AuditLog::where('action', AuditAction::LoggedIn->value)->where('user_id', $user->id)->latest('id')->firstOrFail();
+        $this->assertSame('14.6723, 121.0183', $log->locationSummary());
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get(route('admin.audit-logs.show', $log))
+            ->assertOk()
+            ->assertSee('14.6723, 121.0183')
+            ->assertSee('maps?q=14.6723,121.0183', false);
     }
 
     public function test_only_audit_authorized_roles_can_access_the_audit_trail(): void

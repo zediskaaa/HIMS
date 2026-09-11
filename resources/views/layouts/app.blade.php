@@ -1,6 +1,9 @@
 @php
     $sessionActivityRoute = \App\Support\AuthenticationContext::activityRoute();
     $sessionExpiredRoute = \App\Support\AuthenticationContext::expiredRoute();
+    $auditLocationCaptureUrl = \App\Support\AuditBrowserLocation::current(request()) === null
+        ? route('profile.audit-location.store')
+        : null;
 @endphp
 
 <!DOCTYPE html>
@@ -29,6 +32,9 @@
     data-session-warning-enabled="{{ auth()->user()?->session_timeout_reminder_enabled === false ? 'false' : 'true' }}"
     data-session-activity-url="{{ route($sessionActivityRoute) }}"
     data-session-expired-url="{{ Illuminate\Support\Facades\URL::signedRoute($sessionExpiredRoute, absolute: false) }}"
+    @if ($auditLocationCaptureUrl)
+        data-audit-location-url="{{ $auditLocationCaptureUrl }}"
+    @endif
 >
     <div x-data="{ sidebarOpen: false }" class="hims-app-shell min-h-full overflow-x-clip">
 

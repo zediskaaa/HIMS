@@ -79,6 +79,15 @@ class AppServiceProvider extends ServiceProvider
             if ($event->user instanceof User) {
                 $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
 
+                $request = app()->bound('request') ? request() : null;
+                if ($request && is_numeric($request->input('latitude')) && is_numeric($request->input('longitude'))) {
+                    \App\Support\AuditBrowserLocation::store($request, [
+                        'latitude' => $request->input('latitude'),
+                        'longitude' => $request->input('longitude'),
+                        'accuracy' => $request->input('accuracy', 0),
+                    ], $event->user->getKey());
+                }
+
                 app(AuditLogger::class)->log(
                     AuditAction::LoggedIn,
                     $event->user,

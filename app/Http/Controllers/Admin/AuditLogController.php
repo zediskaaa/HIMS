@@ -71,7 +71,15 @@ class AuditLogController extends Controller implements HasMiddleware
                         ->orWhere('description', 'like', $term)
                         ->orWhere('old_values->email', 'like', $term)
                         ->orWhere('new_values->email', 'like', $term)
-                        ->orWhere('ip_address', 'like', $term);
+                        ->orWhere('ip_address', 'like', $term)
+                        ->orWhere('device_type', 'like', $term)
+                        ->orWhere('device_name', 'like', $term)
+                        ->orWhere('operating_system', 'like', $term)
+                        ->orWhere('browser', 'like', $term)
+                        ->orWhere('location_city', 'like', $term)
+                        ->orWhere('location_region', 'like', $term)
+                        ->orWhere('location_country', 'like', $term)
+                        ->orWhere('location_country_code', 'like', $term);
 
                     if ($matchingActions !== []) {
                         $q->orWhereIn('action', $matchingActions);

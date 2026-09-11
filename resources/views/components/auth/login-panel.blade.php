@@ -119,6 +119,9 @@
 
     <form method="POST" action="{{ $action }}" class="animate-fade-up space-y-5 [animation-delay:440ms]" x-data="{ showPassword: false }" data-login-form>
         @csrf
+        <input type="hidden" name="latitude" data-login-latitude>
+        <input type="hidden" name="longitude" data-login-longitude>
+        <input type="hidden" name="accuracy" data-login-accuracy>
 
         <div>
             <x-input-label for="email" :value="__('Email address')" class="text-neutral-700" />

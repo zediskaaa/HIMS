@@ -61,7 +61,28 @@
                 <div><dt class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Source</dt><dd class="mt-1 text-sm text-neutral-900">{{ \Illuminate\Support\Str::headline($log->source ?? 'legacy') }}</dd></div>
                 <div><dt class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Target</dt><dd class="mt-1 break-words text-sm text-neutral-900">{{ $log->target_reference ?? $log->target_name ?? 'None' }}</dd></div>
                 <div><dt class="text-xs font-semibold uppercase tracking-wide text-neutral-500">IP address</dt><dd class="mt-1 break-all font-mono text-xs text-neutral-700">{{ $log->ip_address ?? 'Not recorded' }}</dd></div>
-                <div><dt class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Device context</dt><dd class="mt-1 break-words text-xs text-neutral-700">{{ $log->user_agent ?? 'Not recorded' }}</dd></div>
+                <div>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Approximate location</dt>
+                    <dd class="mt-1 break-words text-sm font-medium text-neutral-900">{{ $log->locationSummary() ?? 'Unavailable' }}</dd>
+                    @if ($log->location_latitude !== null && $log->location_longitude !== null)
+                        <dd class="mt-1">
+                            <a href="https://www.google.com/maps?q={{ $log->location_latitude }},{{ $log->location_longitude }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:text-primary-800 hover:underline">
+                                <x-ui.icon name="map-pin" class="h-3.5 w-3.5 text-primary-600" />
+                                View on Google Maps ({{ $log->location_latitude }}, {{ $log->location_longitude }}) &rarr;
+                            </a>
+                        </dd>
+                    @endif
+                    @if ($log->locationSourceLabel())
+                        <dd class="mt-1 text-xs text-neutral-500">
+                            {{ $log->locationSourceLabel() }}
+                            @if ($log->location_accuracy_meters !== null)
+                                · reported accuracy ±{{ number_format($log->location_accuracy_meters) }} m
+                            @endif
+                        </dd>
+                    @endif
+                </div>
+                <div><dt class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Device</dt><dd class="mt-1 break-words text-sm text-neutral-900">{{ $log->deviceSummary() ?? 'Unavailable' }}</dd></div>
+                <div><dt class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Raw user agent</dt><dd class="mt-1 break-words text-xs text-neutral-700">{{ $log->user_agent ?? 'Not recorded' }}</dd></div>
             </dl>
         </x-ui.card>
     </div>
