@@ -35,7 +35,7 @@
         @csrf
         @method('patch')
 
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <div>
                 <x-input-label for="surname" :value="__('Last Name')" />
                 <x-text-input
@@ -69,7 +69,7 @@
                 <x-input-error class="mt-2" :messages="$errors->get('first_name')" />
             </div>
 
-            <div class="sm:col-span-2 lg:col-span-1">
+            <div class="sm:col-span-2 xl:col-span-1">
                 <x-input-label for="middle_name" :value="__('Middle Name')" />
                 <x-text-input
                     id="middle_name"
@@ -126,8 +126,8 @@
             <x-input-error class="mt-2" :messages="$errors->get('current_password')" />
         </div>
 
-        <div class="flex items-center">
-            <x-primary-button data-loading-text="Saving profile...">{{ __('Save') }}</x-primary-button>
+        <div class="flex items-center pt-2">
+            <x-ui.button type="submit" data-loading-text="Saving profile...">{{ __('Save') }}</x-ui.button>
         </div>
     </form>
 </section>

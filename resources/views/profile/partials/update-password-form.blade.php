@@ -45,8 +45,8 @@
 
         <x-auth.password-requirements />
 
-        <div class="flex items-center">
-            <x-primary-button data-loading-text="Updating password...">{{ __('Save') }}</x-primary-button>
+        <div class="flex items-center pt-2">
+            <x-ui.button type="submit" data-loading-text="Updating password...">{{ __('Save') }}</x-ui.button>
         </div>
     </form>
 </section>

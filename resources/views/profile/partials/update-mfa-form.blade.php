@@ -55,8 +55,8 @@
 
         <x-input-error :messages="$errors->get('mfa_enabled')" class="text-danger-600" />
 
-        <div class="flex items-center">
-            <x-primary-button data-loading-text="Saving MFA setting...">{{ __('Save MFA setting') }}</x-primary-button>
+        <div class="flex items-center pt-2">
+            <x-ui.button type="submit" data-loading-text="Saving MFA setting...">{{ __('Save MFA setting') }}</x-ui.button>
         </div>
     </form>
 </section>
