@@ -11,6 +11,7 @@ enum AuditAction: string
     case FailedLogin = 'failed_login';
     case LoggedOut = 'logged_out';
     case ChangedPassword = 'changed_password';
+    case ChangedMfa = 'changed_mfa';
     case TemporarilyLockedUser = 'temporarily_locked_user';
     case UnlockedUser = 'unlocked_user';
     case CreatedSupplier = 'created_supplier';
@@ -110,6 +111,7 @@ enum AuditAction: string
             self::FailedLogin => 'Failed Login',
             self::LoggedOut => 'Logged Out',
             self::ChangedPassword => 'Changed Password',
+            self::ChangedMfa => 'Changed MFA',
             self::TemporarilyLockedUser => 'Temporarily Locked User',
             self::UnlockedUser => 'Unlocked User',
             self::CreatedSupplier => 'Created Supplier',
@@ -209,6 +211,7 @@ enum AuditAction: string
                 self::FailedLogin,
                 self::LoggedOut,
                 self::ChangedPassword,
+                self::ChangedMfa,
                 self::TemporarilyLockedUser,
                 self::UnlockedUser,
             ], true) => 'Authentication',

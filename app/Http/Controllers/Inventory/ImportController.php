@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Enums\NotificationDestination;
+use App\Enums\NotificationPriority;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
+use App\Services\HimsNotificationService;
 use App\Services\Import\DataImportExecutor;
 use App\Services\Import\DataImportReader;
 use App\Services\Import\DataImportValidator;
@@ -29,6 +32,7 @@ class ImportController extends Controller implements HasMiddleware
         private readonly DataImportExecutor $executor,
         private readonly ImportTemplateGenerator $templates,
         private readonly ImportStagingService $staging,
+        private readonly HimsNotificationService $notifications,
     ) {}
 
     /**
@@ -227,9 +231,31 @@ class ImportController extends Controller implements HasMiddleware
                 'target' => $target,
             ]);
         } catch (Throwable $e) {
+            report($e);
+
+            $targetName = match ($target) {
+                'items' => 'inventory items',
+                'locations' => 'storage locations',
+                'suppliers' => 'suppliers',
+                default => 'records',
+            };
+
+            try {
+                $this->notifications->sendToUser(
+                    $user,
+                    'import-failed:'.hash('sha256', $token),
+                    'Data import failed',
+                    "The {$targetName} import failed and no records were committed. Review the file and try again.",
+                    NotificationPriority::Warning,
+                    NotificationDestination::Import,
+                );
+            } catch (Throwable $notificationException) {
+                report($notificationException);
+            }
+
             return response()->json([
                 'success' => false,
-                'message' => 'Database transaction failed during import: '.$e->getMessage(),
+                'message' => 'The import could not be completed. No records were committed. Review the file and try again.',
             ], 500);
         }
     }

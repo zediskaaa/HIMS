@@ -25,6 +25,7 @@ use App\Http\Controllers\Inventory\StockTransferController;
 use App\Http\Controllers\Inventory\StorageLocationController;
 use App\Http\Controllers\Inventory\TelemetryController;
 use App\Http\Controllers\Inventory\WarehouseTaskController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
@@ -55,6 +56,14 @@ Route::get('/dashboard/live', [InventoryController::class, 'live'])->middleware(
  * who holds what, and /admin/permissions for the matrix that renders it.
  */
 Route::middleware('auth:web,admin,super_admin')->group(function () {
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead'])
+        ->whereUuid('notification')
+        ->name('notifications.read');
+    Route::get('/notifications/{notification}', [NotificationController::class, 'open'])
+        ->whereUuid('notification')
+        ->name('notifications.open');
+
     Route::get('/inventory', function () {
         return redirect()->route('dashboard');
     })->name('inventory');

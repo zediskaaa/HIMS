@@ -23,8 +23,8 @@ class StockAdjustmentController extends Controller implements HasMiddleware
     {
         return [
             'auth:web,admin,super_admin',
-            new Middleware('can:' . Permission::AdjustStock->value, only: ['index', 'store']),
-            new Middleware('can:' . Permission::ApproveAdjustment->value, only: ['approve']),
+            new Middleware('can:' . Permission::AdjustStock->value, only: ['store']),
+            new Middleware('can:' . Permission::ApproveAdjustment->value, only: ['index', 'approve']),
         ];
     }
 

@@ -4,6 +4,8 @@ namespace App\Services\Inventory;
 
 use App\Enums\AuditAction;
 use App\Enums\MovementType;
+use App\Enums\NotificationDestination;
+use App\Enums\NotificationPriority;
 use App\Enums\Permission;
 use App\Enums\WarehouseTaskType;
 use App\Models\InventoryItem;
@@ -14,6 +16,7 @@ use App\Models\StorageLocation;
 use App\Models\User;
 use App\Models\WarehouseTask;
 use App\Services\AuditLogger;
+use App\Services\HimsNotificationService;
 use App\Services\InventoryAutomationService;
 use App\Services\Warehouse\WarehouseTaskService;
 use Carbon\Carbon;
@@ -28,6 +31,7 @@ class IssuanceEngine
         private readonly InventoryAutomationService $automationService,
         private readonly AuditLogger $auditLogger,
         private readonly WarehouseTaskService $warehouseTasks,
+        private readonly HimsNotificationService $notifications,
     ) {}
 
     /**
@@ -37,7 +41,7 @@ class IssuanceEngine
      */
     public function createRequisition(array $data, User $requester): MaterialRequisition
     {
-        return DB::transaction(function () use ($data, $requester) {
+        $requisition = DB::transaction(function () use ($data, $requester) {
             $reqNumber = self::generateRequisitionNumber();
 
             $requisition = MaterialRequisition::create([
@@ -95,6 +99,25 @@ class IssuanceEngine
 
             return $requisition;
         });
+
+        $priority = match ($requisition->urgency) {
+            'stat_emergency' => NotificationPriority::Critical,
+            'urgent' => NotificationPriority::Warning,
+            default => NotificationPriority::Info,
+        };
+
+        $this->notifications->sendToPermission(
+            Permission::ApproveRequisition,
+            "material-requisition:{$requisition->id}:approval",
+            'Requisition approval required',
+            "{$requisition->requisition_number} from {$requisition->department} is awaiting approval.",
+            $priority,
+            NotificationDestination::MaterialRequisition,
+            ['requisition' => $requisition->id],
+            $requester,
+        );
+
+        return $requisition;
     }
 
     /**

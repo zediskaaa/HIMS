@@ -68,7 +68,7 @@
                 <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
                     <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">Dual-Tier Required</p>
                     <p class="mt-2 text-2xl font-bold text-rose-600">
-                        {{ $adjustments->where('status', 'second_approval_required')->count() }}
+                        {{ $adjustments->where('status', 'pending_second_approval')->count() }}
                     </p>
                     <p class="mt-1 text-xs text-neutral-500">Over ₱25,000 threshold</p>
                 </div>
@@ -200,7 +200,7 @@
                                             <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
                                                 Tier 1 Review Pending
                                             </span>
-                                        @elseif($adj->status === 'second_approval_required')
+                                        @elseif($adj->status === 'pending_second_approval')
                                             <span class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-semibold text-purple-800">
                                                 Tier 2 Executive Sign-Off Required
                                             </span>
@@ -215,14 +215,14 @@
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-right">
-                                        @if(in_array($adj->status, ['pending_approval', 'second_approval_required']) && auth()->user()->can(\App\Enums\Permission::ApproveAdjustment->value))
-                                            @if($adj->status === 'second_approval_required' && auth()->id() === $adj->approved_by_id)
+                                        @if(in_array($adj->status, ['pending_approval', 'pending_second_approval']) && auth()->user()->can(\App\Enums\Permission::ApproveAdjustment->value))
+                                            @if($adj->status === 'pending_second_approval' && auth()->id() === $adj->approved_by_id)
                                                 <span class="text-xs text-neutral-400 italic">Signed (Tier 1)</span>
                                             @else
                                                 <form action="{{ route('inventory.adjustments.approve', $adj) }}" method="POST" class="inline">
                                                     @csrf
                                                     <button type="submit" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
-                                                        {{ $adj->status === 'second_approval_required' ? 'Tier 2 Authorize' : 'Authorize Adjustment' }}
+                                                        {{ $adj->status === 'pending_second_approval' ? 'Tier 2 Authorize' : 'Authorize Adjustment' }}
                                                     </button>
                                                 </form>
                                             @endif

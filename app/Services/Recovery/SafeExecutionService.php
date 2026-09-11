@@ -3,10 +3,14 @@
 namespace App\Services\Recovery;
 
 use App\Enums\AuditAction;
+use App\Enums\NotificationDestination;
+use App\Enums\NotificationPriority;
+use App\Enums\Permission;
 use App\Exceptions\SafeOperationException;
 use App\Models\SystemRecoveryRecord;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\HimsNotificationService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,7 +27,8 @@ class SafeExecutionService
     private const SENSITIVE_KEY_PATTERN = '/(?:password|passphrase|token|secret|otp|totp|authorization|cookie|session|api[_-]?key|private[_-]?key|file[_-]?(?:content|contents)|document[_-]?content)/i';
 
     public function __construct(
-        private readonly AuditLogger $auditLogger
+        private readonly AuditLogger $auditLogger,
+        private readonly HimsNotificationService $notifications,
     ) {}
 
     /**
@@ -223,6 +228,23 @@ class SafeExecutionService
             );
         } catch (Throwable $auditException) {
             Log::error('Failed to write audit log for recovery record: ' . $auditException->getMessage());
+        }
+
+        try {
+            $this->notifications->sendToPermission(
+                Permission::ManageSystemRecovery,
+                "system-recovery-record:{$record->id}",
+                'Critical system event',
+                "Incident {$errorId} in {$module} requires review in the Recovery Center.",
+                NotificationPriority::Critical,
+                NotificationDestination::RecoveryRecord,
+                ['record' => $record->id],
+            );
+        } catch (Throwable $notificationException) {
+            Log::error('Failed to create a recovery notification.', [
+                'recovery_record_id' => $record->id,
+                'exception_class' => $notificationException::class,
+            ]);
         }
 
         return $record;

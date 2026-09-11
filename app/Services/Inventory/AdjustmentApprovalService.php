@@ -4,12 +4,17 @@ namespace App\Services\Inventory;
 
 use App\Enums\AuditAction;
 use App\Enums\MovementType;
+use App\Enums\NotificationDestination;
+use App\Enums\NotificationPriority;
+use App\Enums\Permission;
+use App\Enums\UserRole;
 use App\Models\InventoryAdjustment;
 use App\Models\InventoryItem;
 use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\HimsNotificationService;
 use App\Services\InventoryAutomationService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +24,8 @@ class AdjustmentApprovalService
 {
     public function __construct(
         private readonly InventoryAutomationService $automationService,
-        private readonly AuditLogger $auditLogger
+        private readonly AuditLogger $auditLogger,
+        private readonly HimsNotificationService $notifications,
     ) {}
 
     /**
@@ -29,7 +35,7 @@ class AdjustmentApprovalService
      */
     public function requestAdjustment(array $data, User $requester): InventoryAdjustment
     {
-        return DB::transaction(function () use ($data, $requester) {
+        $adjustment = DB::transaction(function () use ($data, $requester) {
             $item = InventoryItem::lockForUpdate()->findOrFail($data['item_id']);
             $location = StorageLocation::findOrFail($data['storage_location_id']);
             $batchId = $data['item_batch_id'] ?? null;
@@ -82,6 +88,20 @@ class AdjustmentApprovalService
 
             return $adjustment;
         });
+
+        $this->notifications->sendToPermission(
+            Permission::ApproveAdjustment,
+            "inventory-adjustment:{$adjustment->id}:tier-1",
+            'Stock adjustment approval required',
+            "{$adjustment->adjustment_number} is awaiting authorization.",
+            abs((float) $adjustment->total_variance_value) > 25000
+                ? NotificationPriority::Warning
+                : NotificationPriority::Info,
+            NotificationDestination::InventoryAdjustments,
+            except: $requester,
+        );
+
+        return $adjustment;
     }
 
     /**
@@ -90,7 +110,7 @@ class AdjustmentApprovalService
      */
     public function approveAndPost(InventoryAdjustment $adjustment, User $approver): InventoryAdjustment
     {
-        return DB::transaction(function () use ($adjustment, $approver) {
+        $updated = DB::transaction(function () use ($adjustment, $approver) {
             $adj = InventoryAdjustment::lockForUpdate()->with('item')->findOrFail($adjustment->id);
 
             // Segregation of Duties: Requester cannot approve their own adjustment
@@ -186,5 +206,19 @@ class AdjustmentApprovalService
 
             return $adj;
         });
+
+        if ($updated->status === 'pending_second_approval') {
+            $this->notifications->sendToRoles(
+                [UserRole::Administrator],
+                "inventory-adjustment:{$updated->id}:tier-2",
+                'Second stock adjustment approval required',
+                "High-value adjustment {$updated->adjustment_number} requires a distinct second authorization.",
+                NotificationPriority::Warning,
+                NotificationDestination::InventoryAdjustments,
+                except: $approver,
+            );
+        }
+
+        return $updated;
     }
 }

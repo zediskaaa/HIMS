@@ -4,6 +4,8 @@ namespace App\Services\Procurement;
 
 use App\Enums\ApprovalChainType;
 use App\Enums\ApprovalStepStatus;
+use App\Enums\NotificationDestination;
+use App\Enums\NotificationPriority;
 use App\Enums\UserRole;
 use App\Models\ApprovalChain;
 use App\Models\ApprovalStep;
@@ -11,11 +13,14 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Models\SourcingRfq;
 use App\Models\User;
+use App\Services\HimsNotificationService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
 class ApprovalRoutingEngine
 {
+    public function __construct(private readonly HimsNotificationService $notifications) {}
+
     /**
      * Determine and instantiate an Approval Chain for a Purchase Request.
      */
@@ -53,7 +58,7 @@ class ApprovalRoutingEngine
         float $commitmentAmount,
         User $initiator
     ): ApprovalChain {
-        return DB::transaction(function () use ($chainType, $targetId, $commitmentAmount, $initiator) {
+        $chain = DB::transaction(function () use ($chainType, $targetId, $commitmentAmount) {
             $chain = ApprovalChain::create([
                 'chain_type' => $chainType,
                 'target_id' => $targetId,
@@ -108,6 +113,10 @@ class ApprovalRoutingEngine
 
             return $chain;
         });
+
+        $this->notifyCurrentStep($chain, $initiator);
+
+        return $chain;
     }
 
     /**
@@ -118,7 +127,7 @@ class ApprovalRoutingEngine
         User $approver,
         string $decisionNotes = null
     ): ApprovalStep {
-        return DB::transaction(function () use ($chain, $approver, $decisionNotes) {
+        $approvedStep = DB::transaction(function () use ($chain, $approver, $decisionNotes) {
             $step = $chain->currentPendingStep();
 
             if (! $step) {
@@ -155,6 +164,10 @@ class ApprovalRoutingEngine
 
             return $step;
         });
+
+        $this->notifyCurrentStep($chain->fresh(), $approver);
+
+        return $approvedStep;
     }
 
     /**
@@ -212,6 +225,31 @@ class ApprovalRoutingEngine
         }
 
         return $user->role->value === $requiredRole;
+    }
+
+    private function notifyCurrentStep(ApprovalChain $chain, User $except): void
+    {
+        $step = $chain->currentPendingStep();
+        $role = $step === null ? null : UserRole::tryFrom($step->required_role);
+
+        if ($step === null || $role === null) {
+            return;
+        }
+
+        $this->notifications->sendToRoles(
+            [$role],
+            "approval-chain:{$chain->id}:step:{$step->id}",
+            'Procurement approval required',
+            sprintf(
+                '%s #%d is awaiting your step %d approval.',
+                $chain->chain_type->label(),
+                $chain->target_id,
+                $step->step_number,
+            ),
+            NotificationPriority::Info,
+            NotificationDestination::Procurement,
+            except: $except,
+        );
     }
 
     private function applyApprovedStateToTarget(ApprovalChain $chain): void

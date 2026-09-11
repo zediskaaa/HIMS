@@ -3,17 +3,23 @@
 namespace App\Providers;
 
 use App\Enums\AuditAction;
+use App\Enums\NotificationDestination;
+use App\Enums\NotificationPriority;
 use App\Enums\Permission;
 use App\Models\User;
 use App\Observers\UserObserver;
 use App\Services\AuditLogger;
+use App\Services\HimsNotificationService;
 use App\Support\AuthenticationPanel;
+use App\View\Composers\NotificationComposer;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Auth\Events\PasswordReset as PasswordResetEvent;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -34,6 +40,7 @@ class AppServiceProvider extends ServiceProvider
         $this->registerPermissionGates();
         $this->registerAuditLogging();
         $this->registerPasswordResetUrls();
+        View::composer('layouts.partials.topbar', NotificationComposer::class);
     }
 
     /**
@@ -121,6 +128,30 @@ class AppServiceProvider extends ServiceProvider
                     'Account',
                 );
             }
+        });
+
+        Event::listen(function (PasswordResetEvent $event): void {
+            if (! $event->user instanceof User) {
+                return;
+            }
+
+            $auditLog = app(AuditLogger::class)->log(
+                AuditAction::ChangedPassword,
+                null,
+                'Reset an account password using the verified password-recovery flow.',
+                $event->user,
+                $event->user->name,
+                source: 'system',
+            );
+
+            app(HimsNotificationService::class)->sendToUser(
+                $event->user,
+                "password-reset:{$auditLog->event_id}",
+                'Password reset completed',
+                'Your HIMS password was reset. Contact an administrator immediately if this was not you.',
+                NotificationPriority::Warning,
+                NotificationDestination::Profile,
+            );
         });
     }
 }

@@ -4,6 +4,9 @@ namespace App\Services;
 
 use App\Enums\AlertStatus;
 use App\Enums\AlertType;
+use App\Enums\NotificationDestination;
+use App\Enums\NotificationPriority;
+use App\Enums\Permission;
 use App\Models\InventoryItem;
 use App\Models\ItemBatch;
 use App\Models\StockAlert;
@@ -18,6 +21,8 @@ use Illuminate\Support\Facades\DB;
  */
 class StockAlertService
 {
+    public function __construct(private readonly HimsNotificationService $notifications) {}
+
     /**
      * Re-evaluate a single item's stock alerts.
      *
@@ -171,16 +176,37 @@ class StockAlertService
                 'message',
             ])))->save();
 
+            if ($existing->status === AlertStatus::Open) {
+                $this->notifyAlert($existing);
+            }
+
             return 0;
         }
 
-        StockAlert::create(array_merge($attributes, [
+        $alert = StockAlert::create(array_merge($attributes, [
             'type' => $type,
             'severity' => $type->defaultSeverity(),
             'status' => AlertStatus::Open,
         ]));
 
+        $this->notifyAlert($alert);
+
         return 1;
+    }
+
+    private function notifyAlert(StockAlert $alert): void
+    {
+        $this->notifications->sendToPermission(
+            Permission::AcknowledgeAlerts,
+            "stock-alert:{$alert->id}",
+            $alert->type->label(),
+            (string) $alert->message,
+            match ($alert->type) {
+                AlertType::OutOfStock, AlertType::Expired => NotificationPriority::Critical,
+                default => NotificationPriority::Warning,
+            },
+            NotificationDestination::InventoryAlerts,
+        );
     }
 
     /**
