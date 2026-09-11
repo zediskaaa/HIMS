@@ -65,6 +65,23 @@ class DemoSeedTest extends TestCase
         $this->assertAuthenticated(AuthenticationContext::ADMIN_GUARD);
     }
 
+    public function test_reseeding_preserves_demo_accounts_and_passwords_without_duplicates(): void
+    {
+        $admin = User::where('email', 'test@example.com')->firstOrFail();
+        $admin->forceFill(['department' => 'Locally Customized Department'])->save();
+        $counts = [User::count(), PasswordHistory::count(), InventoryItem::count()];
+
+        $this->seed(DatabaseSeeder::class);
+
+        $this->assertSame($counts, [User::count(), PasswordHistory::count(), InventoryItem::count()]);
+        $this->assertSame('Locally Customized Department', $admin->fresh()->department);
+
+        $this->post('/admin/login', [
+            'email' => 'test@example.com',
+            'password' => 'DemoAdmin1!',
+        ])->assertRedirect('/dashboard');
+    }
+
     public function test_every_seeded_item_has_consumption_history(): void
     {
         $items = InventoryItem::all();

@@ -19,14 +19,13 @@ use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class LogisticsDemoSeeder extends Seeder
 {
     public function run(): void
     {
         // 1. Ensure realistic users exist
-        $inventoryManager = User::firstOrCreate(
+        $inventoryManager = User::active()->role(UserRole::InventoryManager)->oldest('id')->first() ?? User::firstOrCreate(
             ['email' => 'manager.inv@hims.local'],
             [
                 'name' => 'Dr. Maria Santos, RPh',
@@ -37,7 +36,7 @@ class LogisticsDemoSeeder extends Seeder
             ]
         );
 
-        $warehouseStaff = User::firstOrCreate(
+        $warehouseStaff = User::active()->role(UserRole::WarehouseStaff)->oldest('id')->first() ?? User::firstOrCreate(
             ['email' => 'dock.officer@hims.local'],
             [
                 'name' => 'Eduardo Reyes',
@@ -261,7 +260,7 @@ class LogisticsDemoSeeder extends Seeder
                 'event_type' => 'dock_arrival',
                 'releasing_party_name' => 'Danilo Bautista (Zuellig Fleet)',
                 'receiving_user_id' => $warehouseStaff->id,
-                'receiving_party_name' => $warehouseStaff->name . ' (Receiving Officer)',
+                'receiving_party_name' => $warehouseStaff->name.' (Receiving Officer)',
                 'transferred_at' => now()->subHours(2),
                 'origin_location' => 'Zuellig Santa Rosa Logistics Hub',
                 'destination_location' => 'HIMS Central Receiving Dock Bay 1',

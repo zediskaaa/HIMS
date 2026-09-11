@@ -26,6 +26,12 @@ class InventoryDemoSeeder extends Seeder
 
     public function run(): void
     {
+        if (InventoryItem::query()->where('sku', 'PPE-MASK-N95')->exists()) {
+            $this->command?->line('Preserved existing inventory demonstration data.');
+
+            return;
+        }
+
         // Categories
         $medical = ItemCategory::create(['name' => 'Medical Supplies', 'code' => 'MED', 'is_active' => true]);
         $ppe = ItemCategory::create(['name' => 'PPE', 'code' => 'PPE', 'parent_id' => $medical->id, 'is_active' => true]);
@@ -189,7 +195,7 @@ class InventoryDemoSeeder extends Seeder
             ]);
         }
 
-        $this->command->info('Inventory demo data seeded: 3 categories, 6 locations, 1 supplier, 3 items with batches, stock levels and 90 days of consumption history.');
+        $this->command?->info('Inventory demo data seeded: 3 categories, 6 locations, 1 supplier, 3 items with batches, stock levels and 90 days of consumption history.');
     }
 
     /**
