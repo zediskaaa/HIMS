@@ -104,6 +104,27 @@ class InventoryReportTest extends TestCase
             ->assertDontSee('This area will contain inventory summaries');
     }
 
+    public function test_the_screen_renders_compact_tabbed_sections_and_preserves_print_compatibility(): void
+    {
+        $financialReader = User::factory()->inventoryManager()->create();
+        $nonFinancialReader = User::factory()->viewer()->create();
+
+        $response = $this->actingAs($financialReader)->get('/inventory/reports');
+
+        $response->assertStatus(200)
+            ->assertSee('Valuation &amp; Locations', false)
+            ->assertSee('Procurement &amp; Spending', false)
+            ->assertSee('Movements &amp; Consumption', false)
+            ->assertSee('Expiry Risk Batches', false)
+            ->assertSee('print:!block', false);
+
+        // A viewer without ViewProcurementSensitiveData does not see the procurement spending tab
+        $this->actingAs($nonFinancialReader)->get('/inventory/reports')
+            ->assertStatus(200)
+            ->assertDontSee('Procurement &amp; Spending', false);
+    }
+
+
     /**
      * The gate moved from InventoryController to ReportController when the
      * screen was split out, so assert it followed rather than assuming it did.
