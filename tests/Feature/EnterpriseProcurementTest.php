@@ -732,7 +732,7 @@ class EnterpriseProcurementTest extends TestCase
 
     public function test_multi_line_po_receiving_integrates_with_inventory_automation_service(): void
     {
-        $admin = $this->createAdmin();
+        $manager = $this->createManager();
         $location = $this->createStorageLocation();
         $supplier = $this->createEligibleSupplier();
 
@@ -779,7 +779,7 @@ class EnterpriseProcurementTest extends TestCase
         ]);
 
         // Receive delivery
-        $this->actingAs($admin)->post("/inventory/purchases/{$po->id}/receive", [
+        $this->actingAs($manager)->post("/inventory/purchases/{$po->id}/receive", [
             'storage_location_id' => $location->id,
             'notes' => 'Shipment received at main warehouse dock',
         ])->assertRedirect('/inventory/purchases');

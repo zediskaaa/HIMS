@@ -10,7 +10,7 @@
         <x-ui.stat label="Pending review" :value="$counts['pending']" icon="clipboard-document-list" tone="warning" />
     </div>
 
-    <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+    <div class="mt-6 {{ auth()->user()?->can('manage_suppliers') ? 'grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]' : '' }}">
         <x-ui.card title="Supplier directory" subtitle="Approval and compliance—not record existence—determine procurement eligibility." :padding="false">
             <form method="GET" class="grid gap-3 border-b border-neutral-200 p-4 md:grid-cols-3 xl:grid-cols-5" role="search">
                 <x-ui.field name="search" label="Search" :value="$filters['search'] ?? ''" placeholder="Name, TIN, or email" />
@@ -80,6 +80,7 @@
             @endif
         </x-ui.card>
 
+        @can('manage_suppliers')
         <x-ui.card title="Register supplier" subtitle="This creates a draft record; it does not approve the supplier.">
             <form method="POST" action="{{ route('inventory.suppliers.store') }}" class="space-y-4">
                 @csrf
@@ -100,5 +101,6 @@
                 <x-ui.button type="submit" class="w-full" data-loading-text="Creating supplier...">Create Draft Supplier</x-ui.button>
             </form>
         </x-ui.card>
+        @endcan
     </div>
 </x-app-layout>

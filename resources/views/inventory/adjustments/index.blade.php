@@ -80,6 +80,7 @@
                 </div>
             </div>
 
+            @can('adjust_stock')
             {{-- Apply / Request Adjustment Form Card --}}
             <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
                 <div class="border-b border-neutral-200 pb-4">
@@ -147,6 +148,7 @@
                     </div>
                 </form>
             </div>
+            @endcan
 
             {{-- Adjustments Registry Table --}}
             <div class="rounded-xl border border-neutral-200 bg-white shadow-sm overflow-hidden">

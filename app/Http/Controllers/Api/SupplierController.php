@@ -19,7 +19,10 @@ class SupplierController extends Controller implements HasMiddleware
 
     public static function middleware(): array
     {
-        return [new Middleware('can:'.Permission::ManageSuppliers->value)];
+        return [
+            new Middleware('can:'.Permission::ViewSuppliers->value, only: ['index', 'show']),
+            new Middleware('can:'.Permission::ManageSuppliers->value, only: ['store', 'update']),
+        ];
     }
 
     public function index(Request $request)

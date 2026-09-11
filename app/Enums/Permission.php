@@ -21,6 +21,8 @@ enum Permission: string
     // Read-only.
     case ViewInventory = 'view_inventory';
     case ViewReports = 'view_reports';
+    case ViewSuppliers = 'view_suppliers';
+    case ViewProcurement = 'view_procurement';
 
     // Day-to-day stock operations.
     case IssueStock = 'issue_stock';
@@ -80,6 +82,8 @@ enum Permission: string
         return match ($this) {
             self::ViewInventory => 'View stock levels',
             self::ViewReports => 'View reports',
+            self::ViewSuppliers => 'View supplier profiles',
+            self::ViewProcurement => 'View procurement and purchase orders',
             self::IssueStock => 'Issue and dispense stock',
             self::RecordMovements => 'Record stock movements',
             self::AcknowledgeAlerts => 'Acknowledge stock alerts',
@@ -133,6 +137,8 @@ enum Permission: string
         return match ($this) {
             self::ViewInventory => 'Read item records, stock levels and open alerts.',
             self::ViewReports => 'Read dashboards, stock levels and reports.',
+            self::ViewSuppliers => 'Read vendor profiles, compliance records, and performance scorecards.',
+            self::ViewProcurement => 'Read purchase requests, RFQs, comparative evaluations, and purchase orders.',
             self::IssueStock => 'Issue and dispense stock to wards and departments.',
             self::RecordMovements => 'Receive, transfer, dispose and return stock.',
             self::AcknowledgeAlerts => 'Acknowledge stock alerts.',
@@ -198,7 +204,7 @@ enum Permission: string
             self::ExecuteWarehouseTasks, self::ResolveWarehouseExceptions, self::PrintWarehouseLabels,
             self::ManageWarehouseTopology, self::ManageTelemetryExcursions, self::AccessNarcoticsVault,
             self::RecordConsignments => 'Warehousing',
-            self::ManageSuppliers, self::ReviewSupplierCompliance, self::ApproveSuppliers, self::ManageProcurement,
+            self::ViewSuppliers, self::ViewProcurement, self::ManageSuppliers, self::ReviewSupplierCompliance, self::ApproveSuppliers, self::ManageProcurement,
             self::CreateRequisition, self::ApproveRequisition, self::ManageSourcing, self::EvaluateBids,
             self::AwardProcurement, self::IssuePurchaseOrder, self::ApprovePurchaseOrder, self::ManageProcurementPolicy => 'Procurement',
             self::ViewLogisticsRecords, self::ManageLogisticsRecords, self::VerifyLogisticsDocuments,

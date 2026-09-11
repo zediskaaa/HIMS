@@ -44,21 +44,23 @@
                     <h3 class="text-lg font-semibold text-[var(--text)]">Inventory Items</h3>
                     <p class="mt-2 text-sm text-[var(--muted)]">Register stock items, track quantities, and link them to suppliers and warehouse locations.</p>
                 </a>
+                @endcan
 
+                @canany([\App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ViewWarehouseTasks->value])
                 <a href="{{ route('inventory.storage-locations') }}" class="block rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
                     <h3 class="text-lg font-semibold text-[var(--text)]">Storage Locations</h3>
                     <p class="mt-2 text-sm text-[var(--muted)]">Define warehouse zones, shelves, bins, and storage points for smart warehousing.</p>
                 </a>
-                @endcan
+                @endcanany
 
-                @can(\App\Enums\Permission::AdjustStock->value)
+                @canany([\App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::ApproveAdjustment->value])
                 <a href="{{ route('inventory.adjustments') }}" class="block rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
                     <h3 class="text-lg font-semibold text-[var(--text)]">Stock Adjustments</h3>
                     <p class="mt-2 text-sm text-[var(--muted)]">Correct discrepancies, record damage or loss, and update inventory counts safely.</p>
                 </a>
-                @endcan
+                @endcanany
 
-                @can(\App\Enums\Permission::ManageProcurement->value)
+                @can(\App\Enums\Permission::ViewProcurement->value)
                 <a href="{{ route('inventory.purchases') }}" class="block rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
                     <h3 class="text-lg font-semibold text-[var(--text)]">Purchase Orders & Receiving</h3>
                     <p class="mt-2 text-sm text-[var(--muted)]">Track purchase requisitions, purchase orders, and goods receiving.</p>
@@ -70,7 +72,9 @@
                     <h3 class="text-lg font-semibold text-[var(--text)]">Stock Movement & Transfers</h3>
                     <p class="mt-2 text-sm text-[var(--muted)]">Monitor stock in, stock out, internal transfers, and warehouse movement.</p>
                 </a>
+                @endcan
 
+                @can(\App\Enums\Permission::AcknowledgeAlerts->value)
                 <a href="{{ route('inventory.alerts') }}" class="block rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
                     <h3 class="text-lg font-semibold text-[var(--text)]">Low Stock & Alerts</h3>
                     <p class="mt-2 text-sm text-[var(--muted)]">Flag critical items, reorder points, and expiry risk.</p>

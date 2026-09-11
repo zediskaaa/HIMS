@@ -41,7 +41,14 @@ class ProcurementController extends Controller implements HasMiddleware
     {
         return [
             'auth:web,admin,super_admin',
-            new Middleware('can:'.Permission::ManageProcurement->value),
+            new Middleware('can:'.Permission::ViewProcurement->value, only: ['index']),
+            new Middleware('can:'.Permission::CreateRequisition->value, only: ['storeRequest', 'storeEnterpriseRequest']),
+            new Middleware('can:'.Permission::ManageSourcing->value, only: ['storeQuote', 'createEnterpriseRfq']),
+            new Middleware('can:'.Permission::EvaluateBids->value, only: ['evaluateRfqWeb']),
+            new Middleware('can:'.Permission::AwardProcurement->value, only: ['awardRfqWeb']),
+            new Middleware('can:'.Permission::ApprovePurchaseOrder->value, only: ['approveStepWeb', 'rejectStepWeb']),
+            new Middleware('can:'.Permission::IssuePurchaseOrder->value, only: ['generatePoFromAwardWeb']),
+            new Middleware('can:'.Permission::ApproveRequisition->value, only: ['approve']),
         ];
     }
 

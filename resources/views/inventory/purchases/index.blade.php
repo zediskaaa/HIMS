@@ -9,6 +9,7 @@
                 <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Procurement &amp; Strategic Sourcing</h2>
                 <p class="text-sm text-neutral-600">Enterprise requisition intake, sealed-bid sourcing, landed cost normalization, DOA approvals, and encumbered purchase orders.</p>
             </div>
+            @can('generate_forecasts')
             <div class="flex items-center gap-3">
                 <a href="{{ route('inventory.demand-forecast') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50">
                     <svg class="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -17,10 +18,18 @@
                     Demand Forecasts
                 </a>
             </div>
+            @endcan
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="{ activeTab: 'enterprise_s2p', selectedPoCxml: '', selectedPoNumber: '', showCxmlModal: false }">
+    @php
+        $defaultTab = 'enterprise_s2p';
+        if (!auth()->user()?->canany(['create_requisition', 'manage_sourcing', 'issue_purchase_order', 'manage_procurement'])) {
+            $defaultTab = 'orders_revisions';
+        }
+    @endphp
+
+    <div class="py-6" x-data="{ activeTab: '{{ $defaultTab }}', selectedPoCxml: '', selectedPoNumber: '', showCxmlModal: false }">
         <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
 
             {{-- Flash Notification Banners --}}
@@ -106,32 +115,46 @@
             {{-- Navigation Tabs --}}
             <div class="border-b border-neutral-200">
                 <nav class="-mb-px flex space-x-6 overflow-x-auto text-sm font-medium">
+                    @canany(['create_requisition', 'manage_sourcing', 'issue_purchase_order', 'manage_procurement'])
                     <button @click="activeTab = 'enterprise_s2p'" :class="activeTab === 'enterprise_s2p' ? 'border-primary-600 text-primary-600 border-b-2 font-semibold' : 'text-neutral-500 hover:text-neutral-700'" class="whitespace-nowrap py-3 px-1">
                         Enterprise Source-to-Pay Workspace
                     </button>
+                    @endcanany
+                    @canany(['manage_sourcing', 'evaluate_bids'])
                     <button @click="activeTab = 'sourcing_rfqs'" :class="activeTab === 'sourcing_rfqs' ? 'border-primary-600 text-primary-600 border-b-2 font-semibold' : 'text-neutral-500 hover:text-neutral-700'" class="whitespace-nowrap py-3 px-1">
                         Sourcing Events &amp; RFQs ({{ $rfqs->count() }})
                     </button>
+                    @endcanany
+                    @canany(['evaluate_bids', 'award_procurement'])
                     <button @click="activeTab = 'evaluations'" :class="activeTab === 'evaluations' ? 'border-primary-600 text-primary-600 border-b-2 font-semibold' : 'text-neutral-500 hover:text-neutral-700'" class="whitespace-nowrap py-3 px-1">
                         Comparative Evaluation &amp; Landed Cost Matrix
                     </button>
+                    @endcanany
+                    @can('approve_purchase_order')
                     <button @click="activeTab = 'doa_approvals'" :class="activeTab === 'doa_approvals' ? 'border-primary-600 text-primary-600 border-b-2 font-semibold' : 'text-neutral-500 hover:text-neutral-700'" class="whitespace-nowrap py-3 px-1">
                         Delegation of Authority (DOA) Hub
                     </button>
+                    @endcan
                     <button @click="activeTab = 'orders_revisions'" :class="activeTab === 'orders_revisions' ? 'border-primary-600 text-primary-600 border-b-2 font-semibold' : 'text-neutral-500 hover:text-neutral-700'" class="whitespace-nowrap py-3 px-1">
                         Purchase Orders &amp; Revisions
                     </button>
+                    @canany(['create_requisition', 'manage_sourcing', 'issue_purchase_order'])
                     <button @click="activeTab = 'legacy_canvass'" :class="activeTab === 'legacy_canvass' ? 'border-primary-600 text-primary-600 border-b-2 font-semibold' : 'text-neutral-500 hover:text-neutral-700'" class="whitespace-nowrap py-3 px-1">
                         Standard Canvassing (Stages 1-5)
                     </button>
+                    @endcanany
+                    @can('view_audit_trail')
                     <button @click="activeTab = 'audit_trail'" :class="activeTab === 'audit_trail' ? 'border-primary-600 text-primary-600 border-b-2 font-semibold' : 'text-neutral-500 hover:text-neutral-700'" class="whitespace-nowrap py-3 px-1">
                         Procurement Audit Trail
                     </button>
+                    @endcan
                 </nav>
             </div>
 
             {{-- ======================================================== TAB 1: Enterprise S2P Workspace --}}
+            @canany(['create_requisition', 'manage_sourcing', 'issue_purchase_order', 'manage_procurement'])
             <div x-show="activeTab === 'enterprise_s2p'" class="space-y-6">
+                @can('create_requisition')
                 {{-- Department Requisition Intake with Synchronous Budget Soft Commitment --}}
                 <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm"
                      x-data="{
@@ -295,6 +318,7 @@
                         </div>
                     </form>
                 </div>
+                @endcan
 
                 {{-- Enterprise Requisitions Table --}}
                 <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
@@ -372,13 +396,17 @@
                                             </span>
                                         </td>
                                         <td class="px-3.5 py-3">
-                                            @if(($pr->status->value ?? $pr->status) === 'approved' || ($pr->status->value ?? $pr->status) === 'pending_approval')
-                                                <button @click="activeTab = 'sourcing_rfqs'" class="text-xs font-semibold text-primary-600 hover:underline inline-flex items-center gap-1">
-                                                    Package into RFQ &rarr;
-                                                </button>
+                                            @can('manage_sourcing')
+                                                @if(($pr->status->value ?? $pr->status) === 'approved' || ($pr->status->value ?? $pr->status) === 'pending_approval')
+                                                    <button @click="activeTab = 'sourcing_rfqs'" class="text-xs font-semibold text-primary-600 hover:underline inline-flex items-center gap-1">
+                                                        Package into RFQ &rarr;
+                                                    </button>
+                                                @else
+                                                    <span class="text-xs text-neutral-400">Processed</span>
+                                                @endif
                                             @else
-                                                <span class="text-xs text-neutral-400">Processed</span>
-                                            @endif
+                                                <span class="text-xs text-neutral-400">{{ ucfirst(str_replace('_', ' ', $pr->status->value ?? $pr->status)) }}</span>
+                                            @endcan
                                         </td>
                                     </tr>
                                 @empty
@@ -391,9 +419,12 @@
                     </div>
                 </div>
             </div>
+            @endcanany
 
             {{-- ======================================================== TAB 2: Sourcing Events & RFQs --}}
+            @canany(['manage_sourcing', 'evaluate_bids'])
             <div x-show="activeTab === 'sourcing_rfqs'" class="space-y-6">
+                @can('manage_sourcing')
                 {{-- Create RFQ Package Card --}}
                 <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
                     <div class="flex items-center justify-between border-b border-neutral-100 pb-4">
@@ -453,6 +484,7 @@
                         </div>
                     </form>
                 </div>
+                @endcan
 
                 {{-- Published RFQs Table --}}
                 <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
@@ -542,6 +574,7 @@
                                                     <button @click="activeTab = 'evaluations'" type="button" class="inline-flex items-center gap-1 rounded bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 shadow-sm">
                                                         View Matrix
                                                     </button>
+                                                    @can('evaluate_bids')
                                                     <form method="POST" action="{{ route('inventory.purchases.rfqs.evaluate', $rfq) }}">
                                                         @csrf
                                                         <button type="submit" title="Re-run comparative evaluation matrix" class="rounded border border-neutral-200 p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 transition">
@@ -550,8 +583,10 @@
                                                             </svg>
                                                         </button>
                                                     </form>
+                                                    @endcan
                                                 </div>
                                             @else
+                                                @can('evaluate_bids')
                                                 <form method="POST" action="{{ route('inventory.purchases.rfqs.evaluate', $rfq) }}">
                                                     @csrf
                                                     <button type="submit" class="inline-flex items-center gap-1 rounded bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-800 shadow-sm transition">
@@ -561,6 +596,9 @@
                                                         Run Evaluation Matrix
                                                     </button>
                                                 </form>
+                                                @else
+                                                <span class="text-xs text-neutral-400">Awaiting Evaluation</span>
+                                                @endcan
                                             @endif
                                         </td>
                                     </tr>
@@ -574,8 +612,10 @@
                     </div>
                 </div>
             </div>
+            @endcanany
 
             {{-- ======================================================== TAB 3: Comparative Evaluation & Landed Cost Matrix --}}
+            @canany(['evaluate_bids', 'award_procurement'])
             <div x-show="activeTab === 'evaluations'" class="space-y-6">
                 <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
                     <div class="flex items-center justify-between border-b border-neutral-100 pb-4">
@@ -635,6 +675,7 @@
                                                             #1 Ranked Winner
                                                         </span>
                                                         @if($activeEvaluatedRfq->status->value !== 'awarded')
+                                                            @can('award_procurement')
                                                             <form method="POST" action="{{ route('inventory.purchases.rfqs.award', $activeEvaluatedRfq) }}" class="mt-1">
                                                                 @csrf
                                                                 <input type="hidden" name="supplier_quote_id" value="{{ $eval->supplier_quote_id }}">
@@ -642,6 +683,9 @@
                                                                     Award &amp; Initiate DOA
                                                                 </button>
                                                             </form>
+                                                            @else
+                                                            <span class="text-xs text-neutral-500 block mt-1">Ready for Award</span>
+                                                            @endcan
                                                         @else
                                                             <span class="text-xs text-neutral-500 block mt-1">Awarded</span>
                                                         @endif
@@ -663,8 +707,10 @@
                     @endif
                 </div>
             </div>
+            @endcanany
 
             {{-- ======================================================== TAB 4: Delegation of Authority (DOA) Hub --}}
+            @can('approve_purchase_order')
             <div x-show="activeTab === 'doa_approvals'" class="space-y-6">
                 <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
                     <div class="flex items-center justify-between border-b border-neutral-100 pb-4">
@@ -708,6 +754,7 @@
                                 </div>
 
                                 @if($chain->status === 'pending')
+                                    @can('approve_purchase_order')
                                     <div class="mt-4 flex items-center justify-end gap-2 border-t border-neutral-100 pt-3">
                                         <form method="POST" action="{{ route('inventory.purchases.approval-chains.approve', $chain) }}">
                                             @csrf
@@ -723,6 +770,7 @@
                                             </button>
                                         </form>
                                     </div>
+                                    @endcan
                                 @endif
                             </div>
                         @empty
@@ -731,9 +779,11 @@
                     </div>
                 </div>
             </div>
+            @endcan
 
             {{-- ======================================================== TAB 5: Purchase Orders, Revisions & cXML Payloads --}}
             <div x-show="activeTab === 'orders_revisions'" class="space-y-6">
+                @can('issue_purchase_order')
                 {{-- Issue Direct Purchase Order Card --}}
                 <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm"
                      x-data="{
@@ -883,6 +933,7 @@
                         </div>
                     </form>
                 </div>
+                @endcan
 
                 {{-- Purchase Orders Ledger Table --}}
                 <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
@@ -956,22 +1007,33 @@
                                         </td>
                                         <td class="px-3.5 py-3">
                                             <div class="flex items-center gap-2">
-                                                @if($po->status !== 'received' && $po->status !== 'fulfilled')
-                                                    <form method="POST" action="{{ route('inventory.purchases.receive', $po) }}" class="inline"
-                                                          data-confirm-title="Receive Purchase Order"
-                                                          data-confirm-message="Are you sure you want to receive this delivery into stock?"
-                                                          data-confirm-label="Receive Delivery">
-                                                        @csrf
-                                                        <button type="submit" class="rounded bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-primary-700 shadow-sm">
-                                                            Receive
-                                                        </button>
-                                                    </form>
+                                                @can('receive_purchase_order')
+                                                    @if($po->status !== 'received' && $po->status !== 'fulfilled')
+                                                        <form method="POST" action="{{ route('inventory.purchases.receive', $po) }}" class="inline"
+                                                              data-confirm-title="Receive Purchase Order"
+                                                              data-confirm-message="Are you sure you want to receive this delivery into stock?"
+                                                              data-confirm-label="Receive Delivery">
+                                                            @csrf
+                                                            <button type="submit" class="rounded bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-primary-700 shadow-sm">
+                                                                Receive
+                                                            </button>
+                                                        </form>
+                                                    @else
+                                                        <span class="text-xs text-emerald-700 font-semibold inline-flex items-center gap-1">
+                                                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                            Stock Posted
+                                                        </span>
+                                                    @endif
                                                 @else
-                                                    <span class="text-xs text-emerald-700 font-semibold inline-flex items-center gap-1">
-                                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                                        Stock Posted
-                                                    </span>
-                                                @endif
+                                                    @if($po->status === 'received' || $po->status === 'fulfilled')
+                                                        <span class="text-xs text-emerald-700 font-semibold inline-flex items-center gap-1">
+                                                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                            Stock Posted
+                                                        </span>
+                                                    @else
+                                                        <span class="text-xs text-neutral-400 italic">Pending Delivery</span>
+                                                    @endif
+                                                @endcan
 
                                                 @if($po->cxml_payload)
                                                     <button type="button"
@@ -1018,6 +1080,7 @@
                     <x-ui.loader id="demand-plans-api-status" size="sm" label="Loading demand plans from API..." class="mt-3 text-sm text-[var(--muted)]" />
                 </div>
 
+                @can('create_requisition')
                 {{-- Stage 2 • Procurement request --}}
                 <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
                     <h3 class="text-lg font-semibold text-[var(--text)]">Stage 2 • Procurement request</h3>
@@ -1086,6 +1149,7 @@
                         </div>
                     </form>
                 </div>
+                @endcan
 
                 {{-- Procurement requests API-fed list --}}
                 <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
@@ -1096,6 +1160,7 @@
                     <x-ui.loader id="procurement-requests-api-status" size="sm" label="Loading procurement requests from API..." class="mt-3 text-sm text-[var(--muted)]" />
                 </div>
 
+                @can('manage_sourcing')
                 {{-- Stage 3 • Supplier quotation --}}
                 <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
                     <h3 class="text-lg font-semibold text-[var(--text)]">Stage 3 &bull; Supplier quotation</h3>
@@ -1151,6 +1216,7 @@
                         </form>
                     @endif
                 </div>
+                @endcan
 
                 {{-- Supplier quotations API list --}}
                 <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
@@ -1161,6 +1227,7 @@
                     <x-ui.loader id="supplier-quotes-api-status" size="sm" label="Loading supplier quotes from API..." class="mt-3 text-sm text-[var(--muted)]" />
                 </div>
 
+                @can('issue_purchase_order')
                 {{-- Stage 4: Purchase order --}}
                 <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm"
                      x-data="{
@@ -1250,6 +1317,7 @@
                         </div>
                     </form>
                 </div>
+                @endcan
 
                 {{-- Purchase orders table --}}
                 <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
@@ -1279,6 +1347,7 @@
             </div>
 
             {{-- ======================================================== TAB 7: Procurement Audit Trail --}}
+            @can('view_audit_trail')
             <div x-show="activeTab === 'audit_trail'" class="space-y-6">
                 <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
                     <h3 class="text-lg font-bold text-neutral-900">Append-Only Procurement Audit Ledger</h3>
@@ -1320,6 +1389,7 @@
                     </div>
                 </div>
             </div>
+            @endcan
 
             {{-- B2B cXML Modal Viewer --}}
             <div x-show="showCxmlModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">

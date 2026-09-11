@@ -26,13 +26,16 @@ class ConsignmentController extends Controller implements HasMiddleware
     {
         return [
             'auth:web,admin,super_admin',
-            new Middleware('can:'.Permission::ViewWarehouseTasks->value, only: ['index']),
             new Middleware('can:'.Permission::RecordConsignments->value, only: ['consume']),
         ];
     }
 
     public function index(Request $request): View
     {
+        abort_unless(
+            $request->user()->can(Permission::ViewWarehouseTasks->value) || $request->user()->can(Permission::RecordConsignments->value),
+            403
+        );
         $consignmentItems = InventoryItem::where('is_consignment', true)->orderBy('name')->get();
         $consignmentLocations = StorageLocation::active()->orderBy('code')->get();
 

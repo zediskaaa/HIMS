@@ -35,6 +35,7 @@
     <div class="mt-6 space-y-6">
         <section id="overview" class="scroll-mt-20 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
             <x-ui.card title="Supplier master" subtitle="Business identity and procurement-planning defaults.">
+                @can('manage_suppliers')
                 <form method="POST" action="{{ route('inventory.suppliers.update', $supplier) }}" class="grid gap-4 md:grid-cols-2">
                     @csrf
                     @method('PATCH')
@@ -59,6 +60,23 @@
                     <x-ui.field name="notes" label="Internal notes" type="textarea" rows="2" :value="$supplier->notes" />
                     <div class="md:col-span-2"><x-ui.button type="submit" data-loading-text="Saving supplier...">Save Supplier Information</x-ui.button></div>
                 </form>
+                @else
+                <div class="grid gap-4 md:grid-cols-2 text-sm">
+                    <div><span class="text-xs font-semibold uppercase text-neutral-500">Legal / Registered Name</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->name }}</p></div>
+                    <div><span class="text-xs font-semibold uppercase text-neutral-500">Trade Name</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->trade_name ?: '—' }}</p></div>
+                    <div><span class="text-xs font-semibold uppercase text-neutral-500">Business Structure</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->business_structure ? str($supplier->business_structure)->headline() : '—' }}</p></div>
+                    <div><span class="text-xs font-semibold uppercase text-neutral-500">Tax Identifier (TIN)</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->tax_number ?: '—' }}</p></div>
+                    <div><span class="text-xs font-semibold uppercase text-neutral-500">General Email</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->email ?: '—' }}</p></div>
+                    <div><span class="text-xs font-semibold uppercase text-neutral-500">Phone</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->phone ?: '—' }}</p></div>
+                    <div class="md:col-span-2"><span class="text-xs font-semibold uppercase text-neutral-500">Registered Address</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->address ?: '—' }}</p></div>
+                    <div><span class="text-xs font-semibold uppercase text-neutral-500">Billing Address</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->billing_address ?: '—' }}</p></div>
+                    <div><span class="text-xs font-semibold uppercase text-neutral-500">Delivery Address</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->delivery_address ?: '—' }}</p></div>
+                    <div><span class="text-xs font-semibold uppercase text-neutral-500">Standard Lead Time</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->standard_lead_time_days !== null ? $supplier->standard_lead_time_days.' days' : '—' }}</p></div>
+                    <div><span class="text-xs font-semibold uppercase text-neutral-500">Regulated Health Products</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->provides_regulated_health_products ? 'Yes (FDA Regulated)' : 'No' }}</p></div>
+                    <div class="md:col-span-2"><span class="text-xs font-semibold uppercase text-neutral-500">Default Payment Terms</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->payment_terms ?: '—' }}</p></div>
+                    <div class="md:col-span-2"><span class="text-xs font-semibold uppercase text-neutral-500">Internal Notes</span><p class="mt-1 font-medium text-neutral-900">{{ $supplier->notes ?: '—' }}</p></div>
+                </div>
+                @endcan
             </x-ui.card>
 
             <div class="space-y-6">

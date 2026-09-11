@@ -30,38 +30,62 @@
 
                         <div x-show="inventoryOpen" class="absolute left-0 z-50 mt-2 w-96 rounded-xl border border-gray-200 bg-white p-3 shadow-xl" style="display: none;">
                             <div class="space-y-3">
+                                @canany([\App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::ManageLocations->value])
                                 <div>
                                     <div class="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-700">Smart Warehousing System (SWS)</div>
-                                    <a href="{{ route('inventory.warehousing.dashboard') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-primary-800 hover:bg-primary-50">Warehouse Dashboard</a>
-                                    <a href="{{ route('inventory.warehousing.locations') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Spatial Topology &amp; Locations</a>
-                                    <a href="{{ route('inventory.warehouse-tasks.index') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Warehouse Tasks &amp; Put-Away</a>
-                                    <a href="{{ route('inventory.warehousing.scan-station') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Scan Workstation</a>
-                                    <a href="{{ route('inventory.warehousing.telemetry') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Cold Chain &amp; IoT Telemetry</a>
-                                    <a href="{{ route('inventory.warehousing.narcotics') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">PDEA Narcotics Vault &amp; DDRB</a>
-                                    <a href="{{ route('inventory.warehousing.consignment') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Surgical Consignment Implants</a>
+                                    @can(\App\Enums\Permission::ViewWarehouseTasks->value)
+                                        <a href="{{ route('inventory.warehousing.dashboard') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-primary-800 hover:bg-primary-50">Warehouse Dashboard</a>
+                                        <a href="{{ route('inventory.warehousing.locations') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Spatial Topology &amp; Locations</a>
+                                        <a href="{{ route('inventory.warehouse-tasks.index') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Warehouse Tasks &amp; Put-Away</a>
+                                    @endcan
+                                    @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
+                                        <a href="{{ route('inventory.warehousing.scan-station') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Scan Workstation</a>
+                                    @endcan
+                                    @can(\App\Enums\Permission::ManageTelemetryExcursions->value)
+                                        <a href="{{ route('inventory.warehousing.telemetry') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Cold Chain &amp; IoT Telemetry</a>
+                                    @endcan
+                                    @can(\App\Enums\Permission::AccessNarcoticsVault->value)
+                                        <a href="{{ route('inventory.warehousing.narcotics') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">PDEA Narcotics Vault &amp; DDRB</a>
+                                    @endcan
+                                    @can(\App\Enums\Permission::RecordConsignments->value)
+                                        <a href="{{ route('inventory.warehousing.consignment') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Surgical Consignment Implants</a>
+                                    @endcan
                                 </div>
+                                @endcanany
 
+                                @can(\App\Enums\Permission::ViewInventory->value)
                                 <div>
                                     <div class="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500">Inventory Management System</div>
                                     <a href="{{ route('inventory.items') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Inventory Items</a>
-                                    <a href="{{ route('inventory.adjustments') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Stock Adjustments</a>
-                                    <a href="{{ route('inventory.reports') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Inventory Reports</a>
+                                    @canany([\App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::ApproveAdjustment->value])
+                                        <a href="{{ route('inventory.adjustments') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Stock Adjustments</a>
+                                    @endcanany
+                                    @can(\App\Enums\Permission::ViewReports->value)
+                                        <a href="{{ route('inventory.reports') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Inventory Reports</a>
+                                    @endcan
                                 </div>
+                                @endcan
 
+                                @can(\App\Enums\Permission::ViewProcurement->value)
                                 <div>
                                     <div class="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500">Procurement &amp; Sourcing Management (PSM)</div>
-                                    <a href="{{ route('inventory.purchases') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Purchase Orders & Receiving</a>
+                                    <a href="{{ route('inventory.purchases') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Purchase Orders &amp; Receiving</a>
                                 </div>
+                                @endcan
 
+                                @can(\App\Enums\Permission::ViewSuppliers->value)
                                 <div>
                                     <div class="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500">Supplier / Vendor Management</div>
                                     <a href="{{ route('inventory.suppliers') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Supplier Directory</a>
                                 </div>
+                                @endcan
 
+                                @can(\App\Enums\Permission::ViewLogisticsRecords->value)
                                 <div>
                                     <div class="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500">Document Tracking &amp; Logistics Records System (DTRS)</div>
-                                    <a href="{{ route('inventory.logistics') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Logistics & Records</a>
+                                    <a href="{{ route('inventory.logistics') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Logistics &amp; Records</a>
                                 </div>
+                                @endcan
                             </div>
                         </div>
                     </div>
@@ -128,27 +152,39 @@
             <div class="px-4 py-2">
                 <div class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Inventory Modules</div>
                 <div class="mt-2 space-y-1">
-                    <x-responsive-nav-link :href="route('inventory')" :active="request()->routeIs('inventory')">
-                        {{ __('Inventory Dashboard') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('inventory.storage-locations')" :active="request()->routeIs('inventory.storage-locations')">
-                        {{ __('Storage Locations') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('inventory.items')" :active="request()->routeIs('inventory.items')">
-                        {{ __('Inventory Items') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('inventory.adjustments')" :active="request()->routeIs('inventory.adjustments')">
-                        {{ __('Stock Adjustments') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('inventory.suppliers')" :active="request()->routeIs('inventory.suppliers')">
-                        {{ __('Supplier / Vendor Management') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('inventory.purchases')" :active="request()->routeIs('inventory.purchases')">
-                        {{ __('Purchase Orders') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('inventory.logistics')" :active="request()->routeIs('inventory.logistics')">
-                        {{ __('Document Tracking & Logistics') }}
-                    </x-responsive-nav-link>
+                    @can(\App\Enums\Permission::ViewInventory->value)
+                        <x-responsive-nav-link :href="route('inventory')" :active="request()->routeIs('inventory')">
+                            {{ __('Inventory Dashboard') }}
+                        </x-responsive-nav-link>
+                        <x-responsive-nav-link :href="route('inventory.items')" :active="request()->routeIs('inventory.items')">
+                            {{ __('Inventory Items') }}
+                        </x-responsive-nav-link>
+                    @endcan
+                    @canany([\App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ViewWarehouseTasks->value])
+                        <x-responsive-nav-link :href="route('inventory.storage-locations')" :active="request()->routeIs('inventory.storage-locations')">
+                            {{ __('Storage Locations') }}
+                        </x-responsive-nav-link>
+                    @endcanany
+                    @canany([\App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::ApproveAdjustment->value])
+                        <x-responsive-nav-link :href="route('inventory.adjustments')" :active="request()->routeIs('inventory.adjustments')">
+                            {{ __('Stock Adjustments') }}
+                        </x-responsive-nav-link>
+                    @endcanany
+                    @can(\App\Enums\Permission::ViewSuppliers->value)
+                        <x-responsive-nav-link :href="route('inventory.suppliers')" :active="request()->routeIs('inventory.suppliers')">
+                            {{ __('Supplier / Vendor Management') }}
+                        </x-responsive-nav-link>
+                    @endcan
+                    @can(\App\Enums\Permission::ViewProcurement->value)
+                        <x-responsive-nav-link :href="route('inventory.purchases')" :active="request()->routeIs('inventory.purchases')">
+                            {{ __('Purchase Orders') }}
+                        </x-responsive-nav-link>
+                    @endcan
+                    @can(\App\Enums\Permission::ViewLogisticsRecords->value)
+                        <x-responsive-nav-link :href="route('inventory.logistics')" :active="request()->routeIs('inventory.logistics')">
+                            {{ __('Document Tracking & Logistics') }}
+                        </x-responsive-nav-link>
+                    @endcan
                 </div>
             </div>
         </div>

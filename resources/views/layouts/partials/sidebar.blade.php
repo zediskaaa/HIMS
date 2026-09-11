@@ -79,45 +79,13 @@
                             Cycle Counts
                         </x-ui.nav-item>
                     @endcan
-                    @can(\App\Enums\Permission::AdjustStock->value)
+                    @canany([\App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::ApproveAdjustment->value])
                         <x-ui.nav-item :href="route('inventory.adjustments')" icon="clipboard-document-list"
                                        :active="request()->routeIs('inventory.adjustments*')">
                             Adjustments
                         </x-ui.nav-item>
-                    @endcan
-                </div>
-            </div>
-        @endcanany
-
-        @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::InspectStock->value, \App\Enums\Permission::ViewWarehouseTasks->value])
-            <div>
-                <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                    Warehousing
-                </p>
-                <div class="space-y-0.5">
-                    @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
-                        <x-ui.nav-item :href="route('inventory.receiving.index')" icon="arrow-down-tray"
-                                       :active="request()->routeIs('inventory.receiving*')">
-                            Dock Receiving
-                        </x-ui.nav-item>
-                    @endcan
-                    @can(\App\Enums\Permission::InspectStock->value)
-                        <x-ui.nav-item :href="route('inventory.qc.index')" icon="shield-check"
-                                       :active="request()->routeIs('inventory.qc*')">
-                            QC Inspection Queue
-                        </x-ui.nav-item>
-                    @endcan
-                    @can(\App\Enums\Permission::ViewWarehouseTasks->value)
-                        <x-ui.nav-item :href="route('inventory.warehouse-tasks.index')" icon="clipboard-document-list"
-                                       :active="request()->routeIs('inventory.warehouse-tasks*')">
-                            Warehouse Tasks
-                        </x-ui.nav-item>
-                    @endcan
-                    @can(\App\Enums\Permission::ViewInventory->value)
-                        <x-ui.nav-item :href="route('inventory.storage-locations')" icon="building-storefront"
-                                       :active="request()->routeIs('inventory.storage-locations*')">
-                            Storage Locations
-                        </x-ui.nav-item>
+                    @endcanany
+                    @can(\App\Enums\Permission::AcknowledgeAlerts->value)
                         <x-ui.nav-item :href="route('inventory.alerts')" icon="bell-alert"
                                        :active="request()->routeIs('inventory.alerts')"
                                        :badge="$openAlertCount ?? null">
@@ -128,19 +96,59 @@
             </div>
         @endcanany
 
-        @canany([\App\Enums\Permission::ManageProcurement->value, \App\Enums\Permission::ManageSuppliers->value])
+        @canany([\App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::ManageLocations->value])
+            <div>
+                <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                    Warehousing
+                </p>
+                <div class="space-y-0.5">
+                    @can(\App\Enums\Permission::ViewWarehouseTasks->value)
+                        <x-ui.nav-item :href="route('inventory.warehousing.dashboard')" icon="building-storefront"
+                                       :active="request()->routeIs('inventory.warehousing*')">
+                            Smart Warehousing
+                        </x-ui.nav-item>
+                    @endcan
+                    @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
+                        <x-ui.nav-item :href="route('inventory.receiving.index')" icon="arrow-down-tray"
+                                       :active="request()->routeIs('inventory.receiving*')">
+                            Dock Receiving
+                        </x-ui.nav-item>
+                    @endcan
+                    @if(auth()->user()?->can(\App\Enums\Permission::InspectStock->value) && auth()->user()?->canany([\App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ReceivePurchaseOrder->value]))
+                        <x-ui.nav-item :href="route('inventory.qc.index')" icon="shield-check"
+                                       :active="request()->routeIs('inventory.qc*')">
+                            QC Inspection Queue
+                        </x-ui.nav-item>
+                    @endif
+                    @can(\App\Enums\Permission::ViewWarehouseTasks->value)
+                        <x-ui.nav-item :href="route('inventory.warehouse-tasks.index')" icon="clipboard-document-list"
+                                       :active="request()->routeIs('inventory.warehouse-tasks*')">
+                            Warehouse Tasks
+                        </x-ui.nav-item>
+                    @endcan
+                    @canany([\App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ViewWarehouseTasks->value])
+                        <x-ui.nav-item :href="route('inventory.storage-locations')" icon="map-pin"
+                                       :active="request()->routeIs('inventory.storage-locations*')">
+                            Storage Locations
+                        </x-ui.nav-item>
+                    @endcanany
+                </div>
+            </div>
+        @endcanany
+
+        @canany([\App\Enums\Permission::ViewProcurement->value, \App\Enums\Permission::ViewSuppliers->value])
             <div>
                 <p class="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                     Procurement
                 </p>
                 <div class="space-y-0.5">
-                    @can(\App\Enums\Permission::ManageProcurement->value)
+                    @can(\App\Enums\Permission::ViewProcurement->value)
                         <x-ui.nav-item :href="route('inventory.purchases')" icon="clipboard-document-list"
                                        :active="request()->routeIs('inventory.purchases*')">
                             Requisitions &amp; POs
                         </x-ui.nav-item>
                     @endcan
-                    @can(\App\Enums\Permission::ManageSuppliers->value)
+                    @can(\App\Enums\Permission::ViewSuppliers->value)
                         <x-ui.nav-item :href="route('inventory.suppliers')" icon="truck"
                                        :active="request()->routeIs('inventory.suppliers*')">
                             Suppliers
@@ -167,6 +175,8 @@
                                        :active="request()->routeIs('inventory.reports')">
                             Reports
                         </x-ui.nav-item>
+                    @endcan
+                    @can(\App\Enums\Permission::GenerateForecasts->value)
                         <x-ui.nav-item :href="route('inventory.demand-forecast')" icon="arrow-trending-up"
                                        :active="request()->routeIs('inventory.demand-forecast*')">
                             Demand Forecast

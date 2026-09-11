@@ -113,4 +113,127 @@ class UiNavigationAuthorizationTest extends TestCase
         $this->assertStringContainsString('min-w-0 max-w-full w-full', $field);
         $this->assertStringContainsString('w-full min-w-0 max-w-full touch-pan-x', $table);
     }
+
+    public function test_sidebar_navigation_strictly_reflects_role_and_panel_boundaries(): void
+    {
+        // 1. Pharmacy Staff: Dispensary care, no warehousing access
+        $pharmacy = User::factory()->role(UserRole::PharmacyStaff)->create();
+        $this->actingAs($pharmacy)->get('/dashboard')
+            ->assertOk()
+            ->assertDontSee('Warehousing')
+            ->assertDontSee('QC Inspection Queue')
+            ->assertDontSee('Suppliers')
+            ->assertDontSee('Demand Forecast')
+            ->assertDontSee('Process Reviews')
+            ->assertDontSee('User Management')
+            ->assertDontSee('Audit Trail')
+            ->assertSee('Store Requisitions')
+            ->assertSee('Transfers')
+            ->assertSee('Requisitions &amp; POs', false)
+            ->assertSee('Documents &amp; Logistics', false);
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        // 2. Warehouse Staff: Storage dock operations, no supplier management or forecasting
+        $warehouse = User::factory()->role(UserRole::WarehouseStaff)->create();
+        $this->actingAs($warehouse)->get('/dashboard')
+            ->assertOk()
+            ->assertSee('Warehousing')
+            ->assertSee('Smart Warehousing')
+            ->assertSee('Dock Receiving')
+            ->assertSee('QC Inspection Queue')
+            ->assertSee('Warehouse Tasks')
+            ->assertDontSee('Suppliers')
+            ->assertDontSee('Demand Forecast')
+            ->assertDontSee('Process Reviews')
+            ->assertDontSee('User Management')
+            ->assertDontSee('Audit Trail');
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        // 3. Inventory Manager: Full storeroom, procurement, forecasting, and warehousing
+        $manager = User::factory()->role(UserRole::InventoryManager)->create();
+        $this->actingAs($manager)->get('/dashboard')
+            ->assertOk()
+            ->assertSee('Warehousing')
+            ->assertSee('Suppliers')
+            ->assertSee('Demand Forecast')
+            ->assertSee('Process Reviews')
+            ->assertDontSee('User Management')
+            ->assertDontSee('Access Control');
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        // 4. Auditor: Read-only governance & audit logs, including warehousing oversight
+        $auditor = User::factory()->role(UserRole::Auditor)->create();
+        $this->actingAs($auditor)->get('/dashboard')
+            ->assertOk()
+            ->assertSee('Warehousing')
+            ->assertSee('Smart Warehousing')
+            ->assertSee('Warehouse Tasks')
+            ->assertDontSee('Dock Receiving')
+            ->assertDontSee('QC Inspection Queue')
+            ->assertSee('Suppliers')
+            ->assertSee('Process Reviews')
+            ->assertSee('Audit Trail')
+            ->assertDontSee('User Management')
+            ->assertDontSee('Access Control');
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        // 5. Viewer: Pure read-only observer across inventory, procurement, and reports
+        $viewer = User::factory()->role(UserRole::Viewer)->create();
+        $this->actingAs($viewer)->get('/dashboard')
+            ->assertOk()
+            ->assertDontSee('Warehousing')
+            ->assertSee('Suppliers')
+            ->assertDontSee('Demand Forecast')
+            ->assertSee('Process Reviews')
+            ->assertDontSee('User Management')
+            ->assertDontSee('Audit Trail')
+            ->assertDontSee('Store Requisitions')
+            ->assertDontSee('Adjustments');
+    }
+
+    public function test_procurement_workspace_tabs_dynamically_adapt_to_role_permissions(): void
+    {
+        // 1. Warehouse Staff only views POs for receiving; no S2P, RFQs, DOA, or Audit tabs
+        $warehouse = User::factory()->role(UserRole::WarehouseStaff)->create();
+        $this->actingAs($warehouse)->get('/inventory/purchases')
+            ->assertOk()
+            ->assertDontSee('Enterprise Source-to-Pay Workspace')
+            ->assertDontSee('Sourcing Events &amp; RFQs', false)
+            ->assertDontSee('Delegation of Authority (DOA) Hub')
+            ->assertDontSee('Procurement Audit Trail')
+            ->assertSee('Purchase Orders &amp; Revisions', false);
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        // 2. Pharmacy Staff can enter purchase requisitions in S2P; blocked from RFQs, DOA, and Audit tabs
+        $pharmacy = User::factory()->role(UserRole::PharmacyStaff)->create();
+        $this->actingAs($pharmacy)->get('/inventory/purchases')
+            ->assertOk()
+            ->assertSee('Enterprise Source-to-Pay Workspace')
+            ->assertDontSee('Sourcing Events &amp; RFQs', false)
+            ->assertDontSee('Delegation of Authority (DOA) Hub')
+            ->assertDontSee('Procurement Audit Trail')
+            ->assertSee('Purchase Orders &amp; Revisions', false);
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        // 3. Inventory Manager handles S2P, RFQs, and Evaluations
+        $manager = User::factory()->role(UserRole::InventoryManager)->create();
+        $this->actingAs($manager)->get('/inventory/purchases')
+            ->assertOk()
+            ->assertSee('Enterprise Source-to-Pay Workspace')
+            ->assertSee('Sourcing Events &amp; RFQs', false)
+            ->assertSee('Comparative Evaluation &amp; Landed Cost Matrix', false)
+            ->assertSee('Purchase Orders &amp; Revisions', false);
+    }
 }

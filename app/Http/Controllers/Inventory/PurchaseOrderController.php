@@ -37,8 +37,10 @@ class PurchaseOrderController extends Controller implements HasMiddleware
     {
         return [
             'auth:web,admin,super_admin',
-            new Middleware('can:'.Permission::ManageProcurement->value, only: ['index', 'store', 'revise']),
-            new Middleware('can:'.Permission::RecordMovements->value, only: ['receive']),
+            new Middleware('can:'.Permission::ViewProcurement->value, only: ['index']),
+            new Middleware('can:'.Permission::IssuePurchaseOrder->value, only: ['store']),
+            new Middleware('can:'.Permission::ApprovePurchaseOrder->value, only: ['revise']),
+            new Middleware('can:'.Permission::ReceivePurchaseOrder->value, only: ['receive']),
         ];
     }
 
