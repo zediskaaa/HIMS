@@ -112,15 +112,22 @@ class ImportController extends Controller implements HasMiddleware
         // Verify supported file extension
         $clientExt = strtolower($file->getClientOriginalExtension());
         if (! in_array($clientExt, ['csv', 'txt', 'json', 'xlsx', 'xls'], true)) {
+            $extLabel = $clientExt !== '' ? "[{$clientExt}]" : '[no extension]';
             return response()->json([
                 'is_valid' => false,
-                'message' => "Unsupported file extension [{$clientExt}]. Please upload a .csv, .xlsx, .xls, or .json file.",
+                'total_rows' => 0,
+                'valid_count' => 0,
+                'invalid_count' => 1,
+                'create_count' => 0,
+                'update_count' => 0,
+                'message' => "Unsupported file format {$extLabel}. Please upload a CSV (.csv), Excel (.xlsx / .xls), or JSON (.json) file.",
                 'errors' => [
                     [
                         'row' => 1,
                         'field' => 'file',
                         'value' => $file->getClientOriginalName(),
-                        'message' => "Unsupported file format. Allowed formats: CSV (.csv), Excel (.xlsx / .xls), JSON (.json).",
+                        'type' => 'invalid_structure',
+                        'message' => "Unsupported file format {$extLabel}. Allowed formats: CSV (.csv), Excel (.xlsx / .xls), JSON (.json).",
                     ],
                 ],
                 'preview_rows' => [],
@@ -132,6 +139,11 @@ class ImportController extends Controller implements HasMiddleware
         } catch (Throwable $e) {
             return response()->json([
                 'is_valid' => false,
+                'total_rows' => 0,
+                'valid_count' => 0,
+                'invalid_count' => 1,
+                'create_count' => 0,
+                'update_count' => 0,
                 'message' => 'Failed to parse file: '.$e->getMessage(),
                 'errors' => [
                     [

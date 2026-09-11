@@ -576,6 +576,22 @@
                         const data = await response.json();
 
                         if (!response.ok) {
+                            if (data && data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+                                this.validationResult = {
+                                    is_valid: false,
+                                    total_rows: data.total_rows || 0,
+                                    valid_count: data.valid_count || 0,
+                                    invalid_count: data.invalid_count || data.errors.length,
+                                    create_count: 0,
+                                    update_count: 0,
+                                    errors: data.errors,
+                                    warnings: data.warnings || [],
+                                    preview_rows: data.preview_rows || []
+                                };
+                                this.errorMessage = data.message || data.errors[0].message;
+                                return;
+                            }
+
                             let msg = data.message || 'Validation failed.';
                             if (data.errors && typeof data.errors === 'object') {
                                 if (Array.isArray(data.errors) && data.errors[0]?.message) {

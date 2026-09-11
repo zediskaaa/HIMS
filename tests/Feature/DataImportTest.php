@@ -980,5 +980,323 @@ class DataImportTest extends TestCase
             ->assertJsonPath('preview_rows.0.sku', 'MED-REP-01')
             ->assertJsonPath('preview_rows.0.name', 'Paracetamol 500mg Tablet');
     }
+
+    public function test_preview_rejects_unsupported_file_extensions(): void
+    {
+        $user = $this->inventoryManager();
+
+        $extensions = ['pdf', 'docx', 'png', 'exe', 'zip'];
+
+        foreach ($extensions as $ext) {
+            $file = UploadedFile::fake()->create("sample.{$ext}", 100);
+
+            $res = $this->actingAs($user)->postJson('/inventory/import/preview', [
+                'file' => $file,
+                'target' => 'items',
+                'mode' => 'create_only',
+            ]);
+
+            $res->assertStatus(422)
+                ->assertJsonPath('is_valid', false)
+                ->assertJsonPath('total_rows', 0)
+                ->assertJsonPath('invalid_count', 1)
+                ->assertJsonPath('errors.0.type', 'invalid_structure')
+                ->assertJsonPath('errors.0.field', 'file');
+
+            $this->assertStringContainsString("Unsupported file format [{$ext}]", $res->json('message'));
+            $this->assertNull($res->json('import_token'));
+        }
+    }
+
+    public function test_preview_rejects_corrupted_or_empty_xlsx_files(): void
+    {
+        $user = $this->inventoryManager();
+
+        // 1. 0-byte .xlsx file
+        $emptyXlsx = UploadedFile::fake()->createWithContent('empty.xlsx', '');
+        $resEmpty = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $emptyXlsx,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $resEmpty->assertStatus(422)
+            ->assertJsonPath('is_valid', false)
+            ->assertJsonPath('errors.0.type', 'invalid_structure');
+        $this->assertStringContainsString('empty (0 bytes)', $resEmpty->json('errors.0.message'));
+
+        // 2. Non-zip / corrupted .xlsx file
+        $corruptXlsx = UploadedFile::fake()->createWithContent('corrupt.xlsx', 'THIS_IS_NOT_A_VALID_ZIP_ARCHIVE');
+        $resCorrupt = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $corruptXlsx,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $resCorrupt->assertStatus(422)
+            ->assertJsonPath('is_valid', false)
+            ->assertJsonPath('errors.0.type', 'invalid_structure');
+        $this->assertStringContainsString('Unable to open the Excel (.xlsx) file', $resCorrupt->json('errors.0.message'));
+
+        // 3. Valid zip archive with corrupted worksheet XML
+        $tempZip = tempnam(sys_get_temp_dir(), 'xlsx_corrupt_test');
+        $zip = new \ZipArchive();
+        $zip->open($tempZip, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+        $zip->addFromString('xl/worksheets/sheet1.xml', '<worksheet><unclosed_corrupted_xml');
+        $zip->close();
+        $corruptXmlContent = file_get_contents($tempZip);
+        @unlink($tempZip);
+
+        $corruptXmlFile = UploadedFile::fake()->createWithContent('corrupt_xml.xlsx', $corruptXmlContent);
+        $resXmlCorrupt = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $corruptXmlFile,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $resXmlCorrupt->assertStatus(422)
+            ->assertJsonPath('is_valid', false)
+            ->assertJsonPath('errors.0.type', 'invalid_structure');
+        $this->assertStringContainsString('worksheet XML is corrupted or malformed', $resXmlCorrupt->json('errors.0.message'));
+    }
+
+    public function test_preview_rejects_legacy_binary_xls_with_clear_guidance(): void
+    {
+        $user = $this->inventoryManager();
+
+        // OLE2 Compound Document header for binary BIFF8 .xls
+        $biffContent = "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1\x00\x00\x00\x00\x00\x00\x00\x00";
+        $file = UploadedFile::fake()->createWithContent('legacy_inventory.xls', $biffContent);
+
+        $res = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $file,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $res->assertStatus(422)
+            ->assertJsonPath('is_valid', false)
+            ->assertJsonPath('errors.0.type', 'invalid_structure');
+        $this->assertStringContainsString('Legacy binary Excel 97-2004 format (.xls BIFF) is not directly supported', $res->json('errors.0.message'));
+    }
+
+    public function test_preview_rejects_malformed_csv_unclosed_quotes(): void
+    {
+        $user = $this->inventoryManager();
+
+        // Malformed CSV with an unclosed double quote (odd number of quotation marks)
+        $csvContent = "sku,name,unit_cost\n\"MED-UNCLOSED,Paracetamol 500mg,1.50\n";
+        $file = UploadedFile::fake()->createWithContent('unclosed_quote.csv', $csvContent);
+
+        $res = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $file,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $res->assertStatus(422)
+            ->assertJsonPath('is_valid', false)
+            ->assertJsonPath('errors.0.type', 'invalid_structure');
+        $this->assertStringContainsString('malformed: contains an unclosed quote or unbalanced quotation marks', $res->json('errors.0.message'));
+    }
+
+    public function test_preview_rejects_malformed_csv_with_binary_control_characters(): void
+    {
+        $user = $this->inventoryManager();
+
+        // CSV containing binary control characters
+        $binaryControlContent = "sku,name\n\x01\x02\x03\x04MED-01,Test Product\n";
+        $file = UploadedFile::fake()->createWithContent('control_chars.csv', $binaryControlContent);
+
+        $res = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $file,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $res->assertStatus(422)
+            ->assertJsonPath('is_valid', false)
+            ->assertJsonPath('errors.0.type', 'invalid_structure');
+        $this->assertStringContainsString('binary file or corrupted CSV containing control characters', $res->json('errors.0.message'));
+    }
+
+    public function test_preview_rejects_malformed_json_syntax_and_primitives(): void
+    {
+        $user = $this->inventoryManager();
+
+        // 1. Invalid JSON syntax
+        $badSyntaxFile = UploadedFile::fake()->createWithContent('syntax_error.json', "{sku: 'bad', name: }");
+        $resSyntax = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $badSyntaxFile,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $resSyntax->assertStatus(422)
+            ->assertJsonPath('is_valid', false)
+            ->assertJsonPath('errors.0.type', 'invalid_structure');
+        $this->assertStringContainsString('Invalid JSON syntax', $resSyntax->json('errors.0.message'));
+
+        // 2. Primitive scalar value (e.g. 123) instead of array of objects
+        $scalarFile = UploadedFile::fake()->createWithContent('primitive.json', '12345');
+        $resScalar = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $scalarFile,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $resScalar->assertStatus(422)
+            ->assertJsonPath('is_valid', false)
+            ->assertJsonPath('errors.0.type', 'invalid_structure');
+        $this->assertStringContainsString('Expected a JSON array of objects', $resScalar->json('errors.0.message'));
+
+        // 3. Array of non-objects (e.g. strings)
+        $arrayOfStrings = UploadedFile::fake()->createWithContent('array_of_strings.json', json_encode(['MED-01', 'MED-02']));
+        $resNonObject = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $arrayOfStrings,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $resNonObject->assertStatus(422)
+            ->assertJsonPath('is_valid', false)
+            ->assertJsonPath('errors.0.type', 'invalid_structure');
+        $this->assertStringContainsString('Expected a JSON object with key-value pairs', $resNonObject->json('errors.0.message'));
+    }
+
+    public function test_preview_rejects_empty_json_files_and_empty_envelopes(): void
+    {
+        $user = $this->inventoryManager();
+
+        // 1. Empty JSON array
+        $emptyArrayFile = UploadedFile::fake()->createWithContent('empty_array.json', '[]');
+        $resA = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $emptyArrayFile,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $resA->assertStatus(200)
+            ->assertJsonPath('is_valid', false)
+            ->assertJsonPath('errors.0.type', 'invalid_structure');
+        $this->assertStringContainsString('empty or contains no readable data rows', $resA->json('errors.0.message'));
+
+        // 2. Empty envelope {"data": []}
+        $emptyEnvelope = UploadedFile::fake()->createWithContent('empty_envelope.json', '{"data": []}');
+        $resB = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $emptyEnvelope,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $resB->assertStatus(200)
+            ->assertJsonPath('is_valid', false)
+            ->assertJsonPath('errors.0.type', 'invalid_structure');
+        $this->assertStringContainsString('empty or contains no readable data rows', $resB->json('errors.0.message'));
+
+        // 3. Whitespace-only JSON
+        $wsFile = UploadedFile::fake()->createWithContent('whitespace.json', "   \n\t   ");
+        $resC = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $wsFile,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $resC->assertStatus(200)
+            ->assertJsonPath('is_valid', false)
+            ->assertJsonPath('errors.0.type', 'invalid_structure');
+    }
+
+    public function test_preview_rejects_whitespace_only_csv_files(): void
+    {
+        $user = $this->inventoryManager();
+
+        $wsCsv = UploadedFile::fake()->createWithContent('whitespace.csv', "   \r\n\t   \n   \n");
+        $res = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $wsCsv,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $res->assertStatus(200)
+            ->assertJsonPath('is_valid', false)
+            ->assertJsonPath('errors.0.type', 'invalid_structure')
+            ->assertJsonPath('errors.0.message', 'The uploaded file is empty or contains no readable data rows.');
+    }
+
+    public function test_preview_rejects_files_with_incorrect_structure_and_missing_required_headers(): void
+    {
+        $user = $this->inventoryManager();
+
+        // File with headers that do not match expected HIMS import structure
+        $csvContent = "random_column_a,random_column_b,unrelated_date\n".
+            "Value 1,Value 2,2026-09-12\n";
+        $file = UploadedFile::fake()->createWithContent('unrelated.csv', $csvContent);
+
+        $res = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $file,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $res->assertStatus(200)
+            ->assertJsonPath('is_valid', false)
+            ->assertJsonPath('errors.0.type', 'missing_header')
+            ->assertJsonPath('errors.0.field', 'sku, name');
+
+        $this->assertStringContainsString('Missing required column headers: sku, name', $res->json('errors.0.message'));
+    }
+
+    public function test_preview_rejects_file_exceeding_max_file_size(): void
+    {
+        $user = $this->inventoryManager();
+
+        // 10241 KB exceeds 10240 KB limit (10 MB)
+        $largeFile = UploadedFile::fake()->create('large_catalogue.csv', 10241);
+
+        $res = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $largeFile,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $res->assertStatus(422)
+            ->assertJsonValidationErrors('file');
+
+        $this->assertStringContainsString('The file size cannot exceed 10 MB', $res->json('errors.file.0'));
+    }
+
+    public function test_invalid_files_safely_prevent_commit_and_prevent_database_writes(): void
+    {
+        $user = $this->inventoryManager();
+        $initialItemCount = InventoryItem::count();
+
+        // 1. Attempt preview with an invalid file
+        $invalidCsv = "sku,name,unit_cost\n\"UNCLOSED_QUOTE,Paracetamol,10.00\n";
+        $file = UploadedFile::fake()->createWithContent('invalid_file.csv', $invalidCsv);
+
+        $previewRes = $this->actingAs($user)->postJson('/inventory/import/preview', [
+            'file' => $file,
+            'target' => 'items',
+            'mode' => 'create_only',
+        ]);
+
+        $previewRes->assertStatus(422)
+            ->assertJsonPath('is_valid', false);
+
+        $this->assertNull($previewRes->json('import_token'));
+
+        // 2. Attempt commit without valid staging token
+        $commitRes = $this->actingAs($user)->postJson('/inventory/import/commit', [
+            'import_token' => 'invalid_or_forged_token',
+            'target' => 'items',
+        ]);
+
+        $commitRes->assertStatus(422)
+            ->assertJsonPath('success', false);
+
+        // 3. Verify zero database modification occurred
+        $this->assertSame($initialItemCount, InventoryItem::count());
+    }
 }
 

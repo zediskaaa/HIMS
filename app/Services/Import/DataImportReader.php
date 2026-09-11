@@ -165,6 +165,10 @@ class DataImportReader
             throw new InvalidArgumentException('Import file could not be read or does not exist.');
         }
 
+        if (filesize($path) === 0 && $extension === 'xlsx') {
+            throw new InvalidArgumentException('The uploaded Excel (.xlsx) file is empty (0 bytes).');
+        }
+
         // Dedicated JSON parsing directly preserves object keys and does NOT treat values as table headers
         if ($extension === 'json') {
             return $this->readJsonDirect($path, $target);
@@ -217,29 +221,31 @@ class DataImportReader
             throw new InvalidArgumentException('Invalid JSON syntax: ' . json_last_error_msg());
         }
 
+        if (! is_array($decoded)) {
+            throw new InvalidArgumentException('Invalid JSON structure: Expected a JSON array of objects or an enveloped records object.');
+        }
+
         // Handle common envelopes like {"data": [...]}, {"items": [...]}, {"rows": [...]}, {"records": [...]}
-        if (is_array($decoded)) {
-            if (isset($decoded['data']) && is_array($decoded['data']) && ! empty($decoded['data'])) {
-                $decoded = $decoded['data'];
-            } elseif (isset($decoded['items']) && is_array($decoded['items']) && ! empty($decoded['items'])) {
-                $decoded = $decoded['items'];
-            } elseif (isset($decoded['records']) && is_array($decoded['records']) && ! empty($decoded['records'])) {
-                $decoded = $decoded['records'];
-            } elseif (isset($decoded['rows']) && is_array($decoded['rows']) && ! empty($decoded['rows'])) {
-                $decoded = $decoded['rows'];
-            } elseif (isset($decoded['sections']) && is_array($decoded['sections'])) {
-                // Support HIMS report export dossiers where items are listed in sections[*]['rows']
-                $sectionRows = [];
-                foreach ($decoded['sections'] as $section) {
-                    if (isset($section['rows']) && is_array($section['rows'])) {
-                        foreach ($section['rows'] as $r) {
-                            $sectionRows[] = $r;
-                        }
+        if (array_key_exists('data', $decoded) && is_array($decoded['data'])) {
+            $decoded = $decoded['data'];
+        } elseif (array_key_exists('items', $decoded) && is_array($decoded['items'])) {
+            $decoded = $decoded['items'];
+        } elseif (array_key_exists('records', $decoded) && is_array($decoded['records'])) {
+            $decoded = $decoded['records'];
+        } elseif (array_key_exists('rows', $decoded) && is_array($decoded['rows'])) {
+            $decoded = $decoded['rows'];
+        } elseif (isset($decoded['sections']) && is_array($decoded['sections'])) {
+            // Support HIMS report export dossiers where items are listed in sections[*]['rows']
+            $sectionRows = [];
+            foreach ($decoded['sections'] as $section) {
+                if (isset($section['rows']) && is_array($section['rows'])) {
+                    foreach ($section['rows'] as $r) {
+                        $sectionRows[] = $r;
                     }
                 }
-                if (! empty($sectionRows)) {
-                    $decoded = $sectionRows;
-                }
+            }
+            if (! empty($sectionRows)) {
+                $decoded = $sectionRows;
             }
         }
 
@@ -248,7 +254,7 @@ class DataImportReader
             $decoded = [$decoded];
         }
 
-        if (! is_array($decoded) || empty($decoded)) {
+        if (empty($decoded)) {
             return [
                 'format' => 'json',
                 'headers' => [],
@@ -340,9 +346,15 @@ class DataImportReader
         }
 
         // Check for binary / corrupted file (null bytes, except in UTF-16)
-        if (! str_starts_with($content, "\xFF\xFE") && ! str_starts_with($content, "\xFE\xFF")) {
-            if (str_contains(substr($content, 0, 2048), "\0")) {
+        $isUtf16 = str_starts_with($content, "\xFF\xFE") || str_starts_with($content, "\xFE\xFF");
+        if (! $isUtf16) {
+            if (str_contains($content, "\0")) {
                 throw new InvalidArgumentException('Uploaded file appears to be a binary file or malformed CSV.');
+            }
+
+            // Check for non-printable binary control characters (excluding tab \t, newline \n, carriage return \r)
+            if (preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', substr($content, 0, 8192))) {
+                throw new InvalidArgumentException('Uploaded file appears to be a binary file or corrupted CSV containing control characters.');
             }
         }
 
@@ -354,6 +366,26 @@ class DataImportReader
         } elseif (str_starts_with($content, "\xEF\xBB\xBF")) {
             // Strip UTF-8 BOM
             $content = substr($content, 3);
+        }
+
+        // If converted from UTF-16, ensure no null bytes remain in converted UTF-8
+        if ($isUtf16 && str_contains($content, "\0")) {
+            throw new InvalidArgumentException('Uploaded UTF-16 file appears to be corrupted or binary.');
+        }
+
+        // Verify encoding is valid UTF-8, with fallback conversion from Windows-1252/ANSI
+        if (! mb_check_encoding($content, 'UTF-8')) {
+            $converted = @mb_convert_encoding($content, 'UTF-8', 'Windows-1252');
+            if ($converted !== false && mb_check_encoding($converted, 'UTF-8') && ! str_contains($converted, "\0")) {
+                $content = $converted;
+            } else {
+                throw new InvalidArgumentException('Uploaded CSV file has invalid character encoding. Please ensure the file is encoded in UTF-8 or standard Excel CSV format.');
+            }
+        }
+
+        // Check quotation parity for unclosed / unbalanced quotation marks
+        if (substr_count($content, '"') % 2 !== 0) {
+            throw new InvalidArgumentException('Uploaded CSV file is malformed: contains an unclosed quote or unbalanced quotation marks.');
         }
 
         // Standardize line endings to LF
@@ -463,6 +495,10 @@ class DataImportReader
      */
     public function readXlsx(string $path): array
     {
+        if (filesize($path) === 0) {
+            throw new InvalidArgumentException('The uploaded Excel (.xlsx) file is empty (0 bytes).');
+        }
+
         $zip = new ZipArchive();
         if ($zip->open($path) !== true) {
             throw new InvalidArgumentException('Unable to open the Excel (.xlsx) file. It may be corrupted or password-protected.');
@@ -502,7 +538,10 @@ class DataImportReader
 
         $cleanSheetXml = preg_replace('/xmlns(:\w+)?="[^"]*"/', '', $sheetXml);
         $sheet = @simplexml_load_string($cleanSheetXml);
-        if (! $sheet || ! isset($sheet->sheetData->row)) {
+        if ($sheet === false) {
+            throw new InvalidArgumentException('The Excel (.xlsx) worksheet XML is corrupted or malformed.');
+        }
+        if (! isset($sheet->sheetData->row)) {
             return [];
         }
 
@@ -566,6 +605,11 @@ class DataImportReader
         $content = file_get_contents($path);
         if (! $content || trim($content) === '') {
             return [];
+        }
+
+        // Case 0: Legacy binary BIFF8 / OLE2 Excel file (\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1)
+        if (str_starts_with($content, "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1")) {
+            throw new InvalidArgumentException('Legacy binary Excel 97-2004 format (.xls BIFF) is not directly supported. Please save or export your file as Modern Excel (.xlsx) or CSV (.csv).');
         }
 
         // Case 1: SpreadsheetML (XML Spreadsheet)

@@ -850,7 +850,7 @@ class DataImportValidator
             'is_valid' => false,
             'total_rows' => 0,
             'valid_count' => 0,
-            'invalid_count' => 0,
+            'invalid_count' => 1,
             'create_count' => 0,
             'update_count' => 0,
             'errors' => [
