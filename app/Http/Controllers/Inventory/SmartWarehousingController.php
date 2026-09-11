@@ -36,7 +36,8 @@ class SmartWarehousingController extends Controller implements HasMiddleware
     {
         return [
             'auth:web,admin,super_admin',
-            new Middleware('can:'.Permission::ViewWarehouseTasks->value, only: ['dashboard', 'locations', 'scanStation']),
+            new Middleware('can:'.Permission::ViewWarehouseTasks->value, only: ['dashboard', 'locations']),
+            new Middleware('can:'.Permission::ExecuteWarehouseTasks->value, only: ['scanStation']),
             new Middleware('can:'.Permission::ManageWarehouseTopology->value, only: ['storeLocation']),
         ];
     }

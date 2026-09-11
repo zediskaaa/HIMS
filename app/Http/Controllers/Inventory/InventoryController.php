@@ -41,8 +41,10 @@ class InventoryController extends Controller implements HasMiddleware
         ];
     }
 
-    public function index(Request $request): View
+    public function index(?Request $request = null): View
     {
+        $request ??= request();
+
         $canViewSuppliers = $request->user()->can(Permission::ViewSuppliers->value);
         $canViewProcurementFinancials = $request->user()->can(Permission::ViewProcurementSensitiveData->value);
 
@@ -120,8 +122,10 @@ class InventoryController extends Controller implements HasMiddleware
      *
      * @return array<string, mixed>
      */
-    private function liveSnapshot(Request $request): array
+    private function liveSnapshot(?Request $request = null): array
     {
+        $request ??= request();
+
         // Alerts still describing a live condition, worst severity first.
         $activeAlerts = StockAlert::with(['item', 'batch', 'location'])
             ->where('status', '!=', AlertStatus::Resolved)

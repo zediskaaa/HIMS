@@ -7,10 +7,12 @@
                 <p class="text-sm text-neutral-600">Physical location topology, IoT cold-chain telemetry, scan verification, and regulatory compliance.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
+                @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
                 <a href="{{ route('inventory.warehousing.scan-station') }}" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
                     Scan Workstation
                 </a>
+                @endcan
                 <a href="{{ route('inventory.warehouse-tasks.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
                     Warehouse Tasks
                 </a>
@@ -180,9 +182,11 @@
                             <h3 class="text-base font-semibold text-neutral-900">Real-Time Scan Log</h3>
                             <p class="text-xs text-neutral-500">GS1 DataMatrix and location barcode verification events.</p>
                         </div>
+                        @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
                         <a href="{{ route('inventory.warehousing.scan-station') }}" class="text-xs font-semibold text-primary-600 hover:text-primary-800">
                             Launch Scanner &rarr;
                         </a>
+                        @endcan
                     </div>
                     <div class="divide-y divide-neutral-100 overflow-hidden">
                         @forelse($recentScans as $scan)
@@ -213,6 +217,7 @@
 
             {{-- Smart Warehousing Submodules Quick Links --}}
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                @can(\App\Enums\Permission::AccessNarcoticsVault->value)
                 <a href="{{ route('inventory.warehousing.narcotics') }}" class="group rounded-xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-purple-300 hover:shadow-md">
                     <div class="flex items-center gap-3">
                         <div class="rounded-lg bg-purple-50 p-2.5 text-purple-700 group-hover:bg-purple-100">
@@ -224,7 +229,9 @@
                         </div>
                     </div>
                 </a>
+                @endcan
 
+                @canany([\App\Enums\Permission::ManageTelemetryExcursions->value, \App\Enums\Permission::ViewWarehouseTasks->value])
                 <a href="{{ route('inventory.warehousing.telemetry') }}" class="group rounded-xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-cyan-300 hover:shadow-md">
                     <div class="flex items-center gap-3">
                         <div class="rounded-lg bg-cyan-50 p-2.5 text-cyan-700 group-hover:bg-cyan-100">
@@ -236,7 +243,9 @@
                         </div>
                     </div>
                 </a>
+                @endcanany
 
+                @canany([\App\Enums\Permission::RecordConsignments->value, \App\Enums\Permission::ViewWarehouseTasks->value])
                 <a href="{{ route('inventory.warehousing.consignment') }}" class="group rounded-xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md">
                     <div class="flex items-center gap-3">
                         <div class="rounded-lg bg-amber-50 p-2.5 text-amber-700 group-hover:bg-amber-100">
@@ -248,7 +257,9 @@
                         </div>
                     </div>
                 </a>
+                @endcanany
 
+                @canany([\App\Enums\Permission::ManageWarehouseTopology->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ViewWarehouseTasks->value])
                 <a href="{{ route('inventory.warehousing.locations') }}" class="group rounded-xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-emerald-300 hover:shadow-md">
                     <div class="flex items-center gap-3">
                         <div class="rounded-lg bg-emerald-50 p-2.5 text-emerald-700 group-hover:bg-emerald-100">
@@ -260,6 +271,7 @@
                         </div>
                     </div>
                 </a>
+                @endcanany
             </div>
 
         </div>

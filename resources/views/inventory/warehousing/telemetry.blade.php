@@ -169,6 +169,7 @@
 
         </div>
 
+        @can(\App\Enums\Permission::ManageTelemetryExcursions->value)
         {{-- Ingest Telemetry Modal --}}
         <div x-show="showIngestModal" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/60 p-4 sm:items-center" x-cloak style="display: none;">
             <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" @click.away="showIngestModal = false">
@@ -233,6 +234,7 @@
                 </form>
             </div>
         </div>
+        @endcan
 
     </div>
 </x-app-layout>

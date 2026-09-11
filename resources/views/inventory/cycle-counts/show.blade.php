@@ -227,6 +227,7 @@
                         </span>
                     </div>
 
+                    @can(\App\Enums\Permission::PerformCycleCount->value)
                     <form action="{{ route('inventory.cycle-counts.submit', $cycleCountDoc) }}" method="POST">
                         @csrf
                         <div class="overflow-x-auto">
@@ -269,6 +270,42 @@
                             </button>
                         </div>
                     </form>
+                    @else
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-neutral-600">
+                            <thead class="bg-neutral-50 text-xs uppercase text-neutral-500 border-b border-neutral-200">
+                                <tr>
+                                    <th class="px-6 py-3 font-medium">Item &amp; SKU</th>
+                                    <th class="px-6 py-3 font-medium">Storage Location</th>
+                                    <th class="px-6 py-3 font-medium">Batch / Lot</th>
+                                    <th class="px-6 py-3 font-medium text-right">Physical Count</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-neutral-200">
+                                @foreach($cycleCountDoc->lines as $line)
+                                    <tr class="hover:bg-neutral-50">
+                                        <td class="px-6 py-4">
+                                            <p class="font-semibold text-neutral-900">{{ $line->item->name ?? 'Item #' . $line->inventory_item_id }}</p>
+                                            <p class="text-xs text-neutral-500">SKU: {{ $line->item->sku ?? 'N/A' }} | Class: {{ $line->item->abc_class ?? 'C' }}</p>
+                                        </td>
+                                        <td class="px-6 py-4 text-xs font-medium text-neutral-800">
+                                            {{ $line->location->name ?? 'Main Storage' }}
+                                            <span class="text-neutral-400">({{ $line->location->code ?? '' }})</span>
+                                        </td>
+                                        <td class="px-6 py-4 text-xs font-mono text-neutral-600">
+                                            {{ $line->batch->batch_number ?? 'No Batch' }}
+                                        </td>
+                                        <td class="px-6 py-4 text-right">
+                                            <span class="inline-flex items-center rounded-md bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-600">
+                                                Pending Count
+                                            </span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    @endcan
                 </div>
             @endif
 

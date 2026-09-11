@@ -32,7 +32,7 @@
                  where login lands, so the tiles are what narrow it per role —
                  a pharmacy account sees stock and reports, not procurement. --}}
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-                @can(\App\Enums\Permission::ManageSuppliers->value)
+                @can(\App\Enums\Permission::ViewSuppliers->value)
                 <a href="{{ route('inventory.suppliers') }}" class="block rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
                     <h3 class="text-lg font-semibold text-[var(--text)]">Supplier & Vendor Management</h3>
                     <p class="mt-2 text-sm text-[var(--muted)]">Maintain vendor profiles, rebates, and supplier records.</p>

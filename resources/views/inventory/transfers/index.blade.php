@@ -251,9 +251,8 @@
                                 <div>
                                     <h3 class="text-lg font-bold text-neutral-900">Initiate Inter-Location Stock Transfer</h3>
                                     <p class="text-xs text-neutral-500">Dispatch inventory into the virtual In-Transit location buffer.</p>
-        </div>
-        @endcan
-    </div>
+                                </div>
+                            </div>
 
                             {{-- In-Modal Error Alert --}}
                             @if($errors->any())
@@ -406,6 +405,7 @@
                 </div>
             </div>
         </div>
+        @endcan
 
     </div>
 </x-app-layout>

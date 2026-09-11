@@ -194,6 +194,7 @@
 
         </div>
 
+        @can(\App\Enums\Permission::PerformCycleCount->value)
         {{-- SCHEDULE COUNT MODAL --}}
         <div x-show="scheduleModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" style="display: none;"
              x-transition:enter="transition ease-out duration-200"
@@ -271,6 +272,7 @@
                 </div>
             </div>
         </div>
+        @endcan
 
     </div>
 </x-app-layout>

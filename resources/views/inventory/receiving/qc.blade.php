@@ -132,6 +132,7 @@
                                         {{ $insp->inspection_date ? $insp->inspection_date->format('M d, Y') : 'N/A' }}
                                     </td>
                                     <td class="px-6 py-4 text-center">
+                                        @can(\App\Enums\Permission::InspectStock->value)
                                         <div class="flex items-center justify-center gap-2">
                                             <button type="button"
                                                 @click="openReleaseModal({{ Js::from([
@@ -160,6 +161,11 @@
                                                 Reject / Block
                                             </button>
                                         </div>
+                                        @else
+                                        <span class="inline-flex items-center rounded-md bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-600">
+                                            Under Review
+                                        </span>
+                                        @endcan
                                     </td>
                                 </tr>
                             @empty
@@ -185,6 +191,7 @@
 
         </div>
 
+        @can(\App\Enums\Permission::InspectStock->value)
         {{-- RELEASE MODAL --}}
         <div x-show="releaseModalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;"
              x-transition:enter="transition ease-out duration-200"
@@ -316,6 +323,7 @@
                 </div>
             </div>
         </div>
+        @endcan
 
     </div>
 </x-app-layout>

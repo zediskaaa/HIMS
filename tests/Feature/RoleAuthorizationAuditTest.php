@@ -272,4 +272,47 @@ class RoleAuthorizationAuditTest extends TestCase
             ->assertOk()
             ->assertSee('Register Inbound Shipment');
     }
+
+    public function test_auditor_does_not_see_operational_smart_warehousing_buttons_or_narcotics_vault(): void
+    {
+        $auditor = User::factory()->role(UserRole::Auditor)->create();
+
+        $this->actingAs($auditor)->get(route('inventory.warehousing.dashboard'))
+            ->assertOk()
+            ->assertDontSee('PDEA Narcotics Vault')
+            ->assertDontSee('Scan Workstation')
+            ->assertDontSee('Launch Scanner');
+
+        $this->actingAs($auditor)->get(route('inventory.warehousing.scan-station'))
+            ->assertForbidden();
+
+        $this->actingAs($auditor)->get(route('inventory.transfers.index'))
+            ->assertOk()
+            ->assertDontSee('Dispatch to In-Transit Buffer')
+            ->assertDontSee('Initiate Inter-Location Stock Transfer');
+
+        $this->actingAs($auditor)->get(route('inventory.requisitions.index'))
+            ->assertOk()
+            ->assertDontSee('Submit Store Requisition')
+            ->assertDontSee('Create Material Store Requisition');
+
+        $viewer = User::factory()->role(UserRole::Viewer)->create();
+        $this->actingAs($viewer)->get(route('inventory.logistics'))
+            ->assertOk()
+            ->assertDontSee('IAR Processing');
+
+        $this->actingAs($auditor)->get(route('inventory.qc.index'))
+            ->assertForbidden();
+
+        $warehouse = User::factory()->role(UserRole::WarehouseStaff)->create();
+        $this->actingAs($warehouse)->get(route('inventory.qc.index'))
+            ->assertOk();
+
+        $manager = User::factory()->role(UserRole::InventoryManager)->create();
+        $this->actingAs($manager)->get(route('inventory.warehousing.dashboard'))
+            ->assertOk()
+            ->assertSee('PDEA Narcotics Vault')
+            ->assertSee('Scan Workstation')
+            ->assertSee('Launch Scanner');
+    }
 }

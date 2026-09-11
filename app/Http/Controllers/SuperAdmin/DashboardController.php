@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Inventory\InventoryController;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
@@ -15,8 +16,8 @@ use Illuminate\View\View;
  */
 class DashboardController extends Controller
 {
-    public function __invoke(InventoryController $dashboard): View
+    public function __invoke(Request $request, InventoryController $dashboard): View
     {
-        return $dashboard->index()->with('superAdminPanel', true);
+        return $dashboard->index($request)->with('superAdminPanel', true);
     }
 }

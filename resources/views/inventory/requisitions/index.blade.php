@@ -307,9 +307,8 @@
                                 <div>
                                     <h3 class="text-lg font-bold text-neutral-900">Create Material Store Requisition</h3>
                                     <p class="text-xs text-neutral-500">Request clinical and medical supplies from central inventory storage.</p>
-        </div>
-        @endcan
-    </div>
+                                </div>
+                            </div>
 
                             <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
@@ -410,6 +409,7 @@
                 </div>
             </div>
         </div>
+        @endcan
 
     </div>
 </x-app-layout>
