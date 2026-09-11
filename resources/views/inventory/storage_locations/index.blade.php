@@ -1,9 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Smart Warehousing</p>
-            <h2 class="text-2xl font-bold text-neutral-900">Warehouse Hierarchy &amp; Locations</h2>
-            <p class="text-sm text-neutral-600">Configure operational storage points, capacity, classifications, and scannable internal codes.</p>
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Smart Warehousing</p>
+                <h2 class="text-2xl font-bold text-neutral-900">Warehouse Hierarchy &amp; Locations</h2>
+                <p class="text-sm text-neutral-600">Configure operational storage points, capacity, classifications, and scannable internal codes.</p>
+            </div>
+            <x-ui.button variant="secondary" :href="route('inventory.warehousing.dashboard')" icon="arrow-left">Back to Smart Warehousing</x-ui.button>
         </div>
     </x-slot>
 

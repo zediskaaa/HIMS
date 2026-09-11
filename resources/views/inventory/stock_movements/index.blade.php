@@ -2,7 +2,11 @@
     <x-ui.page-header
         title="Stock Movement & Transfer"
         subtitle="Record stock in, stock out and transfers between storage locations."
-        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Stock Movements' => null]" />
+        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Inventory' => route('inventory.items'), 'Stock Movements' => null]">
+        <x-slot:actions>
+            <x-ui.button variant="secondary" :href="route('inventory.items')" icon="arrow-left">Back to Inventory</x-ui.button>
+        </x-slot:actions>
+    </x-ui.page-header>
 
     @if ($errors->any())
         <x-ui.alert variant="danger" title="This movement was not recorded">

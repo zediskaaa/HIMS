@@ -52,7 +52,8 @@
                         Inter-facility and inter-department inventory movements with in-transit buffer accounting and transit damage/loss logging.
                     </p>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <x-ui.button variant="secondary" :href="route('inventory.items')" icon="arrow-left">Back to Inventory</x-ui.button>
                     @can(\App\Enums\Permission::TransferStock->value)
                         <button type="button"
                                 @click="newTransferModal = true"

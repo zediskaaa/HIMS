@@ -11,6 +11,7 @@
                     Documented quantity and value corrections. Adjustments exceeding ₱25,000 trigger mandatory second-tier Plant Controller authorization.
                 </p>
             </div>
+            <x-ui.button variant="secondary" :href="route('inventory.items')" icon="arrow-left">Back to Inventory</x-ui.button>
         </div>
     </x-slot>
 

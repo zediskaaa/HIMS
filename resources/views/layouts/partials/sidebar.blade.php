@@ -24,8 +24,8 @@
         Every entry is gated on the same permission its route enforces, so the
         sidebar shows a door only when it will open. The section headers use
         @canany so a group whose items are all hidden does not leave a heading
-        floating above nothing — a pharmacy account sees no "Procurement"
-        caption at all, rather than an empty one.
+        floating above nothing. Secondary workflows live as contextual buttons
+        on their major module page instead of crowding this navigation rail.
 
         The permissions themselves live in App\Enums\UserRole::permissions(),
         and /admin/permissions renders the full matrix.
@@ -49,47 +49,9 @@
                 <div class="space-y-0.5">
                     @can(\App\Enums\Permission::ViewInventory->value)
                         <x-ui.nav-item :href="route('inventory.items')" icon="cube"
-                                       :active="request()->routeIs('inventory.items*')">
-                            Items
-                        </x-ui.nav-item>
-                        <x-ui.nav-item :href="route('inventory.stock')" icon="chart-bar"
-                                       :active="request()->routeIs('inventory.stock')">
-                            Stock Levels
-                        </x-ui.nav-item>
-                        <x-ui.nav-item :href="route('inventory.stock-movements')" icon="arrows-right-left"
-                                       :active="request()->routeIs('inventory.stock-movements*')">
-                            Stock Movements
-                        </x-ui.nav-item>
-                    @endcan
-                    @canany([\App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::ApproveRequisition->value, \App\Enums\Permission::IssueStock->value])
-                        <x-ui.nav-item :href="route('inventory.requisitions.index')" icon="document-duplicate"
-                                       :active="request()->routeIs('inventory.requisitions*')">
-                            Store Requisitions
-                        </x-ui.nav-item>
-                    @endcanany
-                    @can(\App\Enums\Permission::TransferStock->value)
-                        <x-ui.nav-item :href="route('inventory.transfers.index')" icon="truck"
-                                       :active="request()->routeIs('inventory.transfers*')">
-                            Transfers
-                        </x-ui.nav-item>
-                    @endcan
-                    @can(\App\Enums\Permission::PerformCycleCount->value)
-                        <x-ui.nav-item :href="route('inventory.cycle-counts.index')" icon="clipboard-document-check"
-                                       :active="request()->routeIs('inventory.cycle-counts*')">
-                            Cycle Counts
-                        </x-ui.nav-item>
-                    @endcan
-                    @canany([\App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::ApproveAdjustment->value])
-                        <x-ui.nav-item :href="route('inventory.adjustments')" icon="clipboard-document-list"
-                                       :active="request()->routeIs('inventory.adjustments*')">
-                            Adjustments
-                        </x-ui.nav-item>
-                    @endcanany
-                    @can(\App\Enums\Permission::AcknowledgeAlerts->value)
-                        <x-ui.nav-item :href="route('inventory.alerts')" icon="bell-alert"
-                                       :active="request()->routeIs('inventory.alerts')"
+                                       :active="request()->routeIs('inventory.items*', 'inventory.stock', 'inventory.stock-movements*', 'inventory.requisitions*', 'inventory.transfers*', 'inventory.cycle-counts*', 'inventory.adjustments*', 'inventory.alerts')"
                                        :badge="$openAlertCount ?? null">
-                            Stock Alerts
+                            Inventory
                         </x-ui.nav-item>
                     @endcan
                 </div>
@@ -104,40 +66,10 @@
                 <div class="space-y-0.5">
                     @can(\App\Enums\Permission::ViewWarehouseTasks->value)
                         <x-ui.nav-item :href="route('inventory.warehousing.dashboard')" icon="building-storefront"
-                                       :active="request()->routeIs('inventory.warehousing*') && !request()->routeIs('inventory.warehousing.scan-station*')">
+                                       :active="request()->routeIs('inventory.warehousing*', 'inventory.receiving*', 'inventory.qc*', 'inventory.warehouse-tasks*', 'inventory.storage-locations*')">
                             Smart Warehousing
                         </x-ui.nav-item>
                     @endcan
-                    @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
-                        <x-ui.nav-item :href="route('inventory.warehousing.scan-station')" icon="camera"
-                                       :active="request()->routeIs('inventory.warehousing.scan-station*')">
-                            Scan Workstation
-                        </x-ui.nav-item>
-                    @endcan
-                    @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
-                        <x-ui.nav-item :href="route('inventory.receiving.index')" icon="arrow-down-tray"
-                                       :active="request()->routeIs('inventory.receiving*')">
-                            Dock Receiving
-                        </x-ui.nav-item>
-                    @endcan
-                    @if(auth()->user()?->can(\App\Enums\Permission::InspectStock->value) && auth()->user()?->canany([\App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ReceivePurchaseOrder->value]))
-                        <x-ui.nav-item :href="route('inventory.qc.index')" icon="shield-check"
-                                       :active="request()->routeIs('inventory.qc*')">
-                            QC Inspection Queue
-                        </x-ui.nav-item>
-                    @endif
-                    @can(\App\Enums\Permission::ViewWarehouseTasks->value)
-                        <x-ui.nav-item :href="route('inventory.warehouse-tasks.index')" icon="clipboard-document-list"
-                                       :active="request()->routeIs('inventory.warehouse-tasks*')">
-                            Warehouse Tasks
-                        </x-ui.nav-item>
-                    @endcan
-                    @canany([\App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ViewWarehouseTasks->value])
-                        <x-ui.nav-item :href="route('inventory.storage-locations')" icon="map-pin"
-                                       :active="request()->routeIs('inventory.storage-locations*')">
-                            Storage Locations
-                        </x-ui.nav-item>
-                    @endcanany
                 </div>
             </div>
         @endcanany
@@ -150,14 +82,8 @@
                 <div class="space-y-0.5">
                     @can(\App\Enums\Permission::ViewProcurement->value)
                         <x-ui.nav-item :href="route('inventory.purchases')" icon="clipboard-document-list"
-                                       :active="request()->routeIs('inventory.purchases*')">
-                            Requisitions &amp; POs
-                        </x-ui.nav-item>
-                    @endcan
-                    @can(\App\Enums\Permission::ViewSuppliers->value)
-                        <x-ui.nav-item :href="route('inventory.suppliers')" icon="truck"
-                                       :active="request()->routeIs('inventory.suppliers*')">
-                            Suppliers
+                                       :active="request()->routeIs('inventory.purchases*', 'inventory.suppliers*', 'inventory.demand-forecast*')">
+                            Procurement &amp; Sourcing
                         </x-ui.nav-item>
                     @endcan
                 </div>
@@ -182,12 +108,6 @@
                             Reports
                         </x-ui.nav-item>
                     @endcan
-                    @can(\App\Enums\Permission::GenerateForecasts->value)
-                        <x-ui.nav-item :href="route('inventory.demand-forecast')" icon="arrow-trending-up"
-                                       :active="request()->routeIs('inventory.demand-forecast*')">
-                            Demand Forecast
-                        </x-ui.nav-item>
-                    @endcan
                     @can(\App\Enums\Permission::ViewProcessReviews->value)
                         <x-ui.nav-item :href="route('reviews.index')" icon="clipboard-document-check"
                                        :active="request()->routeIs('reviews.*')">
@@ -208,12 +128,8 @@
                 <div class="space-y-0.5">
                     @can(\App\Enums\Permission::ManageUsers->value)
                         <x-ui.nav-item :href="route('admin.users.index')" icon="users"
-                                       :active="request()->routeIs('admin.users.*')">
+                                       :active="request()->routeIs('admin.users.*', 'admin.permissions')">
                             User Management
-                        </x-ui.nav-item>
-                        <x-ui.nav-item :href="route('admin.permissions')" icon="shield-check"
-                                       :active="request()->routeIs('admin.permissions')">
-                            Access Control
                         </x-ui.nav-item>
                     @endcan
                     @can(\App\Enums\Permission::ViewAuditTrail->value)

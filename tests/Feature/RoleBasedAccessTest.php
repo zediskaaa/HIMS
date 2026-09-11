@@ -547,27 +547,38 @@ class RoleBasedAccessTest extends TestCase
     public function test_the_sidebar_narrows_to_what_the_role_may_open(): void
     {
         $this->actingAs($this->user(UserRole::InventoryManager))->get('/dashboard')
-            ->assertSee('Procurement')
-            ->assertSee('Suppliers')
+            ->assertSee('Procurement &amp; Sourcing', false)
+            ->assertSee('Smart Warehousing');
+
+        $this->get('/inventory/items')
             ->assertSee('Adjustments');
+
+        $this->get('/inventory/purchases')
+            ->assertSee('Suppliers');
 
         $this->actingAs($this->user(UserRole::PharmacyStaff))->get('/dashboard')
             ->assertStatus(200)
-            ->assertSee('Stock Movements')
-            ->assertSee('Procurement')
-            ->assertDontSee('Suppliers')
-            ->assertDontSee('Adjustments')
+            ->assertSee('Inventory')
+            ->assertSee('Procurement &amp; Sourcing', false)
             ->assertDontSee('Smart Warehousing')
             ->assertDontSee('Access Control');
 
+        $this->get('/inventory/items')
+            ->assertSee('Stock Movements')
+            ->assertSee('Store Requisitions')
+            ->assertSee('Transfers')
+            ->assertDontSee('Adjustments');
+
         $this->actingAs($this->user(UserRole::WarehouseStaff))->get('/dashboard')
             ->assertStatus(200)
-            ->assertSee('Stock Movements')
-            ->assertSee('Procurement')
+            ->assertSee('Inventory')
+            ->assertSee('Procurement &amp; Sourcing', false)
             ->assertSee('Smart Warehousing')
-            ->assertDontSee('Suppliers')
-            ->assertDontSee('Adjustments')
             ->assertDontSee('Access Control');
+
+        $this->get('/inventory/warehousing')
+            ->assertSee('Dock Receiving')
+            ->assertSee('Warehouse Tasks');
     }
 
     /**

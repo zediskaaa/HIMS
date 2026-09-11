@@ -150,11 +150,14 @@ class SuperAdminAuthenticationTest extends TestCase
             ->assertOk()
             ->assertSee('Super Admin Dashboard')
             ->assertSee('User Management')
-            ->assertSee('Access Control')
             ->assertSee('Audit Trail');
 
-        $this->get(route('admin.users.index'))->assertOk();
-        $this->get(route('admin.permissions'))->assertOk();
+        $this->get(route('admin.users.index'))
+            ->assertOk()
+            ->assertSee('Access Control');
+        $this->get(route('admin.permissions'))
+            ->assertOk()
+            ->assertSee('Back to User Management');
         $this->get(route('admin.audit-logs.index'))->assertOk();
         $this->get(route('inventory.items'))->assertOk();
         $this->get(route('inventory.purchases'))->assertOk();

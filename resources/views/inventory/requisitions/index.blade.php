@@ -39,7 +39,8 @@
                         Department store requisitions, budget verification, Segregation of Duties approval, hard ATP stock reservation, and FEFO picking.
                     </p>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <x-ui.button variant="secondary" :href="route('inventory.items')" icon="arrow-left">Back to Inventory</x-ui.button>
                     @can(\App\Enums\Permission::CreateRequisition->value)
                         <button type="button"
                                 @click="newRequisitionModal = true"

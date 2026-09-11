@@ -14,6 +14,7 @@
             $supplier->name => null,
         ]">
         <x-slot:actions>
+            <x-ui.button variant="secondary" :href="route('inventory.suppliers')" icon="arrow-left">Back to Suppliers</x-ui.button>
             <x-ui.badge :status="$supplier->status->value" dot>{{ $supplier->status->label() }}</x-ui.badge>
             <x-ui.badge :status="$accreditation->value" dot>{{ $accreditation->label() }}</x-ui.badge>
             <x-ui.badge :status="$compliance">{{ str($compliance)->headline() }}</x-ui.badge>

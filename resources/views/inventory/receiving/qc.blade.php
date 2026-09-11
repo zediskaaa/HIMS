@@ -12,9 +12,7 @@
                 </p>
             </div>
             <div class="flex items-center gap-3">
-                <a href="{{ route('inventory.receiving.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50">
-                    &larr; Dock Receiving Notes
-                </a>
+                <x-ui.button variant="secondary" :href="route('inventory.warehousing.dashboard')" icon="arrow-left">Back to Smart Warehousing</x-ui.button>
             </div>
         </div>
     </x-slot>

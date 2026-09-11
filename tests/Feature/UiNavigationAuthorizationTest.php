@@ -26,10 +26,15 @@ class UiNavigationAuthorizationTest extends TestCase
         }
     }
 
-    public function test_sidebar_visibility_matches_requisition_and_cycle_count_permissions(): void
+    public function test_inventory_workflows_are_contextual_buttons_instead_of_sidebar_links(): void
     {
         $viewer = User::factory()->role(UserRole::Viewer)->create();
-        $this->actingAs($viewer)->get('/dashboard')
+        $viewerSidebar = $this->mainNavigationFor($viewer);
+        $this->assertStringContainsString('Inventory', $viewerSidebar);
+        $this->assertStringNotContainsString('Store Requisitions', $viewerSidebar);
+        $this->assertStringNotContainsString('Cycle Counts', $viewerSidebar);
+
+        $this->actingAs($viewer)->get('/inventory/items')
             ->assertOk()
             ->assertDontSee('Store Requisitions')
             ->assertDontSee('Cycle Counts');
@@ -38,10 +43,18 @@ class UiNavigationAuthorizationTest extends TestCase
         $this->app['auth']->forgetGuards();
 
         $warehouse = User::factory()->role(UserRole::WarehouseStaff)->create();
-        $this->actingAs($warehouse)->get('/dashboard')
+        $warehouseSidebar = $this->mainNavigationFor($warehouse);
+        $this->assertStringNotContainsString('Store Requisitions', $warehouseSidebar);
+        $this->assertStringNotContainsString('Cycle Counts', $warehouseSidebar);
+
+        $this->actingAs($warehouse)->get('/inventory/items')
             ->assertOk()
             ->assertSee('Store Requisitions')
             ->assertSee('Cycle Counts');
+
+        $this->actingAs($warehouse)->get('/inventory/cycle-counts')
+            ->assertOk()
+            ->assertSee('Back to Inventory');
     }
 
     public function test_viewer_cannot_mutate_inventory_through_the_api(): void
@@ -116,87 +129,102 @@ class UiNavigationAuthorizationTest extends TestCase
 
     public function test_sidebar_navigation_strictly_reflects_role_and_panel_boundaries(): void
     {
-        // 1. Pharmacy Staff: Dispensary care, no warehousing access
+        // The left rail contains only major modules. Workflow links live on
+        // their parent page and retain the same role permission checks.
         $pharmacy = User::factory()->role(UserRole::PharmacyStaff)->create();
-        $this->actingAs($pharmacy)->get('/dashboard')
-            ->assertOk()
-            ->assertDontSee('Warehousing')
-            ->assertDontSee('QC Inspection Queue')
-            ->assertDontSee('Suppliers')
-            ->assertDontSee('Demand Forecast')
-            ->assertDontSee('Process Reviews')
-            ->assertDontSee('User Management')
-            ->assertDontSee('Audit Trail')
-            ->assertSee('Store Requisitions')
-            ->assertSee('Transfers')
-            ->assertSee('Requisitions &amp; POs', false)
-            ->assertSee('Documents &amp; Logistics', false);
+        $sidebar = $this->mainNavigationFor($pharmacy);
+        $this->assertStringContainsString('Inventory', $sidebar);
+        $this->assertStringContainsString('Procurement &amp; Sourcing', $sidebar);
+        $this->assertStringContainsString('Documents &amp; Logistics', $sidebar);
+        $this->assertStringNotContainsString('Smart Warehousing', $sidebar);
+        $this->assertStringNotContainsString('Store Requisitions', $sidebar);
+        $this->assertStringNotContainsString('Transfers', $sidebar);
 
         $this->flushSession();
         $this->app['auth']->forgetGuards();
 
-        // 2. Warehouse Staff: Storage dock operations, no supplier management or forecasting
         $warehouse = User::factory()->role(UserRole::WarehouseStaff)->create();
-        $this->actingAs($warehouse)->get('/dashboard')
+        $sidebar = $this->mainNavigationFor($warehouse);
+        $this->assertStringContainsString('Smart Warehousing', $sidebar);
+        $this->assertStringNotContainsString('Dock Receiving', $sidebar);
+        $this->assertStringNotContainsString('QC Inspection Queue', $sidebar);
+        $this->assertStringNotContainsString('Warehouse Tasks', $sidebar);
+
+        $this->actingAs($warehouse)->get('/inventory/warehousing')
             ->assertOk()
-            ->assertSee('Warehousing')
-            ->assertSee('Smart Warehousing')
             ->assertSee('Dock Receiving')
-            ->assertSee('QC Inspection Queue')
-            ->assertSee('Warehouse Tasks')
-            ->assertDontSee('Suppliers')
-            ->assertDontSee('Demand Forecast')
-            ->assertDontSee('Process Reviews')
-            ->assertDontSee('User Management')
-            ->assertDontSee('Audit Trail');
+            ->assertSee('QC Inspection')
+            ->assertSee('Warehouse Tasks');
 
         $this->flushSession();
         $this->app['auth']->forgetGuards();
 
-        // 3. Inventory Manager: Full storeroom, procurement, forecasting, and warehousing
         $manager = User::factory()->role(UserRole::InventoryManager)->create();
-        $this->actingAs($manager)->get('/dashboard')
+        $sidebar = $this->mainNavigationFor($manager);
+        $this->assertStringContainsString('Smart Warehousing', $sidebar);
+        $this->assertStringContainsString('Procurement &amp; Sourcing', $sidebar);
+        $this->assertStringContainsString('Process Reviews', $sidebar);
+        $this->assertStringNotContainsString('Suppliers', $sidebar);
+        $this->assertStringNotContainsString('Demand Forecast', $sidebar);
+
+        $this->actingAs($manager)->get('/inventory/purchases')
             ->assertOk()
-            ->assertSee('Warehousing')
             ->assertSee('Suppliers')
-            ->assertSee('Demand Forecast')
-            ->assertSee('Process Reviews')
-            ->assertDontSee('User Management')
-            ->assertDontSee('Access Control');
+            ->assertSee('Demand Forecasts');
 
         $this->flushSession();
         $this->app['auth']->forgetGuards();
 
-        // 4. Auditor: Read-only governance & audit logs, including warehousing oversight
         $auditor = User::factory()->role(UserRole::Auditor)->create();
-        $this->actingAs($auditor)->get('/dashboard')
-            ->assertOk()
-            ->assertSee('Warehousing')
-            ->assertSee('Smart Warehousing')
-            ->assertSee('Warehouse Tasks')
-            ->assertDontSee('Dock Receiving')
-            ->assertDontSee('QC Inspection Queue')
-            ->assertSee('Suppliers')
-            ->assertSee('Process Reviews')
-            ->assertSee('Audit Trail')
-            ->assertDontSee('User Management')
-            ->assertDontSee('Access Control');
+        $sidebar = $this->mainNavigationFor($auditor);
+        $this->assertStringContainsString('Smart Warehousing', $sidebar);
+        $this->assertStringContainsString('Process Reviews', $sidebar);
+        $this->assertStringContainsString('Audit Trail', $sidebar);
+        $this->assertStringNotContainsString('Warehouse Tasks', $sidebar);
+        $this->assertStringNotContainsString('Suppliers', $sidebar);
 
         $this->flushSession();
         $this->app['auth']->forgetGuards();
 
-        // 5. Viewer: Pure read-only observer across inventory, procurement, and reports
         $viewer = User::factory()->role(UserRole::Viewer)->create();
-        $this->actingAs($viewer)->get('/dashboard')
+        $sidebar = $this->mainNavigationFor($viewer);
+        $this->assertStringContainsString('Inventory', $sidebar);
+        $this->assertStringContainsString('Process Reviews', $sidebar);
+        $this->assertStringNotContainsString('Smart Warehousing', $sidebar);
+        $this->assertStringNotContainsString('Suppliers', $sidebar);
+        $this->assertStringNotContainsString('Store Requisitions', $sidebar);
+        $this->assertStringNotContainsString('Adjustments', $sidebar);
+    }
+
+    public function test_secondary_pages_link_back_to_their_major_module(): void
+    {
+        $manager = User::factory()->role(UserRole::InventoryManager)->create();
+
+        $this->actingAs($manager)->get('/inventory/stock-movements')
             ->assertOk()
-            ->assertDontSee('Warehousing')
-            ->assertSee('Suppliers')
-            ->assertDontSee('Demand Forecast')
-            ->assertSee('Process Reviews')
-            ->assertDontSee('User Management')
-            ->assertDontSee('Audit Trail')
-            ->assertDontSee('Store Requisitions')
-            ->assertDontSee('Adjustments');
+            ->assertSee('Back to Inventory');
+
+        $this->actingAs($manager)->get('/inventory/suppliers')
+            ->assertOk()
+            ->assertSee('Back to Procurement');
+
+        $this->actingAs($manager)->get('/inventory/demand-forecast')
+            ->assertOk()
+            ->assertSee('Back to Procurement');
+
+        $this->actingAs($manager)->get('/inventory/warehousing/scan-station')
+            ->assertOk()
+            ->assertSee('Back to Smart Warehousing');
+
+        $administrator = User::factory()->administrator()->create();
+
+        $this->actingAs($administrator)->get('/admin/users')
+            ->assertOk()
+            ->assertSee('Access Control');
+
+        $this->actingAs($administrator)->get('/admin/permissions')
+            ->assertOk()
+            ->assertSee('Back to User Management');
     }
 
     public function test_procurement_workspace_tabs_dynamically_adapt_to_role_permissions(): void
@@ -235,5 +263,16 @@ class UiNavigationAuthorizationTest extends TestCase
             ->assertSee('Sourcing Events &amp; RFQs', false)
             ->assertSee('Comparative Evaluation &amp; Landed Cost Matrix', false)
             ->assertSee('Purchase Orders &amp; Revisions', false);
+    }
+
+    private function mainNavigationFor(User $user): string
+    {
+        $html = $this->actingAs($user)->get('/dashboard')->assertOk()->getContent();
+
+        $this->assertIsString($html);
+        $this->assertMatchesRegularExpression('/<nav[^>]+aria-label="Main navigation"[^>]*>/i', $html);
+        preg_match('/<nav[^>]+aria-label="Main navigation"[^>]*>(.*?)<\/nav>/is', $html, $matches);
+
+        return $matches[1] ?? '';
     }
 }

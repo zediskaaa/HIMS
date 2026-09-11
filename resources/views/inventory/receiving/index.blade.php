@@ -9,7 +9,8 @@
                 <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Dock Receiving &amp; Goods Receipt Notes</h2>
                 <p class="text-sm text-neutral-600">Physical carrier intake, PO line tolerance verification (+5% max), lot/batch registration, and quarantine placement.</p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center gap-2">
+                <x-ui.button variant="secondary" :href="route('inventory.warehousing.dashboard')" icon="arrow-left">Back to Smart Warehousing</x-ui.button>
                 @can(\App\Enums\Permission::InspectStock->value)
                     <a href="{{ route('inventory.qc.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2 text-sm font-medium text-amber-800 shadow-sm hover:bg-amber-100">
                         <svg class="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">

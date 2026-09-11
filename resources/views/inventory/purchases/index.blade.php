@@ -9,16 +9,21 @@
                 <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Procurement &amp; Strategic Sourcing</h2>
                 <p class="text-sm text-neutral-600">Enterprise requisition intake, sealed-bid sourcing, landed cost normalization, DOA approvals, and encumbered purchase orders.</p>
             </div>
-            @can('generate_forecasts')
-            <div class="flex items-center gap-3">
+            @canany([\App\Enums\Permission::ViewSuppliers->value, \App\Enums\Permission::GenerateForecasts->value])
+            <div class="flex flex-wrap items-center gap-2">
+                @can(\App\Enums\Permission::ViewSuppliers->value)
+                    <x-ui.button variant="secondary" :href="route('inventory.suppliers')" icon="truck">Suppliers</x-ui.button>
+                @endcan
+                @can(\App\Enums\Permission::GenerateForecasts->value)
                 <a href="{{ route('inventory.demand-forecast') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50">
                     <svg class="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                     Demand Forecasts
                 </a>
+                @endcan
             </div>
-            @endcan
+            @endcanany
         </div>
     </x-slot>
 

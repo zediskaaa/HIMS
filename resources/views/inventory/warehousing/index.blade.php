@@ -13,11 +13,20 @@
                     Scan Workstation
                 </a>
                 @endcan
+                @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
+                    <x-ui.button variant="secondary" :href="route('inventory.receiving.index')" icon="arrow-down-tray">Dock Receiving</x-ui.button>
+                @endcan
+                @can(\App\Enums\Permission::InspectStock->value)
+                    <x-ui.button variant="secondary" :href="route('inventory.qc.index')" icon="shield-check">QC Inspection</x-ui.button>
+                @endcan
                 <a href="{{ route('inventory.warehouse-tasks.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
                     Warehouse Tasks
                 </a>
                 <a href="{{ route('inventory.warehousing.locations') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
                     Locations Explorer
+                </a>
+                <a href="{{ route('inventory.storage-locations') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
+                    Location Registry
                 </a>
             </div>
         </div>

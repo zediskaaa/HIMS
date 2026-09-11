@@ -16,7 +16,8 @@
                         Systematic perpetual inventory counting, blind physical verification, statistical variance analysis, and multi-tier adjustment posting.
                     </p>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <x-ui.button variant="secondary" :href="route('inventory.items')" icon="arrow-left">Back to Inventory</x-ui.button>
                     @can(\App\Enums\Permission::PerformCycleCount->value)
                         <form action="{{ route('inventory.cycle-counts.abc') }}" method="POST" class="inline">
                             @csrf

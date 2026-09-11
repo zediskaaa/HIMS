@@ -2,7 +2,11 @@
     <x-ui.page-header
         title="Supplier Management"
         subtitle="Qualify suppliers, maintain commercial records, and control procurement eligibility."
-        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Suppliers' => null]" />
+        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Procurement' => route('inventory.purchases'), 'Suppliers' => null]">
+        <x-slot:actions>
+            <x-ui.button variant="secondary" :href="route('inventory.purchases')" icon="arrow-left">Back to Procurement</x-ui.button>
+        </x-slot:actions>
+    </x-ui.page-header>
 
     <div class="mt-6 grid gap-4 sm:grid-cols-3">
         <x-ui.stat label="Supplier records" :value="$counts['total']" icon="truck" />

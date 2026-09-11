@@ -13,6 +13,33 @@
                 </div>
             @endif
 
+            <x-ui.card title="Inventory tools" subtitle="Open a workflow when you need it; only actions allowed for your role are shown.">
+                <div class="flex flex-wrap gap-2">
+                    <x-ui.button variant="secondary" :href="route('inventory.stock')" icon="chart-bar">Stock Levels</x-ui.button>
+                    <x-ui.button variant="secondary" :href="route('inventory.stock-movements')" icon="arrows-right-left">Stock Movements</x-ui.button>
+                    @canany([\App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::ApproveRequisition->value, \App\Enums\Permission::IssueStock->value])
+                        <x-ui.button variant="secondary" :href="route('inventory.requisitions.index')" icon="document-duplicate">Store Requisitions</x-ui.button>
+                    @endcanany
+                    @can(\App\Enums\Permission::TransferStock->value)
+                        <x-ui.button variant="secondary" :href="route('inventory.transfers.index')" icon="truck">Transfers</x-ui.button>
+                    @endcan
+                    @can(\App\Enums\Permission::PerformCycleCount->value)
+                        <x-ui.button variant="secondary" :href="route('inventory.cycle-counts.index')" icon="clipboard-document-check">Cycle Counts</x-ui.button>
+                    @endcan
+                    @canany([\App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::ApproveAdjustment->value])
+                        <x-ui.button variant="secondary" :href="route('inventory.adjustments')" icon="clipboard-document-list">Adjustments</x-ui.button>
+                    @endcanany
+                    @can(\App\Enums\Permission::AcknowledgeAlerts->value)
+                        <x-ui.button variant="secondary" :href="route('inventory.alerts')" icon="bell-alert">
+                            Stock Alerts
+                            @if (($openAlertCount ?? 0) > 0)
+                                ({{ $openAlertCount }})
+                            @endif
+                        </x-ui.button>
+                    @endcan
+                </div>
+            </x-ui.card>
+
             {{-- The catalogue is readable by anyone with view_inventory, but only
                  manage_items may add to it, so the form is hidden rather than
                  shown-and-refused. --}}

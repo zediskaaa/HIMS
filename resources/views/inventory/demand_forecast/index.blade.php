@@ -2,7 +2,11 @@
     <x-ui.page-header
         title="Demand Forecasting"
         subtitle="Reorder quantities worked out from recorded consumption, not from typed-in estimates."
-        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Demand Forecast' => null]" />
+        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Procurement' => route('inventory.purchases'), 'Demand Forecast' => null]">
+        <x-slot:actions>
+            <x-ui.button variant="secondary" :href="route('inventory.purchases')" icon="arrow-left">Back to Procurement</x-ui.button>
+        </x-slot:actions>
+    </x-ui.page-header>
 
     @if ($errors->any())
         <x-ui.alert variant="danger" title="This plan was not saved">
