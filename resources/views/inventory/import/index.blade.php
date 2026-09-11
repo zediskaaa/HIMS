@@ -281,208 +281,409 @@
                 </div>
             </div>
 
-            {{-- Step 2: Interactive Validation & Preview Console --}}
-            <div x-show="validationResult" x-cloak class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                <div class="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <span class="inline-flex items-center rounded-md bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-800">Step 2</span>
-                        <h3 class="mt-1.5 text-lg font-bold text-slate-900">Pre-Commit Validation &amp; Record Preview</h3>
-                    </div>
-                    <div class="flex items-center gap-2">
+            {{-- Compact Pre-Commit Validation Status Bar (Shown on main page when a file has been validated) --}}
+            <div x-show="validationResult" x-cloak class="rounded-2xl border p-5 shadow-sm transition"
+                 :class="validationResult && validationResult.is_valid ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/40'">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div class="flex items-start sm:items-center gap-3.5">
                         <template x-if="validationResult && validationResult.is_valid">
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
-                                <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                                <span>Passed All Integrity Checks</span>
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 shadow-sm">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                             </span>
                         </template>
                         <template x-if="validationResult && !validationResult.is_valid">
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 border border-rose-200">
-                                <span class="h-2 w-2 rounded-full bg-rose-500"></span>
-                                <span>Errors Detected (Cannot Commit)</span>
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600 shadow-sm">
+                                <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
                             </span>
                         </template>
-                    </div>
-                </div>
-
-                {{-- Summary Metrics Cards --}}
-                <div class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    <div class="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-                        <div class="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Rows</div>
-                        <div class="mt-1 text-2xl font-bold text-slate-900" x-text="validationResult ? validationResult.total_rows : 0"></div>
-                    </div>
-                    <div class="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
-                        <div class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Valid Rows</div>
-                        <div class="mt-1 text-2xl font-bold text-emerald-700" x-text="validationResult ? validationResult.valid_count : 0"></div>
-                    </div>
-                    <div class="rounded-xl border border-rose-200 bg-rose-50/40 p-4">
-                        <div class="text-xs font-semibold uppercase tracking-wider text-rose-700">Errors</div>
-                        <div class="mt-1 text-2xl font-bold text-rose-700" x-text="validationResult ? validationResult.invalid_count : 0"></div>
-                    </div>
-                    <div class="rounded-xl border border-sky-200 bg-sky-50/40 p-4">
-                        <div class="text-xs font-semibold uppercase tracking-wider text-sky-700">Planned Updates</div>
-                        <div class="mt-1 text-2xl font-bold text-sky-700" x-text="validationResult ? validationResult.update_count : 0"></div>
-                    </div>
-                </div>
-
-                {{-- Error Diagnostics Accordion --}}
-                <template x-if="validationResult && !validationResult.is_valid && validationResult.errors.length > 0">
-                    <div class="mt-6 rounded-xl border border-rose-200 bg-rose-50/30 p-4">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2 text-rose-900 font-semibold text-sm">
-                                <svg class="h-5 w-5 text-rose-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
-                                <span>Validation Issues Found (<span x-text="validationResult.errors.length"></span>)</span>
-                            </div>
-                            <span class="text-xs text-rose-700">Fix these rows in your source file and re-upload.</span>
-                        </div>
-
-                        <div class="mt-3 max-h-60 overflow-y-auto rounded-lg border border-rose-200 bg-white">
-                            <table class="min-w-full divide-y divide-rose-100 text-xs text-left">
-                                <thead class="bg-rose-50 text-rose-900 font-semibold uppercase tracking-wider">
-                                    <tr>
-                                        <th class="px-3 py-2">Row #</th>
-                                        <th class="px-3 py-2">Issue Type</th>
-                                        <th class="px-3 py-2">Field</th>
-                                        <th class="px-3 py-2">Uploaded Value</th>
-                                        <th class="px-3 py-2">Error Explanation</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-100">
-                                    <template x-for="(err, idx) in validationResult.errors" :key="idx">
-                                        <tr class="hover:bg-rose-50/20">
-                                            <td class="px-3 py-2 font-bold text-slate-800 font-mono" x-text="err.row"></td>
-                                            <td class="px-3 py-2 font-sans">
-                                                <span class="inline-flex rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
-                                                      :class="{
-                                                          'bg-red-100 text-red-800': err.type === 'missing_header',
-                                                          'bg-amber-100 text-amber-800': err.type === 'empty_required',
-                                                          'bg-purple-100 text-purple-800': err.type === 'invalid_value',
-                                                          'bg-orange-100 text-orange-800': err.type === 'duplicate_record',
-                                                          'bg-blue-100 text-blue-800': err.type === 'referential_integrity',
-                                                          'bg-rose-100 text-rose-800': err.type === 'invalid_structure',
-                                                          'bg-slate-100 text-slate-700': !err.type
-                                                      }"
-                                                      x-text="err.type ? err.type.replace('_', ' ') : 'issue'">
-                                                </span>
-                                            </td>
-                                            <td class="px-3 py-2 font-semibold text-slate-700 font-mono" x-text="err.field"></td>
-                                            <td class="px-3 py-2 text-rose-600 truncate max-w-xs font-mono" x-text="err.value || '-'"></td>
-                                            <td class="px-3 py-2 text-slate-700 font-sans leading-relaxed" x-text="err.message"></td>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </template>
-
-                {{-- Record Preview Table --}}
-                <div class="mt-6">
-                    <div class="flex items-center justify-between">
-                        <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500">Record Preview (First 25 Rows)</h4>
-                        <span class="text-xs text-slate-400">Zero data is saved until confirmed below.</span>
-                    </div>
-
-                    <div class="mt-2.5 overflow-x-auto rounded-xl border border-slate-200">
-                        <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
-                            <thead class="bg-slate-50 font-semibold text-slate-700">
-                                <tr>
-                                    <th class="px-3.5 py-2.5">Row</th>
-                                    <th class="px-3.5 py-2.5">Status</th>
-                                    <template x-if="target === 'items'">
-                                        <th class="px-3.5 py-2.5">SKU</th>
-                                    </template>
-                                    <template x-if="target === 'locations'">
-                                        <th class="px-3.5 py-2.5">Location Code</th>
-                                    </template>
-                                    <th class="px-3.5 py-2.5">Name / Description</th>
-                                    <template x-if="target === 'items'">
-                                        <th class="px-3.5 py-2.5">Category</th>
-                                    </template>
-                                    <template x-if="target === 'items'">
-                                        <th class="px-3.5 py-2.5">Unit Cost</th>
-                                    </template>
-                                    <template x-if="target === 'locations'">
-                                        <th class="px-3.5 py-2.5">Zone &amp; Capacity</th>
-                                    </template>
-                                    <template x-if="target === 'suppliers'">
-                                        <th class="px-3.5 py-2.5">Contact / Email</th>
-                                    </template>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100 bg-white" x-show="validationResult && validationResult.preview_rows.length > 0">
-                                <template x-for="(row, idx) in validationResult ? validationResult.preview_rows : []" :key="idx">
-                                    <tr class="hover:bg-slate-50/50" :class="row.status === 'invalid' ? 'bg-rose-50/30' : ''">
-                                        <td class="px-3.5 py-2.5 font-semibold text-slate-800" x-text="row.row"></td>
-                                        <td class="px-3.5 py-2.5">
-                                            <template x-if="row.status === 'valid'">
-                                                <span class="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
-                                                    Valid
-                                                </span>
-                                            </template>
-                                            <template x-if="row.status === 'update'">
-                                                <span class="inline-flex items-center gap-1 rounded bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-800">
-                                                    Update
-                                                </span>
-                                            </template>
-                                            <template x-if="row.status === 'invalid'">
-                                                <span class="inline-flex items-center gap-1 rounded bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800" :title="row.errors.join('; ')">
-                                                    Error
-                                                </span>
-                                            </template>
-                                        </td>
-                                        <template x-if="target === 'items'">
-                                            <td class="px-3.5 py-2.5 font-mono text-slate-700" x-text="row.sku"></td>
-                                        </template>
-                                        <template x-if="target === 'locations'">
-                                            <td class="px-3.5 py-2.5 font-mono text-slate-700" x-text="row.code"></td>
-                                        </template>
-                                        <td class="px-3.5 py-2.5 font-medium text-slate-900" x-text="row.name"></td>
-                                        <template x-if="target === 'items'">
-                                            <td class="px-3.5 py-2.5 text-slate-600" x-text="row.category"></td>
-                                        </template>
-                                        <template x-if="target === 'items'">
-                                            <td class="px-3.5 py-2.5 text-slate-700 font-semibold" x-text="row.unit_cost"></td>
-                                        </template>
-                                        <template x-if="target === 'locations'">
-                                            <td class="px-3.5 py-2.5 text-slate-600" x-text="row.zone + ' (' + row.capacity + ')'"></td>
-                                        </template>
-                                        <template x-if="target === 'suppliers'">
-                                            <td class="px-3.5 py-2.5 text-slate-600" x-text="(row.contact_person || '') + ' ' + (row.email || '')"></td>
-                                        </template>
-                                    </tr>
+                        <div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h4 class="font-bold text-slate-900 text-sm sm:text-base"
+                                    x-text="validationResult && validationResult.is_valid ? 'Validation Passed — Ready for Import' : 'Validation Issues Detected'">
+                                </h4>
+                                <template x-if="validationResult && validationResult.is_valid">
+                                    <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                                        <span x-text="validationResult.valid_count"></span> Records Valid
+                                    </span>
                                 </template>
-                            </tbody>
-                        </table>
+                                <template x-if="validationResult && !validationResult.is_valid">
+                                    <span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800">
+                                        <span x-text="validationResult.invalid_count"></span> Error(s) Found
+                                    </span>
+                                </template>
+                            </div>
+                            <p class="mt-0.5 text-xs text-slate-600">
+                                <span x-text="selectedFile ? selectedFile.name : (validationResult ? validationResult.file_name : 'Uploaded File')"></span>
+                                <span class="text-slate-400">•</span>
+                                <span x-text="validationResult ? validationResult.total_rows + ' total rows parsed' : ''"></span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2.5 self-end sm:self-auto">
+                        <button
+                            type="button"
+                            @click="showValidationModal = true"
+                            class="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs sm:text-sm font-semibold shadow-sm transition"
+                            :class="validationResult && validationResult.is_valid ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-rose-600 hover:bg-rose-500 text-white'"
+                        >
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            <span x-text="validationResult && validationResult.is_valid ? 'Review & Confirm Import' : 'View Validation Issues'"></span>
+                        </button>
+                        <button
+                            type="button"
+                            @click="resetPreview()"
+                            class="inline-flex items-center gap-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm"
+                        >
+                            <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            <span>Clear</span>
+                        </button>
                     </div>
                 </div>
+            </div>
 
-                {{-- Action Footer --}}
-                <div class="mt-8 flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                    <button
-                        type="button"
-                        @click="resetPreview()"
-                        class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
-                    >
-                        Cancel / Re-Upload
-                    </button>
+            {{-- Validation Results Modal --}}
+            <div
+                x-show="showValidationModal"
+                x-cloak
+                class="fixed inset-0 z-50 overflow-y-auto"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="validation-modal-title"
+                @keydown.escape.window="if (!isCommitting) showValidationModal = false"
+            >
+                {{-- Modal Backdrop --}}
+                <div
+                    x-show="showValidationModal"
+                    x-transition:enter="ease-out duration-300"
+                    x-transition:enter-start="opacity-0"
+                    x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-200"
+                    x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    @click="if (!isCommitting) showValidationModal = false"
+                    class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+                ></div>
 
-                    <button
-                        type="button"
-                        @click="commitImport()"
-                        :disabled="!validationResult || !validationResult.is_valid || isCommitting"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                {{-- Modal Dialog Container --}}
+                <div class="flex min-h-full items-center justify-center p-3 sm:p-6 text-center">
+                    <div
+                        x-show="showValidationModal"
+                        x-transition:enter="ease-out duration-300"
+                        x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave="ease-in duration-200"
+                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                        @click.stop
+                        class="relative flex flex-col w-full max-w-5xl max-h-[90vh] text-left bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all"
                     >
-                        <template x-if="isCommitting">
-                            <svg class="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                        </template>
-                        <template x-if="!isCommitting">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                        </template>
-                        <span x-text="isCommitting ? 'Committing Transaction...' : 'Confirm & Import ' + (validationResult ? validationResult.valid_count : 0) + ' Records'"></span>
-                    </button>
+                        {{-- Modal Header --}}
+                        <div class="flex items-start justify-between border-b border-slate-100 px-6 py-5 bg-white">
+                            <div class="flex items-start gap-3.5">
+                                <template x-if="validationResult && validationResult.is_valid">
+                                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 shadow-sm">
+                                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                </template>
+                                <template x-if="validationResult && !validationResult.is_valid">
+                                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600 shadow-sm">
+                                        <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                                    </div>
+                                </template>
+                                <div>
+                                    <div class="flex items-center gap-2.5 flex-wrap">
+                                        <h3 id="validation-modal-title" class="text-lg font-bold text-slate-900"
+                                            x-text="validationResult && validationResult.is_valid ? 'Pre-Commit Validation Passed' : 'Pre-Commit Validation Issues'">
+                                        </h3>
+                                        <template x-if="validationResult && validationResult.is_valid">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                                Ready for Import
+                                            </span>
+                                        </template>
+                                        <template x-if="validationResult && !validationResult.is_valid">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-3 py-0.5 text-xs font-semibold text-rose-700 border border-rose-200">
+                                                <span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                                                Errors Detected (Cannot Commit)
+                                            </span>
+                                        </template>
+                                    </div>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        Target Module: <span class="font-semibold text-slate-700 capitalize" x-text="target"></span>
+                                        <span class="text-slate-300">•</span>
+                                        File: <span class="font-semibold text-slate-700 font-mono" x-text="selectedFile ? selectedFile.name : (validationResult ? validationResult.file_name : 'Uploaded File')"></span>
+                                        <span class="text-slate-300">•</span>
+                                        Mode: <span class="font-semibold text-slate-700" x-text="mode === 'create_only' ? 'Create Only' : 'Update or Create'"></span>
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                @click="showValidationModal = false"
+                                :disabled="isCommitting"
+                                class="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition disabled:opacity-50"
+                            >
+                                <span class="sr-only">Close modal</span>
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+
+                        {{-- Summary Metrics Bar --}}
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-3.5 bg-slate-50/80 border-b border-slate-100 text-xs">
+                            <div class="rounded-xl border border-slate-200 bg-white p-3">
+                                <div class="font-semibold uppercase tracking-wider text-slate-500 text-[11px]">Total Rows</div>
+                                <div class="mt-0.5 text-xl font-bold text-slate-900" x-text="validationResult ? validationResult.total_rows : 0"></div>
+                            </div>
+                            <div class="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
+                                <div class="font-semibold uppercase tracking-wider text-emerald-700 text-[11px]">Valid Rows</div>
+                                <div class="mt-0.5 text-xl font-bold text-emerald-700" x-text="validationResult ? validationResult.valid_count : 0"></div>
+                            </div>
+                            <div class="rounded-xl border border-rose-200 bg-rose-50/40 p-3">
+                                <div class="font-semibold uppercase tracking-wider text-rose-700 text-[11px]">Errors</div>
+                                <div class="mt-0.5 text-xl font-bold text-rose-700" x-text="validationResult ? validationResult.invalid_count : 0"></div>
+                            </div>
+                            <div class="rounded-xl border border-sky-200 bg-sky-50/40 p-3">
+                                <div class="font-semibold uppercase tracking-wider text-sky-700 text-[11px]">Planned Updates</div>
+                                <div class="mt-0.5 text-xl font-bold text-sky-700" x-text="validationResult ? validationResult.update_count : 0"></div>
+                            </div>
+                        </div>
+
+                        {{-- Navigation Tabs --}}
+                        <div class="flex items-center border-b border-slate-200 px-6 bg-white gap-4">
+                            <button
+                                type="button"
+                                @click="activeTab = 'issues'"
+                                class="flex items-center gap-2 py-3 text-xs sm:text-sm font-semibold border-b-2 transition"
+                                :class="activeTab === 'issues' ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-800'"
+                            >
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                <span>Validation Issues</span>
+                                <span class="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                      :class="validationResult && validationResult.errors.length > 0 ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'"
+                                      x-text="validationResult ? validationResult.errors.length : 0">
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                @click="activeTab = 'preview'"
+                                class="flex items-center gap-2 py-3 text-xs sm:text-sm font-semibold border-b-2 transition"
+                                :class="activeTab === 'preview' ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-800'"
+                            >
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                <span>Record Preview</span>
+                                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600"
+                                      x-text="validationResult ? validationResult.preview_rows.length : 0">
+                                </span>
+                            </button>
+                        </div>
+
+                        {{-- Modal Body (Scrollable) --}}
+                        <div class="flex-1 overflow-y-auto p-6 space-y-4">
+                            {{-- Tab 1: Validation Issues --}}
+                            <div x-show="activeTab === 'issues'">
+                                <template x-if="validationResult && validationResult.errors.length > 0">
+                                    <div class="space-y-3">
+                                        <div class="rounded-xl border border-rose-200 bg-rose-50/60 p-3.5 flex items-start gap-3">
+                                            <svg class="h-5 w-5 text-rose-600 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                                            <div class="text-xs text-rose-900 leading-relaxed">
+                                                <span class="font-bold">Errors must be resolved before import can proceed.</span>
+                                                <span>Review the exact issues below, update your source file, and re-upload.</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+                                            <div class="overflow-y-auto max-h-[360px]">
+                                                <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+                                                    <thead class="bg-slate-50 font-semibold text-slate-700 sticky top-0 z-10">
+                                                        <tr>
+                                                            <th class="px-3 py-2.5 bg-slate-50">Row #</th>
+                                                            <th class="px-3 py-2.5 bg-slate-50">Issue Type</th>
+                                                            <th class="px-3 py-2.5 bg-slate-50">Field</th>
+                                                            <th class="px-3 py-2.5 bg-slate-50">Uploaded Value</th>
+                                                            <th class="px-3 py-2.5 bg-slate-50">Error Explanation</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody class="divide-y divide-slate-100 bg-white">
+                                                        <template x-for="(err, idx) in validationResult ? validationResult.errors : []" :key="idx">
+                                                            <tr class="hover:bg-rose-50/20">
+                                                                <td class="px-3 py-2.5 font-bold text-slate-800 font-mono" x-text="err.row"></td>
+                                                                <td class="px-3 py-2.5">
+                                                                    <span class="inline-flex rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
+                                                                          :class="{
+                                                                              'bg-red-100 text-red-800': err.type === 'missing_header',
+                                                                              'bg-amber-100 text-amber-800': err.type === 'empty_required',
+                                                                              'bg-purple-100 text-purple-800': err.type === 'invalid_value',
+                                                                              'bg-orange-100 text-orange-800': err.type === 'duplicate_record',
+                                                                              'bg-blue-100 text-blue-800': err.type === 'referential_integrity',
+                                                                              'bg-rose-100 text-rose-800': err.type === 'invalid_structure',
+                                                                              'bg-slate-100 text-slate-700': !err.type
+                                                                          }"
+                                                                          x-text="err.type ? err.type.replace('_', ' ') : 'issue'">
+                                                                    </span>
+                                                                </td>
+                                                                <td class="px-3 py-2.5 font-semibold text-slate-700 font-mono" x-text="err.field"></td>
+                                                                <td class="px-3 py-2.5 text-rose-600 truncate max-w-xs font-mono" x-text="err.value || '-'"></td>
+                                                                <td class="px-3 py-2.5 text-slate-700 font-sans leading-relaxed" x-text="err.message"></td>
+                                                            </tr>
+                                                        </template>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <template x-if="validationResult && validationResult.errors.length === 0">
+                                    <div class="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-8 text-center">
+                                        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                        </div>
+                                        <h4 class="mt-3 text-base font-bold text-emerald-900">Zero Validation Issues Found</h4>
+                                        <p class="mt-1 text-xs text-emerald-700 max-w-md mx-auto leading-relaxed">
+                                            All <span class="font-bold" x-text="validationResult.valid_count"></span> records passed structural, data type, uniqueness, and referential integrity checks.
+                                        </p>
+                                        <div class="mt-4">
+                                            <button
+                                                type="button"
+                                                @click="activeTab = 'preview'"
+                                                class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800 underline hover:text-emerald-900"
+                                            >
+                                                <span>View Record Preview Table</span>
+                                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            {{-- Tab 2: Record Preview --}}
+                            <div x-show="activeTab === 'preview'">
+                                <div class="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+                                    <div class="overflow-y-auto max-h-[360px]">
+                                        <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+                                            <thead class="bg-slate-50 font-semibold text-slate-700 sticky top-0 z-10">
+                                                <tr>
+                                                    <th class="px-3.5 py-2.5 bg-slate-50">Row</th>
+                                                    <th class="px-3.5 py-2.5 bg-slate-50">Status</th>
+                                                    <template x-if="target === 'items'">
+                                                        <th class="px-3.5 py-2.5 bg-slate-50">SKU</th>
+                                                    </template>
+                                                    <template x-if="target === 'locations'">
+                                                        <th class="px-3.5 py-2.5 bg-slate-50">Location Code</th>
+                                                    </template>
+                                                    <th class="px-3.5 py-2.5 bg-slate-50">Name / Description</th>
+                                                    <template x-if="target === 'items'">
+                                                        <th class="px-3.5 py-2.5 bg-slate-50">Category</th>
+                                                    </template>
+                                                    <template x-if="target === 'items'">
+                                                        <th class="px-3.5 py-2.5 bg-slate-50">Unit Cost</th>
+                                                    </template>
+                                                    <template x-if="target === 'locations'">
+                                                        <th class="px-3.5 py-2.5 bg-slate-50">Zone &amp; Capacity</th>
+                                                    </template>
+                                                    <template x-if="target === 'suppliers'">
+                                                        <th class="px-3.5 py-2.5 bg-slate-50">Contact / Email</th>
+                                                    </template>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-100 bg-white">
+                                                <template x-for="(row, idx) in validationResult ? validationResult.preview_rows : []" :key="idx">
+                                                    <tr class="hover:bg-slate-50/50" :class="row.status === 'invalid' ? 'bg-rose-50/30' : ''">
+                                                        <td class="px-3.5 py-2.5 font-semibold text-slate-800" x-text="row.row"></td>
+                                                        <td class="px-3.5 py-2.5">
+                                                            <template x-if="row.status === 'valid'">
+                                                                <span class="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                                                                    Valid
+                                                                </span>
+                                                            </template>
+                                                            <template x-if="row.status === 'update'">
+                                                                <span class="inline-flex items-center gap-1 rounded bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-800">
+                                                                    Update
+                                                                </span>
+                                                            </template>
+                                                            <template x-if="row.status === 'invalid'">
+                                                                <span class="inline-flex items-center gap-1 rounded bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800" :title="row.errors.join('; ')">
+                                                                    Error
+                                                                </span>
+                                                            </template>
+                                                        </td>
+                                                        <template x-if="target === 'items'">
+                                                            <td class="px-3.5 py-2.5 font-mono text-slate-700" x-text="row.sku"></td>
+                                                        </template>
+                                                        <template x-if="target === 'locations'">
+                                                            <td class="px-3.5 py-2.5 font-mono text-slate-700" x-text="row.code"></td>
+                                                        </template>
+                                                        <td class="px-3.5 py-2.5 font-medium text-slate-900" x-text="row.name"></td>
+                                                        <template x-if="target === 'items'">
+                                                            <td class="px-3.5 py-2.5 text-slate-600" x-text="row.category"></td>
+                                                        </template>
+                                                        <template x-if="target === 'items'">
+                                                            <td class="px-3.5 py-2.5 text-slate-700 font-semibold" x-text="row.unit_cost"></td>
+                                                        </template>
+                                                        <template x-if="target === 'locations'">
+                                                            <td class="px-3.5 py-2.5 text-slate-600" x-text="row.zone + ' (' + row.capacity + ')'"></td>
+                                                        </template>
+                                                        <template x-if="target === 'suppliers'">
+                                                            <td class="px-3.5 py-2.5 text-slate-600" x-text="(row.contact_person || '') + ' ' + (row.email || '')"></td>
+                                                        </template>
+                                                    </tr>
+                                                </template>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Modal Footer --}}
+                        <div class="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                            <div class="flex items-center gap-2 w-full sm:w-auto">
+                                <button
+                                    type="button"
+                                    @click="resetPreview(); showValidationModal = false;"
+                                    :disabled="isCommitting"
+                                    class="w-full sm:w-auto rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition shadow-sm disabled:opacity-50"
+                                >
+                                    Cancel / Re-Upload
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="showValidationModal = false"
+                                    :disabled="isCommitting"
+                                    class="w-full sm:w-auto rounded-xl border border-transparent px-3 py-2 text-xs sm:text-sm font-medium text-slate-500 hover:text-slate-800 transition disabled:opacity-50"
+                                >
+                                    Close
+                                </button>
+                            </div>
+
+                            <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+                                <template x-if="validationResult && !validationResult.is_valid">
+                                    <span class="text-xs text-rose-600 font-medium hidden sm:inline">
+                                        Cannot import with errors
+                                    </span>
+                                </template>
+                                <button
+                                    type="button"
+                                    @click="commitImport()"
+                                    :disabled="!validationResult || !validationResult.is_valid || isCommitting"
+                                    class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                    <template x-if="isCommitting">
+                                        <svg class="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    </template>
+                                    <template x-if="!isCommitting">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    </template>
+                                    <span x-text="isCommitting ? 'Committing Transaction...' : 'Confirm & Import ' + (validationResult ? validationResult.valid_count : 0) + ' Records'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -498,6 +699,8 @@
                 isDragging: false,
                 isValidating: false,
                 isCommitting: false,
+                showValidationModal: false,
+                activeTab: 'issues',
                 validationResult: null,
                 errorMessage: '',
                 successMessage: '',
@@ -516,6 +719,7 @@
                     if (files && files.length > 0) {
                         this.selectedFile = files[0];
                         this.validationResult = null;
+                        this.showValidationModal = false;
                         this.errorMessage = '';
                     }
                 },
@@ -526,6 +730,7 @@
                     if (files && files.length > 0) {
                         this.selectedFile = files[0];
                         this.validationResult = null;
+                        this.showValidationModal = false;
                         this.errorMessage = '';
                     }
                 },
@@ -533,6 +738,7 @@
                 clearFile() {
                     this.selectedFile = null;
                     this.validationResult = null;
+                    this.showValidationModal = false;
                     const input = document.getElementById('file-upload');
                     if (input) input.value = '';
                 },
@@ -588,6 +794,8 @@
                                     warnings: data.warnings || [],
                                     preview_rows: data.preview_rows || []
                                 };
+                                this.activeTab = 'issues';
+                                this.showValidationModal = true;
                                 this.errorMessage = data.message || data.errors[0].message;
                                 return;
                             }
@@ -604,12 +812,16 @@
                         }
 
                         this.validationResult = data;
+                        this.activeTab = (!data.is_valid || (data.errors && data.errors.length > 0)) ? 'issues' : 'preview';
+                        this.showValidationModal = true;
+
                         if (!data.is_valid) {
-                            this.errorMessage = `Found ${data.invalid_count} row(s) with validation errors. Review the issues below before proceeding.`;
+                            this.errorMessage = `Found ${data.invalid_count} row(s) with validation errors. Review the issues in the modal before proceeding.`;
                         }
                     } catch (err) {
                         this.errorMessage = err.message || 'An unexpected error occurred while parsing the file.';
                         this.validationResult = null;
+                        this.showValidationModal = false;
                     } finally {
                         this.isValidating = false;
                     }
@@ -647,6 +859,7 @@
                         this.lastCommittedTarget = this.target;
                         this.successMessage = data.message;
                         this.validationResult = null;
+                        this.showValidationModal = false;
                         this.clearFile();
                     } catch (err) {
                         this.errorMessage = err.message || 'Failed to complete database transaction.';
