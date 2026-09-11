@@ -1028,6 +1028,47 @@ class InventoryReportTest extends TestCase
             $this->assertEquals(200, $customRes->getStatusCode(), "Failed testing {$reportType} with custom date range");
         }
     }
+
+    public function test_the_screen_renders_only_one_generate_report_header_button_and_configuration_modal(): void
+    {
+        $response = $this->actingAs($this->reader())
+            ->get('/inventory/reports');
+
+        $response->assertStatus(200);
+
+        // Verify there is only ONE "Generate Report" trigger button on the page (in the page header)
+        $content = $response->getContent();
+        $generateButtonMatches = preg_match_all('/>\s*Generate Report\s*</', $content);
+        $this->assertSame(1, $generateButtonMatches, 'Expected exactly one "Generate Report" button in the page markup.');
+
+        // Verify the Print button has been removed from the header
+        $response->assertDontSee('onclick="window.print()"', false);
+
+        // Verify the header button triggers the overlay modal
+        $response->assertSee('open-report-modal', false);
+
+        // Verify Dashboard Timeline filter is present in header actions
+        $response->assertSee('Dashboard Timeline', false)
+            ->assertSee('Preset Windows', false)
+            ->assertSee('Apply to Dashboard', false);
+
+        // Verify modal structure and overlay configuration
+        $response->assertSee('id="report-generator"', false)
+            ->assertSee('x-show="isOpen"', false)
+            ->assertSee('role="dialog"', false)
+            ->assertSee('aria-modal="true"', false)
+            ->assertSee('Report Generator & Timeline Controls', false)
+            ->assertSee('1. Report Module & Timeline Window', false)
+            ->assertSee('Report Module', false)
+            ->assertSee('Timeline / Window', false)
+            ->assertSee('From Date', false)
+            ->assertSee('To Date', false)
+            ->assertSee('2. Dynamic Filters & Sorting', false)
+            ->assertSee('3. Export Format', false)
+            ->assertSee('Generate & Export Report', false)
+            ->assertSee('Cancel', false);
+    }
 }
+
 
 

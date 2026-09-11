@@ -8,18 +8,135 @@
         :subtitle="($canViewFinancialData ? 'Inventory valuation, stock status, procurement spend and movement history' : 'Stock status and movement history').' for the '.(!empty($period['is_custom']) ? 'custom date range '.$period['from']->format('M d, Y').' — '.$period['to']->format('M d, Y') : $period['days'].'-day window ending '.$period['to']->format('M d, Y')).'.'"
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Reports' => null]">
         <x-slot name="actions">
-            <x-ui.button variant="secondary" icon="document-text"
-                         onclick="window.print()" class="print:hidden">
-                Print
-            </x-ui.button>
+            {{-- Dashboard Timeline Filter Dropdown --}}
+            <div x-data="dashboardTimelineFilter({
+                    period: '{{ $currentPeriod }}',
+                    from: '{{ $currentFrom ?? $period['from']->format('Y-m-d') }}',
+                    to: '{{ $currentTo ?? $period['to']->format('Y-m-d') }}',
+                    isCustom: {{ !empty($period['is_custom']) ? 'true' : 'false' }},
+                    dashboardUrl: '{{ route('inventory.reports') }}',
+                    today: '{{ now()->format('Y-m-d') }}'
+                 })"
+                 x-cloak
+                 class="relative inline-block text-left print:hidden">
+                <button type="button" @click="isOpen = !isOpen"
+                        class="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-md border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 hover:text-neutral-900 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary-500">
+                    <x-ui.icon name="calendar" class="w-4 h-4 text-primary-600 shrink-0" />
+                    <span class="max-w-[180px] truncate">
+                        @if (!empty($period['is_custom']))
+                            Custom: {{ $period['from']->format('M d') }} — {{ $period['to']->format('M d, Y') }}
+                        @else
+                            {{ $period['days'] == 1 ? 'Today' : ($period['days'] == 365 ? 'Last 12 months' : 'Last '.$period['days'].' days') }}
+                        @endif
+                    </span>
+                    <x-ui.icon name="chevron-down" class="w-3.5 h-3.5 text-neutral-400 shrink-0 transition-transform duration-200"
+                               ::class="isOpen ? 'rotate-180' : ''" />
+                </button>
+
+                {{-- Dropdown Menu --}}
+                <div x-show="isOpen"
+                     @click.outside="isOpen = false"
+                     x-transition:enter="transition ease-out duration-100"
+                     x-transition:enter-start="transform opacity-0 scale-95"
+                     x-transition:enter-end="transform opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-75"
+                     x-transition:leave-start="transform opacity-100 scale-100"
+                     x-transition:leave-end="transform opacity-0 scale-95"
+                     class="absolute right-0 z-40 mt-1.5 w-72 sm:w-80 rounded-xl bg-white shadow-xl border border-neutral-200 p-3 text-neutral-800 space-y-3">
+
+                    <div class="flex items-center justify-between pb-2 border-b border-neutral-100">
+                        <span class="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
+                            <x-ui.icon name="funnel" class="w-3.5 h-3.5 text-primary-600" />
+                            <span>Dashboard Timeline</span>
+                        </span>
+                        <span class="text-[10px] text-neutral-400 font-medium">Filter on-screen data</span>
+                    </div>
+
+                    {{-- Error banner --}}
+                    <div x-show="error" x-cloak
+                         class="p-2 rounded-lg bg-danger-50 border border-danger-200 text-danger-800 text-[11px] font-medium"
+                         x-text="error"></div>
+
+                    {{-- Timeline options grid --}}
+                    <div>
+                        <label class="block text-[11px] font-semibold text-neutral-600 mb-1.5">Preset Windows</label>
+                        <div class="grid grid-cols-2 gap-1.5">
+                            <button type="button" @click="selectPreset('1')"
+                                    :class="period === '1' && !isCustom ? 'bg-primary-50 text-primary-700 font-bold border-primary-300' : 'bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border-neutral-200'"
+                                    class="px-2.5 py-1.5 text-xs rounded-lg border text-left transition-colors">
+                                Today
+                            </button>
+                            <button type="button" @click="selectPreset('7')"
+                                    :class="period === '7' && !isCustom ? 'bg-primary-50 text-primary-700 font-bold border-primary-300' : 'bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border-neutral-200'"
+                                    class="px-2.5 py-1.5 text-xs rounded-lg border text-left transition-colors">
+                                Last 7 days
+                            </button>
+                            <button type="button" @click="selectPreset('30')"
+                                    :class="period === '30' && !isCustom ? 'bg-primary-50 text-primary-700 font-bold border-primary-300' : 'bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border-neutral-200'"
+                                    class="px-2.5 py-1.5 text-xs rounded-lg border text-left transition-colors">
+                                Last 30 days
+                            </button>
+                            <button type="button" @click="selectPreset('90')"
+                                    :class="period === '90' && !isCustom ? 'bg-primary-50 text-primary-700 font-bold border-primary-300' : 'bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border-neutral-200'"
+                                    class="px-2.5 py-1.5 text-xs rounded-lg border text-left transition-colors">
+                                Last 90 days
+                            </button>
+                            <button type="button" @click="selectPreset('365')"
+                                    :class="period === '365' && !isCustom ? 'bg-primary-50 text-primary-700 font-bold border-primary-300' : 'bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border-neutral-200'"
+                                    class="px-2.5 py-1.5 text-xs rounded-lg border text-left transition-colors">
+                                Last 12 months
+                            </button>
+                            <button type="button" @click="selectPreset('all')"
+                                    :class="period === 'all' && !isCustom ? 'bg-primary-50 text-primary-700 font-bold border-primary-300' : 'bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border-neutral-200'"
+                                    class="px-2.5 py-1.5 text-xs rounded-lg border text-left transition-colors">
+                                All time
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Custom Range Section --}}
+                    <div class="pt-2 border-t border-neutral-100">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-[11px] font-semibold text-neutral-600">Custom Date Range</span>
+                            <button type="button" @click="isCustom = true; period = 'custom'"
+                                    class="text-[11px] text-primary-600 hover:text-primary-800 font-medium underline">
+                                Select custom
+                            </button>
+                        </div>
+
+                        <div x-show="isCustom" class="space-y-2.5 mt-1.5">
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[10px] font-medium text-neutral-500 mb-0.5">Start Date</label>
+                                    <input type="date" x-model="from" max="{{ now()->format('Y-m-d') }}"
+                                           class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1 px-2 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-medium text-neutral-500 mb-0.5">End Date</label>
+                                    <input type="date" x-model="to" max="{{ now()->format('Y-m-d') }}"
+                                           class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1 px-2 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
+                                </div>
+                            </div>
+
+                            <button type="button" @click="applyCustom()"
+                                    class="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg text-white bg-primary-600 hover:bg-primary-700 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                <x-ui.icon name="calendar" class="w-3.5 h-3.5" />
+                                <span>Apply to Dashboard</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Single Primary Generate Report Button --}}
             <x-ui.button icon="arrow-down-tray" class="print:hidden"
-                         onclick="document.getElementById('report-generator')?.scrollIntoView({behavior: 'smooth'})">
+                         @click="$dispatch('open-report-modal')">
                 Generate Report
             </x-ui.button>
         </x-slot>
     </x-ui.page-header>
 
-    {{-- ------------------------------------------------ Integrated Full-Width Report Generator & Controls --}}
+    {{-- ------------------------------------------------ Report Configuration & Generation Overlay Modal --}}
     <div id="report-generator"
          x-data="reportGenerator({
              initialPeriod: '{{ $currentPeriod }}',
@@ -31,153 +148,199 @@
              todayDate: '{{ now()->format('Y-m-d') }}',
              canViewFinancial: @json($canViewFinancialData)
          })"
-         class="print:hidden">
-        <x-ui.card>
-            <div class="space-y-4">
-                {{-- Header: Title, Active Mode Badge, and Reset --}}
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-neutral-100">
-                    <div>
-                        <h2 class="text-sm font-bold text-neutral-900 flex items-center gap-2">
-                            <x-ui.icon name="document-chart-bar" class="w-4 h-4 text-primary-600" />
-                            <span>Report Generator & Timeline Controls</span>
-                        </h2>
-                        <p class="text-xs text-neutral-500 mt-0.5">
-                            Customize report parameters, filter data by real clinical records, and export across multiple formats.
-                        </p>
+         x-on:open-report-modal.window="openModal()"
+         x-on:close-report-modal.window="closeModal()"
+         x-on:keydown.escape.window="closeModal()"
+         x-show="isOpen"
+         x-cloak
+         class="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center print:hidden"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="report-modal-title">
+
+        {{-- Backdrop --}}
+        <div x-show="isOpen"
+             x-transition:enter="ease-out duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="ease-in duration-200"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             @click="closeModal()"
+             class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm transition-opacity"
+             aria-hidden="true"></div>
+
+        {{-- Modal Dialog Panel --}}
+        <div x-show="isOpen"
+             x-transition:enter="ease-out duration-300"
+             x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+             x-transition:leave="ease-in duration-200"
+             x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+             x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+             class="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col max-h-[92vh] my-auto z-10">
+
+            {{-- Modal Header --}}
+            <div class="px-5 py-4 sm:px-6 sm:py-5 border-b border-neutral-200 bg-white flex items-center justify-between gap-4 shrink-0">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-10 h-10 rounded-xl bg-primary-50 border border-primary-100 flex items-center justify-center text-primary-600 shrink-0">
+                        <x-ui.icon name="document-chart-bar" class="w-5 h-5" />
                     </div>
-                    <div class="flex items-center gap-2.5">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-primary-50 text-primary-700 border border-primary-100">
-                            <span class="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse"></span>
-                            <span>Live Database Aggregation</span>
-                        </span>
-                        <button type="button" @click="resetFilters()"
-                                class="text-xs text-neutral-500 hover:text-neutral-800 underline font-medium transition-colors">
-                            Reset Defaults
-                        </button>
+                    <div class="min-w-0">
+                        <h2 id="report-modal-title" class="text-base font-bold text-neutral-900 truncate">
+                            Report Generator & Timeline Controls
+                        </h2>
+                        <p class="text-xs text-neutral-500 truncate mt-0.5">
+                            Customize report parameters, dynamic filters, sorting, and export formats.
+                        </p>
                     </div>
                 </div>
 
+                <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" @click="resetFilters()"
+                            class="text-xs text-neutral-500 hover:text-neutral-800 underline font-medium transition-colors hidden sm:inline-block mr-2">
+                        Reset Defaults
+                    </button>
+                    <button type="button" @click="closeModal()"
+                            class="p-2 -mr-1 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                            aria-label="Close dialog">
+                        <x-ui.icon name="x-mark" class="w-5 h-5" />
+                    </button>
+                </div>
+            </div>
+
+            {{-- Modal Body: Scrollable Form Content --}}
+            <div class="p-5 sm:p-6 overflow-y-auto space-y-6">
                 {{-- Feedback / Alert Banners --}}
                 <div x-show="errorMessage" x-cloak
-                     class="flex items-start gap-2.5 p-3 rounded-lg bg-danger-50 border border-danger-200 text-danger-800 text-xs transition-all">
+                     class="flex items-start gap-2.5 p-3.5 rounded-xl bg-danger-50 border border-danger-200 text-danger-800 text-xs transition-all">
                     <x-ui.icon name="exclamation-circle" class="w-4 h-4 text-danger-600 shrink-0 mt-0.5" />
                     <div class="flex-1 font-medium" x-text="errorMessage"></div>
-                    <button type="button" @click="errorMessage = ''" class="text-danger-500 hover:text-danger-700">
+                    <button type="button" @click="errorMessage = ''" class="text-danger-500 hover:text-danger-700 p-0.5">
                         <x-ui.icon name="x-mark" class="w-3.5 h-3.5" />
                     </button>
                 </div>
 
                 <div x-show="successMessage" x-cloak
-                     class="flex items-start gap-2.5 p-3 rounded-lg bg-success-50 border border-success-200 text-success-800 text-xs transition-all">
+                     class="flex items-start gap-2.5 p-3.5 rounded-xl bg-success-50 border border-success-200 text-success-800 text-xs transition-all">
                     <x-ui.icon name="check-circle" class="w-4 h-4 text-success-600 shrink-0 mt-0.5" />
                     <div class="flex-1 font-medium" x-text="successMessage"></div>
-                    <button type="button" @click="successMessage = ''" class="text-success-500 hover:text-success-700">
+                    <button type="button" @click="successMessage = ''" class="text-success-500 hover:text-success-700 p-0.5">
                         <x-ui.icon name="x-mark" class="w-3.5 h-3.5" />
                     </button>
                 </div>
 
-                {{-- Row 1: Primary Controls (Scope, Timeline, Custom Date Range) --}}
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-3 lg:gap-4 items-end">
-                    {{-- 1. Report Type Selection --}}
-                    <div class="md:col-span-6 lg:col-span-4">
-                        <label class="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                            <span>1. Report Module <span class="text-danger-500">*</span></span>
-                            <span class="text-[10px] text-neutral-400 font-normal">10 modules</span>
-                        </label>
-                        <select x-model="reportType" @change="onReportTypeChange()"
-                                class="w-full text-xs font-semibold rounded-lg border-neutral-300 bg-white py-2 focus:border-primary-500 focus:ring-primary-500 shadow-sm text-neutral-900">
-                            <optgroup label="Complete Dossier">
-                                <option value="all">⭐ All Reports (Complete Hospital Dossier)</option>
-                            </optgroup>
-                            <optgroup label="Stock & Valuation">
-                                <option value="stock_status">Stock Status & Health</option>
-                                <option value="valuation">Inventory Valuation by Category</option>
-                                <option value="stock_by_location">Stock Distribution by Storage Location</option>
-                                <option value="expiry_exposure">Expiry Exposure & Risk Batches</option>
-                            </optgroup>
-                            <optgroup label="Movements & Consumption">
-                                <option value="movement_history">Stock Movement History & Ledger</option>
-                                <option value="most_consumed">Most Consumed Items (Usage Velocity)</option>
-                                <option value="movements_by_type">Activity by Movement Type</option>
-                            </optgroup>
-                            @if ($canViewFinancialData)
-                            <optgroup label="Procurement & Financial (Protected)">
-                                <option value="procurement_expense">Procurement Expense Breakdown</option>
-                                <option value="spend_by_supplier">Spend by Supplier & Fulfilment</option>
-                            </optgroup>
-                            @endif
-                        </select>
+                {{-- Section 1: Scope & Timeline --}}
+                <div>
+                    <div class="flex items-center justify-between pb-2 mb-3 border-b border-neutral-100">
+                        <span class="text-xs font-bold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <x-ui.icon name="document-text" class="w-3.5 h-3.5 text-primary-600" />
+                            <span>1. Report Module & Timeline Window</span>
+                        </span>
+                        <span class="text-[11px] text-neutral-400">Required fields</span>
                     </div>
 
-                    {{-- 2. Reporting Period / Timeline --}}
-                    <div class="md:col-span-6 lg:col-span-3">
-                        <label class="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                            <span>2. Timeline / Window <span class="text-danger-500">*</span></span>
-                            <span class="text-[10px] text-neutral-400 font-normal">Presets & Custom</span>
-                        </label>
-                        <select x-model="period" @change="onPeriodChange()"
-                                class="w-full text-xs font-medium rounded-lg border-neutral-300 bg-white py-2 focus:border-primary-500 focus:ring-primary-500 shadow-sm text-neutral-900">
-                            <option value="1">Today</option>
-                            <option value="7">Last 7 days</option>
-                            <option value="30">Last 30 days</option>
-                            <option value="90">Last 90 days</option>
-                            <option value="365">Last 12 months</option>
-                            <option value="all">All time</option>
-                            <option value="custom">Custom Date Range...</option>
-                        </select>
-                    </div>
-
-                    {{-- 3. Custom Date Range Pickers OR Timeline Active Window Badge --}}
-                    <div class="md:col-span-12 lg:col-span-5">
-                        <div x-show="period === 'custom'" x-cloak class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-xs font-medium text-neutral-700 mb-1 flex items-center justify-between">
-                                    <span>From Date</span>
-                                    <span class="text-[10px] text-neutral-400 font-normal">start</span>
-                                </label>
-                                <input type="date" x-model="fromDate" max="{{ now()->format('Y-m-d') }}"
-                                       class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1.5 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-neutral-700 mb-1 flex items-center justify-between">
-                                    <span>To Date</span>
-                                    <span class="text-[10px] text-neutral-400 font-normal">end</span>
-                                </label>
-                                <input type="date" x-model="toDate" max="{{ now()->format('Y-m-d') }}"
-                                       class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1.5 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
-                            </div>
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                        {{-- Report Type Selection --}}
+                        <div class="md:col-span-6">
+                            <label class="block text-xs font-semibold text-neutral-700 mb-1.5 flex items-center justify-between">
+                                <span>Report Module <span class="text-danger-500">*</span></span>
+                                <span class="text-[10px] text-neutral-400 font-normal">10 modules available</span>
+                            </label>
+                            <select x-model="reportType" @change="onReportTypeChange()"
+                                    class="w-full text-xs font-medium rounded-lg border-neutral-300 bg-white py-2 focus:border-primary-500 focus:ring-primary-500 shadow-sm text-neutral-900">
+                                <optgroup label="Complete Dossier">
+                                    <option value="all">⭐ All Reports (Complete Hospital Dossier)</option>
+                                </optgroup>
+                                <optgroup label="Stock & Valuation">
+                                    <option value="stock_status">Stock Status & Health</option>
+                                    <option value="valuation">Inventory Valuation by Category</option>
+                                    <option value="stock_by_location">Stock Distribution by Storage Location</option>
+                                    <option value="expiry_exposure">Expiry Exposure & Risk Batches</option>
+                                </optgroup>
+                                <optgroup label="Movements & Consumption">
+                                    <option value="movement_history">Stock Movement History & Ledger</option>
+                                    <option value="most_consumed">Most Consumed Items (Usage Velocity)</option>
+                                    <option value="movements_by_type">Activity by Movement Type</option>
+                                </optgroup>
+                                @if ($canViewFinancialData)
+                                <optgroup label="Procurement & Financial (Protected)">
+                                    <option value="procurement_expense">Procurement Expense Breakdown</option>
+                                    <option value="spend_by_supplier">Spend by Supplier & Fulfilment</option>
+                                </optgroup>
+                                @endif
+                            </select>
+                            <p class="text-[11px] text-neutral-500 mt-1.5" x-text="reportModuleDescription"></p>
                         </div>
 
-                        <div x-show="period !== 'custom'"
-                             class="flex items-center justify-between p-2 rounded-lg bg-neutral-50 border border-neutral-200">
-                            <div class="flex items-center gap-2">
-                                <x-ui.icon name="calendar" class="w-4 h-4 text-primary-600 shrink-0" />
+                        {{-- Timeline / Window --}}
+                        <div class="md:col-span-6">
+                            <label class="block text-xs font-semibold text-neutral-700 mb-1.5 flex items-center justify-between">
+                                <span>Timeline / Window <span class="text-danger-500">*</span></span>
+                                <span class="text-[10px] text-neutral-400 font-normal">Presets & Custom</span>
+                            </label>
+                            <select x-model="period" @change="onPeriodChange()"
+                                    class="w-full text-xs font-medium rounded-lg border-neutral-300 bg-white py-2 focus:border-primary-500 focus:ring-primary-500 shadow-sm text-neutral-900">
+                                <option value="1">Today</option>
+                                <option value="7">Last 7 days</option>
+                                <option value="30">Last 30 days</option>
+                                <option value="90">Last 90 days</option>
+                                <option value="365">Last 12 months</option>
+                                <option value="all">All time</option>
+                                <option value="custom">Custom Date Range...</option>
+                            </select>
+
+                            {{-- Custom Date Range Pickers --}}
+                            <div x-show="period === 'custom'" x-cloak class="grid grid-cols-2 gap-2 mt-2.5">
                                 <div>
-                                    <div class="text-[11px] font-semibold text-neutral-800" x-text="computedWindowText"></div>
-                                    <div class="text-[10px] text-neutral-500">
-                                        <span x-show="isPointInTimeReport()">Point-in-time catalogue snapshot (Dates apply to audit/history)</span>
-                                        <span x-show="!isPointInTimeReport()">Historical transaction boundaries</span>
-                                    </div>
+                                    <label class="block text-[11px] font-medium text-neutral-700 mb-1 flex items-center justify-between">
+                                        <span>From Date</span>
+                                        <span class="text-[10px] text-neutral-400 font-normal">start</span>
+                                    </label>
+                                    <input type="date" x-model="fromDate" max="{{ now()->format('Y-m-d') }}"
+                                           class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1.5 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-medium text-neutral-700 mb-1 flex items-center justify-between">
+                                        <span>To Date</span>
+                                        <span class="text-[10px] text-neutral-400 font-normal">end</span>
+                                    </label>
+                                    <input type="date" x-model="toDate" max="{{ now()->format('Y-m-d') }}"
+                                           class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1.5 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
                                 </div>
                             </div>
-                            <span class="text-[10px] font-medium px-2 py-0.5 rounded bg-white border border-neutral-200 text-neutral-600">
-                                Active Window
-                            </span>
+
+                            {{-- Active Window Badge for Presets --}}
+                            <div x-show="period !== 'custom'" class="mt-2.5 flex items-center justify-between p-2 rounded-lg bg-neutral-50 border border-neutral-200">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <x-ui.icon name="calendar" class="w-4 h-4 text-primary-600 shrink-0" />
+                                    <div class="min-w-0">
+                                        <div class="text-[11px] font-semibold text-neutral-800 truncate" x-text="computedWindowText"></div>
+                                        <div class="text-[10px] text-neutral-500 truncate">
+                                            <span x-show="isPointInTimeReport()">Point-in-time catalogue snapshot (Dates apply to audit/history)</span>
+                                            <span x-show="!isPointInTimeReport()">Historical transaction boundaries</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="text-[10px] font-medium px-2 py-0.5 rounded bg-white border border-neutral-200 text-neutral-600 shrink-0">
+                                    Active Window
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {{-- Row 2: Dynamic Filters & Sorting (Only applicable fields shown) --}}
-                <div class="pt-3 border-t border-neutral-100">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold text-neutral-700 uppercase tracking-wider flex items-center gap-1.5">
+                {{-- Section 2: Dynamic Filters & Sorting --}}
+                <div>
+                    <div class="flex items-center justify-between pb-2 mb-3 border-b border-neutral-100">
+                        <span class="text-xs font-bold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
                             <x-ui.icon name="funnel" class="w-3.5 h-3.5 text-primary-600" />
-                            <span>3. Dynamic Filters & Sorting</span>
+                            <span>2. Dynamic Filters & Sorting</span>
                         </span>
-                        <span class="text-[11px] text-neutral-400">Filters dynamically show or hide based on the active report module</span>
+                        <span class="text-[11px] text-neutral-400">Only relevant parameters shown for active module</span>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         {{-- Category Filter --}}
                         <div x-show="hasCategoryFilter()">
                             <label class="block text-xs font-medium text-neutral-700 mb-1">Item Category</label>
@@ -261,64 +424,105 @@
                             </select>
                         </div>
                     </div>
+
+                    {{-- Notice when no dynamic filters are active for the module --}}
+                    <div x-show="!hasAnyDynamicFilter()" x-cloak class="mt-2 text-xs text-neutral-500 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200">
+                        No module-specific category or location filters apply to this report. Sorting and timeline parameters are active.
+                    </div>
                 </div>
 
-                {{-- Row 3: Output Format & Action Bar (Full Width Footer) --}}
-                <div class="pt-3 border-t border-neutral-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-neutral-50/70 -mx-6 -mb-6 p-4 rounded-b-xl">
-                    {{-- Format Selector Pills --}}
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs font-bold text-neutral-700 uppercase tracking-wider hidden lg:inline mr-1">
-                            4. Format:
+                {{-- Section 3: Export Format --}}
+                <div>
+                    <div class="flex items-center justify-between pb-2 mb-3 border-b border-neutral-100">
+                        <span class="text-xs font-bold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <x-ui.icon name="arrow-down-tray" class="w-3.5 h-3.5 text-primary-600" />
+                            <span>3. Export Format</span>
                         </span>
-                        <div class="inline-flex rounded-lg border border-neutral-300 bg-white p-0.5 shadow-sm">
-                            <button type="button" @click="format = 'pdf'"
-                                    :class="format === 'pdf' ? 'bg-primary-600 text-white font-semibold' : 'text-neutral-700 hover:text-neutral-900'"
-                                    class="px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all">
-                                <span>PDF / Print</span>
-                            </button>
-                            <button type="button" @click="format = 'excel'"
-                                    :class="format === 'excel' ? 'bg-primary-600 text-white font-semibold' : 'text-neutral-700 hover:text-neutral-900'"
-                                    class="px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all">
-                                <span>Excel (.xls)</span>
-                            </button>
-                            <button type="button" @click="format = 'csv'"
-                                    :class="format === 'csv' ? 'bg-primary-600 text-white font-semibold' : 'text-neutral-700 hover:text-neutral-900'"
-                                    class="px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all">
-                                <span>CSV</span>
-                            </button>
-                            <button type="button" @click="format = 'json'"
-                                    :class="format === 'json' ? 'bg-primary-600 text-white font-semibold' : 'text-neutral-700 hover:text-neutral-900'"
-                                    class="px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all">
-                                <span>JSON</span>
-                            </button>
-                        </div>
+                        <span class="text-[11px] text-neutral-400">Choose output destination</span>
                     </div>
 
-                    {{-- Action Controls --}}
-                    <div class="flex items-center gap-2.5 justify-end">
-                        <button type="button" @click="applyToDashboard()"
-                                class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 shadow-sm transition-all">
-                            <x-ui.icon name="calendar" class="w-3.5 h-3.5 text-neutral-500" />
-                            <span>Apply to Dashboard</span>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        <button type="button" @click="format = 'pdf'"
+                                :class="format === 'pdf' ? 'border-primary-600 bg-primary-50/70 text-primary-900 ring-2 ring-primary-500' : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50'"
+                                class="p-3 rounded-xl border text-left transition-all flex flex-col justify-between">
+                            <div class="flex items-center justify-between">
+                                <x-ui.icon name="document-text" class="w-4 h-4 text-primary-600" />
+                                <span x-show="format === 'pdf'" class="w-2 h-2 rounded-full bg-primary-600"></span>
+                            </div>
+                            <div class="mt-2">
+                                <div class="text-xs font-bold">PDF / Print</div>
+                                <div class="text-[10px] text-neutral-500">Official hospital layout</div>
+                            </div>
                         </button>
 
-                        <button type="button" @click="generate()" :disabled="loading"
-                                class="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all focus:ring-2 focus:ring-primary-500 focus:ring-offset-1">
-                            <template x-if="loading">
-                                <svg class="animate-spin -ml-1 mr-1 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                            </template>
-                            <template x-if="!loading">
-                                <x-ui.icon name="arrow-down-tray" class="w-3.5 h-3.5 text-white" />
-                            </template>
-                            <span x-text="loading ? 'Generating Report...' : (format === 'pdf' ? 'Open Printable Report' : 'Generate & Export Report')"></span>
+                        <button type="button" @click="format = 'excel'"
+                                :class="format === 'excel' ? 'border-primary-600 bg-primary-50/70 text-primary-900 ring-2 ring-primary-500' : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50'"
+                                class="p-3 rounded-xl border text-left transition-all flex flex-col justify-between">
+                            <div class="flex items-center justify-between">
+                                <x-ui.icon name="table" class="w-4 h-4 text-success-600" />
+                                <span x-show="format === 'excel'" class="w-2 h-2 rounded-full bg-primary-600"></span>
+                            </div>
+                            <div class="mt-2">
+                                <div class="text-xs font-bold">Excel (.xls)</div>
+                                <div class="text-[10px] text-neutral-500">Structured spreadsheets</div>
+                            </div>
+                        </button>
+
+                        <button type="button" @click="format = 'csv'"
+                                :class="format === 'csv' ? 'border-primary-600 bg-primary-50/70 text-primary-900 ring-2 ring-primary-500' : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50'"
+                                class="p-3 rounded-xl border text-left transition-all flex flex-col justify-between">
+                            <div class="flex items-center justify-between">
+                                <x-ui.icon name="arrow-down-tray" class="w-4 h-4 text-neutral-600" />
+                                <span x-show="format === 'csv'" class="w-2 h-2 rounded-full bg-primary-600"></span>
+                            </div>
+                            <div class="mt-2">
+                                <div class="text-xs font-bold">CSV</div>
+                                <div class="text-[10px] text-neutral-500">UTF-8 compatible data</div>
+                            </div>
+                        </button>
+
+                        <button type="button" @click="format = 'json'"
+                                :class="format === 'json' ? 'border-primary-600 bg-primary-50/70 text-primary-900 ring-2 ring-primary-500' : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50'"
+                                class="p-3 rounded-xl border text-left transition-all flex flex-col justify-between">
+                            <div class="flex items-center justify-between">
+                                <x-ui.icon name="code-bracket" class="w-4 h-4 text-indigo-600" />
+                                <span x-show="format === 'json'" class="w-2 h-2 rounded-full bg-primary-600"></span>
+                            </div>
+                            <div class="mt-2">
+                                <div class="text-xs font-bold">JSON</div>
+                                <div class="text-[10px] text-neutral-500">API & analytical export</div>
+                            </div>
                         </button>
                     </div>
                 </div>
             </div>
-        </x-ui.card>
+
+            {{-- Modal Footer --}}
+            <div class="px-5 py-4 sm:px-6 bg-neutral-50 border-t border-neutral-200 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                <div>
+                    <button type="button" @click="closeModal()"
+                            class="w-full sm:w-auto px-4 py-2 text-xs font-semibold text-neutral-700 bg-white border border-neutral-300 rounded-lg hover:bg-neutral-100 shadow-sm transition-colors text-center">
+                        Cancel
+                    </button>
+                </div>
+
+                <div class="flex items-center justify-end">
+                    <button type="button" @click="generate()" :disabled="loading"
+                            class="inline-flex items-center justify-center gap-2 px-5 py-2 text-xs font-bold rounded-lg text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all focus:ring-2 focus:ring-primary-500 focus:ring-offset-1">
+                        <template x-if="loading">
+                            <svg class="animate-spin -ml-1 mr-1 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </template>
+                        <template x-if="!loading">
+                            <x-ui.icon name="arrow-down-tray" class="w-3.5 h-3.5 text-white" />
+                        </template>
+                        <span x-text="loading ? 'Generating Report...' : (format === 'pdf' ? 'Open Printable Report' : 'Generate & Export Report')"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     {{-- ------------------------------------------------ 1. inventory summary --}}
@@ -932,6 +1136,7 @@
     <script>
         function reportGenerator(config) {
             return {
+                isOpen: false,
                 reportType: config.initialReportType || 'stock_status',
                 period: config.initialPeriod || '30',
                 fromDate: config.initialFrom || '',
@@ -952,6 +1157,18 @@
                 init() {
                     this.updateComputedWindow();
                     this.updateSortOptions();
+                },
+
+                openModal() {
+                    this.isOpen = true;
+                    this.errorMessage = '';
+                    this.successMessage = '';
+                    document.body.classList.add('overflow-hidden');
+                },
+
+                closeModal() {
+                    this.isOpen = false;
+                    document.body.classList.remove('overflow-hidden');
                 },
 
                 onPeriodChange() {
@@ -987,6 +1204,27 @@
                 hasStockStatusFilter() {
                     return ['all', 'stock_status'].includes(this.reportType);
                 },
+
+                hasAnyDynamicFilter() {
+                    return this.hasCategoryFilter() || this.hasLocationFilter() || (config.canViewFinancial && this.hasSupplierFilter()) || this.hasMovementTypeFilter() || this.hasStockStatusFilter();
+                },
+
+                get reportModuleDescription() {
+                    switch (this.reportType) {
+                        case 'all': return 'Compiles all standard hospital operational and analytical sections into a complete dossier.';
+                        case 'stock_status': return 'Current stock level health across catalogue items with stock health categorization.';
+                        case 'valuation': return 'Financial inventory valuation aggregated by item categories.';
+                        case 'stock_by_location': return 'Storage location breakdown showing unit counts, valuation, and capacity utilization.';
+                        case 'expiry_exposure': return 'Batches with active stock that are already expired or expiring within exposure windows.';
+                        case 'movement_history': return 'Chronological audit ledger of stock issues, receipts, returns, adjustments, and transfers.';
+                        case 'most_consumed': return 'Usage velocity analysis ranking items with highest consumption quantity.';
+                        case 'movements_by_type': return 'Transaction volume and value aggregated by operational movement classification.';
+                        case 'procurement_expense': return 'Purchase order spending breakdown with received and outstanding obligations.';
+                        case 'spend_by_supplier': return 'Supplier procurement expenditure analysis with delivery fulfilment rates.';
+                        default: return 'Configure parameters and generate the report.';
+                    }
+                },
+
 
                 get currentSortOptions() {
                     switch (this.reportType) {
@@ -1234,6 +1472,53 @@
                     } finally {
                         this.loading = false;
                     }
+                }
+            };
+        }
+
+        function dashboardTimelineFilter(config) {
+            return {
+                isOpen: false,
+                period: config.period || '30',
+                from: config.from || '',
+                to: config.to || '',
+                isCustom: config.isCustom || false,
+                error: '',
+
+                selectPreset(days) {
+                    this.period = days;
+                    this.isCustom = false;
+                    this.error = '';
+                    const params = new URLSearchParams();
+                    params.set('period', days);
+                    params.set('days', days === 'all' ? '365' : days);
+                    window.location.href = config.dashboardUrl + '?' + params.toString();
+                },
+
+                applyCustom() {
+                    this.error = '';
+                    if (!this.from) {
+                        this.error = 'Please enter a start date.';
+                        return;
+                    }
+                    if (!this.to) {
+                        this.error = 'Please enter an end date.';
+                        return;
+                    }
+                    if (this.from > this.to) {
+                        this.error = 'Start date cannot be later than end date.';
+                        return;
+                    }
+                    if (this.to > config.today) {
+                        this.error = 'End date cannot be in the future.';
+                        return;
+                    }
+
+                    const params = new URLSearchParams();
+                    params.set('period', 'custom');
+                    params.set('from', this.from);
+                    params.set('to', this.to);
+                    window.location.href = config.dashboardUrl + '?' + params.toString();
                 }
             };
         }
