@@ -680,18 +680,19 @@
                                     </div>
                                 </div>
 
-                                <div class="min-w-0 overflow-x-auto">
-                                    <table class="min-w-[760px] w-full text-left text-xs">
-                                        <thead class="border-y border-neutral-200 bg-neutral-50 text-neutral-500">
+                                {{-- Desktop & Tablet Table (Responsive, 100% width, no horizontal scrollbar) --}}
+                                <div class="hidden md:block overflow-hidden border-y border-neutral-200 bg-white">
+                                    <table class="w-full text-left text-xs">
+                                        <thead class="border-b border-neutral-200 bg-neutral-50 text-neutral-500">
                                             <tr>
-                                                <th scope="col" class="px-4 py-2.5 font-medium">Item</th>
-                                                <th scope="col" class="px-3 py-2.5 text-right font-medium">Current Stock</th>
-                                                <th scope="col" class="px-3 py-2.5 text-right font-medium">Historical</th>
-                                                <th scope="col" class="px-3 py-2.5 text-right font-medium">Predicted Demand</th>
-                                                <th scope="col" class="px-3 py-2.5 font-medium">Stock risk</th>
-                                                <th scope="col" class="px-3 py-2.5 text-right font-medium">Reorder</th>
-                                                <th scope="col" class="px-4 py-2.5 font-medium">Confidence</th>
-                                                <th scope="col" class="px-3 py-2.5 text-right font-medium">Action</th>
+                                                <th scope="col" class="w-[30%] px-4 py-2.5 font-semibold text-neutral-700">Item</th>
+                                                <th scope="col" class="w-[10%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Current Stock</th>
+                                                <th scope="col" class="w-[10%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Historical</th>
+                                                <th scope="col" class="w-[12%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Predicted Demand</th>
+                                                <th scope="col" class="w-[12%] px-2.5 py-2.5 text-center font-semibold text-neutral-700">Stock risk</th>
+                                                <th scope="col" class="w-[10%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Reorder</th>
+                                                <th scope="col" class="w-[8%] px-2.5 py-2.5 font-semibold text-neutral-700">Confidence</th>
+                                                <th scope="col" class="w-[8%] px-3 py-2.5 text-right font-semibold text-neutral-700">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-neutral-100">
@@ -708,20 +709,20 @@
                                                                 class="h-1.5 w-1.5 rounded-full bg-primary-600"
                                                                 aria-hidden="true"
                                                             ></span>
-                                                            <div>
-                                                                <p class="font-semibold text-neutral-900" x-text="item.item_name"></p>
+                                                            <div class="min-w-0">
+                                                                <p class="truncate font-semibold text-neutral-900" x-text="item.item_name"></p>
                                                                 <p class="text-neutral-500" x-text="item.sku"></p>
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td class="px-3 py-2.5 text-right tabular-nums text-neutral-700" x-text="formatNumber(item.current_stock)"></td>
-                                                    <td class="px-3 py-2.5 text-right tabular-nums text-neutral-700" x-text="item.historical_consumption == null ? '—' : formatNumber(item.historical_consumption)"></td>
-                                                    <td class="px-3 py-2.5 text-right font-bold tabular-nums text-neutral-900" x-text="formatNumber(item.predicted_demand)"></td>
-                                                    <td class="px-3 py-2.5">
-                                                        <span class="inline-flex rounded-full px-2 py-0.5 font-semibold text-[11px] ring-1 ring-inset" x-bind:class="riskClasses(item.risk_level)" x-text="`${item.risk_level} risk`"></span>
+                                                    <td class="px-2.5 py-2.5 text-right tabular-nums text-neutral-700" x-text="formatNumber(item.current_stock)"></td>
+                                                    <td class="px-2.5 py-2.5 text-right tabular-nums text-neutral-700" x-text="item.historical_consumption == null ? '—' : formatNumber(item.historical_consumption)"></td>
+                                                    <td class="px-2.5 py-2.5 text-right font-bold tabular-nums text-neutral-900" x-text="formatNumber(item.predicted_demand)"></td>
+                                                    <td class="px-2.5 py-2.5 text-center">
+                                                        <span class="inline-flex rounded-full px-2 py-0.5 font-semibold text-[11px] ring-1 ring-inset whitespace-nowrap" x-bind:class="riskClasses(item.risk_level)" x-text="`${item.risk_level} risk`"></span>
                                                     </td>
-                                                    <td class="px-3 py-2.5 text-right font-semibold tabular-nums text-neutral-900" x-text="formatNumber(item.recommended_reorder_quantity)"></td>
-                                                    <td class="px-4 py-2.5 capitalize text-neutral-700" x-text="item.confidence"></td>
+                                                    <td class="px-2.5 py-2.5 text-right font-semibold tabular-nums text-neutral-900" x-text="formatNumber(item.recommended_reorder_quantity)"></td>
+                                                    <td class="px-2.5 py-2.5 capitalize text-neutral-700 text-[11px]" x-text="item.confidence"></td>
                                                     <td class="px-3 py-2.5 text-right">
                                                         <button
                                                             type="button"
@@ -737,6 +738,57 @@
                                             </tr>
                                         </tbody>
                                     </table>
+                                </div>
+
+                                {{-- Mobile Card List (Zero horizontal scrolling on smartphones) --}}
+                                <div class="md:hidden space-y-2.5 p-3">
+                                    <template x-for="item in topItems()" x-bind:key="item.item_id">
+                                        <div
+                                            class="cursor-pointer rounded-xl border p-3 transition-colors space-y-2"
+                                            x-bind:class="selectedItemId === String(item.item_id) ? 'border-primary-300 bg-primary-50/70 shadow-xs' : 'border-neutral-200 bg-white hover:bg-neutral-50/80'"
+                                            x-on:click="selectItem(item.item_id)"
+                                        >
+                                            <div class="flex items-start justify-between gap-2">
+                                                <div class="min-w-0 flex-1">
+                                                    <p class="font-semibold text-neutral-900 text-xs leading-snug" x-text="item.item_name"></p>
+                                                    <p class="text-[11px] text-neutral-500" x-text="item.sku"></p>
+                                                </div>
+                                                <span class="inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset whitespace-nowrap" x-bind:class="riskClasses(item.risk_level)" x-text="`${item.risk_level} risk`"></span>
+                                            </div>
+
+                                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-lg bg-neutral-50 p-2 text-center text-[11px]">
+                                                <div class="rounded bg-white/80 py-1 border border-neutral-100">
+                                                    <span class="block text-[10px] text-neutral-500">Current</span>
+                                                    <span class="font-semibold text-neutral-800 tabular-nums" x-text="formatNumber(item.current_stock)"></span>
+                                                </div>
+                                                <div class="rounded bg-white/80 py-1 border border-neutral-100">
+                                                    <span class="block text-[10px] text-neutral-500">Historical</span>
+                                                    <span class="font-medium text-neutral-600 tabular-nums" x-text="item.historical_consumption == null ? '—' : formatNumber(item.historical_consumption)"></span>
+                                                </div>
+                                                <div class="rounded bg-white/80 py-1 border border-neutral-100">
+                                                    <span class="block text-[10px] text-neutral-500">Forecast</span>
+                                                    <span class="font-bold text-neutral-900 tabular-nums" x-text="formatNumber(item.predicted_demand)"></span>
+                                                </div>
+                                                <div class="rounded bg-white/80 py-1 border border-neutral-100">
+                                                    <span class="block text-[10px] text-primary-700">Reorder</span>
+                                                    <span class="font-bold text-primary-700 tabular-nums" x-text="formatNumber(item.recommended_reorder_quantity)"></span>
+                                                </div>
+                                            </div>
+
+                                            <div class="flex items-center justify-between pt-1">
+                                                <span class="text-[11px] text-neutral-500">Confidence: <span class="capitalize font-medium text-neutral-700" x-text="item.confidence"></span></span>
+                                                <button
+                                                    type="button"
+                                                    class="rounded px-2.5 py-1 text-xs font-medium"
+                                                    x-bind:class="selectedItemId === String(item.item_id) ? 'bg-primary-600 text-white' : 'text-primary-700 bg-primary-50'"
+                                                    x-text="selectedItemId === String(item.item_id) ? 'Active Curve' : 'Plot Curve'"
+                                                ></button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <div x-show="topItems().length === 0" class="py-6 text-center text-sm text-neutral-500">
+                                        No forecast items match the current filters.
+                                    </div>
                                 </div>
                             </div>
 
@@ -760,7 +812,7 @@
                 </div>
             </x-ui.card>
 
-            <x-ui.modal name="dashboard-demand-forecast" title="Full Demand Forecast" maxWidth="2xl">
+            <x-ui.modal name="dashboard-demand-forecast" title="Full Demand Forecast" maxWidth="6xl">
                 <div class="space-y-4">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -782,46 +834,90 @@
                         <p class="mt-1 text-xs text-neutral-500">Clear or adjust the dashboard filters to see more results.</p>
                     </div>
 
-                    <div class="max-w-full overflow-x-auto rounded-lg border border-neutral-200">
-                        <table class="min-w-[980px] w-full text-left text-xs">
-                            <thead class="sticky top-0 bg-neutral-50 text-neutral-500">
+                    {{-- Desktop & Tablet Table (100% width, no horizontal scrollbar, clear column proportions) --}}
+                    <div x-show="filteredItems().length > 0" class="hidden md:block rounded-lg border border-neutral-200 overflow-hidden bg-white">
+                        <table class="w-full text-left text-xs">
+                            <thead class="sticky top-0 bg-neutral-50 text-neutral-500 border-b border-neutral-200">
                                 <tr>
-                                    <th scope="col" class="px-3 py-2 font-medium">Item</th>
-                                    <th scope="col" class="px-3 py-2 text-right font-medium">Current</th>
-                                    <th scope="col" class="px-3 py-2 text-right font-medium">Historical</th>
-                                    <th scope="col" class="px-3 py-2 text-right font-medium">Forecast</th>
-                                    <th scope="col" class="px-3 py-2 font-medium">Risk</th>
-                                    <th scope="col" class="px-3 py-2 text-right font-medium">Reorder</th>
-                                    <th scope="col" class="px-3 py-2 font-medium">Confidence</th>
-                                    <th scope="col" class="w-[30%] px-3 py-2 font-medium">Explanation</th>
+                                    <th scope="col" class="w-[34%] px-3.5 py-2.5 font-semibold text-neutral-700">Item & Explanation</th>
+                                    <th scope="col" class="w-[9%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Current</th>
+                                    <th scope="col" class="w-[10%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Historical</th>
+                                    <th scope="col" class="w-[11%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Forecast</th>
+                                    <th scope="col" class="w-[11%] px-2.5 py-2.5 text-center font-semibold text-neutral-700">Risk</th>
+                                    <th scope="col" class="w-[11%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Reorder</th>
+                                    <th scope="col" class="w-[14%] px-3 py-2.5 font-semibold text-neutral-700">Confidence</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-neutral-100">
                                 <template x-for="item in filteredItems()" x-bind:key="item.item_id">
-                                    <tr class="align-top hover:bg-neutral-50">
-                                        <td class="px-3 py-3">
-                                            <p class="font-medium text-neutral-900" x-text="item.item_name"></p>
-                                            <p class="text-neutral-500" x-text="`${item.sku}${item.category ? ` · ${item.category}` : ''}`"></p>
+                                    <tr class="align-top transition-colors hover:bg-neutral-50/80">
+                                        <td class="px-3.5 py-3">
+                                            <p class="font-semibold text-neutral-900" x-text="item.item_name"></p>
+                                            <p class="text-[11px] text-neutral-500 mt-0.5" x-text="`${item.sku}${item.category ? ` · ${item.category}` : ''}`"></p>
+                                            <p x-show="item.explanation" class="mt-1.5 text-[11px] leading-relaxed text-neutral-600" x-text="item.explanation"></p>
+                                            <p x-show="item.limited_data" class="mt-1 font-medium text-[10px] text-warning-700">Limited movement history</p>
                                         </td>
-                                        <td class="px-3 py-3 text-right tabular-nums text-neutral-700" x-text="formatNumber(item.current_stock)"></td>
-                                        <td class="px-3 py-3 text-right tabular-nums text-neutral-700" x-text="item.historical_consumption == null ? '—' : formatNumber(item.historical_consumption)"></td>
-                                        <td class="px-3 py-3 text-right font-semibold tabular-nums text-neutral-900" x-text="formatNumber(item.predicted_demand)"></td>
-                                        <td class="px-3 py-3">
-                                            <span class="inline-flex rounded-full px-2 py-0.5 font-medium ring-1 ring-inset" x-bind:class="riskClasses(item.risk_level)" x-text="`${item.risk_level} risk`"></span>
+                                        <td class="px-2.5 py-3 text-right tabular-nums text-neutral-700" x-text="formatNumber(item.current_stock)"></td>
+                                        <td class="px-2.5 py-3 text-right tabular-nums text-neutral-600" x-text="item.historical_consumption == null ? '—' : formatNumber(item.historical_consumption)"></td>
+                                        <td class="px-2.5 py-3 text-right font-bold tabular-nums text-neutral-900" x-text="formatNumber(item.predicted_demand)"></td>
+                                        <td class="px-2.5 py-3 text-center">
+                                            <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset whitespace-nowrap" x-bind:class="riskClasses(item.risk_level)" x-text="`${item.risk_level} risk`"></span>
                                         </td>
-                                        <td class="px-3 py-3 text-right font-semibold tabular-nums text-neutral-900" x-text="formatNumber(item.recommended_reorder_quantity)"></td>
-                                        <td class="px-3 py-3 capitalize text-neutral-700">
-                                            <span x-text="item.confidence"></span>
-                                            <span class="block text-neutral-500" x-text="`${item.demand_trend} trend`"></span>
-                                        </td>
-                                        <td class="px-3 py-3">
-                                            <p class="whitespace-normal leading-5 text-neutral-600" x-text="item.explanation"></p>
-                                            <p x-show="item.limited_data" class="mt-1 font-medium text-warning-700">Limited movement history</p>
+                                        <td class="px-2.5 py-3 text-right font-bold tabular-nums text-primary-700" x-text="formatNumber(item.recommended_reorder_quantity)"></td>
+                                        <td class="px-3 py-3 text-neutral-700">
+                                            <span class="font-medium capitalize text-neutral-900 block" x-text="item.confidence"></span>
+                                            <span class="text-[10px] text-neutral-500 block leading-tight" x-text="`${item.demand_trend} trend`"></span>
                                         </td>
                                     </tr>
                                 </template>
                             </tbody>
                         </table>
+                    </div>
+
+                    {{-- Mobile Card List (Zero horizontal scrolling on smartphones) --}}
+                    <div x-show="filteredItems().length > 0" class="space-y-3 md:hidden">
+                        <template x-for="item in filteredItems()" x-bind:key="item.item_id">
+                            <div class="rounded-xl border border-neutral-200 bg-white p-3.5 shadow-2xs space-y-2.5">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-semibold text-neutral-900 text-xs leading-snug" x-text="item.item_name"></p>
+                                        <p class="text-[11px] text-neutral-500 mt-0.5" x-text="`${item.sku}${item.category ? ` · ${item.category}` : ''}`"></p>
+                                    </div>
+                                    <span class="inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset whitespace-nowrap" x-bind:class="riskClasses(item.risk_level)" x-text="`${item.risk_level} risk`"></span>
+                                </div>
+
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-lg bg-neutral-50 p-2 text-center text-[11px]">
+                                    <div class="rounded bg-white/80 py-1 border border-neutral-100">
+                                        <span class="block text-[10px] text-neutral-500">Current</span>
+                                        <span class="font-semibold text-neutral-800 tabular-nums" x-text="formatNumber(item.current_stock)"></span>
+                                    </div>
+                                    <div class="rounded bg-white/80 py-1 border border-neutral-100">
+                                        <span class="block text-[10px] text-neutral-500">Historical</span>
+                                        <span class="font-medium text-neutral-600 tabular-nums" x-text="item.historical_consumption == null ? '—' : formatNumber(item.historical_consumption)"></span>
+                                    </div>
+                                    <div class="rounded bg-white/80 py-1 border border-neutral-100">
+                                        <span class="block text-[10px] text-neutral-500">Forecast</span>
+                                        <span class="font-bold text-neutral-900 tabular-nums" x-text="formatNumber(item.predicted_demand)"></span>
+                                    </div>
+                                    <div class="rounded bg-white/80 py-1 border border-neutral-100">
+                                        <span class="block text-[10px] text-primary-700">Reorder</span>
+                                        <span class="font-bold text-primary-700 tabular-nums" x-text="formatNumber(item.recommended_reorder_quantity)"></span>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between text-[11px] text-neutral-500">
+                                    <span>Confidence: <strong class="font-semibold capitalize text-neutral-800" x-text="item.confidence"></strong></span>
+                                    <span class="capitalize" x-text="`${item.demand_trend} trend`"></span>
+                                </div>
+
+                                <template x-if="item.explanation">
+                                    <div class="text-[11px] text-neutral-600 bg-neutral-50/80 rounded-lg p-2.5 border border-neutral-100 leading-relaxed">
+                                        <span class="font-semibold text-neutral-700">Explanation:</span>
+                                        <span x-text="item.explanation"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
                     </div>
                 </div>
 
