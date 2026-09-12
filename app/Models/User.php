@@ -114,6 +114,18 @@ class User extends Authenticatable
         });
     }
 
+    public function getNameAttribute(?string $value): string
+    {
+        if (filled($this->first_name) || filled($this->surname)) {
+            $composed = self::composeName($this->first_name, $this->middle_name, $this->surname);
+            if (filled($composed)) {
+                return $composed;
+            }
+        }
+
+        return (string) ($value ?? '');
+    }
+
     public static function composeName(?string $firstName, ?string $middleName, ?string $surname): string
     {
         return collect([$firstName, $middleName, $surname])
@@ -336,5 +348,10 @@ class User extends Authenticatable
     public function scopeSuperAdministrators(Builder $query): Builder
     {
         return $query->role(UserRole::SuperAdministrator);
+    }
+
+    public function aiChatConversations(): HasMany
+    {
+        return $this->hasMany(AiChatConversation::class);
     }
 }

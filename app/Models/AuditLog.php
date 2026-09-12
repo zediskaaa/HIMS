@@ -148,4 +148,20 @@ class AuditLog extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+
+    /**
+     * Resolve human-readable actor name, falling back to linked user's real full name
+     * if the snapshot contains the generic role placeholder "HIMS Super Administrator".
+     */
+    public function displayActorName(): string
+    {
+        if ($this->actor_name === 'HIMS Super Administrator' && $this->actor) {
+            $realName = $this->actor->name;
+            if ($realName && $realName !== 'HIMS Super Administrator') {
+                return $realName;
+            }
+        }
+
+        return $this->actor_name ?: 'System';
+    }
 }

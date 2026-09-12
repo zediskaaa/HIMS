@@ -1899,10 +1899,23 @@ Alpine.data('auditSearchAutocomplete', ({ endpoint, formId, initialQuery = '' })
     },
 }));
 
-Alpine.data('himsAiAssistant', ({ endpoint, knownItems = [] }) => ({
+Alpine.data('himsAiAssistant', ({
+    endpoint,
+    conversationsEndpoint = '/dashboard/ai-assistant/conversations',
+    activeEndpoint = '/dashboard/ai-assistant/conversations/active',
+    conversationShowBase = '/dashboard/ai-assistant/conversations',
+    knownItems = []
+}) => ({
     isOpen: false,
     endpoint,
+    conversationsEndpoint,
+    activeEndpoint,
+    conversationShowBase,
     knownItems: Array.isArray(knownItems) ? knownItems : [],
+
+    // Active conversation state
+    conversationId: null,
+    conversationTitle: '',
     messages: [],
     input: '',
     isLoading: false,
@@ -1913,23 +1926,81 @@ Alpine.data('himsAiAssistant', ({ endpoint, knownItems = [] }) => ({
     allowedExtensions: ['pdf', 'csv', 'xlsx', 'docx', 'txt', 'jpg', 'jpeg', 'png'],
     maxFileSize: 35 * 1024 * 1024, // 35MB
 
+    // History and navigation state
+    viewMode: 'chat', // 'chat' | 'history'
+    conversationsList: [],
+    isHistoryLoading: false,
+    showNewChatConfirm: false,
+    hasRestoredActive: false,
+
+    init() {
+        this.restoreActiveConversation();
+    },
+
+    async restoreActiveConversation() {
+        if (this.hasRestoredActive) return;
+        try {
+            const resp = await fetch(this.activeEndpoint, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.status === 'success' && data.conversation) {
+                    this.conversationId = data.conversation.id;
+                    this.conversationTitle = data.conversation.title;
+                    this.messages = Array.isArray(data.conversation.messages) ? data.conversation.messages : [];
+                }
+            }
+        } catch (e) {
+            // Silently fallback to clean empty chat state
+        } finally {
+            this.hasRestoredActive = true;
+        }
+    },
+
     toggle() {
         this.isOpen = !this.isOpen;
         if (this.isOpen) {
+            if (!this.hasRestoredActive) {
+                this.restoreActiveConversation();
+            }
             this.$nextTick(() => {
                 this.scrollToBottom();
-                this.$refs.chatInput?.focus();
+                if (this.viewMode === 'chat') {
+                    this.$refs.chatInput?.focus();
+                }
             });
         }
     },
 
     close() {
+        // CLOSE CHATBOT ≠ NEW CHAT: Only hide the UI, preserve current conversation
         this.isOpen = false;
+        this.viewMode = 'chat';
+        this.showNewChatConfirm = false;
     },
 
-    clearChat() {
+    requestNewChat() {
+        if (this.messages.length > 0) {
+            this.showNewChatConfirm = true;
+        } else {
+            this.startNewChat();
+        }
+    },
+
+    cancelNewChat() {
+        this.showNewChatConfirm = false;
+    },
+
+    startNewChat() {
+        this.showNewChatConfirm = false;
+        this.conversationId = null;
+        this.conversationTitle = '';
         this.messages.forEach(m => {
-            if (m.attachment?.previewUrl && typeof URL !== 'undefined' && URL.revokeObjectURL) {
+            if (m.attachment?.previewUrl && m.attachment.previewUrl.startsWith('blob:') && typeof URL !== 'undefined' && URL.revokeObjectURL) {
                 try {
                     URL.revokeObjectURL(m.attachment.previewUrl);
                 } catch (e) {}
@@ -1938,6 +2009,89 @@ Alpine.data('himsAiAssistant', ({ endpoint, knownItems = [] }) => ({
         this.messages = [];
         this.errorMessage = '';
         this.removeFile(true);
+        this.viewMode = 'chat';
+        this.$nextTick(() => {
+            this.$refs.chatInput?.focus();
+        });
+    },
+
+    clearChat() {
+        this.requestNewChat();
+    },
+
+    async toggleHistory() {
+        if (this.viewMode === 'history') {
+            this.viewMode = 'chat';
+            this.$nextTick(() => this.scrollToBottom());
+        } else {
+            this.viewMode = 'history';
+            await this.loadConversations();
+        }
+    },
+
+    async loadConversations() {
+        this.isHistoryLoading = true;
+        try {
+            const resp = await fetch(this.conversationsEndpoint, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                this.conversationsList = Array.isArray(data.conversations) ? data.conversations : [];
+            }
+        } catch (e) {
+            console.error('Failed to load conversations', e);
+        } finally {
+            this.isHistoryLoading = false;
+        }
+    },
+
+    get groupedConversations() {
+        const groups = {};
+        for (const conv of this.conversationsList) {
+            const group = conv.date_group || 'Previous';
+            if (!groups[group]) {
+                groups[group] = [];
+            }
+            groups[group].push(conv);
+        }
+        return groups;
+    },
+
+    async selectConversation(id) {
+        if (this.conversationId === id && this.messages.length > 0) {
+            this.viewMode = 'chat';
+            this.$nextTick(() => this.scrollToBottom());
+            return;
+        }
+
+        this.isLoading = true;
+        this.viewMode = 'chat';
+        try {
+            const url = `${this.conversationShowBase}/${id}`;
+            const resp = await fetch(url, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.status === 'success' && data.conversation) {
+                    this.conversationId = data.conversation.id;
+                    this.conversationTitle = data.conversation.title;
+                    this.messages = Array.isArray(data.conversation.messages) ? data.conversation.messages : [];
+                    this.$nextTick(() => this.scrollToBottom());
+                }
+            }
+        } catch (e) {
+            this.errorMessage = 'Failed to load selected conversation.';
+        } finally {
+            this.isLoading = false;
+        }
     },
 
     scrollToBottom() {
@@ -2394,6 +2548,9 @@ Alpine.data('himsAiAssistant', ({ endpoint, knownItems = [] }) => ({
                 if (text) {
                     formData.append('message', text);
                 }
+                if (this.conversationId) {
+                    formData.append('conversation_id', this.conversationId);
+                }
                 formData.append('attachment', attached.file);
                 formData.append('history', JSON.stringify(historyPayload));
 
@@ -2421,6 +2578,7 @@ Alpine.data('himsAiAssistant', ({ endpoint, knownItems = [] }) => ({
                     },
                     body: JSON.stringify({
                         message: text,
+                        conversation_id: this.conversationId,
                         history: historyPayload,
                     }),
                 });
@@ -2430,6 +2588,13 @@ Alpine.data('himsAiAssistant', ({ endpoint, knownItems = [] }) => ({
 
             if (!response.ok) {
                 throw new Error(data.message || (data.errors && data.errors.attachment ? data.errors.attachment[0] : null) || 'The assistant is temporarily unavailable. Please try again.');
+            }
+
+            if (data.conversation_id) {
+                this.conversationId = data.conversation_id;
+            }
+            if (data.conversation_title) {
+                this.conversationTitle = data.conversation_title;
             }
 
             this.messages.push({

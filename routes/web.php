@@ -54,6 +54,18 @@ Route::get('/dashboard/live', [InventoryController::class, 'live'])->middleware(
 Route::post('/dashboard/ai-assistant', [DashboardAiAssistantController::class, 'chat'])
     ->middleware(['auth:web,admin,super_admin', 'throttle:30,1'])
     ->name('dashboard.ai-assistant');
+Route::get('/dashboard/ai-assistant/conversations', [DashboardAiAssistantController::class, 'conversations'])
+    ->middleware(['auth:web,admin,super_admin'])
+    ->name('dashboard.ai-assistant.conversations');
+Route::get('/dashboard/ai-assistant/conversations/active', [DashboardAiAssistantController::class, 'activeConversation'])
+    ->middleware(['auth:web,admin,super_admin'])
+    ->name('dashboard.ai-assistant.active');
+Route::get('/dashboard/ai-assistant/conversations/{id}', [DashboardAiAssistantController::class, 'showConversation'])
+    ->middleware(['auth:web,admin,super_admin'])
+    ->name('dashboard.ai-assistant.conversation');
+Route::get('/dashboard/ai-assistant/attachment/{message}', [DashboardAiAssistantController::class, 'attachment'])
+    ->middleware(['auth:web,admin,super_admin'])
+    ->name('dashboard.ai-assistant.attachment');
 
 /*
  * The inventory surface. `auth` here only establishes that somebody is signed

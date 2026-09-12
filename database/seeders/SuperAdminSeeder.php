@@ -31,10 +31,15 @@ class SuperAdminSeeder extends Seeder
             $shouldSetInitialPassword = ! $user->exists || ! $user->isProtected();
             $employeeId = $user->employee_id ?: $this->availableEmployeeId($user);
 
+            $hasPersonalName = filled($user->first_name) || filled($user->surname);
+            $preservedName = $hasPersonalName
+                ? User::composeName($user->first_name, $user->middle_name, $user->surname)
+                : ($user->name && $user->name !== 'HIMS Super Administrator' ? $user->name : 'HIMS Super Administrator');
+
             // forceFill is deliberate: is_protected and email_verified_at are
             // system-owned fields and must never be mass assignable from HTTP.
             $attributes = [
-                'name' => 'HIMS Super Administrator',
+                'name' => $preservedName,
                 'role' => UserRole::SuperAdministrator,
                 'status' => UserStatus::Active,
                 'is_protected' => true,

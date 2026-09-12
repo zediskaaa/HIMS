@@ -1101,6 +1101,9 @@
     <aside
         x-data="himsAiAssistant({
             endpoint: '{{ route('dashboard.ai-assistant') }}',
+            conversationsEndpoint: '{{ route('dashboard.ai-assistant.conversations') }}',
+            activeEndpoint: '{{ route('dashboard.ai-assistant.active') }}',
+            conversationShowBase: '{{ url('/dashboard/ai-assistant/conversations') }}',
             knownItems: {{ Js::from(\App\Models\InventoryItem::query()->pluck('name')->values()) }}
         })"
         x-cloak
@@ -1146,6 +1149,49 @@
             aria-modal="false"
             class="absolute bottom-16 right-0 flex h-[580px] max-h-[calc(100vh-5rem)] w-[400px] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-neutral-50/60 shadow-2xl ring-1 ring-black/10 backdrop-blur-sm sm:w-[440px]"
         >
+            {{-- Confirmation Dialog for New Chat --}}
+            <div
+                x-show="showNewChatConfirm"
+                x-transition.opacity
+                class="absolute inset-0 z-40 flex items-center justify-center bg-neutral-900/40 p-4 backdrop-blur-2xs"
+            >
+                <div
+                    x-show="showNewChatConfirm"
+                    x-transition:enter="transition ease-out duration-150"
+                    x-transition:enter-start="scale-95 opacity-0"
+                    x-transition:enter-end="scale-100 opacity-100"
+                    class="w-full max-w-xs rounded-2xl border border-neutral-200 bg-white p-4 shadow-xl"
+                >
+                    <div class="flex items-center gap-2.5 text-primary-600">
+                        <div class="flex h-8 w-8 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+                            <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                        </div>
+                        <h4 class="text-xs font-bold text-neutral-900">Start a new chat?</h4>
+                    </div>
+                    <p class="mt-2 text-xs leading-relaxed text-neutral-600">
+                        This will start a new conversation. Your current chat will remain available in your chat history.
+                    </p>
+                    <div class="mt-4 flex items-center justify-end gap-2">
+                        <button
+                            type="button"
+                            x-on:click="cancelNewChat()"
+                            class="rounded-xl border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            x-on:click="startNewChat()"
+                            class="rounded-xl bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-primary-700"
+                        >
+                            New Chat
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             {{-- Drag and Drop Visual Overlay --}}
             <div
                 x-show="isDraggingOver"
@@ -1161,41 +1207,59 @@
                 <p class="mt-1 text-xs text-primary-200">PDF, Excel, Word, CSV, TXT, or images (up to 35MB)</p>
             </div>
 
-            {{-- Redesigned Header --}}
-            <header class="flex items-center justify-between border-b border-neutral-200/80 bg-white/95 px-4 py-3 shadow-2xs backdrop-blur-xs">
-                <div class="flex items-center gap-3">
-                    <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary-600 to-primary-800 text-white shadow-xs">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+            {{-- Redesigned Clean Header --}}
+            <header class="flex items-center justify-between border-b border-neutral-200/80 bg-white/95 px-3.5 py-2.5 shadow-2xs backdrop-blur-xs">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-600 to-primary-800 text-white shadow-xs">
+                        <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a.75.75 0 0 1-1.154-.672c.07-.866.27-1.77.585-2.556C3.593 16.32 3 14.28 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
                         </svg>
                     </div>
-                    <div>
-                        <h3 id="hims-assistant-title" class="text-sm font-semibold tracking-tight text-neutral-900">
+                    <div class="min-w-0">
+                        <h3 id="hims-assistant-title" class="text-xs sm:text-sm font-semibold tracking-tight text-neutral-900 truncate">
                             HIMS AI Assistant
                         </h3>
-                        <p class="text-[11px] font-medium text-neutral-500">
-                            Inventory Intelligence Assistant
+                        <p class="text-[10px] sm:text-[11px] font-medium text-neutral-500 truncate" x-text="conversationTitle ? conversationTitle : 'Inventory Intelligence Assistant'">
                         </p>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-1.5 shrink-0">
+                    {{-- New Chat Button --}}
                     <button
                         type="button"
-                        x-on:click="clearChat()"
-                        title="Clear conversation"
-                        class="rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
-                        aria-label="Clear conversation"
+                        x-on:click="requestNewChat()"
+                        class="inline-flex items-center gap-1 rounded-lg border border-neutral-200/90 bg-neutral-50 px-2 py-1 text-[11px] font-medium text-neutral-700 transition-colors hover:border-primary-300 hover:bg-primary-50/60 hover:text-primary-800 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                        title="Start a new chat (+ New Chat)"
+                        aria-label="Start new chat"
                     >
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                        <svg class="h-3.5 w-3.5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
+                        <span>New Chat</span>
                     </button>
+
+                    {{-- History Button --}}
+                    <button
+                        type="button"
+                        x-on:click="toggleHistory()"
+                        class="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                        x-bind:class="viewMode === 'history' ? 'border-primary-300 bg-primary-50 text-primary-800 font-semibold' : 'border-neutral-200/90 bg-neutral-50 text-neutral-700 hover:border-neutral-300 hover:bg-neutral-100'"
+                        title="View conversation history"
+                        aria-label="Toggle chat history"
+                    >
+                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                        <span>History</span>
+                    </button>
+
+                    {{-- Close Button (only hides/minimizes the panel; NEVER clears or deletes chat) --}}
                     <button
                         type="button"
                         x-on:click="close()"
-                        title="Close assistant"
-                        class="rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+                        title="Close assistant (conversation remains saved)"
+                        class="rounded-lg p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 focus:outline-none"
                         aria-label="Close assistant"
                     >
                         <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -1205,9 +1269,73 @@
                 </div>
             </header>
 
+            {{-- History Drawer View --}}
+            <div
+                x-show="viewMode === 'history'"
+                x-transition
+                class="flex flex-1 flex-col overflow-y-auto bg-neutral-50/50 p-3 text-xs"
+            >
+                <div class="mb-2.5 flex items-center justify-between px-1">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Chat History</span>
+                    <button
+                        type="button"
+                        x-on:click="viewMode = 'chat'"
+                        class="text-xs font-semibold text-primary-600 hover:text-primary-800"
+                    >
+                        &larr; Back to chat
+                    </button>
+                </div>
+
+                {{-- Loading indicator --}}
+                <div x-show="isHistoryLoading" class="flex items-center justify-center py-12 text-neutral-400">
+                    <svg class="h-5 w-5 animate-spin text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                </div>
+
+                {{-- Empty History State --}}
+                <div x-show="!isHistoryLoading && conversationsList.length === 0" class="py-12 text-center text-neutral-500">
+                    <div class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-100 text-neutral-400">
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                    </div>
+                    <p class="text-xs font-semibold text-neutral-700">No previous conversations</p>
+                    <p class="mt-0.5 text-[11px] text-neutral-400">Your chat conversations will be saved and listed here.</p>
+                </div>
+
+                {{-- Grouped Conversations Loop --}}
+                <div x-show="!isHistoryLoading && conversationsList.length > 0" class="space-y-3.5">
+                    <template x-for="(groupItems, groupName) in groupedConversations" x-bind:key="groupName">
+                        <div class="space-y-1">
+                            <p class="px-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400" x-text="groupName"></p>
+                            <div class="space-y-1">
+                                <template x-for="conv in groupItems" x-bind:key="conv.id">
+                                    <button
+                                        type="button"
+                                        x-on:click="selectConversation(conv.id)"
+                                        class="group flex w-full items-center justify-between rounded-xl border p-2.5 text-left transition"
+                                        x-bind:class="conversationId === conv.id ? 'border-primary-300 bg-primary-50/70 text-primary-900 shadow-2xs' : 'border-neutral-200/80 bg-white hover:border-neutral-300 hover:bg-neutral-50 text-neutral-800'"
+                                    >
+                                        <div class="min-w-0 flex-1 pr-2">
+                                            <p class="truncate text-xs font-semibold text-neutral-900" x-text="conv.title"></p>
+                                            <p class="text-[10px] text-neutral-400" x-text="conv.time_ago + ' &bull; ' + conv.message_count + ' message' + (conv.message_count === 1 ? '' : 's')"></p>
+                                        </div>
+                                        <svg class="h-4 w-4 shrink-0 text-neutral-400 transition-transform group-hover:translate-x-0.5 group-hover:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                                        </svg>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
             {{-- Message Area --}}
             <div
                 x-ref="messagesContainer"
+                x-show="viewMode === 'chat'"
                 class="flex-1 space-y-3.5 overflow-y-auto p-4 text-xs select-text scroll-smooth"
             >
                 {{-- Welcome / Empty State with Suggested Inquiries --}}
@@ -1397,7 +1525,7 @@
 
             {{-- Error Message Alert --}}
             <div
-                x-show="errorMessage"
+                x-show="viewMode === 'chat' && errorMessage"
                 x-transition
                 class="flex items-center justify-between border-t border-danger-200 bg-danger-50 px-3 py-1.5 text-xs text-danger-700"
             >
@@ -1407,7 +1535,7 @@
 
             {{-- Selected File Preview Strip --}}
             <div
-                x-show="selectedFile"
+                x-show="viewMode === 'chat' && selectedFile"
                 x-transition
                 class="flex items-center justify-between border-t border-neutral-200/80 bg-neutral-100/70 px-3.5 py-2 text-xs"
             >
@@ -1440,6 +1568,7 @@
 
             {{-- Input Area --}}
             <form
+                x-show="viewMode === 'chat'"
                 x-on:submit.prevent="sendMessage()"
                 data-no-loading
                 class="border-t border-neutral-200/80 bg-white p-2.5"

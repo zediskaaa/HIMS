@@ -56,7 +56,7 @@
 
         <x-ui.card title="Context" class="min-w-0">
             <dl class="space-y-4">
-                <div><dt class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Performed by</dt><dd class="mt-1 break-words text-sm text-neutral-900">{{ $log->actor_name }}</dd></div>
+                <div><dt class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Performed by</dt><dd class="mt-1 break-words text-sm text-neutral-900">{{ $log->displayActorName() }}</dd></div>
                 <div><dt class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Role snapshot</dt><dd class="mt-1 text-sm text-neutral-900">{{ $log->actor_role ? (\App\Enums\UserRole::tryFrom($log->actor_role)?->label() ?? \Illuminate\Support\Str::headline($log->actor_role)) : 'Not recorded' }}</dd></div>
                 <div><dt class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Source</dt><dd class="mt-1 text-sm text-neutral-900">{{ \Illuminate\Support\Str::headline($log->source ?? 'legacy') }}</dd></div>
                 <div><dt class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Target</dt><dd class="mt-1 break-words text-sm text-neutral-900">{{ $log->target_reference ?? $log->target_name ?? 'None' }}</dd></div>
