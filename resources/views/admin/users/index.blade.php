@@ -92,11 +92,7 @@
                 <div class="p-4 space-y-3">
                     <div class="flex items-start justify-between gap-3">
                         <div class="flex items-center gap-2.5 min-w-0">
-                            <span class="flex items-center justify-center w-9 h-9 rounded-full shrink-0
-                                         text-xs font-semibold
-                                         {{ $account->isActive() ? 'bg-primary-50 text-primary-700' : 'bg-neutral-100 text-neutral-400' }}">
-                                {{ $account->initials() }}
-                            </span>
+                            <x-ui.avatar :user="$account" size="sm" />
                             <div class="min-w-0">
                                 <a href="{{ route('admin.users.show', $account) }}"
                                    title="{{ $account->name }}"
@@ -223,11 +219,7 @@
 
                             <x-ui.table.td class="px-3 py-2.5">
                                 <div class="flex items-center gap-2 min-w-0">
-                                    <span class="flex items-center justify-center w-7 h-7 rounded-full shrink-0
-                                                 text-xs font-semibold
-                                                 {{ $account->isActive() ? 'bg-primary-50 text-primary-700' : 'bg-neutral-100 text-neutral-400' }}">
-                                        {{ $account->initials() }}
-                                    </span>
+                                    <x-ui.avatar :user="$account" size="xs" />
                                     <div class="min-w-0">
                                         <a href="{{ route('admin.users.show', $account) }}"
                                            title="{{ $account->name }}"

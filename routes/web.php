@@ -229,6 +229,13 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])
+        ->middleware('throttle:10,1')
+        ->name('profile.avatar.update');
+    Route::delete('/profile/avatar', [ProfileController::class, 'destroyAvatar'])
+        ->name('profile.avatar.destroy');
+    Route::get('/users/{user}/avatar', [ProfileController::class, 'showAvatar'])
+        ->name('users.avatar');
     Route::patch('/profile/session-timeout-reminder', [ProfileController::class, 'updateSessionTimeoutReminder'])->name('profile.session-timeout-reminder.update');
     Route::post('/profile/audit-location', [ProfileController::class, 'storeAuditLocation'])
         ->middleware('throttle:10,1')

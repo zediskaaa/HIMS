@@ -141,7 +141,7 @@
                         @canany(['view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids', 'award_procurement'])
                             <optgroup label="Strategic Sourcing &amp; Bids">
                                 <option value="sourcing_rfqs">Sourcing Events &amp; RFQs ({{ $rfqs->count() }})</option>
-                                <option value="evaluations">Comparative Evaluation &amp; Landed Cost</option>
+                                <option value="evaluations">Comparative Evaluation &amp; Landed Cost Matrix</option>
                             </optgroup>
                         @endcanany
                         <optgroup label="Governance &amp; Approvals">

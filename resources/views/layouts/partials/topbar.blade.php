@@ -175,10 +175,7 @@
             :aria-expanded="open ? 'true' : 'false'"
             aria-haspopup="menu"
         >
-            <span class="flex items-center justify-center w-8 h-8 rounded-full bg-primary-100
-                         text-primary-700 text-xs font-semibold shrink-0">
-                {{ Str::upper(Str::substr(Auth::user()?->name ?? '?', 0, 1)) }}
-            </span>
+            <x-ui.avatar :user="Auth::user()" size="sm" />
             <span class="hidden sm:block text-sm font-medium text-neutral-700 max-w-32 truncate">
                 {{ Auth::user()?->name }}
             </span>

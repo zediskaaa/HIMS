@@ -50,10 +50,7 @@
         <div class="lg:col-span-1 space-y-6">
             <x-ui.card title="Account">
                 <div class="flex items-center gap-3">
-                    <span class="flex items-center justify-center w-12 h-12 rounded-full shrink-0 text-sm font-semibold
-                                 {{ $user->isActive() ? 'bg-primary-50 text-primary-700' : 'bg-neutral-100 text-neutral-400' }}">
-                        {{ $user->initials() }}
-                    </span>
+                    <x-ui.avatar :user="$user" size="lg" />
                     <div class="min-w-0">
                         <p class="text-sm font-semibold text-neutral-900 truncate">{{ $user->name }}</p>
                         <p class="text-xs text-neutral-500 truncate">{{ $user->email }}</p>

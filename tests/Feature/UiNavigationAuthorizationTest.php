@@ -44,8 +44,10 @@ class UiNavigationAuthorizationTest extends TestCase
 
         $warehouse = User::factory()->role(UserRole::WarehouseStaff)->create();
         $warehouseSidebar = $this->mainNavigationFor($warehouse);
-        $this->assertStringNotContainsString('Store Requisitions', $warehouseSidebar);
-        $this->assertStringNotContainsString('Cycle Counts', $warehouseSidebar);
+        $this->assertStringContainsString('Store Requisitions', $warehouseSidebar);
+        $this->assertStringContainsString('Cycle Counts', $warehouseSidebar);
+        $this->assertStringNotContainsString('Suppliers Directory', $warehouseSidebar);
+        $this->assertStringNotContainsString('User Management', $warehouseSidebar);
 
         $this->actingAs($warehouse)->get('/inventory/items')
             ->assertOk()
@@ -129,16 +131,15 @@ class UiNavigationAuthorizationTest extends TestCase
 
     public function test_sidebar_navigation_strictly_reflects_role_and_panel_boundaries(): void
     {
-        // The left rail contains only major modules. Workflow links live on
-        // their parent page and retain the same role permission checks.
+        // The left rail contains accordion dropdown modules with role-gated submodules.
         $pharmacy = User::factory()->role(UserRole::PharmacyStaff)->create();
         $sidebar = $this->mainNavigationFor($pharmacy);
         $this->assertStringContainsString('Inventory', $sidebar);
         $this->assertStringContainsString('Procurement &amp; Sourcing', $sidebar);
         $this->assertStringContainsString('Documents &amp; Logistics', $sidebar);
         $this->assertStringNotContainsString('Smart Warehousing', $sidebar);
-        $this->assertStringNotContainsString('Store Requisitions', $sidebar);
-        $this->assertStringNotContainsString('Transfers', $sidebar);
+        $this->assertStringNotContainsString('Stock Adjustments', $sidebar);
+        $this->assertStringNotContainsString('Cycle Counts', $sidebar);
 
         $this->flushSession();
         $this->app['auth']->forgetGuards();
@@ -146,9 +147,9 @@ class UiNavigationAuthorizationTest extends TestCase
         $warehouse = User::factory()->role(UserRole::WarehouseStaff)->create();
         $sidebar = $this->mainNavigationFor($warehouse);
         $this->assertStringContainsString('Smart Warehousing', $sidebar);
-        $this->assertStringNotContainsString('Dock Receiving', $sidebar);
-        $this->assertStringNotContainsString('QC Inspection Queue', $sidebar);
-        $this->assertStringNotContainsString('Warehouse Tasks', $sidebar);
+        $this->assertStringNotContainsString('Suppliers Directory', $sidebar);
+        $this->assertStringNotContainsString('Demand Forecasts', $sidebar);
+        $this->assertStringNotContainsString('User Management', $sidebar);
 
         $this->actingAs($warehouse)->get('/inventory/warehousing')
             ->assertOk()
@@ -164,8 +165,8 @@ class UiNavigationAuthorizationTest extends TestCase
         $this->assertStringContainsString('Smart Warehousing', $sidebar);
         $this->assertStringContainsString('Procurement &amp; Sourcing', $sidebar);
         $this->assertStringContainsString('Process Reviews', $sidebar);
-        $this->assertStringNotContainsString('Suppliers', $sidebar);
-        $this->assertStringNotContainsString('Demand Forecast', $sidebar);
+        $this->assertStringNotContainsString('User Management', $sidebar);
+        $this->assertStringNotContainsString('Access Control', $sidebar);
 
         $this->actingAs($manager)->get('/inventory/purchases')
             ->assertOk()
@@ -180,8 +181,8 @@ class UiNavigationAuthorizationTest extends TestCase
         $this->assertStringContainsString('Smart Warehousing', $sidebar);
         $this->assertStringContainsString('Process Reviews', $sidebar);
         $this->assertStringContainsString('Audit Trail', $sidebar);
-        $this->assertStringNotContainsString('Warehouse Tasks', $sidebar);
-        $this->assertStringNotContainsString('Suppliers', $sidebar);
+        $this->assertStringContainsString('Suppliers Directory', $sidebar);
+        $this->assertStringNotContainsString('User Management', $sidebar);
 
         $this->flushSession();
         $this->app['auth']->forgetGuards();
@@ -189,11 +190,11 @@ class UiNavigationAuthorizationTest extends TestCase
         $viewer = User::factory()->role(UserRole::Viewer)->create();
         $sidebar = $this->mainNavigationFor($viewer);
         $this->assertStringContainsString('Inventory', $sidebar);
-        $this->assertStringContainsString('Process Reviews', $sidebar);
-        $this->assertStringNotContainsString('Smart Warehousing', $sidebar);
-        $this->assertStringNotContainsString('Suppliers', $sidebar);
+        $this->assertStringContainsString('Suppliers Directory', $sidebar);
+        $this->assertStringNotContainsString('User Management', $sidebar);
+        $this->assertStringNotContainsString('Audit Trail', $sidebar);
         $this->assertStringNotContainsString('Store Requisitions', $sidebar);
-        $this->assertStringNotContainsString('Adjustments', $sidebar);
+        $this->assertStringNotContainsString('Stock Adjustments', $sidebar);
     }
 
     public function test_secondary_pages_link_back_to_their_major_module(): void

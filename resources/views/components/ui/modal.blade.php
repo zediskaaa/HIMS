@@ -26,7 +26,7 @@
     x-on:keydown.escape.window="open = false"
     x-show="open"
     x-cloak
-    class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:py-10"
+    class="fixed inset-0 z-50 flex min-h-full items-center justify-center overflow-y-auto p-4 sm:p-6"
     role="dialog"
     aria-modal="true"
     @if ($title) aria-label="{{ $title }}" @endif

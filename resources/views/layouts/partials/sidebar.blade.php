@@ -134,7 +134,7 @@
         @endcanany
 
         {{-- 3. Smart Warehousing (Major Tab Dropdown) --}}
-        @canany([\App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::InspectStock->value, \App\Enums\Permission::ExecuteWarehouseTasks->value, \App\Enums\Permission::ManageTelemetryExcursions->value, \App\Enums\Permission::AccessNarcoticsVault->value, \App\Enums\Permission::RecordConsignments->value])
+        @canany([\App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ExecuteWarehouseTasks->value, \App\Enums\Permission::ManageTelemetryExcursions->value])
             @php
                 $isWarehousingActive = request()->routeIs(
                     'inventory.warehousing*', 'inventory.receiving*', 'inventory.qc*',
@@ -215,7 +215,7 @@
             @endphp
             <x-ui.nav-dropdown
                 id="procurement"
-                title="Procurement"
+                title="Procurement & Sourcing"
                 icon="clipboard-document-list"
                 :active="$isProcurementActive"
             >
@@ -248,7 +248,7 @@
             @endphp
             <x-ui.nav-dropdown
                 id="records"
-                title="Records & Logistics"
+                title="Documents & Logistics"
                 icon="document-text"
                 :active="$isRecordsActive"
             >

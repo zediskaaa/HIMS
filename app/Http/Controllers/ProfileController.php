@@ -14,7 +14,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ProfileController extends Controller
 {
@@ -127,5 +130,108 @@ class ProfileController extends Controller
         AuditBrowserLocation::store($request, $validated);
 
         return response()->json(['stored' => true]);
+    }
+
+    /**
+     * Update the user's profile picture.
+     */
+    public function updateAvatar(Request $request): RedirectResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'avatar' => [
+                'required',
+                'file',
+                'mimes:jpg,jpeg,png',
+                'mimetypes:image/jpeg,image/png',
+                'max:3072', // 3 MB max
+            ],
+        ], [
+            'avatar.required' => 'Please select an image file to upload.',
+            'avatar.file' => 'The uploaded file is not valid.',
+            'avatar.mimes' => 'The profile picture must be a file of type: JPG, JPEG, PNG.',
+            'avatar.mimetypes' => 'The profile picture must be a file of type: JPG, JPEG, PNG.',
+            'avatar.max' => 'The profile picture must not exceed 3 MB.',
+        ]);
+
+        $validator->after(function ($validator) use ($request) {
+            $file = $request->file('avatar');
+            if (! $file || ! $file->isValid()) {
+                return;
+            }
+
+            // Image integrity check: verify decodable image headers and dimensions
+            $imageInfo = @getimagesize($file->getRealPath());
+            if ($imageInfo === false || empty($imageInfo[0]) || empty($imageInfo[1])) {
+                $validator->errors()->add('avatar', 'The uploaded file is corrupted or not a valid image.');
+                return;
+            }
+
+            if (! in_array($imageInfo['mime'], ['image/jpeg', 'image/png'], true)) {
+                $validator->errors()->add('avatar', 'The uploaded image must be a valid JPG, JPEG, or PNG format.');
+                return;
+            }
+
+            if ($imageInfo[0] > 4096 || $imageInfo[1] > 4096) {
+                $validator->errors()->add('avatar', 'The image dimensions cannot exceed 4096x4096 pixels.');
+                return;
+            }
+        });
+
+        if ($validator->fails()) {
+            return Redirect::route('profile.edit')
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        $user = $request->user();
+        $file = $request->file('avatar');
+
+        // Delete previous avatar file from storage disk if exists
+        if ($user->avatar_path && Storage::disk('public')->exists($user->avatar_path)) {
+            Storage::disk('public')->delete($user->avatar_path);
+        }
+
+        // Store new image securely using hashed filename on public disk
+        $path = $file->store('avatars', 'public');
+        $user->forceFill(['avatar_path' => $path])->save();
+
+        $request->session()->put('avatar_success', 'Profile picture updated successfully.');
+
+        return Redirect::route('profile.edit');
+    }
+
+    /**
+     * Remove the user's profile picture.
+     */
+    public function destroyAvatar(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+
+        if ($user->avatar_path && Storage::disk('public')->exists($user->avatar_path)) {
+            Storage::disk('public')->delete($user->avatar_path);
+        }
+
+        $user->forceFill(['avatar_path' => null])->save();
+
+        $request->session()->put('avatar_success', 'Profile picture removed. Your initials avatar is now active.');
+
+        return Redirect::route('profile.edit');
+    }
+
+    /**
+     * Safely stream the user's profile picture.
+     */
+    public function showAvatar(User $user): BinaryFileResponse
+    {
+        abort_unless($user->avatar_path && Storage::disk('public')->exists($user->avatar_path), 404);
+
+        $path = Storage::disk('public')->path($user->avatar_path);
+        $mime = Storage::disk('public')->mimeType($user->avatar_path) ?? 'image/jpeg';
+
+        return response()->file($path, [
+            'Content-Type' => $mime,
+            'Cache-Control' => 'private, max-age=86400',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 }

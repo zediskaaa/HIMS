@@ -38,6 +38,7 @@ class User extends Authenticatable
         'employee_id',
         'department',
         'phone',
+        'avatar_path',
     ];
 
     /**
@@ -298,6 +299,20 @@ class User extends Authenticatable
             ->take(2)
             ->map(fn (string $part) => mb_strtoupper(mb_substr($part, 0, 1)))
             ->implode('') ?: '?';
+    }
+
+    public function hasAvatar(): bool
+    {
+        return ! empty($this->avatar_path);
+    }
+
+    public function avatarUrl(): ?string
+    {
+        if (! $this->avatar_path) {
+            return null;
+        }
+
+        return route('users.avatar', $this);
     }
 
     public function scopeActive(Builder $query): Builder

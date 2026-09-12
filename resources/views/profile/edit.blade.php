@@ -8,13 +8,40 @@
         ]"
     />
 
+    @if (session('avatar_success'))
+        <x-ui.alert variant="success" title="{{ __('Profile picture updated') }}" dismissible class="mb-6">
+            {{ session('avatar_success') }}
+        </x-ui.alert>
+    @endif
+
     {{-- Account Profile Summary Card --}}
-    <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
+    <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6 mb-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex items-center gap-4">
-                <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-100 text-lg font-bold text-primary-800">
-                    {{ $user->initials() }}
-                </span>
+                {{-- Interactive Avatar Trigger with hover overlay and pencil-square badge --}}
+                <div
+                    x-data
+                    x-on:click="$dispatch('open-modal', 'update-profile-picture')"
+                    class="relative group cursor-pointer shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    title="{{ __('Click to change profile picture') }}"
+                    role="button"
+                    tabindex="0"
+                    x-on:keydown.enter="$dispatch('open-modal', 'update-profile-picture')"
+                    x-on:keydown.space.prevent="$dispatch('open-modal', 'update-profile-picture')"
+                >
+                    <x-ui.avatar :user="$user" size="lg" class="ring-2 ring-primary-500/20 shadow-xs group-hover:ring-primary-500 transition-all" />
+
+                    {{-- Hover overlay on avatar image --}}
+                    <div class="absolute inset-0 rounded-full bg-neutral-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity" aria-hidden="true">
+                        <x-ui.icon name="camera" class="h-5 w-5 text-white drop-shadow-xs" />
+                    </div>
+
+                    {{-- Floating pencil-square badge at bottom-right corner --}}
+                    <span class="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-white text-neutral-600 shadow-sm ring-1 ring-neutral-300 group-hover:bg-primary-50 group-hover:text-primary-600 group-hover:ring-primary-400 transition-all">
+                        <x-ui.icon name="pencil-square" class="h-3.5 w-3.5" />
+                    </span>
+                </div>
+
                 <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
                         <h2 class="text-lg font-bold text-neutral-900 truncate">{{ $user->name }}</h2>
@@ -79,4 +106,7 @@
             </div>
         </div>
     </div>
+
+    {{-- Profile Picture Modal --}}
+    @include('profile.partials.update-profile-picture-modal')
 </x-app-layout>
