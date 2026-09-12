@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\PermissionMatrixController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Analytics\ProcessReviewController;
 use App\Http\Controllers\AuthenticatorController;
+use App\Http\Controllers\DashboardAiAssistantController;
 use App\Http\Controllers\Inventory\ConsignmentController;
 use App\Http\Controllers\Inventory\CycleCountController;
 use App\Http\Controllers\Inventory\DemandForecastController;
@@ -48,6 +49,11 @@ Route::get('/dashboard', [InventoryController::class, 'index'])->middleware('aut
 // Polled by the dashboard's alert panel every 30s. Sits on the web routes so
 // it authenticates with the session cookie the page already has.
 Route::get('/dashboard/live', [InventoryController::class, 'live'])->middleware('auth:web,admin,super_admin')->name('dashboard.live');
+
+// Conversational HIMS AI Inventory Assistant.
+Route::post('/dashboard/ai-assistant', [DashboardAiAssistantController::class, 'chat'])
+    ->middleware(['auth:web,admin,super_admin', 'throttle:30,1'])
+    ->name('dashboard.ai-assistant');
 
 /*
  * The inventory surface. `auth` here only establishes that somebody is signed

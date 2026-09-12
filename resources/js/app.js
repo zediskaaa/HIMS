@@ -1118,12 +1118,33 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     forecast: initialForecast,
     endpoint,
     forecastDays: String(initialForecast?.forecast_days ?? 30),
+    selectedItemId: '',
     category: '',
     risk: '',
     search: '',
     loading: false,
     error: '',
     success: '',
+    activePoint: null,
+    isDragging: false,
+
+    init() {
+        this.$nextTick(() => {
+            this.resetActivePointToTransition();
+        });
+    },
+
+    resetActivePointToTransition() {
+        const points = this.allChartPoints();
+        if (points.length === 0) {
+            this.activePoint = null;
+            return;
+        }
+
+        const hist = this.historicalPoints();
+        const target = hist.length > 0 ? hist[hist.length - 1] : points[0];
+        this.setActivePoint(target);
+    },
 
     allItems() {
         return Array.isArray(this.forecast?.items) ? this.forecast.items : [];
@@ -1143,8 +1164,27 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         });
     },
 
+    selectedItem() {
+        if (!this.selectedItemId) return null;
+        return this.allItems().find((item) => String(item.item_id) === String(this.selectedItemId)) || null;
+    },
+
+    selectItem(id) {
+        const newId = String(id || '');
+        this.selectedItemId = this.selectedItemId === newId ? '' : newId;
+        this.$nextTick(() => {
+            this.resetActivePointToTransition();
+        });
+    },
+
     topItems() {
-        return this.filteredItems().slice(0, 5);
+        const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
+        return [...this.filteredItems()].sort((a, b) => {
+            const prioA = priorityOrder[a.reorder_priority] ?? (a.risk_level === 'high' ? 1 : (a.risk_level === 'medium' ? 2 : 3));
+            const prioB = priorityOrder[b.reorder_priority] ?? (b.risk_level === 'high' ? 1 : (b.risk_level === 'medium' ? 2 : 3));
+            if (prioA !== prioB) return prioA - prioB;
+            return (b.predicted_demand || 0) - (a.predicted_demand || 0);
+        }).slice(0, 6);
     },
 
     highRiskCount() {
@@ -1186,6 +1226,30 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         return 'Medium';
     },
 
+    summaryPredictedDemand() {
+        const sel = this.selectedItem();
+        return sel ? Number(sel.predicted_demand || 0) : this.predictedDemand();
+    },
+
+    summaryCurrentStock() {
+        const sel = this.selectedItem();
+        if (sel) return Number(sel.current_stock || 0);
+        return this.filteredItems().reduce((total, item) => total + Number(item.current_stock || 0), 0);
+    },
+
+    summaryStockRisk() {
+        const sel = this.selectedItem();
+        if (sel) return sel.risk_level || 'low';
+        if (this.highRiskCount() > 0) return 'high';
+        if (this.lowStockRiskCount() > 0) return 'medium';
+        return 'low';
+    },
+
+    summaryRecommendedReorder() {
+        const sel = this.selectedItem();
+        return sel ? Number(sel.recommended_reorder_quantity || 0) : this.recommendedReorder();
+    },
+
     aggregateSeries(field) {
         const totals = new Map();
 
@@ -1203,33 +1267,62 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
             .sort((left, right) => left.date.localeCompare(right.date));
     },
 
-    historicalSeries() {
+    currentHistoricalSeries() {
+        const sel = this.selectedItem();
+        if (sel) {
+            const series = Array.isArray(sel.historical_series) ? sel.historical_series : [];
+            return series
+                .filter((p) => p.period_start)
+                .map((p) => ({ date: p.period_start, quantity: Number(p.quantity || 0) }))
+                .sort((a, b) => a.date.localeCompare(b.date));
+        }
         return this.aggregateSeries('historical_series');
     },
 
-    forecastSeries() {
+    currentForecastSeries() {
+        const sel = this.selectedItem();
+        if (sel) {
+            const series = Array.isArray(sel.forecast_series) ? sel.forecast_series : [];
+            return series
+                .filter((p) => p.period_start)
+                .map((p) => ({ date: p.period_start, quantity: Number(p.quantity || 0) }))
+                .sort((a, b) => a.date.localeCompare(b.date));
+        }
         return this.aggregateSeries('forecast_series');
     },
 
+    historicalSeries() {
+        return this.currentHistoricalSeries();
+    },
+
+    forecastSeries() {
+        return this.currentForecastSeries();
+    },
+
     hasChartData() {
-        return this.historicalSeries().length > 0 && this.forecastSeries().length > 0;
+        return this.currentHistoricalSeries().length > 0 && this.currentForecastSeries().length > 0;
     },
 
     chartMaximum() {
-        return Math.max(
-            ...this.historicalSeries().map((point) => point.quantity),
-            ...this.forecastSeries().map((point) => point.quantity),
-            1,
-        );
+        const histMax = Math.max(...this.currentHistoricalSeries().map((point) => Number(point.quantity || 0)), 0);
+        const foreMax = Math.max(...this.currentForecastSeries().map((point) => Number(point.quantity || 0)), 0);
+        return Math.max(histMax, foreMax, 1);
     },
 
     chartY(value) {
-        return Math.round((208 - ((Number(value) / this.chartMaximum()) * 168)) * 10) / 10;
+        return Math.round((205 - ((Number(value) / this.chartMaximum()) * 165)) * 10) / 10;
     },
 
-    seriesPoints(series, startX, endX) {
+    transitionX() {
+        return 470;
+    },
+
+    historicalPoints() {
+        const series = this.currentHistoricalSeries();
         if (series.length === 0) return [];
 
+        const startX = 50;
+        const endX = this.transitionX();
         const step = series.length === 1 ? 0 : (endX - startX) / (series.length - 1);
 
         return series.map((point, index) => ({
@@ -1237,47 +1330,204 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
             y: this.chartY(point.quantity),
             date: point.date,
             quantity: point.quantity,
+            type: 'actual',
+            label: 'Actual Demand',
         }));
     },
 
-    historicalPoints() {
-        return this.seriesPoints(this.historicalSeries(), 42, 370);
+    forecastPoints() {
+        const series = this.currentForecastSeries();
+        if (series.length === 0) return [];
+
+        const startX = this.transitionX();
+        const endX = 725;
+        const count = series.length;
+        const step = (endX - startX) / count;
+
+        return series.map((point, index) => ({
+            x: Math.round((startX + (step * (index + 1))) * 10) / 10,
+            y: this.chartY(point.quantity),
+            date: point.date,
+            quantity: point.quantity,
+            type: 'forecast',
+            label: 'AI Forecast',
+        }));
     },
 
-    forecastPoints() {
-        return this.seriesPoints(this.forecastSeries(), 400, 728);
+    forecastPointsWithTransition() {
+        const hist = this.historicalPoints();
+        const fore = this.forecastPoints();
+        if (fore.length === 0) return [];
+
+        const transitionY = hist.length > 0 ? hist[hist.length - 1].y : fore[0].y;
+        const connector = {
+            x: this.transitionX(),
+            y: transitionY,
+            date: hist.length > 0 ? hist[hist.length - 1].date : fore[0].date,
+            quantity: hist.length > 0 ? hist[hist.length - 1].quantity : fore[0].quantity,
+            type: 'boundary',
+            label: 'Forecast Transition',
+        };
+
+        return [connector, ...fore];
+    },
+
+    allChartPoints() {
+        return [...this.historicalPoints(), ...this.forecastPoints()];
     },
 
     seriesPath(points) {
+        if (points.length === 0) return '';
         return points.map((point, index) => (
             `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`
         )).join(' ');
     },
 
+    historicalAreaPath() {
+        const points = this.historicalPoints();
+        if (points.length === 0) return '';
+
+        const baseline = 205;
+        return `M ${points[0].x} ${baseline} L ${points[0].x} ${points[0].y} ${points
+            .slice(1)
+            .map((p) => `L ${p.x} ${p.y}`)
+            .join(' ')} L ${points[points.length - 1].x} ${baseline} Z`;
+    },
+
+    forecastAreaPath() {
+        const points = this.forecastPointsWithTransition();
+        if (points.length === 0) return '';
+
+        const baseline = 205;
+        return `M ${points[0].x} ${baseline} L ${points[0].x} ${points[0].y} ${points
+            .slice(1)
+            .map((p) => `L ${p.x} ${p.y}`)
+            .join(' ')} L ${points[points.length - 1].x} ${baseline} Z`;
+    },
+
     areaPath(points) {
         if (points.length === 0) return '';
 
-        return `M ${points[0].x} 208 L ${points[0].x} ${points[0].y} ${points
+        return `M ${points[0].x} 205 L ${points[0].x} ${points[0].y} ${points
             .slice(1)
             .map((point) => `L ${point.x} ${point.y}`)
-            .join(' ')} L ${points[points.length - 1].x} 208 Z`;
+            .join(' ')} L ${points[points.length - 1].x} 205 Z`;
     },
 
     chartStartLabel(series) {
-        return series.length > 0 ? this.formatShortDate(series[0].date) : '';
+        const s = series || this.currentHistoricalSeries();
+        return s.length > 0 ? this.formatShortDate(s[0].date) : '';
     },
 
     chartEndLabel(series) {
-        return series.length > 0 ? this.formatShortDate(series[series.length - 1].date) : '';
+        const s = series || this.currentForecastSeries();
+        return s.length > 0 ? this.formatShortDate(s[s.length - 1].date) : '';
+    },
+
+    chartTransitionLabel() {
+        const hist = this.currentHistoricalSeries();
+        return hist.length > 0 ? this.formatShortDate(hist[hist.length - 1].date) : 'Today';
+    },
+
+    onChartPointerDown(event) {
+        this.isDragging = true;
+        try {
+            event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {}
+        this.handlePointerPosition(event);
+    },
+
+    onChartPointerMove(event) {
+        this.handlePointerPosition(event);
+    },
+
+    onChartPointerUp(event) {
+        this.isDragging = false;
+        try {
+            if (event.currentTarget?.hasPointerCapture?.(event.pointerId)) {
+                event.currentTarget.releasePointerCapture(event.pointerId);
+            }
+        } catch {}
+    },
+
+    onChartPointerCancel(event) {
+        this.onChartPointerUp(event);
+    },
+
+    onChartMouseMove(event) {
+        this.handlePointerPosition(event);
+    },
+
+    onChartMouseLeave() {
+        this.isDragging = false;
+    },
+
+    handlePointerPosition(event) {
+        const svg = event.currentTarget;
+        if (!svg) return;
+        const rect = svg.getBoundingClientRect();
+        if (rect.width <= 0) return;
+
+        const clientX = event.clientX;
+        const rawX = ((clientX - rect.left) / rect.width) * 760;
+        const svgX = Math.max(50, Math.min(725, rawX));
+
+        const closest = this.getNearestPoint(svgX);
+        if (closest) {
+            this.setActivePoint(closest);
+        }
+    },
+
+    getNearestPoint(svgX) {
+        const points = this.allChartPoints();
+        if (points.length === 0) return null;
+
+        let closest = points[0];
+        let minDiff = Math.abs(svgX - points[0].x);
+
+        for (let i = 1; i < points.length; i++) {
+            const diff = Math.abs(svgX - points[i].x);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closest = points[i];
+            }
+        }
+
+        return closest;
+    },
+
+    setActivePoint(point) {
+        if (!point) return;
+        this.activePoint = {
+            ...point,
+            formattedDate: this.formatDateLabel(point.date),
+            percentageX: Math.round((point.x / 760) * 100),
+            percentageY: Math.round((point.y / 240) * 100),
+        };
+    },
+
+    stepPoint(direction) {
+        const points = this.allChartPoints();
+        if (points.length === 0) return;
+        const currentIndex = points.findIndex(
+            (p) => p.date === this.activePoint?.date && p.type === this.activePoint?.type
+        );
+        const nextIndex = Math.max(
+            0,
+            Math.min(points.length - 1, (currentIndex >= 0 ? currentIndex : 0) + direction)
+        );
+        this.setActivePoint(points[nextIndex]);
     },
 
     historicalDailyRate() {
-        return this.historicalSeries().reduce((total, point) => total + point.quantity, 0)
+        const series = this.currentHistoricalSeries();
+        return series.reduce((total, point) => total + point.quantity, 0)
             / Math.max(1, Number(this.forecast?.analysis_days || 1));
     },
 
     predictedDailyRate() {
-        return this.forecastSeries().reduce((total, point) => total + point.quantity, 0)
+        const series = this.currentForecastSeries();
+        return series.reduce((total, point) => total + point.quantity, 0)
             / Math.max(1, Number(this.forecast?.forecast_days || 1));
     },
 
@@ -1295,6 +1545,11 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     },
 
     insight() {
+        const sel = this.selectedItem();
+        if (sel) {
+            return sel.explanation || `${sel.item_name} has predicted demand of ${this.formatNumber(sel.predicted_demand)} units. Current stock is ${this.formatNumber(sel.current_stock)} units.`;
+        }
+
         const count = this.filteredItems().length;
         if (count === 0) return 'No forecast items match the current filters.';
 
@@ -1318,9 +1573,13 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     },
 
     clearFilters() {
+        this.selectedItemId = '';
         this.category = '';
         this.risk = '';
         this.search = '';
+        this.$nextTick(() => {
+            this.resetActivePointToTransition();
+        });
     },
 
     riskClasses(risk) {
@@ -1354,7 +1613,20 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         }).format(date);
     },
 
+    formatDateLabel(value) {
+        if (!value) return '';
+        const date = new Date(`${value}T00:00:00`);
+        if (Number.isNaN(date.getTime())) return String(value);
+
+        return new Intl.DateTimeFormat(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+        }).format(date);
+    },
+
     formatShortDate(value) {
+        if (!value) return '';
         const date = new Date(`${value}T00:00:00`);
         if (Number.isNaN(date.getTime())) return '';
 
@@ -1399,6 +1671,9 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
 
             this.forecast = payload.forecast;
             this.success = payload.message || 'Forecast generated successfully.';
+            this.$nextTick(() => {
+                this.resetActivePointToTransition();
+            });
         } catch (error) {
             this.error = error instanceof Error
                 ? error.message
@@ -1621,6 +1896,152 @@ Alpine.data('auditSearchAutocomplete', ({ endpoint, formId, initialQuery = '' })
 
     destroy() {
         this.reset();
+    },
+}));
+
+Alpine.data('himsAiAssistant', ({ endpoint }) => ({
+    isOpen: false,
+    endpoint,
+    messages: [],
+    input: '',
+    isLoading: false,
+    errorMessage: '',
+
+    toggle() {
+        this.isOpen = !this.isOpen;
+        if (this.isOpen) {
+            this.$nextTick(() => {
+                this.scrollToBottom();
+                this.$refs.chatInput?.focus();
+            });
+        }
+    },
+
+    close() {
+        this.isOpen = false;
+    },
+
+    clearChat() {
+        this.messages = [];
+        this.errorMessage = '';
+    },
+
+    scrollToBottom() {
+        this.$nextTick(() => {
+            const container = this.$refs.messagesContainer;
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+        });
+    },
+
+    formatTime() {
+        return new Intl.DateTimeFormat(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+        }).format(new Date());
+    },
+
+    formatMarkdown(text) {
+        if (!text) return '';
+
+        let sanitized = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+
+        // Links: [Text](url)
+        sanitized = sanitized.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, title, url) => {
+            const safeUrl = url.startsWith('/') || url.startsWith('http') ? url : '#';
+            return `<a href="${safeUrl}" class="inline-flex items-center gap-1 font-semibold text-primary-600 underline hover:text-primary-800 transition-colors" target="_self">${title}</a>`;
+        });
+
+        // Bold: **text**
+        sanitized = sanitized.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+        // Italics: *text*
+        sanitized = sanitized.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+        // Inline code: `code`
+        sanitized = sanitized.replace(/`([^`]+)`/g, '<code class="rounded bg-neutral-200/80 px-1 py-0.5 text-xs font-mono text-neutral-800">$1</code>');
+
+        // Unordered list items: - item or * item
+        sanitized = sanitized.replace(/^\s*[-*]\s+(.*)$/gm, '<li class="ml-3 list-disc text-neutral-800">$1</li>');
+
+        // Line breaks
+        sanitized = sanitized.replace(/\n/g, '<br>');
+
+        return sanitized;
+    },
+
+    async sendSuggested(text) {
+        this.input = text;
+        await this.sendMessage();
+    },
+
+    async sendMessage() {
+        const text = this.input.trim();
+        if (!text || this.isLoading) return;
+
+        this.errorMessage = '';
+        this.input = '';
+        this.isLoading = true;
+
+        const userMsg = {
+            role: 'user',
+            content: text,
+            time: this.formatTime(),
+        };
+        this.messages.push(userMsg);
+        this.scrollToBottom();
+
+        const historyPayload = this.messages.slice(-6).map((m) => ({
+            role: m.role,
+            content: m.content,
+        }));
+
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+            const response = await fetch(this.endpoint, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken || '',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-Session-Activity': 'passive',
+                },
+                body: JSON.stringify({
+                    message: text,
+                    history: historyPayload,
+                }),
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(data.message || 'The assistant is temporarily unavailable. Please try again.');
+            }
+
+            this.messages.push({
+                role: 'assistant',
+                content: data.reply || 'No response generated.',
+                time: this.formatTime(),
+                source: data.source || 'ai',
+            });
+        } catch (err) {
+            this.errorMessage = err instanceof Error ? err.message : 'Unable to get an AI response right now.';
+            this.messages.push({
+                role: 'assistant',
+                content: "I'm unable to generate an AI response right now. Please try again.",
+                time: this.formatTime(),
+                isError: true,
+            });
+        } finally {
+            this.isLoading = false;
+            this.scrollToBottom();
+        }
     },
 }));
 
