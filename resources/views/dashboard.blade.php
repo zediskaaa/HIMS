@@ -1003,7 +1003,10 @@
     {{-- HIMS AI Inventory Assistant Floating Chatbot --}}
     @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::ViewReports->value])
     <aside
-        x-data="himsAiAssistant({ endpoint: '{{ route('dashboard.ai-assistant') }}' })"
+        x-data="himsAiAssistant({
+            endpoint: '{{ route('dashboard.ai-assistant') }}',
+            knownItems: {{ Js::from(\App\Models\InventoryItem::query()->pluck('name')->values()) }}
+        })"
         x-cloak
         class="fixed bottom-5 right-5 z-50 select-none print:hidden sm:bottom-6 sm:right-6"
         aria-label="HIMS AI Assistant"
@@ -1013,17 +1016,14 @@
             type="button"
             x-on:click="toggle()"
             x-bind:aria-expanded="isOpen.toString()"
-            class="group relative flex h-14 w-14 items-center justify-center rounded-full bg-primary-600 text-white shadow-xl transition-all duration-200 hover:scale-105 hover:bg-primary-700 hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-primary-500/30"
+            class="group relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary-600 to-primary-700 text-white shadow-xl transition-all duration-200 hover:scale-105 hover:from-primary-500 hover:to-primary-600 hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-primary-500/30 active:scale-95"
             title="Open HIMS AI Assistant"
             aria-label="Toggle HIMS AI Assistant"
         >
             <span class="sr-only">Toggle HIMS AI Assistant</span>
-            {{-- Pulse ring on idle --}}
-            <span x-show="!isOpen" class="absolute -inset-0.5 rounded-full bg-primary-400/40 opacity-75 animate-ping"></span>
-
-            {{-- Sparkle / Chat Icon when closed --}}
-            <svg x-show="!isOpen" class="relative h-6 w-6 transition-transform duration-200 group-hover:rotate-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
+            {{-- Chatbot Icon when closed --}}
+            <svg x-show="!isOpen" class="relative h-6 w-6 transition-transform duration-200 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a.75.75 0 0 1-1.154-.672c.07-.866.27-1.77.585-2.556C3.593 16.32 3 14.28 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
             </svg>
 
             {{-- Close X icon when open --}}
@@ -1032,7 +1032,7 @@
             </svg>
         </button>
 
-        {{-- Compact Chat Panel --}}
+        {{-- Modern Chat Panel Container --}}
         <section
             x-show="isOpen"
             x-transition:enter="transition ease-out duration-200"
@@ -1042,25 +1042,43 @@
             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
             x-transition:leave-end="opacity-0 translate-y-4 scale-95"
             x-on:keydown.escape.window="close()"
+            x-on:dragover.prevent="isDraggingOver = true"
+            x-on:dragleave.prevent="isDraggingOver = false"
+            x-on:drop.prevent="handleFileDrop($event)"
             role="dialog"
             aria-labelledby="hims-assistant-title"
             aria-modal="false"
-            class="absolute bottom-16 right-0 flex h-[540px] max-h-[calc(100vh-6rem)] w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-2xl ring-1 ring-black/5 sm:w-[420px]"
+            class="absolute bottom-16 right-0 flex h-[580px] max-h-[calc(100vh-5rem)] w-[400px] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-neutral-50/60 shadow-2xl ring-1 ring-black/10 backdrop-blur-sm sm:w-[440px]"
         >
-            {{-- Header --}}
-            <header class="flex items-center justify-between border-b border-neutral-200 bg-neutral-900 px-4 py-3 text-white">
-                <div class="flex items-center gap-2.5">
-                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-600 text-white shadow-sm">
-                        <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
+            {{-- Drag and Drop Visual Overlay --}}
+            <div
+                x-show="isDraggingOver"
+                x-transition.opacity
+                class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-primary-900/90 p-4 text-center text-white backdrop-blur-xs"
+            >
+                <div class="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 shadow-inner animate-pulse">
+                    <svg class="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+                    </svg>
+                </div>
+                <p class="text-sm font-semibold">Drop file to attach</p>
+                <p class="mt-1 text-xs text-primary-200">PDF, Excel, Word, CSV, TXT, or images (up to 35MB)</p>
+            </div>
+
+            {{-- Redesigned Header --}}
+            <header class="flex items-center justify-between border-b border-neutral-200/80 bg-white/95 px-4 py-3 shadow-2xs backdrop-blur-xs">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary-600 to-primary-800 text-white shadow-xs">
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a.75.75 0 0 1-1.154-.672c.07-.866.27-1.77.585-2.556C3.593 16.32 3 14.28 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
                         </svg>
                     </div>
                     <div>
-                        <h3 id="hims-assistant-title" class="text-xs font-bold uppercase tracking-wider text-white sm:text-sm">
+                        <h3 id="hims-assistant-title" class="text-sm font-semibold tracking-tight text-neutral-900">
                             HIMS AI Assistant
                         </h3>
-                        <p class="text-[11px] text-neutral-400">
-                            Ask about inventory, demand, and stock levels.
+                        <p class="text-[11px] font-medium text-neutral-500">
+                            Inventory Intelligence Assistant
                         </p>
                     </div>
                 </div>
@@ -1070,7 +1088,7 @@
                         type="button"
                         x-on:click="clearChat()"
                         title="Clear conversation"
-                        class="rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white"
+                        class="rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
                         aria-label="Clear conversation"
                     >
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -1081,7 +1099,7 @@
                         type="button"
                         x-on:click="close()"
                         title="Close assistant"
-                        class="rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white"
+                        class="rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
                         aria-label="Close assistant"
                     >
                         <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -1094,117 +1112,184 @@
             {{-- Message Area --}}
             <div
                 x-ref="messagesContainer"
-                class="flex-1 space-y-3 overflow-y-auto p-4 text-xs select-text"
+                class="flex-1 space-y-3.5 overflow-y-auto p-4 text-xs select-text scroll-smooth"
             >
-                {{-- Welcome / Empty State with Suggested Prompts --}}
+                {{-- Welcome / Empty State with Suggested Inquiries --}}
                 <template x-if="messages.length === 0">
-                    <div class="space-y-3 py-2">
-                        <div class="flex gap-2.5">
-                            <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700">
-                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
-                                </svg>
+                    <div class="space-y-3.5 py-2">
+                        <div class="rounded-2xl border border-neutral-200/80 bg-white p-4 shadow-xs">
+                            <div class="flex items-center gap-3">
+                                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a.75.75 0 0 1-1.154-.672c.07-.866.27-1.77.585-2.556C3.593 16.32 3 14.28 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="text-xs font-bold text-neutral-900">Welcome to HIMS AI Assistant</h4>
+                                    <p class="text-[11px] text-neutral-500">Real-time inventory intelligence & analysis</p>
+                                </div>
                             </div>
-                            <div class="rounded-2xl rounded-tl-none border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-neutral-800 shadow-xs">
-                                <p class="font-medium text-neutral-900">Hello! I'm your HIMS Inventory Assistant.</p>
-                                <p class="mt-1 text-neutral-600">
-                                    I analyze real-time hospital stock levels, consumption movements, and AI demand forecasts. How can I help you today?
-                                </p>
-                            </div>
+                            <p class="mt-2.5 text-xs leading-relaxed text-neutral-600">
+                                Ask about inventory, demand, and stock levels. You can also attach spreadsheets, documents, and images for deep analysis.
+                            </p>
                         </div>
 
-                        {{-- Suggested Prompt Chips --}}
-                        <div class="space-y-1.5 pt-2">
-                            <p class="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">Suggested questions:</p>
-                            <div class="flex flex-col gap-1.5">
+                        {{-- Suggested Inquiry Chips --}}
+                        <div class="space-y-2 pt-1">
+                            <p class="px-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Suggested inquiries:</p>
+                            <div class="grid grid-cols-1 gap-1.5">
                                 <button
                                     type="button"
                                     x-on:click="sendSuggested('Which items are low in stock?')"
-                                    class="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-xs font-medium text-neutral-700 transition hover:border-primary-300 hover:bg-primary-50/50 hover:text-primary-800"
+                                    class="group flex items-center justify-between rounded-xl border border-neutral-200/80 bg-white px-3.5 py-2.5 text-left text-xs font-medium text-neutral-700 shadow-2xs transition hover:border-primary-300 hover:bg-primary-50/50 hover:text-primary-800"
                                 >
-                                    <span>Which items are low in stock?</span>
-                                    <svg class="h-3.5 w-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+                                    <span class="flex items-center gap-2">
+                                        <svg class="h-3.5 w-3.5 shrink-0 text-warning-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+                                        <span>Which items are low in stock?</span>
+                                    </span>
+                                    <svg class="h-3.5 w-3.5 text-neutral-400 transition-colors group-hover:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
                                 </button>
                                 <button
                                     type="button"
                                     x-on:click="sendSuggested('What should we reorder?')"
-                                    class="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-xs font-medium text-neutral-700 transition hover:border-primary-300 hover:bg-primary-50/50 hover:text-primary-800"
+                                    class="group flex items-center justify-between rounded-xl border border-neutral-200/80 bg-white px-3.5 py-2.5 text-left text-xs font-medium text-neutral-700 shadow-2xs transition hover:border-primary-300 hover:bg-primary-50/50 hover:text-primary-800"
                                 >
-                                    <span>What should we reorder?</span>
-                                    <svg class="h-3.5 w-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+                                    <span class="flex items-center gap-2">
+                                        <svg class="h-3.5 w-3.5 shrink-0 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" /></svg>
+                                        <span>What should we reorder?</span>
+                                    </span>
+                                    <svg class="h-3.5 w-3.5 text-neutral-400 transition-colors group-hover:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
                                 </button>
                                 <button
                                     type="button"
                                     x-on:click="sendSuggested('Explain the demand forecast')"
-                                    class="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-xs font-medium text-neutral-700 transition hover:border-primary-300 hover:bg-primary-50/50 hover:text-primary-800"
+                                    class="group flex items-center justify-between rounded-xl border border-neutral-200/80 bg-white px-3.5 py-2.5 text-left text-xs font-medium text-neutral-700 shadow-2xs transition hover:border-primary-300 hover:bg-primary-50/50 hover:text-primary-800"
                                 >
-                                    <span>Explain the demand forecast</span>
-                                    <svg class="h-3.5 w-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+                                    <span class="flex items-center gap-2">
+                                        <svg class="h-3.5 w-3.5 shrink-0 text-info-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" /></svg>
+                                        <span>Explain the demand forecast</span>
+                                    </span>
+                                    <svg class="h-3.5 w-3.5 text-neutral-400 transition-colors group-hover:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
                                 </button>
                                 <button
                                     type="button"
                                     x-on:click="sendSuggested('Summarize inventory status')"
-                                    class="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-xs font-medium text-neutral-700 transition hover:border-primary-300 hover:bg-primary-50/50 hover:text-primary-800"
+                                    class="group flex items-center justify-between rounded-xl border border-neutral-200/80 bg-white px-3.5 py-2.5 text-left text-xs font-medium text-neutral-700 shadow-2xs transition hover:border-primary-300 hover:bg-primary-50/50 hover:text-primary-800"
                                 >
-                                    <span>Summarize inventory status</span>
-                                    <svg class="h-3.5 w-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+                                    <span class="flex items-center gap-2">
+                                        <svg class="h-3.5 w-3.5 shrink-0 text-success-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                                        <span>Summarize inventory status</span>
+                                    </span>
+                                    <svg class="h-3.5 w-3.5 text-neutral-400 transition-colors group-hover:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
                                 </button>
                             </div>
                         </div>
                     </div>
                 </template>
 
-                {{-- Conversation Messages --}}
+                {{-- Conversation Messages Loop --}}
                 <template x-for="(msg, index) in messages" x-bind:key="index">
                     <div
-                        class="flex gap-2.5"
+                        class="flex w-full"
                         x-bind:class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
                     >
-                        {{-- Assistant Avatar --}}
-                        <template x-if="msg.role !== 'user'">
-                            <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700">
-                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
-                                </svg>
+                        {{-- User Bubble --}}
+                        <template x-if="msg.role === 'user'">
+                            <div class="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary-600 px-3.5 py-2.5 text-white shadow-xs">
+                                {{-- Image Attachment Preview --}}
+                                <template x-if="msg.attachment && msg.attachment.type === 'image' && msg.attachment.previewUrl">
+                                    <div class="mb-2 overflow-hidden rounded-xl border border-primary-400/40 bg-black/10">
+                                        <img :src="msg.attachment.previewUrl" :alt="msg.attachment.name" class="max-h-40 w-full object-cover" />
+                                        <div class="flex items-center justify-between bg-primary-700/80 px-2 py-1 text-[10px] text-primary-100">
+                                            <span class="truncate font-medium text-white" x-text="msg.attachment.name"></span>
+                                            <span x-text="msg.attachment.size"></span>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                {{-- Non-image Attachment Preview --}}
+                                <template x-if="msg.attachment && (msg.attachment.type !== 'image' || !msg.attachment.previewUrl)">
+                                    <div class="mb-2 flex items-center gap-2 rounded-xl border border-primary-400/40 bg-primary-700/70 p-2 text-xs">
+                                        <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/20 font-mono text-[10px] font-bold uppercase text-white">
+                                            <span x-text="msg.attachment.extension"></span>
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="truncate font-medium text-white" x-text="msg.attachment.name"></p>
+                                            <p class="text-[10px] text-primary-200" x-text="msg.attachment.size"></p>
+                                        </div>
+                                        <span class="rounded bg-primary-800/90 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary-100">Attached</span>
+                                    </div>
+                                </template>
+
+                                <p class="whitespace-pre-wrap text-xs leading-relaxed text-white" x-text="msg.content"></p>
+                                <div class="mt-1 flex items-center justify-end text-[10px] text-primary-200">
+                                    <span x-text="msg.time"></span>
+                                </div>
                             </div>
                         </template>
 
-                        {{-- Bubble --}}
-                        <div
-                            class="max-w-[85%] rounded-2xl px-3.5 py-2.5 shadow-xs"
-                            x-bind:class="msg.role === 'user'
-                                ? 'rounded-br-none bg-primary-600 text-white'
-                                : (msg.isError ? 'rounded-tl-none border border-danger-200 bg-danger-50 text-danger-800' : 'rounded-tl-none border border-neutral-200 bg-neutral-50 text-neutral-800')"
-                        >
+                        {{-- Assistant Response Card --}}
+                        <template x-if="msg.role !== 'user'">
                             <div
-                                class="prose prose-xs max-w-none text-xs leading-relaxed"
-                                x-bind:class="msg.role === 'user' ? 'text-white' : 'text-neutral-800'"
-                                x-html="formatMarkdown(msg.content)"
-                            ></div>
-                            <div
-                                class="mt-1 flex items-center justify-end gap-1.5 text-[10px]"
-                                x-bind:class="msg.role === 'user' ? 'text-primary-100' : 'text-neutral-400'"
+                                class="w-full max-w-[94%] rounded-2xl rounded-tl-sm border p-3.5 shadow-xs transition-all"
+                                x-bind:class="msg.isError ? 'border-danger-200 bg-danger-50 text-danger-800' : 'border-neutral-200/90 bg-white text-neutral-800'"
                             >
-                                <span x-text="msg.time"></span>
-                                <template x-if="msg.source === 'ai'">
-                                    <span class="rounded bg-primary-100/50 px-1 py-0.2 text-[9px] font-medium text-primary-700">AI</span>
-                                </template>
+                                {{-- Card Header: Avatar, Brand, Time, Copy Button --}}
+                                <div class="mb-2.5 flex items-center justify-between border-b border-neutral-100 pb-2">
+                                    <div class="flex items-center gap-2">
+                                        <div class="flex h-5 w-5 items-center justify-center rounded-md bg-primary-100 text-primary-700">
+                                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a.75.75 0 0 1-1.154-.672c.07-.866.27-1.77.585-2.556C3.593 16.32 3 14.28 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                                            </svg>
+                                        </div>
+                                        <span class="text-xs font-bold tracking-tight text-neutral-900">HIMS AI</span>
+                                        <span class="text-[10px] text-neutral-400" x-text="msg.time"></span>
+                                    </div>
+
+                                    {{-- Functional Copy Message Button --}}
+                                    <button
+                                        type="button"
+                                        x-on:click="copyMessage(msg.content, index)"
+                                        class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800"
+                                        title="Copy response"
+                                    >
+                                        <template x-if="copiedIndex === index">
+                                            <span class="inline-flex items-center gap-1 font-semibold text-emerald-600">
+                                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                                                <span>Copied!</span>
+                                            </span>
+                                        </template>
+                                        <template x-if="copiedIndex !== index">
+                                            <span class="inline-flex items-center gap-1">
+                                                <svg class="h-3.5 w-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" /></svg>
+                                                <span>Copy</span>
+                                            </span>
+                                        </template>
+                                    </button>
+                                </div>
+
+                                {{-- Rendered Markdown Body --}}
+                                <div
+                                    class="text-xs leading-relaxed"
+                                    x-bind:class="msg.isError ? 'text-danger-800' : 'text-neutral-800'"
+                                    x-html="formatMarkdown(msg.content)"
+                                ></div>
                             </div>
-                        </div>
+                        </template>
                     </div>
                 </template>
 
-                {{-- Typing / Loading Indicator --}}
-                <div x-show="isLoading" class="flex items-center gap-2.5">
-                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700">
-                        <svg class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                        </svg>
-                    </div>
-                    <div class="rounded-2xl rounded-tl-none border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-xs text-neutral-600 shadow-xs">
-                        <div class="flex items-center gap-1.5">
-                            <span class="font-medium text-neutral-700">Analyzing HIMS inventory...</span>
-                            <span class="flex gap-1">
+                {{-- Dynamic Typing / Loading State --}}
+                <div x-show="isLoading" class="flex w-full max-w-[85%] gap-2.5">
+                    <div class="rounded-2xl rounded-tl-sm border border-neutral-200/80 bg-white p-3 shadow-xs">
+                        <div class="flex items-center gap-2">
+                            <div class="flex h-5 w-5 items-center justify-center rounded-md bg-primary-100 text-primary-700">
+                                <svg class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                </svg>
+                            </div>
+                            <span class="text-xs font-semibold text-neutral-700" x-text="loadingStatus"></span>
+                            <span class="ml-1 flex gap-1">
                                 <span class="h-1.5 w-1.5 rounded-full bg-primary-600 animate-bounce"></span>
                                 <span class="h-1.5 w-1.5 rounded-full bg-primary-600 animate-bounce" style="animation-delay: 150ms;"></span>
                                 <span class="h-1.5 w-1.5 rounded-full bg-primary-600 animate-bounce" style="animation-delay: 300ms;"></span>
@@ -1214,25 +1299,94 @@
                 </div>
             </div>
 
+            {{-- Error Message Alert --}}
+            <div
+                x-show="errorMessage"
+                x-transition
+                class="flex items-center justify-between border-t border-danger-200 bg-danger-50 px-3 py-1.5 text-xs text-danger-700"
+            >
+                <span class="truncate font-medium" x-text="errorMessage"></span>
+                <button type="button" x-on:click="errorMessage = ''" class="ml-2 font-bold text-danger-500 hover:text-danger-800" aria-label="Dismiss error">&times;</button>
+            </div>
+
+            {{-- Selected File Preview Strip --}}
+            <div
+                x-show="selectedFile"
+                x-transition
+                class="flex items-center justify-between border-t border-neutral-200/80 bg-neutral-100/70 px-3.5 py-2 text-xs"
+            >
+                <div class="flex min-w-0 items-center gap-2.5">
+                    <template x-if="selectedFile && selectedFile.previewUrl">
+                        <img :src="selectedFile.previewUrl" class="h-8 w-8 rounded-lg object-cover border border-neutral-200" />
+                    </template>
+                    <template x-if="!selectedFile || !selectedFile.previewUrl">
+                        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-100 font-mono text-[10px] font-bold uppercase text-primary-700">
+                            <span x-text="selectedFile ? selectedFile.extension : ''"></span>
+                        </div>
+                    </template>
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate font-semibold text-neutral-800" x-text="selectedFile ? selectedFile.name : ''"></p>
+                        <p class="text-[10px] text-neutral-500" x-text="selectedFile ? selectedFile.size : ''"></p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    x-on:click="removeFile(true)"
+                    class="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-700"
+                    title="Remove attachment"
+                    aria-label="Remove attachment"
+                >
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
             {{-- Input Area --}}
             <form
                 x-on:submit.prevent="sendMessage()"
                 data-no-loading
-                class="border-t border-neutral-200 bg-white p-2.5"
+                class="border-t border-neutral-200/80 bg-white p-2.5"
             >
+                {{-- Hidden file input --}}
+                <input
+                    type="file"
+                    x-ref="fileInput"
+                    x-on:change="handleFileSelect($event)"
+                    accept=".pdf,.csv,.xlsx,.docx,.txt,.jpg,.jpeg,.png"
+                    class="hidden"
+                    aria-label="Upload file attachment"
+                />
+
                 <div class="relative flex items-center">
+                    {{-- Attachment Paperclip Button --}}
+                    <button
+                        type="button"
+                        x-on:click="triggerFileInput()"
+                        x-bind:disabled="isLoading"
+                        class="absolute left-1.5 flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 disabled:opacity-50"
+                        title="Attach file (PDF, Excel, Word, CSV, Image - Max 35MB)"
+                        aria-label="Attach file"
+                    >
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
+                        </svg>
+                    </button>
+
                     <input
                         x-ref="chatInput"
                         x-model="input"
                         type="text"
-                        maxlength="1000"
-                        placeholder="Ask about inventory, stock, demand..."
+                        maxlength="2000"
+                        placeholder="Ask about inventory or attach a file..."
                         x-bind:disabled="isLoading"
-                        class="w-full rounded-xl border border-neutral-300 py-2.5 pl-3 pr-11 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 disabled:bg-neutral-50"
+                        class="w-full rounded-xl border border-neutral-300 py-2.5 pl-10 pr-11 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 disabled:bg-neutral-50"
                     />
+
+                    {{-- Send Button --}}
                     <button
                         type="submit"
-                        x-bind:disabled="isLoading || !input.trim()"
+                        x-bind:disabled="isLoading || (!input.trim() && !selectedFile)"
                         class="absolute right-1.5 flex h-8 w-8 items-center justify-center rounded-lg bg-primary-600 text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-400"
                         title="Send question"
                         aria-label="Send question"

@@ -103,6 +103,8 @@ enum AuditAction: string
     case SystemOperationFailed = 'system_operation_failed';
     case SystemOperationRecovered = 'system_operation_recovered';
     case SystemHealthMaintenance = 'system_health_maintenance';
+    case AnalyzedAiChatAttachment = 'analyzed_ai_chat_attachment';
+    case FailedAiChatAttachment = 'failed_ai_chat_attachment';
 
     public function label(): string
     {
@@ -206,6 +208,8 @@ enum AuditAction: string
             self::SystemOperationFailed => 'System Operation Failed',
             self::SystemOperationRecovered => 'System Operation Recovered',
             self::SystemHealthMaintenance => 'System Health Maintenance',
+            self::AnalyzedAiChatAttachment => 'Analyzed AI Chat Attachment',
+            self::FailedAiChatAttachment => 'Failed AI Chat Attachment',
         };
     }
 
@@ -222,6 +226,7 @@ enum AuditAction: string
                 self::UnlockedUser,
             ], true) => 'Authentication',
             in_array($this, [self::CreatedUser, self::UpdatedUser, self::DeletedUser], true) => 'User Administration',
+            str_contains($this->value, 'ai_chat') => 'AI Assistant',
             str_contains($this->value, 'supplier') && ! in_array($this, [self::SubmittedSupplierQuote], true) => 'Supplier Management',
             str_contains($this->value, 'purchase_request')
                 || str_contains($this->value, 'sourcing_rfq')

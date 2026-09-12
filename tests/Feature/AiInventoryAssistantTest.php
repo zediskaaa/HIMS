@@ -284,11 +284,93 @@ class AiInventoryAssistantTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertSee('HIMS AI Assistant')
+            ->assertSee('Inventory Intelligence Assistant')
             ->assertSee('Ask about inventory, demand, and stock levels.')
             ->assertSee('Which items are low in stock?')
             ->assertSee('What should we reorder?')
             ->assertSee('Explain the demand forecast')
             ->assertSee('Summarize inventory status')
-            ->assertSee('himsAiAssistant({ endpoint:', false);
+            ->assertSee('himsAiAssistant({', false)
+            ->assertSee('loadingStatus', false);
+    }
+
+    public function test_context_aware_intent_status_detection_matches_user_inquiry_categories(): void
+    {
+        $service = app(\App\Services\AiInventoryAssistantService::class);
+
+        // Exact examples from requirement
+        $this->assertSame('Checking low-stock items...', $service->determineIntentStatus('Which items are low in stock?'));
+        $this->assertSame('Reviewing reorder needs...', $service->determineIntentStatus('What should we reorder?'));
+        $this->assertSame('Reviewing Surgical Gloves...', $service->determineIntentStatus('Why is Surgical Gloves high risk?'));
+        $this->assertSame('Checking demand forecast...', $service->determineIntentStatus('What is the predicted demand for this item?'));
+        $this->assertSame('Reviewing recent stock movements...', $service->determineIntentStatus('Show me the stock movement this month.'));
+        $this->assertSame('Checking expiring inventory...', $service->determineIntentStatus('Which items are nearing expiry?'));
+        $this->assertSame('Preparing your inventory summary...', $service->determineIntentStatus('Summarize our inventory.'));
+        $this->assertSame('Reviewing the demand forecast...', $service->determineIntentStatus('Explain the demand forecast.'));
+        $this->assertSame("Reviewing this week's inventory activity...", $service->determineIntentStatus('What happened to our inventory this week?'));
+        $this->assertSame('Reviewing IV Solution...', $service->determineIntentStatus('Why is IV Solution at high risk?'));
+
+        // Additional category tests
+        $this->assertSame('Checking unavailable items...', $service->determineIntentStatus('What items are out of stock?'));
+        $this->assertSame('Checking inventory risk...', $service->determineIntentStatus('Is there any high risk item right now?'));
+        $this->assertSame('Reviewing inventory data...', $service->determineIntentStatus('How many items are in storage?'));
+        $this->assertSame('Looking into that...', $service->determineIntentStatus('Hello there!'));
+    }
+
+    public function test_api_response_includes_context_aware_status_hint(): void
+    {
+        config()->set('services.gemini.key', '');
+        $manager = User::factory()->inventoryManager()->create();
+
+        $response = $this->actingAs($manager)
+            ->postJson(route('dashboard.ai-assistant'), [
+                'message' => 'Which items are low in stock?',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('status_hint', 'Checking low-stock items...');
+
+        $this->assertNotEmpty($response->json('reply'));
+    }
+
+    public function test_fallback_and_system_prompt_exclude_emojis_and_badge_backticks(): void
+    {
+        $service = app(\App\Services\AiInventoryAssistantService::class);
+        $context = [
+            'mentioned_items' => [[
+                'name' => 'Surgical Gloves',
+                'sku' => 'GLV-SURG-75',
+                'current_stock' => 10,
+                'reorder_level' => 30,
+                'safety_stock' => 15,
+                'unit' => 'pairs',
+                'lead_time_days' => 7,
+                'recent_movements' => [],
+            ]],
+        ];
+
+        $reply = $service->generateGroundedFallback('Why is Surgical Gloves low stock?', $context);
+
+        // No emojis
+        $this->assertDoesNotMatchRegularExpression('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]/u', $reply);
+        // No backtick badges around SKU
+        $this->assertStringNotContainsString('`GLV-SURG-75`', $reply);
+        $this->assertStringContainsString('GLV-SURG-75', $reply);
+    }
+
+    public function test_sanitize_assistant_text_strips_emojis_and_id_backticks(): void
+    {
+        $service = app(\App\Services\AiInventoryAssistantService::class);
+        $rawText = "Ang item na `AMOX-500` 📦 ay may 5 units lamang ⚠️! Batch: `BATCH-2024-X` ✅.";
+
+        $sanitized = $service->sanitizeAssistantText($rawText);
+
+        $this->assertStringNotContainsString('📦', $sanitized);
+        $this->assertStringNotContainsString('⚠️', $sanitized);
+        $this->assertStringNotContainsString('✅', $sanitized);
+        $this->assertStringNotContainsString('`AMOX-500`', $sanitized);
+        $this->assertStringNotContainsString('`BATCH-2024-X`', $sanitized);
+        $this->assertStringContainsString('AMOX-500', $sanitized);
+        $this->assertStringContainsString('BATCH-2024-X', $sanitized);
     }
 }

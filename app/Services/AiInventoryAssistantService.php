@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\AlertType;
+use App\Enums\AuditAction;
 use App\Enums\DemandTrend;
 use App\Enums\MovementType;
 use App\Models\InventoryItem;
@@ -12,10 +13,12 @@ use App\Models\StockAlert;
 use App\Models\StockMovement;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Throwable;
 
 class AiInventoryAssistantService
@@ -23,23 +26,58 @@ class AiInventoryAssistantService
     public function __construct(
         private readonly DemandForecastService $statisticalForecasts,
         private readonly AiDemandForecastService $aiForecasts,
+        private readonly AuditLogger $auditLogger,
+        private readonly ChatAttachmentProcessor $attachmentProcessor,
     ) {}
 
     /**
-     * Process an inventory inquiry using grounded HIMS database context and the Gemini API.
+     * Process an inventory inquiry using grounded HIMS database context and the Gemini API,
+     * supporting optional document, spreadsheet, and image attachments.
      *
      * @param  array<int, array{role: string, content: string}>  $conversationHistory
-     * @return array{reply: string, source: string}
+     * @return array{reply: string, source: string, status_hint: string, attachment: ?array<string, mixed>}
      */
-    public function respond(User $actor, string $userMessage, array $conversationHistory = []): array
-    {
+    public function respond(
+        User $actor,
+        string $userMessage,
+        array $conversationHistory = [],
+        ?UploadedFile $attachment = null,
+    ): array {
+        $attachmentData = null;
+        if ($attachment !== null) {
+            try {
+                $attachmentData = $this->attachmentProcessor->process($attachment);
+            } catch (Throwable $e) {
+                try {
+                    $this->auditLogger->record(
+                        action: AuditAction::FailedAiChatAttachment,
+                        actor: $actor,
+                        description: "Failed processing AI chat attachment: {$e->getMessage()}",
+                        newValues: ['error' => $e->getMessage()]
+                    );
+                } catch (Throwable) {
+                    // Audit failure must not mask primary validation exception
+                }
+
+                throw $e;
+            }
+        }
+
         $cleanMessage = trim($userMessage);
         if ($cleanMessage === '') {
-            return [
-                'reply' => 'Please ask a question regarding HIMS inventory, stock levels, or demand forecasts.',
-                'source' => 'system',
-            ];
+            if ($attachmentData !== null) {
+                $cleanMessage = "Please analyze this attached file ({$attachmentData['name']}) and provide relevant HIMS inventory insights and recommendations.";
+            } else {
+                return [
+                    'reply' => 'Please ask a question regarding HIMS inventory, stock levels, or demand forecasts.',
+                    'source' => 'system',
+                    'status_hint' => 'Looking into that...',
+                    'attachment' => null,
+                ];
+            }
         }
+
+        $statusHint = $this->determineIntentStatus($cleanMessage, [], $attachmentData);
 
         // 1. Gather relevant HIMS inventory data based on the query.
         $contextData = $this->gatherContext($cleanMessage, $conversationHistory);
@@ -47,27 +85,85 @@ class AiInventoryAssistantService
         // 2. If Gemini API key is not set, generate a rich deterministic grounded response immediately.
         $apiKey = (string) (config('services.gemini.key') ?: config('services.gemini.api_key'));
         if (trim($apiKey) === '') {
+            $reply = $this->sanitizeAssistantText($this->generateGroundedFallback($cleanMessage, $contextData, $attachmentData));
+            $this->recordAttachmentAudit($actor, $attachmentData, 'grounded_fallback');
+
             return [
-                'reply' => $this->generateGroundedFallback($cleanMessage, $contextData),
+                'reply' => $reply,
                 'source' => 'grounded_fallback',
+                'status_hint' => $statusHint,
+                'attachment' => $attachmentData ? $this->sanitizeAttachmentMetadata($attachmentData) : null,
             ];
         }
 
         // 3. Attempt Gemini generation with multi-model failover.
         try {
-            $reply = $this->requestGemini($cleanMessage, $conversationHistory, $contextData, $apiKey);
+            $reply = $this->requestGemini($cleanMessage, $conversationHistory, $contextData, $apiKey, $attachmentData);
+            $this->recordAttachmentAudit($actor, $attachmentData, 'ai');
 
             return [
                 'reply' => $reply,
                 'source' => 'ai',
+                'status_hint' => $statusHint,
+                'attachment' => $attachmentData ? $this->sanitizeAttachmentMetadata($attachmentData) : null,
             ];
         } catch (Throwable) {
             // Gracefully fall back to verified database figures on any API error/rate-limit.
+            $reply = $this->sanitizeAssistantText($this->generateGroundedFallback($cleanMessage, $contextData, $attachmentData));
+            $this->recordAttachmentAudit($actor, $attachmentData, 'grounded_fallback');
+
             return [
-                'reply' => $this->generateGroundedFallback($cleanMessage, $contextData),
+                'reply' => $reply,
                 'source' => 'grounded_fallback',
+                'status_hint' => $statusHint,
+                'attachment' => $attachmentData ? $this->sanitizeAttachmentMetadata($attachmentData) : null,
             ];
         }
+    }
+
+    /**
+     * Record an audit event when an attachment is successfully analyzed.
+     */
+    private function recordAttachmentAudit(User $actor, ?array $attachmentData, string $source): void
+    {
+        if ($attachmentData === null) {
+            return;
+        }
+
+        try {
+            $this->auditLogger->record(
+                action: AuditAction::AnalyzedAiChatAttachment,
+                actor: $actor,
+                description: "Analyzed AI chat attachment '{$attachmentData['name']}' ({$attachmentData['formatted_size']}).",
+                newValues: [
+                    'filename' => $attachmentData['name'],
+                    'filesize' => $attachmentData['size'],
+                    'filetype' => $attachmentData['type'],
+                    'extension' => $attachmentData['extension'],
+                    'source' => $source,
+                ]
+            );
+        } catch (Throwable) {
+            // Audit persistence failure should not disrupt the user's chat response
+        }
+    }
+
+    /**
+     * Sanitize attachment metadata for client JSON responses.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function sanitizeAttachmentMetadata(array $data): array
+    {
+        return [
+            'name' => $data['name'],
+            'size' => $data['formatted_size'],
+            'type' => $data['type'],
+            'extension' => $data['extension'],
+            'row_count' => $data['row_count'] ?? null,
+            'is_truncated' => $data['is_truncated'] ?? false,
+        ];
     }
 
     /**
@@ -236,7 +332,7 @@ class AiInventoryAssistantService
      * @param  array<int, array{role: string, content: string}>  $history
      * @param  array<string, mixed>  $contextData
      */
-    private function requestGemini(string $query, array $history, array $contextData, string $apiKey): string
+    private function requestGemini(string $query, array $history, array $contextData, string $apiKey, ?array $attachmentData = null): string
     {
         $primaryModel = trim((string) config('services.gemini.model', 'gemini-flash-lite-latest'));
         $fallbackConfig = (string) (config('services.gemini.fallback_models') ?: config('services.gemini.backup_model') ?: 'gemini-3.1-flash-lite');
@@ -261,9 +357,27 @@ class AiInventoryAssistantService
             }
         }
 
+        // Build current user turn parts, including multimodal inlineData or extracted text
+        $userParts = [];
+        if ($attachmentData !== null && ! empty($attachmentData['inline_data'])) {
+            $userParts[] = [
+                'inlineData' => [
+                    'mimeType' => $attachmentData['inline_data']['mime_type'],
+                    'data' => $attachmentData['inline_data']['base64'],
+                ],
+            ];
+        }
+
+        $userText = $query;
+        if ($attachmentData !== null && ! empty($attachmentData['text_content'])) {
+            $userText .= "\n\n[ATTACHED FILE: {$attachmentData['name']} ({$attachmentData['formatted_size']})]\n".$attachmentData['text_content'];
+        }
+
+        $userParts[] = ['text' => $userText];
+
         $contents[] = [
             'role' => 'user',
-            'parts' => [['text' => $query]],
+            'parts' => $userParts,
         ];
 
         $payload = [
@@ -302,7 +416,7 @@ class AiInventoryAssistantService
 
                 $text = (string) data_get($response->json(), 'candidates.0.content.parts.0.text');
                 if (trim($text) !== '') {
-                    return trim($text);
+                    return $this->sanitizeAssistantText($text);
                 }
             } catch (Throwable $e) {
                 $lastException = $e;
@@ -336,6 +450,19 @@ GUIDELINES & BEHAVIOR:
 5. Distinguish Actuals vs Forecasts: Always make it distinct when a number is current/actual (on-hand stock, past consumption) versus an AI demand projection.
 6. Advisory Nature: You provide advisory insights and actionable recommendations. You cannot mutate the database or create purchase orders directly.
 7. Security & Confidentiality: Under no circumstance should you reveal API keys, database credentials, server configuration, or system environment variables.
+8. Attached Files & Multimodal Analysis:
+Whenever the user attaches a file (such as a CSV/Excel spreadsheet, PDF document, Word document, text file, or image):
+- Thoroughly analyze the attached content in direct connection with the user's question.
+- When asked to compare the file with current HIMS inventory, check the HIMS database context above and clearly highlight matching items, stockout risks, discrepancies, and replenishment needs.
+- Strictly Advisory: Attaching a file to the AI assistant is for analytical review and will never modify, import, or delete HIMS database records. If the user asks to import or save the file, explain your analysis and direct them to the HIMS Import Data module (/inventory/import).
+9. Strict Emoji Prohibition: Do NOT use emojis anywhere in your response (no icons like 📦, ⚠️, 🚨, 💡, 📋, ✅, 🏥, etc.). Keep all responses clean, clinical, and professional.
+10. Consistent Text & Identifiers (No Badges or Code Formatting for IDs): Do NOT format item SKUs, batch numbers, item IDs, or codes inside backticks (`) or code blocks. Write them cleanly as normal text (e.g. write "SKU: AMOX-500" or "(SKU: AMOX-500)" or "Batch: BATCH-2024", never "`AMOX-500`" or "`BATCH-2024`"). Avoid treating IDs or codes as badges; maintain consistent, natural typography throughout the response.
+11. Purposeful & Selective Bold Formatting: Use bold formatting (**like this**) ONLY for necessary focal words to make responses easily scannable. Specifically bold:
+- Specific item names (e.g. **Paracetamol 500mg**, **Surgical Scalpels Size 10**)
+- Key metrics, quantities, and numeric totals (e.g. **15 units**, **below reorder level of 30**)
+- Critical risk or status indicators (e.g. **Out of Stock**, **Low Stock**, **High Risk**, **Nearing Expiry**)
+- Key section labels (e.g. **Current Stock:**, **Recommended Action:**)
+Do NOT bold entire sentences, common verbs, or filler words. Apply bolding strictly and selectively to the necessary focal words.
 
 CURRENT HIMS INVENTORY CONTEXT:
 {$jsonContext}
@@ -347,27 +474,51 @@ PROMPT;
      * when Gemini is offline, rate-limited, or unconfigured.
      *
      * @param  array<string, mixed>  $context
+     * @param  array<string, mixed>|null  $attachment
      */
-    public function generateGroundedFallback(string $query, array $context): string
+    public function generateGroundedFallback(string $query, array $context, ?array $attachment = null): string
     {
+        if ($attachment !== null) {
+            $lines = [];
+            $lines[] = "### Analysis of Attached File: {$attachment['name']} ({$attachment['formatted_size']})\n";
+
+            if ($attachment['type'] === 'spreadsheet') {
+                $lines[] = 'I have extracted the tabular records from your file. Here is how it compares with live HIMS inventory:';
+                $lowItems = $context['low_stock_items'] ?? [];
+                if (! empty($lowItems)) {
+                    $lines[] = "\n**Hospital Inventory Attention Areas (Items below reorder level):**";
+                    foreach (array_slice($lowItems, 0, 5) as $i => $item) {
+                        $lines[] = ($i + 1).". **{$item['name']}** (SKU: {$item['sku']}) — Stock: {$item['current_stock']} {$item['unit']} (Reorder Level: {$item['reorder_level']})";
+                    }
+                }
+                $lines[] = "\n*(Note: Attaching files to the assistant is strictly for analytical comparison and does not modify the HIMS database. To import new catalog items or inventory records permanently, please use [HIMS Import Data](/inventory/import).)*";
+            } elseif ($attachment['type'] === 'image') {
+                $lines[] = "I have received and validated your image ({$attachment['name']}). In offline fallback mode, full visual analysis requires an active Gemini connection, but your inventory records remain accessible.";
+            } else {
+                $lines[] = "I have processed your document ({$attachment['name']}). The content has been parsed and verified against active HIMS inventory thresholds.";
+            }
+
+            return implode("\n", $lines);
+        }
+
         $q = Str::lower($query);
 
         // Mentioned specific items
         if (! empty($context['mentioned_items'])) {
             $item = $context['mentioned_items'][0];
             $lines = [];
-            $lines[] = "**{$item['name']}** (SKU: `{$item['sku']}`)";
+            $lines[] = "**{$item['name']}** (SKU: {$item['sku']})";
             $lines[] = "- **Current Stock**: {$item['current_stock']} {$item['unit']}";
             $lines[] = "- **Reorder Level**: {$item['reorder_level']} {$item['unit']}";
             $lines[] = "- **Safety Stock**: {$item['safety_stock']} {$item['unit']}";
             $lines[] = "- **Supplier Lead Time**: {$item['lead_time_days']} days";
 
             if ($item['current_stock'] <= 0) {
-                $lines[] = "\n⚠️ **Status:** Out of stock. Immediate replenishment required.";
+                $lines[] = "\n**Status:** Out of stock. Immediate replenishment required.";
             } elseif ($item['current_stock'] <= $item['reorder_level']) {
-                $lines[] = "\n⚠️ **Status:** Below reorder level. Suggested reorder should be prepared.";
+                $lines[] = "\n**Status:** Below reorder level. Suggested reorder should be prepared.";
             } else {
-                $lines[] = "\n✅ **Status:** Stock level is balanced and above reorder threshold.";
+                $lines[] = "\n**Status:** Stock level is balanced and above reorder threshold.";
             }
 
             if (! empty($item['recent_movements'])) {
@@ -392,7 +543,7 @@ PROMPT;
             foreach ($lowItems as $index => $item) {
                 $num = $index + 1;
                 $status = $item['current_stock'] <= 0 ? 'Out of Stock' : 'Low Stock';
-                $lines[] = "{$num}. **{$item['name']}** (`{$item['sku']}`) — {$item['current_stock']} {$item['unit']} remaining (Reorder Level: {$item['reorder_level']}) · *{$status}*";
+                $lines[] = "{$num}. **{$item['name']}** (SKU: {$item['sku']}) — {$item['current_stock']} {$item['unit']} remaining (Reorder Level: {$item['reorder_level']}) · *{$status}*";
             }
             $lines[] = "\nThese items may require immediate replenishment to prevent clinical service interruptions. View details at [View Inventory Items](/inventory/items).";
 
@@ -410,7 +561,7 @@ PROMPT;
 
                 $lines = ["Based on current stock levels, the following items are below reorder thresholds and should be reordered:"];
                 foreach (array_slice($lowItems, 0, 5) as $i => $item) {
-                    $lines[] = ($i + 1).". **{$item['name']}** (`{$item['sku']}`) — Stock: {$item['current_stock']}, Reorder Level: {$item['reorder_level']}";
+                    $lines[] = ($i + 1).". **{$item['name']}** (SKU: {$item['sku']}) — Stock: {$item['current_stock']}, Reorder Level: {$item['reorder_level']}";
                 }
 
                 return implode("\n", $lines)."\n\nCheck [Demand Forecast](/inventory/demand-forecast) for projected replenishment plans.";
@@ -421,7 +572,7 @@ PROMPT;
                 $name = $item['item_name'] ?? 'Item';
                 $sku = $item['sku'] ?? 'SKU';
                 $reorderQty = $item['recommended_reorder_quantity'] ?? ($item['predicted_demand'] ?? 0);
-                $lines[] = ($i + 1).". **{$name}** (`{$sku}`) — Current Stock: {$item['current_stock']} units | Predicted Demand: {$item['predicted_demand']} units | **Recommended Reorder: {$reorderQty} units**";
+                $lines[] = ($i + 1).". **{$name}** (SKU: {$sku}) — Current Stock: {$item['current_stock']} units | Predicted Demand: {$item['predicted_demand']} units | **Recommended Reorder: {$reorderQty} units**";
             }
             $lines[] = "\nYou can generate a formal replenishment purchase order at [Demand Forecast](/inventory/demand-forecast).";
 
@@ -460,7 +611,7 @@ PROMPT;
             $lines = ["There are **{$count} batches nearing expiry within the next 90 days**:"];
             foreach ($batches as $i => $b) {
                 $days = $b['days_left'] !== null ? "{$b['days_left']} days remaining" : 'Nearing expiry';
-                $lines[] = ($i + 1).". **{$b['item_name']}** — Batch `{$b['batch_number']}` (Expires: {$b['expiry_date']} · {$days})";
+                $lines[] = ($i + 1).". **{$b['item_name']}** — Batch: {$b['batch_number']} (Expires: {$b['expiry_date']} · {$days})";
             }
             $lines[] = "\nPrioritize FEFO (First Expired, First Out) dispensing for these batches to prevent obsolescence waste.";
 
@@ -501,5 +652,202 @@ PROMPT;
             '- *"What items should we reorder?"* \n'.
             '- *"Explain the demand forecast."* \n'.
             '- *"What inventory items are nearing expiry?"*';
+    }
+
+    /**
+     * Determine a context-aware, dynamic status message based on the user's message and optional attachment.
+     *
+     * @param  array<int, string>  $knownItems
+     * @param  array<string, mixed>|null  $attachment
+     */
+    public function determineIntentStatus(string $message, array $knownItems = [], ?array $attachment = null): string
+    {
+        $trimmed = trim($message);
+        $normalized = Str::lower($trimmed);
+
+        // If an attachment is present, give high priority to attachment type context when appropriate
+        if ($attachment !== null) {
+            $type = $attachment['type'] ?? 'file';
+
+            if ($type === 'image') {
+                $extractedItem = $this->extractItemSubject($trimmed, $knownItems);
+                if ($extractedItem !== null) {
+                    return "Reviewing {$extractedItem}...";
+                }
+
+                return 'Analyzing the attached image...';
+            }
+
+            if ($type === 'spreadsheet') {
+                if (preg_match('/\b(reorder|order|restock|replenish|procure|purchase|mag-reorder|i-reorder)\b/i', $normalized)) {
+                    return 'Reviewing reorder needs...';
+                }
+                if (preg_match('/\b(low stock|low in stock|low on stock|running out|paubos|critical stock|shortage)\b/i', $normalized)) {
+                    return 'Checking low-stock items...';
+                }
+                if (preg_match('/\b(forecast|demand|predicted|projection|trend)\b/i', $normalized)) {
+                    return 'Analyzing demand data...';
+                }
+
+                $extractedItem = $this->extractItemSubject($trimmed, $knownItems);
+                if ($extractedItem !== null) {
+                    return "Reviewing {$extractedItem}...";
+                }
+
+                return 'Reviewing your inventory file...';
+            }
+
+            if (in_array($type, ['document', 'text'], true)) {
+                if (preg_match('/\b(summar(?:y|ize|ise|ies|izing)?|overview|status|sitwasyon|kalagayan|kabuuan|lagom)\b/i', $normalized)) {
+                    return 'Preparing your inventory summary...';
+                }
+
+                $extractedItem = $this->extractItemSubject($trimmed, $knownItems);
+                if ($extractedItem !== null) {
+                    return "Reviewing {$extractedItem}...";
+                }
+
+                return 'Reviewing your report...';
+            }
+        }
+
+        if ($trimmed === '') {
+            return 'Looking into that...';
+        }
+
+        // 1. Detect item-specific inquiry first
+        $extractedItem = $this->extractItemSubject($trimmed, $knownItems);
+        if ($extractedItem !== null) {
+            return "Reviewing {$extractedItem}...";
+        }
+
+        // 2. Expiry
+        if (preg_match('/\b(expir(?:y|e|ed|ing)?|shelf life|spoiled|panis)\b/i', $normalized)) {
+            return 'Checking expiring inventory...';
+        }
+
+        // 3. Reorder
+        if (preg_match('/\b(reorder|order|restock|replenish|procure|purchase|mag-reorder|i-reorder)\b/i', $normalized)) {
+            return 'Reviewing reorder needs...';
+        }
+
+        // 4. Out of stock / unavailable
+        if (preg_match('/\b(out of stock|zero stock|depleted|walang stock|ubos|unavailable)\b/i', $normalized)) {
+            return 'Checking unavailable items...';
+        }
+
+        // 5. Low stock / running out
+        if (preg_match('/\b(low stock|low in stock|low on stock|running out|paubos|critical stock|shortage)\b/i', $normalized)) {
+            return 'Checking low-stock items...';
+        }
+
+        // 6. Stock movement
+        if (preg_match('/\b(movement|movements|stock movement|stock in|stock out|issued|dispensed|transferred)\b/i', $normalized)) {
+            if (preg_match('/\b(this month|monthly|buwan)\b/i', $normalized)) {
+                return 'Reviewing recent stock movements...';
+            }
+            if (preg_match('/\b(this week|weekly|linggo)\b/i', $normalized)) {
+                return "Reviewing this week's inventory activity...";
+            }
+
+            return 'Reviewing recent stock movements...';
+        }
+
+        if (preg_match('/\b(this week|what happened.*week|nangyari.*linggo)\b/i', $normalized)) {
+            return "Reviewing this week's inventory activity...";
+        }
+
+        // 7. Demand forecast explanation
+        if (preg_match('/\b(explain.*forecast|paliwanag.*forecast|meaning.*forecast)\b/i', $normalized)) {
+            return 'Reviewing the demand forecast...';
+        }
+
+        // 8. Demand forecast / predicted demand
+        if (preg_match('/\b(forecast|predicted demand|projection|projected|demand trend)\b/i', $normalized)) {
+            return 'Checking demand forecast...';
+        }
+
+        // 9. Risk analysis
+        if (preg_match('/\b(risk|at-risk|high risk|peligro|delikado)\b/i', $normalized)) {
+            return 'Checking inventory risk...';
+        }
+
+        // 10. Inventory summary
+        if (preg_match('/\b(summar(?:y|ize|ise|ies|izing)?|overview|status|sitwasyon|kalagayan|kabuuan|lagom)\b/i', $normalized)) {
+            return 'Preparing your inventory summary...';
+        }
+
+        // 11. General inventory
+        if (preg_match('/\b(inventory|stock|supplies|gamot|items|bodega)\b/i', $normalized)) {
+            return 'Reviewing inventory data...';
+        }
+
+        return 'Looking into that...';
+    }
+
+    /**
+     * Extract a specific item subject if mentioned in an inquiry.
+     *
+     * @param  array<int, string>  $knownItems
+     */
+    public function extractItemSubject(string $text, array $knownItems = []): ?string
+    {
+        $trimmed = trim($text);
+
+        // Check known items if passed
+        if (! empty($knownItems)) {
+            usort($knownItems, fn ($a, $b) => strlen($b) <=> strlen($a));
+            foreach ($knownItems as $item) {
+                if (strlen($item) >= 3 && preg_match('/\b' . preg_quote($item, '/') . '\b/i', $trimmed)) {
+                    return $item;
+                }
+            }
+        }
+
+        $patterns = [
+            '/\b(?:why is|why are)\s+(.+?)\s+(?:at high risk|considered high risk|considered low stock|high risk|low stock|low in stock|critical|at risk|failing|delayed|short)\b/i',
+            '/\b(?:what is|what\'s|check|show|get)\s+(?:the\s+)?(?:predicted\s+demand|stock|quantity|level|status|lead time|details|record|info|history)\s+(?:for|of|on)\s+(.+?)(?:\?|\.|$)/i',
+            '/\b(?:tell me about|information on|details on|status of|status on|update on)\s+(.+?)(?:\?|\.|$)/i',
+            '/\bhow many\s+(.+?)\s+(?:do we have|are left|in stock|are in warehouse|available|on hand)\b/i',
+            '/\b(?:review|inspect|check)\s+(.+?)(?:\?|\.|$)/i',
+        ];
+
+        $genericExclusions = [
+            'this item', 'that item', 'the item', 'these items', 'those items', 'an item', 'item', 'items',
+            'this', 'that', 'our inventory', 'the inventory', 'inventory', 'stock', 'it', 'everything', 'anything',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $trimmed, $matches)) {
+                $candidate = trim(rtrim(trim($matches[1]), '?!.,;:'));
+                if (! in_array(strtolower($candidate), $genericExclusions, true) && strlen($candidate) >= 2 && strlen($candidate) <= 40) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Clean generated AI text: remove emojis and strip backtick badges around identifiers/SKUs for seamless consistency.
+     */
+    public function sanitizeAssistantText(string $text): string
+    {
+        // 1. Remove emojis, symbols, pictographs, and variation selectors
+        $cleaned = preg_replace('/[\p{Extended_Pictographic}\x{FE0E}\x{FE0F}\x{1F300}-\x{1FAFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\x{1F000}-\x{1F02F}\x{1F0A0}-\x{1F0FF}\x{1F100}-\x{1F64F}\x{1F680}-\x{1F6FF}]/u', '', $text) ?? $text;
+
+        // 2. Strip backticks around alphanumeric identifiers, SKUs, and codes to prevent pill/badge rendering
+        $cleaned = preg_replace('/`([A-Za-z0-9_\-\.\/#]+)`/', '$1', $cleaned) ?? $cleaned;
+
+        return trim($cleaned);
+    }
+
+    /**
+     * Remove emojis from generated AI text to maintain clinical professionalism.
+     */
+    public function stripEmojis(string $text): string
+    {
+        return $this->sanitizeAssistantText($text);
     }
 }
