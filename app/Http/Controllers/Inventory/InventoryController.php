@@ -6,11 +6,14 @@ use App\Enums\AlertStatus;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\ItemBatch;
+use App\Models\ItemCategory;
 use App\Models\PurchaseOrder;
 use App\Models\StockAlert;
 use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
+use App\Services\AiDemandForecastService;
+use App\Services\DemandForecastService;
 use App\Services\InventoryReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,7 +23,10 @@ use Illuminate\View\View;
 
 class InventoryController extends Controller implements HasMiddleware
 {
-    public function __construct(private readonly InventoryReportService $reports) {}
+    public function __construct(
+        private readonly InventoryReportService $reports,
+        private readonly AiDemandForecastService $aiForecasts,
+    ) {}
 
     /**
      * The read-only screens, each gated on what it actually shows.
@@ -49,6 +55,16 @@ class InventoryController extends Controller implements HasMiddleware
 
         $canViewSuppliers = $request->user()->can(Permission::ViewSuppliers->value);
         $canViewProcurementFinancials = $request->user()->can(Permission::ViewProcurementSensitiveData->value);
+        $canViewForecasts = $request->user()->can(Permission::ViewReports->value);
+        $aiForecast = $canViewForecasts
+            ? $this->aiForecasts->cached(
+                DemandForecastService::DEFAULT_ANALYSIS_DAYS,
+                DemandForecastService::DEFAULT_FORECAST_DAYS,
+            )
+            : null;
+        $forecastCategories = $canViewForecasts
+            ? ItemCategory::query()->active()->orderBy('name')->get(['id', 'name'])
+            : collect();
 
         $totalSuppliers = $canViewSuppliers ? Supplier::count() : null;
         $activeSuppliers = $canViewSuppliers ? Supplier::where('status', 'active')->count() : null;
@@ -89,7 +105,9 @@ class InventoryController extends Controller implements HasMiddleware
             'recentMovements',
             'pendingPurchaseOrders',
             'pendingPoCount',
-            'expiringBatches'
+            'expiringBatches',
+            'aiForecast',
+            'forecastCategories'
         )));
     }
 

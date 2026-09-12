@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\DemandForecastService;
 use App\Support\AuthenticationContext;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\DemandForecastDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -86,7 +87,7 @@ class DemoSeedTest extends TestCase
     {
         $items = InventoryItem::all();
 
-        $this->assertCount(3, $items);
+        $this->assertCount(15, $items);
 
         foreach ($items as $item) {
             $consumption = StockMovement::where('item_id', $item->id)
@@ -128,7 +129,7 @@ class DemoSeedTest extends TestCase
     {
         $forecasts = app(DemandForecastService::class)->forecastAll();
 
-        $this->assertCount(3, $forecasts);
+        $this->assertCount(15, $forecasts);
 
         foreach ($forecasts as $row) {
             $this->assertGreaterThan(0, $row['historical_usage'], $row['item']->name.' forecast has no usage.');
@@ -150,6 +151,32 @@ class DemoSeedTest extends TestCase
 
         $this->assertGreaterThan(1, $trends->count(), 'Every demo item reports the same trend.');
         $this->assertFalse($trends->contains(DemandTrend::Insufficient), 'A demo item has too little history to trend.');
+    }
+
+    public function test_it_seeds_a_rich_idempotent_forecasting_dataset(): void
+    {
+        $items = InventoryItem::query()->where('sku', 'like', 'FCAST-%')->get();
+        $itemIds = $items->pluck('id');
+
+        $this->assertCount(12, $items);
+        $this->assertSame(
+            288,
+            StockMovement::query()
+                ->whereIn('item_id', $itemIds)
+                ->whereIn('movement_type', MovementType::consumptionValues())
+                ->count(),
+        );
+
+        $forecasts = app(DemandForecastService::class)->forecastAll()
+            ->whereIn('item_id', $itemIds);
+
+        $this->assertCount(12, $forecasts);
+        $this->assertGreaterThanOrEqual(3, $forecasts->pluck('trend')->unique()->count());
+        $this->assertGreaterThanOrEqual(8, $forecasts->where('needs_reorder', true)->count());
+
+        $counts = [InventoryItem::count(), StockMovement::count(), ItemStockLevel::count()];
+        $this->seed(DemandForecastDemoSeeder::class);
+        $this->assertSame($counts, [InventoryItem::count(), StockMovement::count(), ItemStockLevel::count()]);
     }
 
     public function test_the_seeded_transfer_and_adjustment_are_excluded_from_demand(): void

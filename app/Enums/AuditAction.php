@@ -26,6 +26,9 @@ enum AuditAction: string
     case UpdatedInventoryItem = 'updated_inventory_item';
     case DeletedInventoryItem = 'deleted_inventory_item';
     case RecordedStockMovement = 'recorded_stock_movement';
+    case GeneratedDemandForecast = 'generated_demand_forecast';
+    case RefreshedDemandForecast = 'refreshed_demand_forecast';
+    case FailedDemandForecast = 'failed_demand_forecast';
     case UploadedSupplierDocument = 'uploaded_supplier_document';
     case DownloadedSupplierDocument = 'downloaded_supplier_document';
     case VerifiedSupplierDocument = 'verified_supplier_document';
@@ -126,6 +129,9 @@ enum AuditAction: string
             self::UpdatedInventoryItem => 'Updated Inventory Item',
             self::DeletedInventoryItem => 'Deleted Inventory Item',
             self::RecordedStockMovement => 'Recorded Stock Movement',
+            self::GeneratedDemandForecast => 'Generated Demand Forecast',
+            self::RefreshedDemandForecast => 'Refreshed Demand Forecast',
+            self::FailedDemandForecast => 'Failed Demand Forecast',
             self::UploadedSupplierDocument => 'Uploaded Supplier Document',
             self::DownloadedSupplierDocument => 'Downloaded Supplier Document',
             self::VerifiedSupplierDocument => 'Verified Supplier Document',
@@ -224,6 +230,7 @@ enum AuditAction: string
             str_contains($this->value, 'material_requisition') || $this === self::AcknowledgedMaterialIssuance => 'Store Requisitions',
             str_contains($this->value, 'inventory_item') => 'Item Master',
             $this === self::RecordedStockMovement => 'Inventory Movements',
+            str_contains($this->value, 'demand_forecast') => 'Demand Forecasting',
             str_contains($this->value, 'cycle_count') => 'Cycle Counts',
             str_contains($this->value, 'inventory_adjustment') => 'Inventory Adjustments',
             str_contains($this->value, 'stock_transfer') => 'Stock Transfers',

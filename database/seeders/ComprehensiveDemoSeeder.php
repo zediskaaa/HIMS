@@ -17,6 +17,7 @@ class ComprehensiveDemoSeeder extends Seeder
             SuperAdminSeeder::class,
             DemoUserSeeder::class,
             InventoryDemoSeeder::class,
+            DemandForecastDemoSeeder::class,
             SupplierManagementDemoSeeder::class,
             ProcurementDemoSeeder::class,
             SmartWarehousingDemoSeeder::class,

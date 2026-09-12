@@ -7,12 +7,18 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDemandForecastPlanRequest;
 use App\Models\DemandPlan;
 use App\Models\InventoryItem;
+use App\Models\ItemCategory;
+use App\Services\AiDemandForecastService;
 use App\Services\DemandForecastService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
+use RuntimeException;
+use Throwable;
 
 /**
  * Replaces the hand-typed demand plan form that used to sit on the
@@ -21,7 +27,10 @@ use Illuminate\View\View;
  */
 class DemandForecastController extends Controller implements HasMiddleware
 {
-    public function __construct(private readonly DemandForecastService $forecasts) {}
+    public function __construct(
+        private readonly DemandForecastService $forecasts,
+        private readonly AiDemandForecastService $aiForecasts,
+    ) {}
 
     /**
      * @return array<int, Middleware|string>
@@ -33,7 +42,7 @@ class DemandForecastController extends Controller implements HasMiddleware
             // Reading the forecast is a reporting activity; saving a plan
             // commits a reorder decision and needs the planning permission.
             new Middleware('can:'.Permission::ViewReports->value, only: ['index']),
-            new Middleware('can:'.Permission::GenerateForecasts->value, only: ['store']),
+            new Middleware('can:'.Permission::GenerateForecasts->value, only: ['store', 'refresh']),
         ];
     }
 
@@ -48,11 +57,41 @@ class DemandForecastController extends Controller implements HasMiddleware
         $forecastDays = max(7, min(180, $forecastDays));
 
         $forecasts = $this->forecasts->forecastAll($analysisDays, $forecastDays);
+        $aiForecast = $this->aiForecasts->cached($analysisDays, $forecastDays);
+        $aiItems = collect($aiForecast['items'] ?? []);
+
+        $risk = in_array($request->query('risk'), ['high', 'medium', 'low'], true)
+            ? (string) $request->query('risk')
+            : null;
+        $categoryId = filter_var($request->query('category_id'), FILTER_VALIDATE_INT, FILTER_NULL_ON_FAILURE);
+        $search = Str::limit(trim((string) $request->query('search')), 100, '');
+        $attentionOnly = $request->boolean('attention_only');
+
+        if ($risk !== null) {
+            $aiItems = $aiItems->where('risk_level', $risk);
+        }
+        if ($categoryId !== null) {
+            $aiItems = $aiItems->where('category_id', $categoryId);
+        }
+        if ($attentionOnly) {
+            $aiItems = $aiItems->whereIn('risk_level', ['high', 'medium']);
+        }
+        if ($search !== '') {
+            $needle = Str::lower($search);
+            $aiItems = $aiItems->filter(fn (array $item) => Str::contains(
+                Str::lower(($item['item_name'] ?? '').' '.($item['sku'] ?? '')),
+                $needle,
+            ));
+        }
 
         return view('inventory.demand_forecast.index', [
             'forecasts' => $forecasts,
             'analysisDays' => $analysisDays,
             'forecastDays' => $forecastDays,
+            'aiForecast' => $aiForecast,
+            'aiItems' => $aiItems->values(),
+            'categories' => ItemCategory::query()->active()->orderBy('name')->get(['id', 'name']),
+            'aiFilters' => compact('risk', 'categoryId', 'search', 'attentionOnly'),
             'plans' => DemandPlan::with(['item', 'generatedBy'])
                 ->latest('generated_at')
                 ->latest('id')
@@ -65,6 +104,77 @@ class DemandForecastController extends Controller implements HasMiddleware
                 'suggested_units' => (int) $forecasts->sum('suggested_order_quantity'),
             ],
         ]);
+    }
+
+    public function refresh(Request $request): RedirectResponse|JsonResponse
+    {
+        $validated = $request->validate([
+            'analysis_days' => ['nullable', 'integer', 'min:7', 'max:365'],
+            'forecast_days' => ['nullable', 'integer', 'min:7', 'max:180'],
+            'return_to' => ['nullable', 'in:dashboard,forecast'],
+        ]);
+
+        $analysisDays = (int) ($validated['analysis_days'] ?? DemandForecastService::DEFAULT_ANALYSIS_DAYS);
+        $forecastDays = (int) ($validated['forecast_days'] ?? DemandForecastService::DEFAULT_FORECAST_DAYS);
+        $route = ($validated['return_to'] ?? 'forecast') === 'dashboard'
+            ? 'dashboard'
+            : 'inventory.demand-forecast';
+
+        try {
+            $forecast = $this->aiForecasts->generate($request->user(), $analysisDays, $forecastDays);
+        } catch (RuntimeException $exception) {
+            if ($exception->getMessage() === 'No active inventory items are available to forecast.') {
+                if ($request->expectsJson()) {
+                    return response()->json(['message' => $exception->getMessage()], 422);
+                }
+
+                return redirect()->route($route)->with('error', $exception->getMessage());
+            }
+
+            report($exception);
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'The forecast could not be generated. No inventory records were changed.',
+                ], 500);
+            }
+
+            return redirect()->route($route)->with(
+                'error',
+                'The forecast could not be generated. No inventory records were changed.'
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'The forecast could not be generated. No inventory records were changed.',
+                ], 500);
+            }
+
+            return redirect()->route($route)->with(
+                'error',
+                'The forecast could not be generated. No inventory records were changed.'
+            );
+        }
+
+        $message = $forecast['source'] === 'ai'
+            ? 'AI demand forecast generated from the latest inventory history.'
+            : 'Gemini was unavailable. A clearly labeled statistical forecast is shown instead.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $message,
+                'forecast' => $forecast,
+            ]);
+        }
+
+        return redirect()
+            ->route($route, $route === 'inventory.demand-forecast' ? [
+                'analysis_days' => $analysisDays,
+                'forecast_days' => $forecastDays,
+            ] : [])
+            ->with($forecast['source'] === 'ai' ? 'success' : 'info', $message);
     }
 
     /**

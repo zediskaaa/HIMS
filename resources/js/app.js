@@ -955,6 +955,16 @@ const startLoadingIndicators = () => {
         document.body.removeAttribute('aria-busy');
     };
 
+    document.addEventListener('hims-loading-start', (event) => {
+        activeApiRequests += 1;
+        showOverlay(event.detail?.message || 'Loading data...');
+    });
+
+    document.addEventListener('hims-loading-stop', () => {
+        activeApiRequests = Math.max(0, activeApiRequests - 1);
+        hideOverlay();
+    });
+
     // Never inherit a visible or busy state from cached/restored page markup.
     reset();
 
@@ -1103,6 +1113,302 @@ const startLoadingIndicators = () => {
 };
 
 startLoadingIndicators();
+
+Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
+    forecast: initialForecast,
+    endpoint,
+    forecastDays: String(initialForecast?.forecast_days ?? 30),
+    category: '',
+    risk: '',
+    search: '',
+    loading: false,
+    error: '',
+    success: '',
+
+    allItems() {
+        return Array.isArray(this.forecast?.items) ? this.forecast.items : [];
+    },
+
+    filteredItems() {
+        const needle = this.search.trim().toLocaleLowerCase();
+
+        return this.allItems().filter((item) => {
+            const matchesCategory = this.category === ''
+                || String(item.category_id ?? '') === String(this.category);
+            const matchesRisk = this.risk === '' || item.risk_level === this.risk;
+            const searchable = `${item.item_name ?? ''} ${item.sku ?? ''} ${item.category ?? ''}`
+                .toLocaleLowerCase();
+
+            return matchesCategory && matchesRisk && (needle === '' || searchable.includes(needle));
+        });
+    },
+
+    topItems() {
+        return this.filteredItems().slice(0, 5);
+    },
+
+    highRiskCount() {
+        return this.filteredItems().filter((item) => item.risk_level === 'high').length;
+    },
+
+    lowStockRiskCount() {
+        return this.filteredItems().filter((item) => (
+            item.projected_stock_status === 'low_stock'
+            || item.projected_stock_status === 'out_of_stock'
+        )).length;
+    },
+
+    predictedDemand() {
+        return this.filteredItems().reduce(
+            (total, item) => total + Number(item.predicted_demand || 0),
+            0,
+        );
+    },
+
+    recommendedReorder() {
+        return this.filteredItems().reduce(
+            (total, item) => total + Number(item.recommended_reorder_quantity || 0),
+            0,
+        );
+    },
+
+    confidenceLabel() {
+        const items = this.filteredItems();
+        if (items.length === 0) return 'No data';
+
+        const threshold = Math.ceil(items.length / 2);
+        const high = items.filter((item) => item.confidence === 'high').length;
+        const low = items.filter((item) => item.confidence === 'low').length;
+
+        if (high >= threshold) return 'High';
+        if (low >= threshold) return 'Low';
+
+        return 'Medium';
+    },
+
+    aggregateSeries(field) {
+        const totals = new Map();
+
+        this.filteredItems().forEach((item) => {
+            const series = Array.isArray(item[field]) ? item[field] : [];
+            series.forEach((point) => {
+                const date = String(point.period_start || '');
+                if (date === '') return;
+
+                totals.set(date, (totals.get(date) || 0) + Number(point.quantity || 0));
+            });
+        });
+
+        return Array.from(totals, ([date, quantity]) => ({ date, quantity }))
+            .sort((left, right) => left.date.localeCompare(right.date));
+    },
+
+    historicalSeries() {
+        return this.aggregateSeries('historical_series');
+    },
+
+    forecastSeries() {
+        return this.aggregateSeries('forecast_series');
+    },
+
+    hasChartData() {
+        return this.historicalSeries().length > 0 && this.forecastSeries().length > 0;
+    },
+
+    chartMaximum() {
+        return Math.max(
+            ...this.historicalSeries().map((point) => point.quantity),
+            ...this.forecastSeries().map((point) => point.quantity),
+            1,
+        );
+    },
+
+    chartY(value) {
+        return Math.round((208 - ((Number(value) / this.chartMaximum()) * 168)) * 10) / 10;
+    },
+
+    seriesPoints(series, startX, endX) {
+        if (series.length === 0) return [];
+
+        const step = series.length === 1 ? 0 : (endX - startX) / (series.length - 1);
+
+        return series.map((point, index) => ({
+            x: Math.round((startX + (step * index)) * 10) / 10,
+            y: this.chartY(point.quantity),
+            date: point.date,
+            quantity: point.quantity,
+        }));
+    },
+
+    historicalPoints() {
+        return this.seriesPoints(this.historicalSeries(), 42, 370);
+    },
+
+    forecastPoints() {
+        return this.seriesPoints(this.forecastSeries(), 400, 728);
+    },
+
+    seriesPath(points) {
+        return points.map((point, index) => (
+            `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`
+        )).join(' ');
+    },
+
+    areaPath(points) {
+        if (points.length === 0) return '';
+
+        return `M ${points[0].x} 208 L ${points[0].x} ${points[0].y} ${points
+            .slice(1)
+            .map((point) => `L ${point.x} ${point.y}`)
+            .join(' ')} L ${points[points.length - 1].x} 208 Z`;
+    },
+
+    chartStartLabel(series) {
+        return series.length > 0 ? this.formatShortDate(series[0].date) : '';
+    },
+
+    chartEndLabel(series) {
+        return series.length > 0 ? this.formatShortDate(series[series.length - 1].date) : '';
+    },
+
+    historicalDailyRate() {
+        return this.historicalSeries().reduce((total, point) => total + point.quantity, 0)
+            / Math.max(1, Number(this.forecast?.analysis_days || 1));
+    },
+
+    predictedDailyRate() {
+        return this.forecastSeries().reduce((total, point) => total + point.quantity, 0)
+            / Math.max(1, Number(this.forecast?.forecast_days || 1));
+    },
+
+    trendLabel() {
+        const historical = this.historicalDailyRate();
+        const predicted = this.predictedDailyRate();
+
+        if (historical === 0) return predicted > 0 ? 'New recorded demand signal' : 'No demand change';
+
+        const percent = Math.round(Math.abs(((predicted - historical) / historical) * 100));
+        if (predicted > historical) return `${percent}% higher predicted daily demand`;
+        if (predicted < historical) return `${percent}% lower predicted daily demand`;
+
+        return 'Predicted daily demand is stable';
+    },
+
+    insight() {
+        const count = this.filteredItems().length;
+        if (count === 0) return 'No forecast items match the current filters.';
+
+        const highRisk = this.highRiskCount();
+        const lowStock = this.lowStockRiskCount();
+        const reorder = this.recommendedReorder();
+
+        if (highRisk > 0) {
+            return `${highRisk} ${highRisk === 1 ? 'item is' : 'items are'} at high demand risk; ${lowStock} ${lowStock === 1 ? 'item is' : 'items are'} projected to have low or no stock.`;
+        }
+
+        if (lowStock > 0) {
+            return `${lowStock} ${lowStock === 1 ? 'item is' : 'items are'} projected to have low stock, with ${this.formatNumber(reorder)} suggested reorder units.`;
+        }
+
+        return `No filtered items are projected to run low. Predicted demand is ${this.formatNumber(this.predictedDemand())} units for this period.`;
+    },
+
+    isForecastWindowChanged() {
+        return this.forecast && Number(this.forecastDays) !== Number(this.forecast.forecast_days);
+    },
+
+    clearFilters() {
+        this.category = '';
+        this.risk = '';
+        this.search = '';
+    },
+
+    riskClasses(risk) {
+        return {
+            high: 'bg-danger-50 text-danger-700 ring-danger-600/20',
+            medium: 'bg-warning-50 text-warning-700 ring-warning-600/20',
+            low: 'bg-success-50 text-success-700 ring-success-600/20',
+        }[risk] || 'bg-neutral-100 text-neutral-700 ring-neutral-500/20';
+    },
+
+    sourceClasses() {
+        return this.forecast?.source === 'ai'
+            ? 'bg-primary-50 text-primary-700 ring-primary-600/20'
+            : 'bg-warning-50 text-warning-700 ring-warning-600/20';
+    },
+
+    formatNumber(value, maximumFractionDigits = 0) {
+        return new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(Number(value || 0));
+    },
+
+    formatDate(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return 'Unknown time';
+
+        return new Intl.DateTimeFormat(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+        }).format(date);
+    },
+
+    formatShortDate(value) {
+        const date = new Date(`${value}T00:00:00`);
+        if (Number.isNaN(date.getTime())) return '';
+
+        return new Intl.DateTimeFormat(undefined, {
+            month: 'short',
+            day: 'numeric',
+        }).format(date);
+    },
+
+    async generateForecast() {
+        if (this.loading) return;
+
+        this.loading = true;
+        this.error = '';
+        this.success = '';
+        window.dispatchEvent(new CustomEvent('hims-loading-start', {
+            detail: { message: 'Generating forecast...' },
+        }));
+
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+            const response = await fetch(this.endpoint, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken || '',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    analysis_days: 90,
+                    forecast_days: Number(this.forecastDays),
+                    return_to: 'dashboard',
+                }),
+            });
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok || !payload.forecast) {
+                throw new Error(payload.message || 'The forecast could not be generated. Try again.');
+            }
+
+            this.forecast = payload.forecast;
+            this.success = payload.message || 'Forecast generated successfully.';
+        } catch (error) {
+            this.error = error instanceof Error
+                ? error.message
+                : 'The forecast could not be generated. Try again.';
+        } finally {
+            this.loading = false;
+            window.dispatchEvent(new CustomEvent('hims-loading-stop'));
+        }
+    },
+}));
 
 /**
  * Dashboard live updates via 30s polling.

@@ -66,38 +66,15 @@ class DemandForecastService
         $since = now()->subDays($analysisDays);
         $consumption = $this->consumptionSince($item, $since);
 
-        $totalConsumed = (int) $consumption->sum('quantity');
-        $averageDailyUsage = round($totalConsumed / $analysisDays, 3);
-
-        $onHand = (int) $item->quantity_on_hand;
-        $forecastQuantity = (int) ceil($averageDailyUsage * $forecastDays);
-        $safetyStock = (int) ceil($averageDailyUsage * $bufferDays);
-        $reorderPoint = (int) ceil($averageDailyUsage * $leadTimeDays) + $safetyStock;
-
-        // Never suggest a negative order; "you already hold enough" is 0.
-        $suggestedOrderQuantity = max(0, $forecastQuantity + $safetyStock - $onHand);
-
-        return [
-            'item_id' => $item->id,
-            'analysis_days' => $analysisDays,
-            'forecast_days' => $forecastDays,
-            'lead_time_days' => $leadTimeDays,
-            'buffer_days' => $bufferDays,
-
-            'current_stock' => $onHand,
-            'historical_usage' => $totalConsumed,
-            'average_daily_usage' => $averageDailyUsage,
-            'upcoming_need' => $forecastQuantity,
-            'reorder_point' => $reorderPoint,
-            'safety_stock' => $safetyStock,
-            'suggested_order_quantity' => $suggestedOrderQuantity,
-            'days_of_cover' => $this->daysOfCover($onHand, $averageDailyUsage),
-            'trend' => $this->trend($consumption, $since, $analysisDays),
-
-            'movement_count' => $consumption->count(),
-            'needs_reorder' => $onHand <= $reorderPoint && $averageDailyUsage > 0.0,
-            'trigger_reason' => $this->triggerReason($item, $onHand, $reorderPoint, $averageDailyUsage),
-        ];
+        return $this->calculateForecast(
+            $item,
+            $consumption,
+            $since,
+            $analysisDays,
+            $forecastDays,
+            $leadTimeDays,
+            $bufferDays,
+        );
     }
 
     /**
@@ -109,12 +86,23 @@ class DemandForecastService
         int $analysisDays = self::DEFAULT_ANALYSIS_DAYS,
         int $forecastDays = self::DEFAULT_FORECAST_DAYS,
     ): Collection {
+        $analysisDays = max(1, $analysisDays);
+        $since = now()->subDays($analysisDays);
+
         return InventoryItem::query()
-            ->with('supplier')
+            ->where('status', '!=', 'inactive')
+            ->with([
+                'supplier',
+                'category',
+                'movements' => fn ($query) => $query
+                    ->whereIn('movement_type', MovementType::consumptionValues())
+                    ->where('moved_at', '>=', $since)
+                    ->orderBy('moved_at'),
+            ])
             ->orderBy('name')
             ->get()
             ->map(fn (InventoryItem $item) => [
-                ...$this->forecast($item, $analysisDays, $forecastDays),
+                ...$this->calculateForecast($item, $item->movements, $since, $analysisDays, $forecastDays),
                 'item' => $item,
             ])
             ->sortBy(fn (array $row) => $row['days_of_cover'] ?? PHP_INT_MAX)
@@ -174,6 +162,49 @@ class DemandForecastService
             ->where('moved_at', '>=', $since)
             ->orderBy('moved_at')
             ->get();
+    }
+
+    /**
+     * @param  Collection<int, StockMovement>  $consumption
+     * @return array<string, mixed>
+     */
+    private function calculateForecast(
+        InventoryItem $item,
+        Collection $consumption,
+        Carbon $since,
+        int $analysisDays,
+        int $forecastDays,
+        ?int $leadTimeDays = null,
+        int $bufferDays = self::DEFAULT_BUFFER_DAYS,
+    ): array {
+        $leadTimeDays = max(0, $leadTimeDays ?? self::DEFAULT_LEAD_TIME_DAYS);
+        $totalConsumed = (int) $consumption->sum('quantity');
+        $averageDailyUsage = round($totalConsumed / $analysisDays, 3);
+        $onHand = max(0, (int) $item->availableQuantity());
+        $forecastQuantity = (int) ceil($averageDailyUsage * $forecastDays);
+        $safetyStock = (int) ceil($averageDailyUsage * $bufferDays);
+        $reorderPoint = (int) ceil($averageDailyUsage * $leadTimeDays) + $safetyStock;
+        $suggestedOrderQuantity = max(0, $forecastQuantity + $safetyStock - $onHand);
+
+        return [
+            'item_id' => $item->id,
+            'analysis_days' => $analysisDays,
+            'forecast_days' => $forecastDays,
+            'lead_time_days' => $leadTimeDays,
+            'buffer_days' => $bufferDays,
+            'current_stock' => $onHand,
+            'historical_usage' => $totalConsumed,
+            'average_daily_usage' => $averageDailyUsage,
+            'upcoming_need' => $forecastQuantity,
+            'reorder_point' => $reorderPoint,
+            'safety_stock' => $safetyStock,
+            'suggested_order_quantity' => $suggestedOrderQuantity,
+            'days_of_cover' => $this->daysOfCover($onHand, $averageDailyUsage),
+            'trend' => $this->trend($consumption, $since, $analysisDays),
+            'movement_count' => $consumption->count(),
+            'needs_reorder' => $onHand <= $reorderPoint && $averageDailyUsage > 0.0,
+            'trigger_reason' => $this->triggerReason($item, $onHand, $reorderPoint, $averageDailyUsage),
+        ];
     }
 
     /**

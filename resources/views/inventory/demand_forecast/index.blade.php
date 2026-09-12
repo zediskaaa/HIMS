@@ -18,6 +18,156 @@
         </x-ui.alert>
     @endif
 
+    <x-ui.card>
+        <x-slot:header>
+            <div class="flex items-start gap-3">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-700">
+                    <x-ui.icon name="chart-bar" class="h-5 w-5" />
+                </span>
+                <div>
+                    <h2 class="text-sm font-semibold text-neutral-900">AI-Based Stock Demand Forecasting</h2>
+                    <p class="mt-0.5 text-xs text-neutral-500">
+                        Gemini analyzes aggregated HIMS consumption history; recommendations are advisory only.
+                    </p>
+                </div>
+            </div>
+        </x-slot:header>
+
+        @can(\App\Enums\Permission::GenerateForecasts->value)
+            <x-slot:actions>
+                <form method="POST" action="{{ route('inventory.demand-forecast.refresh') }}">
+                    @csrf
+                    <input type="hidden" name="analysis_days" value="{{ $analysisDays }}">
+                    <input type="hidden" name="forecast_days" value="{{ $forecastDays }}">
+                    <input type="hidden" name="return_to" value="forecast">
+                    <x-ui.button type="submit" size="sm" icon="arrow-path" data-loading-text="Generating forecast...">
+                        {{ $aiForecast ? 'Refresh Forecast' : 'Generate Forecast' }}
+                    </x-ui.button>
+                </form>
+            </x-slot:actions>
+        @endcan
+
+        @if (! $aiForecast)
+            <div class="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-4 py-8 text-center">
+                <p class="text-sm font-medium text-neutral-800">No forecast has been generated for this window.</p>
+                <p class="mx-auto mt-1 max-w-2xl text-xs text-neutral-500">
+                    HIMS does not call Gemini when this page opens. Generate a forecast to analyze the latest aggregated stock history, or use the statistical table below.
+                </p>
+            </div>
+        @else
+            <div class="flex flex-wrap items-center gap-2">
+                <x-ui.badge :variant="$aiForecast['source'] === 'ai' ? 'primary' : 'warning'" dot>
+                    {{ $aiForecast['source_label'] }}
+                </x-ui.badge>
+                <span class="text-xs text-neutral-500">{{ $aiForecast['forecast_period'] }}</span>
+                <span class="text-xs text-neutral-400">Generated {{ \Illuminate\Support\Carbon::parse($aiForecast['generated_at'])->format('M d, Y g:i A') }}</span>
+            </div>
+
+            @if ($aiForecast['notice'])
+                <div class="mt-4">
+                    <x-ui.alert variant="warning" title="Statistical fallback active">
+                        {{ $aiForecast['notice'] }}
+                    </x-ui.alert>
+                </div>
+            @endif
+
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                @foreach ([
+                    ['High risk', $aiForecast['summary']['high_risk_items'], 'border-danger-200 bg-danger-50 text-danger-900'],
+                    ['Medium risk', $aiForecast['summary']['medium_risk_items'], 'border-warning-200 bg-warning-50 text-warning-900'],
+                    ['Low risk', $aiForecast['summary']['low_risk_items'], 'border-success-200 bg-success-50 text-success-900'],
+                    ['Suggested units', $aiForecast['summary']['recommended_reorder_units'], 'border-neutral-200 bg-neutral-50 text-neutral-900'],
+                ] as [$label, $value, $classes])
+                    <div class="rounded-lg border px-3 py-3 {{ $classes }}">
+                        <p class="text-xs font-medium opacity-75">{{ $label }}</p>
+                        <p class="mt-1 text-xl font-semibold tabular-nums">{{ number_format($value) }}</p>
+                    </div>
+                @endforeach
+            </div>
+
+            <form method="GET" action="{{ route('inventory.demand-forecast') }}" class="mt-5 grid gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 sm:grid-cols-2 lg:grid-cols-6 lg:items-end">
+                <input type="hidden" name="analysis_days" value="{{ $analysisDays }}">
+                <input type="hidden" name="forecast_days" value="{{ $forecastDays }}">
+                <x-ui.field name="search" label="Item or SKU" :value="$aiFilters['search']" placeholder="Search forecast" />
+                <x-ui.field
+                    name="category_id"
+                    label="Category"
+                    type="select"
+                    :value="$aiFilters['categoryId']"
+                    :options="['' => 'All categories'] + $categories->pluck('name', 'id')->all()" />
+                <x-ui.field
+                    name="risk"
+                    label="Risk"
+                    type="select"
+                    :value="$aiFilters['risk']"
+                    :options="['' => 'All risk levels', 'high' => 'High', 'medium' => 'Medium', 'low' => 'Low']" />
+                <label class="flex min-h-10 items-center gap-2 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700">
+                    <input type="checkbox" name="attention_only" value="1" @checked($aiFilters['attentionOnly']) class="rounded border-neutral-300 text-primary-600 focus:ring-primary-500">
+                    Attention only
+                </label>
+                <div class="flex gap-2 sm:col-span-2">
+                    <x-ui.button type="submit" size="sm">Apply Filters</x-ui.button>
+                    <x-ui.button variant="secondary" size="sm" :href="route('inventory.demand-forecast', ['analysis_days' => $analysisDays, 'forecast_days' => $forecastDays])">Clear</x-ui.button>
+                </div>
+            </form>
+
+            <div class="mt-4 overflow-hidden rounded-lg border border-neutral-200">
+                <x-ui.table :sticky-header="false">
+                    <x-ui.table.head>
+                        <x-ui.table.th>Item</x-ui.table.th>
+                        <x-ui.table.th>Risk</x-ui.table.th>
+                        <x-ui.table.th numeric>Current</x-ui.table.th>
+                        <x-ui.table.th numeric>Predicted</x-ui.table.th>
+                        <x-ui.table.th numeric>Reorder</x-ui.table.th>
+                        <x-ui.table.th>Trend / Confidence</x-ui.table.th>
+                        <x-ui.table.th>Explanation</x-ui.table.th>
+                    </x-ui.table.head>
+                    <tbody>
+                        @forelse ($aiItems as $item)
+                            <x-ui.table.row>
+                                <x-ui.table.td>
+                                    <span class="font-medium text-neutral-900">{{ $item['item_name'] }}</span>
+                                    <span class="block text-xs text-neutral-500">{{ $item['sku'] }}@if($item['category']) &middot; {{ $item['category'] }}@endif</span>
+                                </x-ui.table.td>
+                                <x-ui.table.td>
+                                    <x-ui.badge :variant="match($item['risk_level']) { 'high' => 'danger', 'medium' => 'warning', default => 'success' }" dot>
+                                        {{ ucfirst($item['risk_level']) }}
+                                    </x-ui.badge>
+                                    <span class="mt-1 block text-xs text-neutral-500">{{ ucfirst($item['reorder_priority']) }} priority</span>
+                                    <span class="block text-xs text-neutral-500">Projected: {{ str_replace('_', ' ', ucfirst($item['projected_stock_status'])) }}</span>
+                                </x-ui.table.td>
+                                <x-ui.table.td numeric>{{ number_format($item['current_stock']) }}</x-ui.table.td>
+                                <x-ui.table.td numeric>{{ number_format($item['predicted_demand']) }}</x-ui.table.td>
+                                <x-ui.table.td numeric>
+                                    <span class="font-semibold text-neutral-900">{{ number_format($item['recommended_reorder_quantity']) }}</span>
+                                    @if ($item['pending_procurement_quantity'] > 0)
+                                        <span class="block text-xs text-neutral-400">{{ number_format($item['pending_procurement_quantity']) }} pending</span>
+                                    @endif
+                                </x-ui.table.td>
+                                <x-ui.table.td>
+                                    <span class="text-sm text-neutral-800">{{ ucfirst($item['demand_trend']) }}</span>
+                                    <span class="block text-xs text-neutral-500">{{ ucfirst($item['confidence']) }} confidence</span>
+                                </x-ui.table.td>
+                                <x-ui.table.td>
+                                    <p class="max-w-md whitespace-normal text-sm text-neutral-600">{{ $item['explanation'] }}</p>
+                                    @if ($item['limited_data'])
+                                        <span class="mt-1 block text-xs font-medium text-warning-700">Limited history</span>
+                                    @endif
+                                </x-ui.table.td>
+                            </x-ui.table.row>
+                        @empty
+                            <x-ui.table.empty :colspan="7" icon="magnifying-glass" title="No matching forecast items" message="Adjust or clear the filters to see more results." />
+                        @endforelse
+                    </tbody>
+                </x-ui.table>
+            </div>
+
+            <p class="mt-3 text-xs text-neutral-400">
+                AI output is validated against real item IDs and quantity limits. It cannot change inventory balances or create purchase orders.
+            </p>
+        @endif
+    </x-ui.card>
+
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <x-ui.stat
             label="Items forecast"

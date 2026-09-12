@@ -27,6 +27,7 @@ use App\Http\Controllers\Inventory\TelemetryController;
 use App\Http\Controllers\Inventory\WarehouseTaskController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SuperAdmin\RecoveryCenterController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
 
@@ -212,6 +213,7 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     // plan needs generate_forecasts. Both are declared on the controller.
     Route::get('/inventory/demand-forecast', [DemandForecastController::class, 'index'])->name('inventory.demand-forecast');
     Route::post('/inventory/demand-forecast', [DemandForecastController::class, 'store'])->name('inventory.demand-forecast.store');
+    Route::post('/inventory/demand-forecast/refresh', [DemandForecastController::class, 'refresh'])->name('inventory.demand-forecast.refresh');
 
     // Evidence-Based Process Review & DPRI Reference Pricing
     Route::get('/reviews', [ProcessReviewController::class, 'index'])->name('reviews.index');
@@ -286,15 +288,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('/permissions', [PermissionMatrixController::class, 'index'])->name('permissions');
 
     // System Recovery Center (Super Admin only)
-    Route::get('/recovery', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'index'])->name('recovery.index');
-    Route::get('/recovery/health', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'health'])->name('recovery.health');
-    Route::post('/recovery/rebuild-cache', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'rebuildCache'])->name('recovery.rebuild-cache');
-    Route::post('/recovery/retry-all-jobs', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'retryAllJobs'])->name('recovery.retry-all-jobs');
-    Route::post('/recovery/retry-job/{uuid}', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'retryJob'])->name('recovery.retry-job');
-    Route::get('/recovery/{record}', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'show'])->name('recovery.show');
-    Route::post('/recovery/{record}/retry', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'retry'])->name('recovery.retry');
-    Route::post('/recovery/{record}/resolve', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'resolve'])->name('recovery.resolve');
-    Route::post('/recovery/{record}/ignore', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'ignore'])->name('recovery.ignore');
+    Route::get('/recovery', [RecoveryCenterController::class, 'index'])->name('recovery.index');
+    Route::get('/recovery/health', [RecoveryCenterController::class, 'health'])->name('recovery.health');
+    Route::post('/recovery/rebuild-cache', [RecoveryCenterController::class, 'rebuildCache'])->name('recovery.rebuild-cache');
+    Route::post('/recovery/retry-all-jobs', [RecoveryCenterController::class, 'retryAllJobs'])->name('recovery.retry-all-jobs');
+    Route::post('/recovery/retry-job/{uuid}', [RecoveryCenterController::class, 'retryJob'])->name('recovery.retry-job');
+    Route::get('/recovery/{record}', [RecoveryCenterController::class, 'show'])->name('recovery.show');
+    Route::post('/recovery/{record}/retry', [RecoveryCenterController::class, 'retry'])->name('recovery.retry');
+    Route::post('/recovery/{record}/resolve', [RecoveryCenterController::class, 'resolve'])->name('recovery.resolve');
+    Route::post('/recovery/{record}/ignore', [RecoveryCenterController::class, 'ignore'])->name('recovery.ignore');
 });
 
 require __DIR__.'/auth.php';
