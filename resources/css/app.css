@@ -134,6 +134,19 @@
         height: 0 !important;
     }
 
+    /* User management table is sized to fit desktop screens; keep fallback touch
+       scrolling available without drawing a persistent horizontal scrollbar. */
+    .users-accounts-table .hims-table-scroll {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .users-accounts-table .hims-table-scroll::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+
     .loader {
         --color-1: currentColor;
         --size: 1.25px;
