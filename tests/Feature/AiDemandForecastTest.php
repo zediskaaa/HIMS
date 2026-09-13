@@ -97,10 +97,15 @@ class AiDemandForecastTest extends TestCase
         $this->assertSame(90, collect($cached['items'][0]['historical_series'])->sum('days'));
         $this->assertSame(42, collect($cached['items'][0]['forecast_series'])->sum('quantity'));
         $this->assertSame(30, collect($cached['items'][0]['forecast_series'])->sum('days'));
-        $this->assertLessThan(
-            $cached['items'][0]['forecast_series'][4]['quantity'],
-            $cached['items'][0]['forecast_series'][0]['quantity'],
-        );
+        // The horizon is drawn flat rather than ramping across it: 42 units over
+        // 30 days is 1.4/day, and every bucket carries that rate. The ramp this
+        // replaces opened below the history it was meant to continue.
+        $rates = collect($cached['items'][0]['forecast_series'])
+            ->map(fn (array $bucket): float => $bucket['quantity'] / $bucket['days']);
+
+        foreach ($rates as $rate) {
+            $this->assertEqualsWithDelta(1.4, $rate, 0.2);
+        }
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $manager->id,
@@ -168,7 +173,7 @@ class AiDemandForecastTest extends TestCase
             ->assertJsonPath('forecast.items.0.item_name', 'Bandages')
             ->assertJsonPath('forecast.items.0.historical_consumption', 18)
             ->assertJsonPath('forecast.items.0.predicted_demand', 24)
-            ->assertJsonCount(12, 'forecast.items.0.historical_series')
+            ->assertJsonCount(6, 'forecast.items.0.historical_series')
             ->assertJsonCount(5, 'forecast.items.0.forecast_series');
 
         $this->actingAs($manager)
@@ -258,6 +263,126 @@ class AiDemandForecastTest extends TestCase
         $this->assertSame([4, 3], $forecast->pluck('days')->all());
         $this->assertSame(7, $forecast->sum('days'));
         $this->assertSame(now()->addDay()->toDateString(), $forecast->first()['period_start']);
+    }
+
+    /**
+     * The window is split into six buckets, and ninety days does not divide by
+     * six. Rounding the width up used to leave a stub at the end of the window,
+     * and a stub that short catches one movement or none at all — so the last
+     * point on the chart drew demand collapsing to zero days after the most
+     * recent movement had been recorded.
+     */
+    public function test_every_historical_bucket_covers_a_full_share_of_the_window(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+        $item = $this->item();
+        $this->consume($item, 40, 2);
+
+        Http::fake(['*' => Http::response([], 503)]);
+
+        $response = $this->actingAs($manager)
+            ->postJson(route('inventory.demand-forecast.refresh'), [
+                'analysis_days' => 90,
+                'forecast_days' => 30,
+                'return_to' => 'dashboard',
+            ])
+            ->assertOk();
+
+        $historical = collect($response->json('forecast.items.0.historical_series'));
+
+        $this->assertSame(
+            [15, 15, 15, 15, 15, 15],
+            $historical->pluck('days')->all()
+        );
+        $this->assertSame(90, $historical->sum('days'));
+
+        // The most recent movement belongs to the final bucket rather than
+        // falling outside a stub that closed before it.
+        $this->assertSame(40, $historical->last()['quantity']);
+    }
+
+    public function test_the_forecast_series_stays_at_or_above_the_recorded_average_rate(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+        $item = $this->item();
+        $this->consume($item, 70, 80);
+        $this->consume($item, 12, 20);
+        $this->consume($item, 8, 5);
+
+        Http::fake(['*' => Http::response([], 503)]);
+
+        $response = $this->actingAs($manager)
+            ->postJson(route('inventory.demand-forecast.refresh'), [
+                'analysis_days' => 90,
+                'forecast_days' => 30,
+                'return_to' => 'dashboard',
+            ])
+            ->assertOk();
+
+        $series = collect($response->json('forecast.items.0.forecast_series'));
+        $average = (float) $response->json('forecast.items.0.average_daily_consumption');
+
+        // The figures below are the statistical projection's, so the fixture
+        // needs the fallback path to have been taken.
+        $this->assertSame('statistical', $response->json('forecast.source'));
+
+        // 90 units over the 90-day window, so the baseline sits at 1/day while
+        // the later half has fallen to 20/45 = 0.44/day.
+        $this->assertSame(1.0, $average);
+        $this->assertSame(30, $series->sum('quantity'));
+        $this->assertSame(30, $series->sum('days'));
+
+        // The projection is floored at the average, so no bucket draws the
+        // forecast under the baseline the screen sets beside it — even on an
+        // item that is tapering off.
+        foreach ($series as $bucket) {
+            $this->assertGreaterThanOrEqual($average, $bucket['quantity'] / $bucket['days']);
+        }
+
+        // With nothing to climb to, the line sits flat on that baseline.
+        $this->assertSame(1.0, round($series->first()['quantity'] / $series->first()['days'], 2));
+    }
+
+    /**
+     * The forecast has to pick up where the recorded history stops. Opening at
+     * the window average instead starts the line below the last recorded point
+     * whenever demand is rising, which reads on screen as the forecast dropping
+     * away from the history it is meant to continue.
+     */
+    public function test_the_forecast_series_opens_level_with_the_rate_the_history_ended_on(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+        $item = $this->item();
+        $this->consume($item, 20, 80);
+        $this->consume($item, 50, 20);
+        $this->consume($item, 50, 5);
+
+        Http::fake(['*' => Http::response([], 503)]);
+
+        $response = $this->actingAs($manager)
+            ->postJson(route('inventory.demand-forecast.refresh'), [
+                'analysis_days' => 90,
+                'forecast_days' => 30,
+                'return_to' => 'dashboard',
+            ])
+            ->assertOk();
+
+        $series = collect($response->json('forecast.items.0.forecast_series'));
+        $rates = $series->map(fn (array $bucket): float => $bucket['quantity'] / $bucket['days']);
+
+        // 120 units over ninety days is 1.33/day, but 100 of them fall in the
+        // later half, so the horizon is projected at 100/45 = 2.22/day.
+        $this->assertSame(1.33, (float) $response->json('forecast.items.0.average_daily_consumption'));
+        $this->assertSame(67, $series->sum('quantity'));
+
+        // Every bucket carries that projected rate, the first one included. The
+        // line is level from where the history stopped rather than climbing to
+        // it from the long-run average underneath.
+        foreach ($rates as $rate) {
+            $this->assertEqualsWithDelta(2.22, $rate, 0.2);
+        }
+
+        $this->assertGreaterThan(1.33, $rates->first());
     }
 
     public function test_dashboard_chart_scales_units_per_day_from_bucket_rates(): void

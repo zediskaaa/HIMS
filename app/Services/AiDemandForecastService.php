@@ -180,15 +180,39 @@ class AiDemandForecastService
      */
     private function consumptionSeries(Collection $movements, mixed $since, int $analysisDays): array
     {
-        $bucketDays = max(1, (int) ceil($analysisDays / 12));
-        $bucketCount = (int) ceil($analysisDays / $bucketDays);
-        $series = [];
+        // The window is split evenly rather than into fixed-width buckets. Ninety
+        // days does not divide by six, so rounding the width up would leave a stub
+        // at the end of the window — and a stub that short holds one movement or
+        // none at all. The last point on the chart then read as demand collapsing
+        // to zero days after the most recent movement was recorded.
+        //
+        // Six is chosen against the demo hospital's movement count, not the window
+        // length: twelve buckets across the ninety days left roughly two movements
+        // in each, and a two-movement week is noise rather than a trend. Halving
+        // the count doubles what each bucket holds, which settles the zigzag and
+        // lands the final point near the rate the forecast opens on instead of on
+        // whichever spike landed in the last week.
+        $bucketCount = max(1, min(6, $analysisDays));
+        $baseDays = intdiv($analysisDays, $bucketCount);
+        $remainder = $analysisDays % $bucketCount;
+
+        $periodDays = [];
+        $periodStart = [];
+        $cursor = 0;
 
         for ($index = 0; $index < $bucketCount; $index++) {
+            $periodDays[$index] = max(1, $baseDays + ($index < $remainder ? 1 : 0));
+            $periodStart[$index] = $cursor;
+            $cursor += $periodDays[$index];
+        }
+
+        $series = [];
+
+        foreach ($periodDays as $index => $days) {
             $series[$index] = [
-                'period_start' => $since->copy()->addDays($index * $bucketDays)->toDateString(),
+                'period_start' => $since->copy()->addDays($periodStart[$index])->toDateString(),
                 'quantity' => 0,
-                'days' => max(1, min($bucketDays, $analysisDays - ($index * $bucketDays))),
+                'days' => $days,
             ];
         }
 
@@ -198,7 +222,17 @@ class AiDemandForecastService
             }
 
             $offset = max(0, (int) floor($since->diffInDays($movement->moved_at)));
-            $bucket = min($bucketCount - 1, intdiv($offset, $bucketDays));
+            $bucket = 0;
+
+            // The periods are contiguous but not equal, so the bucket is the last
+            // one that starts at or before the movement. Offsets past the final
+            // start land in the final bucket, which is what the clamp did before.
+            foreach ($periodStart as $index => $start) {
+                if ($offset >= $start) {
+                    $bucket = $index;
+                }
+            }
+
             $series[$bucket]['quantity'] += max(0, (int) $movement->quantity);
         }
 
@@ -539,57 +573,72 @@ class AiDemandForecastService
     }
 
     /**
-     * Allocate the validated period total into a compact chart series. The
-     * weights follow the validated demand trend and always add back to the
-     * exact predicted_demand value; they are display buckets, not new demand.
+     * Allocate the validated period total into a compact chart series.
+     *
+     * The line is flat on purpose. `predicted_demand` is projected from the rate
+     * over the later half of the window, so the flat rate it divides down to is
+     * the rate the recorded history has just been running at — the level the line
+     * has to pick up from. Opening at the item's average instead drew the
+     * forecast starting below the history it is meant to continue whenever demand
+     * was rising, which reads as a drop the recommendation never makes.
+     *
+     * The buckets always add back to the exact predicted_demand value; they are
+     * display buckets, not new demand. Their durations are uneven wherever the
+     * horizon does not divide evenly, which is why the rate is applied per
+     * bucket rather than the total being split by bucket count. Rounding is
+     * carried forward in a running total rather than applied bucket by bucket,
+     * so the leftover lands spread across the horizon instead of collecting in
+     * the final bucket as a step the line does not otherwise have.
      *
      * @param  array<string, mixed>  $item
      * @return array<int, array{period_start: string, quantity: int, days: int}>
      */
     private function forecastSeries(array $item, int $forecastDays, Carbon $generatedAt): array
     {
+        // The horizon is split evenly rather than into fixed-width buckets, the
+        // same way the historical series splits its window. Ninety days does not
+        // divide by eight, so rounding the width up to twelve left the final
+        // bucket six days long while every other held twelve — a bucket drawn the
+        // same width as its neighbours but measuring half the demand, and dating
+        // the end of the chart a fortnight short of where the forecast stops.
         $bucketCount = max(2, min(8, (int) ceil($forecastDays / 7)));
-        $bucketDays = max(1, (int) ceil($forecastDays / $bucketCount));
-        $trendWeights = match ($item['demand_trend']) {
-            'increasing' => range(1, $bucketCount),
-            'decreasing' => range($bucketCount, 1),
-            default => array_fill(0, $bucketCount, 1),
-        };
-        $periodDays = collect(range(0, $bucketCount - 1))
-            ->map(fn (int $index): int => max(1, min(
-                $bucketDays,
-                $forecastDays - ($index * $bucketDays),
-            )))
-            ->all();
-        $weights = collect($trendWeights)
-            ->map(fn (int $weight, int $index): int => $weight * $periodDays[$index])
-            ->all();
-        $weightTotal = array_sum($weights);
-        $predictedDemand = max(0, (int) $item['predicted_demand']);
-        $allocated = 0;
+        $baseDays = intdiv($forecastDays, $bucketCount);
+        $remainder = $forecastDays % $bucketCount;
 
-        return collect($weights)
-            ->map(function (int $weight, int $index) use (
-                $bucketCount,
-                $bucketDays,
+        $periodDays = [];
+        $periodStart = [];
+        $cursor = 0;
+
+        for ($index = 0; $index < $bucketCount; $index++) {
+            $periodDays[$index] = max(1, $baseDays + ($index < $remainder ? 1 : 0));
+            $periodStart[$index] = $cursor;
+            $cursor += $periodDays[$index];
+        }
+
+        $predictedDemand = max(0, (int) $item['predicted_demand']);
+        $totalDays = max(1, array_sum($periodDays));
+        $dailyRate = $predictedDemand / $totalDays;
+        $cumulativeDays = 0;
+        $cumulativeQuantity = 0;
+
+        return collect($periodDays)
+            ->map(function (int $days, int $index) use (
+                $dailyRate,
                 $generatedAt,
-                $periodDays,
                 $predictedDemand,
-                $weightTotal,
-                &$allocated,
+                $periodStart,
+                &$cumulativeDays,
+                &$cumulativeQuantity,
             ): array {
-                $quantity = $index === $bucketCount - 1
-                    ? $predictedDemand - $allocated
-                    : min(
-                        $predictedDemand - $allocated,
-                        max(0, (int) round($predictedDemand * ($weight / $weightTotal))),
-                    );
-                $allocated += $quantity;
+                $cumulativeDays += $days;
+                $quantity = min($predictedDemand, (int) round($dailyRate * $cumulativeDays))
+                    - $cumulativeQuantity;
+                $cumulativeQuantity += $quantity;
 
                 return [
-                    'period_start' => $generatedAt->copy()->startOfDay()->addDay()->addDays($index * $bucketDays)->toDateString(),
+                    'period_start' => $generatedAt->copy()->startOfDay()->addDay()->addDays($periodStart[$index])->toDateString(),
                     'quantity' => $quantity,
-                    'days' => $periodDays[$index],
+                    'days' => $days,
                 ];
             })
             ->all();

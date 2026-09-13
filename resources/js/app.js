@@ -1458,25 +1458,56 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         return Math.round((205 - ((Number(value) / this.chartMaximum()) * 165)) * 10) / 10;
     },
 
+    chartAnalysisDays() {
+        return Math.max(1, Number(this.forecast?.analysis_days || 90));
+    },
+
+    chartForecastDays() {
+        return Math.max(1, Number(this.forecast?.forecast_days || 30));
+    },
+
+    /**
+     * One horizontal scale for the whole chart.
+     *
+     * The two regions used to be handed half the plot each whatever they
+     * measured: ninety days of history across 420px and ninety days of forecast
+     * across 255px. A given slope therefore drew 1.65x steeper on the left, so a
+     * level forecast read as a fall and a real climb read as flat. Both windows
+     * now share a single px-per-day, which puts the boundary wherever the two
+     * window lengths put it rather than at a fixed halfway mark.
+     */
+    chartPxPerDay() {
+        const plotWidth = 675; // 50 to 725, matching the grid lines.
+
+        return plotWidth / (this.chartAnalysisDays() + this.chartForecastDays());
+    },
+
     transitionX() {
-        return 470;
+        return 50 + (this.chartPxPerDay() * this.chartAnalysisDays());
     },
 
     historicalPoints() {
         const series = this.currentHistoricalSeries();
         if (series.length === 0) return [];
 
-        const startX = 50;
-        const endX = this.transitionX();
-        const step = series.length === 1 ? 0 : (endX - startX) / (series.length - 1);
+        const originX = 50;
+        const pxPerDay = this.chartPxPerDay();
+        let elapsedDays = 0;
 
-        return series.map((point, index) => {
+        return series.map((point) => {
             const days = Math.max(1, Number(point.days || 1));
             const quantity = Number(point.quantity || 0);
             const rate = point.rate != null ? Number(point.rate) : (quantity / days);
 
+            // Each bucket is plotted where its period opens, so the first point
+            // lands on the window start and the line begins at the left edge of
+            // the plot. Plotting at the period end instead left the first
+            // bucket's whole width empty and the line looked cut off.
+            const x = originX + (pxPerDay * elapsedDays);
+            elapsedDays += days;
+
             return {
-                x: Math.round((startX + (step * index)) * 10) / 10,
+                x: Math.round(x * 10) / 10,
                 y: this.chartY(rate),
                 date: point.date,
                 formattedDate: this.formatPeriodLabel(point.date, days),
@@ -1493,18 +1524,24 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         const series = this.currentForecastSeries();
         if (series.length === 0) return [];
 
-        const startX = this.transitionX();
-        const endX = 725;
-        const count = series.length;
-        const step = (endX - startX) / count;
+        const originX = 50;
+        const pxPerDay = this.chartPxPerDay();
 
-        return series.map((point, index) => {
+        // The horizon opens the day after the analysis window closes, so its
+        // first bucket is plotted exactly on the boundary rather than a bucket
+        // width past it.
+        let elapsedDays = this.chartAnalysisDays();
+
+        return series.map((point) => {
             const days = Math.max(1, Number(point.days || 1));
             const quantity = Number(point.quantity || 0);
             const rate = point.rate != null ? Number(point.rate) : (quantity / days);
 
+            const x = originX + (pxPerDay * elapsedDays);
+            elapsedDays += days;
+
             return {
-                x: Math.round((startX + (step * (index + 1))) * 10) / 10,
+                x: Math.round(x * 10) / 10,
                 y: this.chartY(rate),
                 date: point.date,
                 formattedDate: this.formatPeriodLabel(point.date, days),
@@ -1576,20 +1613,51 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         )).join(' ');
     },
 
+    /**
+     * Carry a plotted series out to the far edge of its window.
+     *
+     * Buckets are plotted where their period opens, so the final bucket's own
+     * span was left undrawn: the recorded line stopped a bucket short of the
+     * boundary and the forecast stopped short of the horizon end printed on the
+     * axis, which read on screen as the lines being cut off. The last bucket's
+     * value carried across its own period is what that bucket measured, so the
+     * segment is drawn rather than the space left blank.
+     *
+     * Stroke and fill geometry only — markers and hover keep reading the bucket
+     * arrays themselves, so no extra point becomes selectable.
+     */
+    chartLinePoints(points, edgeX) {
+        if (!Array.isArray(points) || points.length === 0) return [];
+
+        const last = points[points.length - 1];
+        if (last.x >= edgeX) return points;
+
+        return [...points, { ...last, x: edgeX }];
+    },
+
     historicalAreaPath() {
+        // The fill has to trace the same stroke it sits under. The history
+        // buckets alone stop a bucket short of the boundary; extending them at
+        // the last bucket's rate instead made the shading jut out past the
+        // line, because by then the line is ramping down to the baseline. The
+        // baseline series' first point is exactly where the two agree.
         const points = this.historicalPoints();
-        if (points.length === 0) return '';
+        const boundary = this.historicalBaselinePoints()
+            .find((point) => point.type === 'baseline');
+
+        const shape = boundary ? [...points, boundary] : points;
+        if (shape.length === 0) return '';
 
         const baseline = 205;
-        return `M ${points[0].x} ${baseline} L ${points[0].x} ${points[0].y} ${points
+        return `M ${shape[0].x} ${baseline} L ${shape[0].x} ${shape[0].y} ${shape
             .slice(1)
             .map((p) => `L ${p.x} ${p.y}`)
-            .join(' ')} L ${points[points.length - 1].x} ${baseline} Z`;
+            .join(' ')} L ${shape[shape.length - 1].x} ${baseline} Z`;
     },
 
     forecastAreaPath() {
         const hist = this.historicalPoints();
-        const fore = this.forecastPoints();
+        const fore = this.chartLinePoints(this.forecastPoints(), 725);
         if (fore.length === 0) return '';
 
         const baseline = 205;
@@ -1617,7 +1685,21 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
 
     chartEndLabel(series) {
         const s = series || this.currentForecastSeries();
-        return s.length > 0 ? this.formatShortDate(s[s.length - 1].date) : '';
+        if (s.length === 0) return '';
+
+        // The horizon ends on the final bucket's last day, not on the day that
+        // bucket opens. Reading the last period_start labelled the chart with a
+        // date up to a fortnight short of where the forecast actually stops.
+        const last = s[s.length - 1];
+        const end = new Date(`${last.date}T00:00:00`);
+        if (Number.isNaN(end.getTime())) return this.formatShortDate(last.date);
+
+        end.setDate(end.getDate() + Math.max(1, Number(last.days || 1)) - 1);
+
+        return new Intl.DateTimeFormat(undefined, {
+            month: 'short',
+            day: 'numeric',
+        }).format(end);
     },
 
     chartTransitionLabel() {

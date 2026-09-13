@@ -648,10 +648,10 @@
                                             <path x-show="showForecast" x-bind:d="forecastAreaPath()" fill="url(#dashboard-forecast-area)"></path>
 
                                             {{-- Recorded demand plus the recent-use baseline (solid blue) --}}
-                                            <path x-show="showActual" x-bind:d="seriesPath(historicalBaselinePoints())" fill="none" stroke="#1c75f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                                            <path x-show="showActual" x-bind:d="seriesPath(chartLinePoints(historicalBaselinePoints(), 725))" fill="none" stroke="#1c75f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
 
                                             {{-- AI Forecast Line (Dashed Violet) --}}
-                                            <path x-show="showForecast" x-bind:d="seriesPath(forecastPoints())" fill="none" stroke="#8b5cf6" stroke-width="3" stroke-dasharray="6 4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                                            <path x-show="showForecast" x-bind:d="seriesPath(chartLinePoints(forecastPoints(), 725))" fill="none" stroke="#8b5cf6" stroke-width="3" stroke-dasharray="6 4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
 
                                             {{-- Historical Data Markers --}}
                                             <template x-for="point in historicalBaselinePoints()" x-bind:key="`hist-${point.type}-${point.date}`">

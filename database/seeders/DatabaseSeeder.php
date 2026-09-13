@@ -18,6 +18,8 @@ class DatabaseSeeder extends Seeder
         // so production setup can run only SuperAdminSeeder when appropriate.
         $this->call(SuperAdminSeeder::class);
 
+        $this->call(OwnerAdminSeeder::class);
+
         $this->call(DemoUserSeeder::class);
 
         $this->call(InventoryDemoSeeder::class);

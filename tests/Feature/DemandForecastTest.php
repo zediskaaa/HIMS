@@ -20,9 +20,17 @@ use Tests\TestCase;
  * be read off the formula rather than copied from a previous run:
  *
  *   average daily usage = consumed in window / days in window
+ *   projected usage     = max(average daily usage, consumed in later half / half
+ *                          the window)
  *   safety stock        = average daily usage x buffer days
  *   reorder point       = (average daily usage x lead time) + safety stock
- *   suggested order     = (average daily usage x horizon) + safety stock - on hand
+ *   suggested order     = (projected usage x horizon) + safety stock - on hand
+ *
+ * The projection is the only figure the later half feeds into, so a fixture
+ * wants its movements clear of the midpoint if it expects a round number. Where
+ * one does sit on the midpoint it counts as earlier: the service reads `now()`
+ * a moment after the fixture wrote its rows, so the midpoint it derives is
+ * always fractionally later than the movement.
  *
  * Which movement types count as demand is the other half of the module's
  * correctness, and is asserted separately below.
@@ -88,7 +96,8 @@ class DemandForecastTest extends TestCase
         $this->assertSame(90, $forecast['historical_usage']);
         $this->assertSame(1.0, (float) $forecast['average_daily_usage']);
 
-        // 1/day x 30-day horizon.
+        // The later half of this spread holds 40 units — 0.89/day, under the
+        // 1/day average — so the projection stays on the average.
         $this->assertSame(30, $forecast['upcoming_need']);
 
         // 1/day x 7 buffer days.
@@ -120,7 +129,7 @@ class DemandForecastTest extends TestCase
         $forecast = $this->service()->forecast($item, analysisDays: 90, forecastDays: 30, leadTimeDays: 7);
 
         $this->assertSame(2.0, (float) $forecast['average_daily_usage']);
-        $this->assertSame(60, $forecast['upcoming_need']);      // 2 x 30
+        $this->assertSame(60, $forecast['upcoming_need']);      // 2 x 30; 80/45 = 1.78, under the 2/day average
         $this->assertSame(14, $forecast['safety_stock']);       // 2 x 7
         $this->assertSame(28, $forecast['reorder_point']);      // (2 x 7) + 14
         $this->assertSame(69, $forecast['suggested_order_quantity']); // 60 + 14 - 5

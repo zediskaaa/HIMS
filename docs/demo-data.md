@@ -27,6 +27,8 @@ Administrator accounts use the dedicated `/admin/login` page. All other accounts
 
 The protected Super Administrator is provisioned separately by `SuperAdminSeeder` and signs in through `/super-admin/login`. Its credential is intentionally not duplicated in this general demo guide. Change every initial password before using the accounts outside an isolated demonstration environment.
 
+The account holder's own Administrator login (`OwnerAdminSeeder`, email `zedrickdemonteverde1@gmail.com`) also uses `/admin/login` and is kept out of the table above for the same reason: it is a real account rather than sample staff, and the seeder never resets it once it exists.
+
 ## Included sample records
 
 - Inventory: categories, item master records, batches, stock balances, storage locations, departments, movements, transfers, adjustments, and consumption history for demand forecasting.

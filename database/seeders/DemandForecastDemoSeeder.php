@@ -81,7 +81,9 @@ class DemandForecastDemoSeeder extends Seeder
             }
         });
 
-        Cache::forget('demand-forecast:v1:90:30');
+        // Kept in step with AiDemandForecastService::cacheKey(). A stale version
+        // here means reseeding writes new history the dashboard never reads.
+        Cache::forget('demand-forecast:v2:90:30');
 
         $this->command?->info(
             self::EXPECTED_ITEMS.' forecasting demo items and '.(self::EXPECTED_ITEMS * 24)
@@ -137,6 +139,11 @@ class DemandForecastDemoSeeder extends Seeder
     }
 
     /**
+     * The demo hospital's catalogue. The rising items carry the largest base
+     * demand on purpose: with no item selected the dashboard draws every item as
+     * one aggregate line, so a growth story only reads if the growing items
+     * dominate the volume being summed.
+     *
      * @return array<int, array{
      *     name: string, sku: string, category: string, unit: string,
      *     stock: int, reserved: int, reorder_level: int, safety_stock: int,
@@ -147,18 +154,18 @@ class DemandForecastDemoSeeder extends Seeder
     private function items(): array
     {
         return [
-            ['name' => '3-Ply Surgical Face Mask', 'sku' => 'MASK-3PLY', 'category' => 'ppe', 'unit' => 'box', 'stock' => 18, 'reserved' => 2, 'reorder_level' => 80, 'safety_stock' => 35, 'lead_time_days' => 10, 'unit_cost' => 115.00, 'base_demand' => 6, 'events' => 24, 'pattern' => 'rising'],
+            ['name' => '3-Ply Surgical Face Mask', 'sku' => 'MASK-3PLY', 'category' => 'ppe', 'unit' => 'box', 'stock' => 18, 'reserved' => 2, 'reorder_level' => 80, 'safety_stock' => 35, 'lead_time_days' => 10, 'unit_cost' => 115.00, 'base_demand' => 18, 'events' => 24, 'pattern' => 'rising'],
             ['name' => 'Examination Gloves (Medium)', 'sku' => 'GLOVE-M', 'category' => 'ppe', 'unit' => 'box', 'stock' => 165, 'reserved' => 15, 'reorder_level' => 110, 'safety_stock' => 45, 'lead_time_days' => 8, 'unit_cost' => 285.00, 'base_demand' => 9, 'events' => 24, 'pattern' => 'steady'],
             ['name' => 'Disposable Syringe 5 mL', 'sku' => 'SYRINGE-5ML', 'category' => 'consumables', 'unit' => 'box', 'stock' => 24, 'reserved' => 3, 'reorder_level' => 95, 'safety_stock' => 30, 'lead_time_days' => 12, 'unit_cost' => 195.00, 'base_demand' => 7, 'events' => 24, 'pattern' => 'surge'],
-            ['name' => 'IV Cannula 22G', 'sku' => 'IVC-22G', 'category' => 'consumables', 'unit' => 'box', 'stock' => 14, 'reserved' => 2, 'reorder_level' => 65, 'safety_stock' => 24, 'lead_time_days' => 14, 'unit_cost' => 420.00, 'base_demand' => 5, 'events' => 24, 'pattern' => 'rising'],
+            ['name' => 'IV Cannula 22G', 'sku' => 'IVC-22G', 'category' => 'consumables', 'unit' => 'box', 'stock' => 14, 'reserved' => 2, 'reorder_level' => 65, 'safety_stock' => 24, 'lead_time_days' => 14, 'unit_cost' => 420.00, 'base_demand' => 14, 'events' => 24, 'pattern' => 'rising'],
             ['name' => 'Sterile Gauze Pads 4x4', 'sku' => 'GAUZE-4X4', 'category' => 'consumables', 'unit' => 'pack', 'stock' => 40, 'reserved' => 4, 'reorder_level' => 75, 'safety_stock' => 28, 'lead_time_days' => 7, 'unit_cost' => 85.00, 'base_demand' => 6, 'events' => 24, 'pattern' => 'falling'],
             ['name' => 'Normal Saline 0.9% 1 L', 'sku' => 'SALINE-1L', 'category' => 'pharmaceuticals', 'unit' => 'bag', 'stock' => 18, 'reserved' => 2, 'reorder_level' => 60, 'safety_stock' => 22, 'lead_time_days' => 9, 'unit_cost' => 68.00, 'base_demand' => 5, 'events' => 24, 'pattern' => 'steady'],
-            ['name' => 'Ceftriaxone 1 g Vial', 'sku' => 'CEFTRI-1G', 'category' => 'pharmaceuticals', 'unit' => 'vial', 'stock' => 12, 'reserved' => 2, 'reorder_level' => 48, 'safety_stock' => 18, 'lead_time_days' => 15, 'unit_cost' => 92.00, 'base_demand' => 4, 'events' => 24, 'pattern' => 'rising'],
+            ['name' => 'Ceftriaxone 1 g Vial', 'sku' => 'CEFTRI-1G', 'category' => 'pharmaceuticals', 'unit' => 'vial', 'stock' => 12, 'reserved' => 2, 'reorder_level' => 48, 'safety_stock' => 18, 'lead_time_days' => 15, 'unit_cost' => 92.00, 'base_demand' => 10, 'events' => 24, 'pattern' => 'rising'],
             ['name' => 'Isopropyl Alcohol 70% 500 mL', 'sku' => 'ALCOHOL-500', 'category' => 'pharmaceuticals', 'unit' => 'bottle', 'stock' => 8, 'reserved' => 1, 'reorder_level' => 42, 'safety_stock' => 16, 'lead_time_days' => 6, 'unit_cost' => 74.00, 'base_demand' => 3, 'events' => 24, 'pattern' => 'surge'],
             ['name' => 'ECG Monitoring Electrodes', 'sku' => 'ECG-ELECTRODE', 'category' => 'diagnostics', 'unit' => 'pack', 'stock' => 16, 'reserved' => 2, 'reorder_level' => 55, 'safety_stock' => 20, 'lead_time_days' => 11, 'unit_cost' => 310.00, 'base_demand' => 4, 'events' => 24, 'pattern' => 'intermittent'],
             ['name' => 'Blood Glucose Test Strips', 'sku' => 'GLUCOSE-STRIP', 'category' => 'diagnostics', 'unit' => 'box', 'stock' => 50, 'reserved' => 5, 'reorder_level' => 70, 'safety_stock' => 26, 'lead_time_days' => 10, 'unit_cost' => 620.00, 'base_demand' => 7, 'events' => 24, 'pattern' => 'steady'],
             ['name' => 'Urinary Catheter 16Fr', 'sku' => 'CATHETER-16FR', 'category' => 'consumables', 'unit' => 'piece', 'stock' => 35, 'reserved' => 3, 'reorder_level' => 38, 'safety_stock' => 14, 'lead_time_days' => 13, 'unit_cost' => 48.00, 'base_demand' => 3, 'events' => 24, 'pattern' => 'falling'],
-            ['name' => 'Absorbable Suture 3-0', 'sku' => 'SUTURE-3-0', 'category' => 'consumables', 'unit' => 'box', 'stock' => 10, 'reserved' => 1, 'reorder_level' => 36, 'safety_stock' => 15, 'lead_time_days' => 16, 'unit_cost' => 780.00, 'base_demand' => 3, 'events' => 24, 'pattern' => 'rising'],
+            ['name' => 'Absorbable Suture 3-0', 'sku' => 'SUTURE-3-0', 'category' => 'consumables', 'unit' => 'box', 'stock' => 10, 'reserved' => 1, 'reorder_level' => 36, 'safety_stock' => 15, 'lead_time_days' => 16, 'unit_cost' => 780.00, 'base_demand' => 8, 'events' => 24, 'pattern' => 'rising'],
         ];
     }
 
@@ -198,7 +205,12 @@ class DemandForecastDemoSeeder extends Seeder
     private function quantityForPattern(int $base, float $progress, string $pattern, int $index): int
     {
         $quantity = match ($pattern) {
-            'rising' => $base * (0.45 + ($progress * 1.65)),
+            // Accelerating demand: about a third of the base at the start of the
+            // window, three times it by the end. The shape matters as much as the
+            // size — the forecast projects the horizon at the rate over the later
+            // half, so a growth story only reads as growth when that half is
+            // genuinely hotter than the window average behind it.
+            'rising' => $base * (0.35 + (($progress ** 2) * 2.65)),
             'falling' => $base * (1.9 - ($progress * 1.35)),
             'surge' => $base * ($progress >= 0.70 ? 2.6 : 0.8 + ($progress * 0.5)),
             'intermittent' => $base * ($index % 4 === 0 ? 2.2 : 0.45),
