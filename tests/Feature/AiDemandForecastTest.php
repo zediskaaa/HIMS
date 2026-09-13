@@ -72,7 +72,7 @@ class AiDemandForecastTest extends TestCase
                 'forecast_days' => 30,
             ]));
 
-        $cached = Cache::get('demand-forecast:v1:90:30');
+        $cached = Cache::get('demand-forecast:v2:90:30');
         $this->assertSame('ai', $cached['source']);
         $response->assertSessionHas('success');
 
@@ -112,7 +112,12 @@ class AiDemandForecastTest extends TestCase
             ->assertOk()
             ->assertSee('AI Forecast')
             ->assertSee('Bandages')
-            ->assertSee('Recent consumption is rising');
+            ->assertSee('Recent consumption is rising')
+            ->assertSee('Forecast scope')
+            ->assertSee('Historical window')
+            ->assertSee('Statistical Forecast by Item')
+            ->assertDontSee('Capital at Risk')
+            ->assertDontSee('What-If Simulation');
 
         $this->actingAs($manager)->get(route('dashboard'))
             ->assertOk()
@@ -178,8 +183,9 @@ class AiDemandForecastTest extends TestCase
             ->assertSee('Current Stock')
             ->assertSee('At-risk items')
             ->assertSee('Reorder units')
-            ->assertSee('Comparison starts')
+            ->assertSee('Forecast starts')
             ->assertSee('Units/day')
+            ->assertSee('Period total:')
             ->assertSee('Inventory attention')
             ->assertSee('AI forecast insight')
             ->assertSee('Forecast details')
@@ -187,6 +193,7 @@ class AiDemandForecastTest extends TestCase
             ->assertSee('AI forecast')
             ->assertSee('data-chart-inspector', false)
             ->assertSee('Hover, drag, or use the arrow keys to inspect either line.')
+            ->assertSee('<details hidden', false)
             ->assertSee('data-dashboard-secondary', false)
             ->assertSee('Clinical Consumables')
             ->assertSee('Full Demand Forecast')
@@ -246,6 +253,25 @@ class AiDemandForecastTest extends TestCase
         $this->assertSame(90, $historical->sum('days'));
         $this->assertSame([4, 3], $forecast->pluck('days')->all());
         $this->assertSame(7, $forecast->sum('days'));
+        $this->assertSame(now()->addDay()->toDateString(), $forecast->first()['period_start']);
+    }
+
+    public function test_dashboard_chart_scales_units_per_day_from_bucket_rates(): void
+    {
+        $script = file_get_contents(resource_path('js/app.js'));
+
+        $this->assertIsString($script);
+        $this->assertStringContainsString(
+            'hist.map((point) => Number(point.rate || 0))',
+            $script,
+        );
+        $this->assertStringContainsString(
+            'fore.map((point) => Number(point.rate || 0))',
+            $script,
+        );
+        $this->assertSame(2, substr_count($script, 'y: this.chartY(rate),'));
+        $this->assertStringContainsString('y: this.chartY(baselineRate),', $script);
+        $this->assertStringNotContainsString('y: this.chartY(point.quantity),', $script);
     }
 
     public function test_missing_api_key_uses_a_clearly_labeled_statistical_fallback(): void
@@ -263,7 +289,7 @@ class AiDemandForecastTest extends TestCase
             ->assertSessionHas('info');
 
         Http::assertNothingSent();
-        $cached = Cache::get('demand-forecast:v1:90:30');
+        $cached = Cache::get('demand-forecast:v2:90:30');
         $this->assertSame('statistical', $cached['source']);
         $this->assertSame('Statistical Forecast', $cached['source_label']);
         $this->assertNotEmpty($cached['notice']);
@@ -349,7 +375,7 @@ class AiDemandForecastTest extends TestCase
             ->assertSessionHas('success');
 
         Http::assertSentCount(2);
-        $this->assertSame('ai', Cache::get('demand-forecast:v1:90:30')['source']);
+        $this->assertSame('ai', Cache::get('demand-forecast:v2:90:30')['source']);
         $this->assertDatabaseMissing('audit_logs', [
             'action' => AuditAction::FailedDemandForecast->value,
         ]);
@@ -373,7 +399,7 @@ class AiDemandForecastTest extends TestCase
         $this->assertSame('gemini_invalid_request', data_get($failure->new_values, 'failure_type'));
         $this->assertStringContainsString(
             'usable validated forecast',
-            Cache::get('demand-forecast:v1:90:30')['notice'],
+            Cache::get('demand-forecast:v2:90:30')['notice'],
         );
     }
 
@@ -406,7 +432,7 @@ class AiDemandForecastTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('info');
 
-        $cached = Cache::get('demand-forecast:v1:90:30');
+        $cached = Cache::get('demand-forecast:v2:90:30');
         $this->assertSame('statistical', $cached['source']);
         $this->assertSame('Bandages', $cached['items'][0]['item_name']);
         $this->assertStringNotContainsString('Hallucinated item', json_encode($cached, JSON_THROW_ON_ERROR));
@@ -423,7 +449,7 @@ class AiDemandForecastTest extends TestCase
             ->assertForbidden();
 
         Http::assertNothingSent();
-        $this->assertNull(Cache::get('demand-forecast:v1:90:30'));
+        $this->assertNull(Cache::get('demand-forecast:v2:90:30'));
     }
 
     public function test_dashboard_never_exposes_the_configured_api_key(): void
@@ -493,7 +519,7 @@ class AiDemandForecastTest extends TestCase
             ->post(route('inventory.demand-forecast.refresh'))
             ->assertSessionHas('success');
 
-        $cached = Cache::get('demand-forecast:v1:90:30');
+        $cached = Cache::get('demand-forecast:v2:90:30');
         $this->assertSame('ai', $cached['source']);
         $this->assertSame('gemini-test-backup', $cached['model']);
 

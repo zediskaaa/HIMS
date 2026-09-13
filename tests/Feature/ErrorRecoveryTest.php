@@ -419,8 +419,10 @@ class ErrorRecoveryTest extends TestCase
             ->get('/super-admin/dashboard');
 
         $response->assertOk();
-        $response->assertSee('Attention: 1 Unresolved System Incident');
-        $response->assertSee('Open Recovery Center');
+        $response->assertSee('data-recovery-incident-card', false);
+        $response->assertSee('System incidents');
+        $response->assertSee('Recovery review required');
+        $response->assertDontSee('Attention: 1 Unresolved System Incident');
     }
 
     public function test_super_admin_can_retry_queue_job(): void

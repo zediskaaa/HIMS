@@ -1422,8 +1422,8 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     chartMaximum() {
         const hist = this.currentHistoricalSeries();
         const fore = this.currentForecastSeries();
-        const histMax = Math.max(...hist.map((point) => Number(point.quantity || 0)), 0);
-        const foreMax = Math.max(...fore.map((point) => Number(point.quantity || 0)), 0);
+        const histMax = Math.max(...hist.map((point) => Number(point.rate || 0)), 0);
+        const foreMax = Math.max(...fore.map((point) => Number(point.rate || 0)), 0);
         return Math.max(histMax, foreMax, 1);
     },
 
@@ -1450,9 +1450,9 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
 
             return {
                 x: Math.round((startX + (step * index)) * 10) / 10,
-                y: this.chartY(point.quantity),
+                y: this.chartY(rate),
                 date: point.date,
-                formattedDate: this.formatDateLabel(point.date),
+                formattedDate: this.formatPeriodLabel(point.date, days),
                 quantity,
                 days,
                 value: rate,
@@ -1478,14 +1478,15 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
 
             return {
                 x: Math.round((startX + (step * (index + 1))) * 10) / 10,
-                y: this.chartY(point.quantity),
+                y: this.chartY(rate),
                 date: point.date,
-                formattedDate: this.formatDateLabel(point.date),
+                formattedDate: this.formatPeriodLabel(point.date, days),
                 quantity,
                 days,
                 value: rate,
                 type: 'forecast',
                 label: 'AI Forecast',
+                confidence: this.selectedItem()?.confidence ?? null,
             };
         });
     },
@@ -1504,9 +1505,9 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
             const quantity = Math.round(baselineRate * days);
             return {
                 x: fp.x,
-                y: this.chartY(quantity),
+                y: this.chartY(baselineRate),
                 date: fp.date,
-                formattedDate: this.formatDateLabel(fp.date),
+                formattedDate: this.formatPeriodLabel(fp.date, days),
                 quantity,
                 days,
                 value: baselineRate,
@@ -1593,6 +1594,9 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     },
 
     chartTransitionLabel() {
+        const forecast = this.currentForecastSeries();
+        if (forecast.length > 0) return this.formatShortDate(forecast[0].date);
+
         const hist = this.currentHistoricalSeries();
         return hist.length > 0 ? this.formatShortDate(hist[hist.length - 1].date) : 'Today';
     },
@@ -1706,7 +1710,7 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
             baselinePoint,
             variancePercent,
             varianceDirection,
-            formattedDate: this.formatDateLabel(point.date),
+            formattedDate: this.formatPeriodLabel(point.date, point.days),
             percentageX: Math.round((primary.x / 760) * 1000) / 10,
             percentageY: Math.round((primary.y / 240) * 1000) / 10,
         };
@@ -1840,6 +1844,23 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
             day: 'numeric',
             year: 'numeric',
         }).format(date);
+    },
+
+    formatPeriodLabel(value, days = 1) {
+        const start = new Date(`${value}T00:00:00`);
+        if (Number.isNaN(start.getTime())) return String(value || '');
+
+        const duration = Math.max(1, Number(days || 1));
+        if (duration <= 1) return this.formatDateLabel(value);
+
+        const end = new Date(start);
+        end.setDate(end.getDate() + duration - 1);
+
+        return `${this.formatDateLabel(value)} – ${new Intl.DateTimeFormat(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+        }).format(end)}`;
     },
 
     formatShortDate(value) {

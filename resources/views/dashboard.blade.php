@@ -51,9 +51,11 @@
         x-init="start()"
         @dashboard-refresh.window="refresh()"
     >
+    @php
+        $pendingRecoveryCount = 0;
+    @endphp
     @can(\App\Enums\Permission::ManageSystemRecovery->value)
         @php
-            $pendingRecoveryCount = 0;
             try {
                 if (\Illuminate\Support\Facades\Schema::hasTable('system_recovery_records')) {
                     $pendingRecoveryCount = \App\Models\SystemRecoveryRecord::pending()->count();
@@ -62,34 +64,13 @@
                 $pendingRecoveryCount = 0;
             }
         @endphp
-        @if ($pendingRecoveryCount > 0)
-            <div class="flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex items-center gap-2.5">
-                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                    </span>
-                    <div>
-                        <h4 class="text-sm font-bold text-amber-950">
-                            Attention: {{ $pendingRecoveryCount }} Unresolved System {{ \Illuminate\Support\Str::plural('Incident', $pendingRecoveryCount) }}
-                        </h4>
-                        <p class="text-xs text-amber-800">
-                            Failed transactions, data imports, or background jobs require review in the Recovery Center.
-                        </p>
-                    </div>
-                </div>
-                <a
-                    href="{{ route('admin.recovery.index') }}"
-                    class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-800 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-amber-900 transition shadow-sm self-start sm:self-auto"
-                >
-                    <span>Open Recovery Center</span>
-                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                </a>
-            </div>
-        @endif
     @endcan
 
     {{-- Key figures --}}
-    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:gap-4">
+    <div @class([
+        'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:gap-4',
+        'xl:grid-cols-5' => $pendingRecoveryCount > 0,
+    ])>
         <x-ui.stat
             label="Tracked items"
             icon="cube"
@@ -140,6 +121,22 @@
         >
             <x-slot:value><span data-stat-value>₱{{ number_format($totalInventoryValue, 2) }}</span></x-slot:value>
         </x-ui.stat>
+        @endcan
+
+        @can(\App\Enums\Permission::ManageSystemRecovery->value)
+            @if ($pendingRecoveryCount > 0)
+                <x-ui.stat
+                    label="System incidents"
+                    icon="exclamation-triangle"
+                    tone="warning"
+                    hint="Recovery review required"
+                    :href="route('admin.recovery.index')"
+                    :compact="true"
+                    data-recovery-incident-card
+                >
+                    <x-slot:value>{{ number_format($pendingRecoveryCount) }}</x-slot:value>
+                </x-ui.stat>
+            @endif
         @endcan
     </div>
     @can(\App\Enums\Permission::ViewReports->value)
@@ -533,9 +530,16 @@
                                                         </div>
                                                     </div>
                                                     <div class="flex justify-between pl-3.5 text-[10px] tabular-nums text-neutral-400">
-                                                        <span>Predicted Total:</span>
+                                                        <span>Period total:</span>
                                                         <span x-text="`${formatNumber(activePoint?.forecastPoint?.quantity ?? activePoint?.quantity)} units`"></span>
                                                     </div>
+
+                                                    <template x-if="activePoint?.forecastPoint?.confidence">
+                                                        <div class="flex justify-between pl-3.5 text-[10px] text-neutral-400">
+                                                            <span>Confidence:</span>
+                                                            <span class="font-medium capitalize text-neutral-600" x-text="activePoint.forecastPoint.confidence"></span>
+                                                        </div>
+                                                    </template>
 
                                                     {{-- Historical Baseline Row --}}
                                                     <template x-if="showActual && (activePoint?.baselinePoint || activePoint?.type === 'baseline')">
@@ -777,7 +781,7 @@
                                         </div>
                                         <div class="flex items-center gap-1.5 px-3 font-semibold text-neutral-800">
                                             <span class="h-2 w-2 rounded-full bg-neutral-600"></span>
-                                            <span>Comparison starts (<span class="tabular-nums text-primary-700" x-text="chartTransitionLabel()"></span>)</span>
+                                            <span>Forecast starts (<span class="tabular-nums text-primary-700" x-text="chartTransitionLabel()"></span>)</span>
                                         </div>
                                         <div class="flex items-center justify-between gap-2">
                                             <span class="hidden text-neutral-400 sm:inline">AI forecast horizon</span>
@@ -987,7 +991,7 @@
         </x-ui.card>
     @endcan
 
-    <details class="group overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm" data-dashboard-secondary>
+    <details hidden class="group overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm" data-dashboard-secondary>
         <summary class="flex cursor-pointer list-none flex-col gap-2 px-4 py-3 marker:content-none sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h2 class="text-sm font-semibold text-neutral-900">Operational details</h2>

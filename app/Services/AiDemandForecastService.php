@@ -587,7 +587,7 @@ class AiDemandForecastService
                 $allocated += $quantity;
 
                 return [
-                    'period_start' => $generatedAt->copy()->startOfDay()->addDays($index * $bucketDays)->toDateString(),
+                    'period_start' => $generatedAt->copy()->startOfDay()->addDay()->addDays($index * $bucketDays)->toDateString(),
                     'quantity' => $quantity,
                     'days' => $periodDays[$index],
                 ];
@@ -666,6 +666,6 @@ class AiDemandForecastService
 
     private function cacheKey(int $analysisDays, int $forecastDays): string
     {
-        return "demand-forecast:v1:{$analysisDays}:{$forecastDays}";
+        return "demand-forecast:v2:{$analysisDays}:{$forecastDays}";
     }
 }
