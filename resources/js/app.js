@@ -1128,6 +1128,8 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     success: '',
     activePoint: null,
     isDragging: false,
+    isHovering: false,
+    isFocused: false,
     filtersOpen: false,
     showActual: true,
     showForecast: true,
@@ -1517,20 +1519,26 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     },
 
     allChartPoints() {
-        const points = [];
-        if (this.showActual) {
-            points.push(...this.historicalBaselinePoints());
+        const hist = this.historicalPoints();
+        const fore = this.forecastPoints();
+        const baselineFuture = this.historicalBaselinePoints().filter((p) => p.type === 'baseline');
+
+        const timelineMap = new Map();
+
+        // 1. Add historical points
+        if (this.showActual || !this.showForecast) {
+            hist.forEach((p) => timelineMap.set(p.date, p));
         }
+
+        // 2. Add future points: prioritize forecast point for primary positioning if forecast is visible
         if (this.showForecast) {
-            this.forecastPoints().forEach((fp) => {
-                if (!points.some((p) => Math.abs(p.x - fp.x) < 2 && Math.abs(p.y - fp.y) < 2)) {
-                    points.push(fp);
-                }
-            });
+            fore.forEach((p) => timelineMap.set(p.date, p));
+        } else if (this.showActual) {
+            baselineFuture.forEach((p) => timelineMap.set(p.date, p));
         }
-        return points.length > 0
-            ? points.sort((a, b) => a.x - b.x)
-            : [...this.historicalPoints(), ...this.forecastPoints()];
+
+        const points = Array.from(timelineMap.values()).sort((a, b) => a.x - b.x);
+        return points.length > 0 ? points : [...hist, ...fore];
     },
 
     seriesPath(points) {
@@ -1591,6 +1599,7 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
 
     onChartPointerDown(event) {
         this.isDragging = true;
+        this.isHovering = true;
         try {
             event.currentTarget.setPointerCapture(event.pointerId);
         } catch {}
@@ -1598,6 +1607,7 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     },
 
     onChartPointerMove(event) {
+        this.isHovering = true;
         this.handlePointerPosition(event);
     },
 
@@ -1615,15 +1625,22 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     },
 
     onChartMouseMove(event) {
+        this.isHovering = true;
         this.handlePointerPosition(event);
     },
 
     onChartMouseLeave() {
         this.isDragging = false;
+        this.isHovering = false;
     },
 
-    onChartPointerLeave() {
+    onChartPointerLeave(event) {
+        if (event && event.pointerType === 'touch') {
+            this.isDragging = false;
+            return;
+        }
         this.isDragging = false;
+        this.isHovering = false;
     },
 
     handlePointerPosition(event) {
@@ -1662,15 +1679,51 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
 
     setActivePoint(point) {
         if (!point) return;
+
+        const isFuture = point.x >= (this.transitionX() - 2) || point.type === 'forecast' || point.type === 'baseline';
+        const forecastPoints = this.forecastPoints();
+        const baselinePoints = this.historicalBaselinePoints();
+
+        const forecastPoint = forecastPoints.find((p) => p.date === point.date)
+            || (point.type === 'forecast' ? point : null);
+        const baselinePoint = baselinePoints.find((p) => p.date === point.date && (p.type === 'baseline' || p.type === 'actual'))
+            || (point.type === 'baseline' ? point : null);
+
+        let variancePercent = null;
+        let varianceDirection = 'equal';
+        if (forecastPoint && baselinePoint && baselinePoint.value > 0) {
+            const diff = (forecastPoint.value ?? 0) - (baselinePoint.value ?? 0);
+            variancePercent = Math.round((Math.abs(diff) / baselinePoint.value) * 100);
+            varianceDirection = diff > 0 ? 'higher' : (diff < 0 ? 'lower' : 'equal');
+        }
+
+        const primary = (isFuture && this.showForecast && forecastPoint) ? forecastPoint : point;
+
         this.activePoint = {
-            ...point,
+            ...primary,
+            isFuture,
+            forecastPoint,
+            baselinePoint,
+            variancePercent,
+            varianceDirection,
             formattedDate: this.formatDateLabel(point.date),
-            percentageX: Math.round((point.x / 760) * 100),
-            percentageY: Math.round((point.y / 240) * 100),
+            percentageX: Math.round((primary.x / 760) * 1000) / 10,
+            percentageY: Math.round((primary.y / 240) * 1000) / 10,
         };
     },
 
+    tooltipStyle() {
+        if (!this.activePoint) return 'display: none;';
+        const pctX = this.activePoint.percentageX ?? 50;
+        if (pctX > 55) {
+            return `left: ${pctX}%; top: 8px; transform: translateX(calc(-100% - 14px));`;
+        }
+        return `left: ${pctX}%; top: 8px; transform: translateX(14px);`;
+    },
+
     stepPoint(direction) {
+        this.isFocused = true;
+        this.isHovering = true;
         const points = this.allChartPoints();
         if (points.length === 0) return;
         const currentIndex = points.findIndex(

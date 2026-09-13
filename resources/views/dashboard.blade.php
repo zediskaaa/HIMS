@@ -475,36 +475,125 @@
                             <div class="min-w-0 px-3 py-2.5">
                                 <div x-show="hasChartData()" class="min-w-0 select-none">
                                     <div
-                                        data-chart-inspector
-                                        class="mb-2 flex min-h-9 items-center rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-[11px] text-neutral-600"
+                                        class="relative min-w-0"
+                                        x-on:pointerenter="isHovering = true"
+                                        x-on:pointerleave="onChartPointerLeave($event)"
                                     >
-                                        <template x-if="!activePoint">
-                                            <p>Hover, drag, or use the arrow keys to inspect either line.</p>
-                                        </template>
-                                        <template x-if="activePoint">
-                                            <div class="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
-                                                <span class="font-medium text-neutral-700" x-text="activePoint?.formattedDate"></span>
-                                                <span
-                                                    class="rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
-                                                    x-bind:class="activePoint?.type === 'forecast' ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-primary-200 bg-primary-50 text-primary-700'"
-                                                    x-text="activePoint?.type === 'forecast' ? 'AI forecast' : (activePoint?.type === 'baseline' ? 'Historical baseline' : 'Historical demand')"
-                                                ></span>
-                                                <span class="font-semibold tabular-nums text-neutral-900">
-                                                    <span x-text="formatNumber(activePoint?.value, 1)"></span>
-                                                    <span class="font-normal text-neutral-500">units/day</span>
-                                                </span>
-                                                <span class="hidden text-neutral-300 sm:inline">&bull;</span>
-                                                <span class="tabular-nums text-neutral-500" x-text="`${formatNumber(activePoint?.quantity)} units across ${activePoint?.days || 1} ${(activePoint?.days || 1) === 1 ? 'day' : 'days'}`"></span>
-                                            </div>
-                                        </template>
-                                    </div>
+                                        {{-- Y-axis scale figures (cleanly positioned without overlapping text) --}}
+                                        <div class="pointer-events-none absolute left-0.5 top-0 z-10 select-none">
+                                            <span class="text-[9px] font-semibold uppercase tracking-wider text-neutral-400">Units/day</span>
+                                        </div>
+                                        <span class="pointer-events-none absolute left-0.5 top-5 z-10 select-none text-[10px] font-medium tabular-nums text-neutral-400" x-text="formatNumber(chartMaximum(), 1)"></span>
+                                        <span class="pointer-events-none absolute left-0.5 top-1/2 -translate-y-1/2 z-10 select-none text-[10px] font-medium tabular-nums text-neutral-400" x-text="formatNumber(chartMaximum() / 2, 1)"></span>
+                                        <span class="pointer-events-none absolute bottom-5 left-0.5 z-10 select-none text-[10px] font-medium tabular-nums text-neutral-400">0</span>
 
-                                    <div class="relative min-w-0">
-                                        {{-- Y-axis scale figures --}}
-                                        <span class="absolute left-0 top-1 text-[10px] tabular-nums text-neutral-400" x-text="formatNumber(chartMaximum(), 1)"></span>
-                                        <span class="absolute left-0 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-neutral-400" x-text="formatNumber(chartMaximum() / 2, 1)"></span>
-                                        <span class="absolute bottom-5 left-0 text-[10px] tabular-nums text-neutral-400">0</span>
-                                        <span class="absolute -left-1 top-8 -rotate-90 origin-top-left text-[9px] font-medium uppercase tracking-wide text-neutral-400">Units/day</span>
+                                        {{-- Interactive Hover Tooltip Popover --}}
+                                        <div
+                                            data-chart-inspector
+                                            x-show="activePoint && (isHovering || isDragging || isFocused)"
+                                            x-cloak
+                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter-start="opacity-0 translate-y-1 scale-95"
+                                            x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                                            x-transition:leave="transition ease-in duration-100"
+                                            x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                                            x-transition:leave-end="opacity-0 translate-y-1 scale-95"
+                                            class="pointer-events-none absolute z-30 min-w-[210px] max-w-[280px] rounded-lg border border-neutral-200/90 bg-white/95 p-2.5 shadow-lg backdrop-blur-sm transition-[left,top] duration-75 ease-out"
+                                            x-bind:style="tooltipStyle()"
+                                        >
+                                            <p class="sr-only">Hover, drag, or use the arrow keys to inspect either line.</p>
+
+                                            {{-- Tooltip Header: Date & Horizon Badge --}}
+                                            <div class="mb-2 flex items-center justify-between gap-2 border-b border-neutral-100 pb-1.5">
+                                                <span class="text-xs font-semibold text-neutral-800" x-text="activePoint?.formattedDate"></span>
+                                                <template x-if="activePoint?.isFuture">
+                                                    <span class="inline-flex items-center rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-700">
+                                                        AI Forecast
+                                                    </span>
+                                                </template>
+                                                <template x-if="!activePoint?.isFuture">
+                                                    <span class="inline-flex items-center rounded border border-primary-200 bg-primary-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary-700">
+                                                        Historical
+                                                    </span>
+                                                </template>
+                                            </div>
+
+                                            {{-- Tooltip Content: Future Forecast Horizon --}}
+                                            <template x-if="activePoint?.isFuture">
+                                                <div class="space-y-1.5 text-xs">
+                                                    {{-- AI Forecast Row --}}
+                                                    <div class="flex items-center justify-between gap-3">
+                                                        <div class="flex items-center gap-1.5">
+                                                            <span class="h-2 w-2 rounded-full bg-violet-600 ring-2 ring-violet-200"></span>
+                                                            <span class="font-medium text-neutral-700">AI Forecast:</span>
+                                                        </div>
+                                                        <div class="text-right tabular-nums">
+                                                            <span class="font-bold text-violet-700" x-text="formatNumber(activePoint?.forecastPoint?.value ?? activePoint?.value, 1)"></span>
+                                                            <span class="text-[10px] font-normal text-neutral-500">units/day</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex justify-between pl-3.5 text-[10px] tabular-nums text-neutral-400">
+                                                        <span>Predicted Total:</span>
+                                                        <span x-text="`${formatNumber(activePoint?.forecastPoint?.quantity ?? activePoint?.quantity)} units`"></span>
+                                                    </div>
+
+                                                    {{-- Historical Baseline Row --}}
+                                                    <template x-if="showActual && (activePoint?.baselinePoint || activePoint?.type === 'baseline')">
+                                                        <div class="mt-1.5 border-t border-dashed border-neutral-100 pt-1.5">
+                                                            <div class="flex items-center justify-between gap-3">
+                                                                <div class="flex items-center gap-1.5">
+                                                                    <span class="h-2 w-2 rounded-full bg-primary-500"></span>
+                                                                    <span class="text-[11px] text-neutral-500">Baseline:</span>
+                                                                </div>
+                                                                <div class="text-right tabular-nums">
+                                                                    <span class="text-[11px] font-medium text-neutral-700" x-text="formatNumber(activePoint?.baselinePoint?.value ?? baselineDailyRate(), 1)"></span>
+                                                                    <span class="text-[10px] font-normal text-neutral-400">units/day</span>
+                                                                </div>
+                                                            </div>
+
+                                                            {{-- Variance comparison --}}
+                                                            <template x-if="activePoint?.variancePercent != null">
+                                                                <div class="mt-1 flex items-center justify-between rounded bg-neutral-50 px-1.5 py-0.5 text-[10px]">
+                                                                    <span class="text-neutral-500">vs Baseline:</span>
+                                                                    <span
+                                                                        class="font-semibold tabular-nums"
+                                                                        x-bind:class="{
+                                                                            'text-emerald-600': activePoint?.varianceDirection === 'higher',
+                                                                            'text-amber-600': activePoint?.varianceDirection === 'lower',
+                                                                            'text-neutral-500': activePoint?.varianceDirection === 'equal'
+                                                                        }"
+                                                                        x-text="activePoint?.varianceDirection === 'higher'
+                                                                            ? `+${activePoint.variancePercent}% higher`
+                                                                            : (activePoint?.varianceDirection === 'lower'
+                                                                                ? `-${activePoint.variancePercent}% lower`
+                                                                                : 'Equal to baseline')"
+                                                                    ></span>
+                                                                </div>
+                                                            </template>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </template>
+
+                                            {{-- Tooltip Content: Recorded History --}}
+                                            <template x-if="!activePoint?.isFuture">
+                                                <div class="space-y-1 text-xs">
+                                                    <div class="flex items-center justify-between gap-3">
+                                                        <div class="flex items-center gap-1.5">
+                                                            <span class="h-2 w-2 rounded-full bg-primary-600"></span>
+                                                            <span class="font-medium text-neutral-700">Recorded Demand:</span>
+                                                        </div>
+                                                        <div class="text-right tabular-nums">
+                                                            <span class="font-bold text-primary-700" x-text="formatNumber(activePoint?.value, 1)"></span>
+                                                            <span class="text-[10px] font-normal text-neutral-500">units/day</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="text-right text-[10px] tabular-nums text-neutral-400">
+                                                        <span x-text="`${formatNumber(activePoint?.quantity)} units across ${activePoint?.days || 1} ${(activePoint?.days || 1) === 1 ? 'day' : 'days'}`"></span>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
 
                                         <svg
                                             class="h-48 w-full cursor-crosshair select-none touch-none sm:h-52"
@@ -516,7 +605,9 @@
                                             x-on:pointermove="onChartPointerMove($event)"
                                             x-on:pointerup="onChartPointerUp($event)"
                                             x-on:pointercancel="onChartPointerCancel($event)"
-                                            x-on:pointerleave="onChartPointerLeave()"
+                                            x-on:pointerleave="onChartPointerLeave($event)"
+                                            x-on:focus="isFocused = true"
+                                            x-on:blur="isFocused = false"
                                             tabindex="0"
                                             x-on:keydown.arrow-left.prevent="stepPoint(-1)"
                                             x-on:keydown.arrow-right.prevent="stepPoint(1)"
@@ -563,8 +654,8 @@
                                                 <circle x-show="showForecast" x-bind:cx="point.x" x-bind:cy="point.y" r="3.5" fill="#ffffff" stroke="#8b5cf6" stroke-width="2" vector-effect="non-scaling-stroke"></circle>
                                             </template>
 
-                                            {{-- Interactive Timeline Scrubber Line & Handle (Moves dynamically with hover, drag, and click) --}}
-                                            <template x-if="activePoint">
+                                            {{-- Interactive Timeline Scrubber Line & Handles (Moves dynamically with hover, drag, and click) --}}
+                                            <template x-if="activePoint && (isHovering || isDragging || isFocused)">
                                                 <g class="transition-all duration-75">
                                                     {{-- Vertical Scrubber Guideline --}}
                                                     <line
@@ -572,42 +663,107 @@
                                                         y1="20"
                                                         x-bind:x2="activePoint.x"
                                                         y2="205"
-                                                        stroke="#1e293b"
+                                                        stroke="#334155"
                                                         stroke-width="1.5"
-                                                        stroke-dasharray="4 4"
+                                                        stroke-dasharray="3 3"
                                                         vector-effect="non-scaling-stroke"
                                                     ></line>
 
-                                                    {{-- Glowing Halo --}}
-                                                    <circle
-                                                        x-bind:cx="activePoint.x"
-                                                        x-bind:cy="activePoint.y"
-                                                        r="11"
-                                                        x-bind:fill="activePoint.type === 'forecast' ? '#8b5cf6' : '#1c75f5'"
-                                                        fill-opacity="0.2"
-                                                        class="animate-pulse"
-                                                    ></circle>
+                                                    {{-- Future point beads: if in forecast region, show both AI Forecast bead & Baseline bead --}}
+                                                    <template x-if="activePoint.isFuture">
+                                                        <g>
+                                                            {{-- AI Forecast Bead (Violet) --}}
+                                                            <template x-if="showForecast && activePoint.forecastPoint">
+                                                                <g>
+                                                                    <circle
+                                                                        x-bind:cx="activePoint.x"
+                                                                        x-bind:cy="activePoint.forecastPoint.y"
+                                                                        r="11"
+                                                                        fill="#8b5cf6"
+                                                                        fill-opacity="0.25"
+                                                                        class="animate-pulse"
+                                                                    ></circle>
+                                                                    <circle
+                                                                        x-bind:cx="activePoint.x"
+                                                                        x-bind:cy="activePoint.forecastPoint.y"
+                                                                        r="5"
+                                                                        fill="#ffffff"
+                                                                        stroke="#8b5cf6"
+                                                                        stroke-width="2.5"
+                                                                        vector-effect="non-scaling-stroke"
+                                                                        class="cursor-grab active:cursor-grabbing"
+                                                                    ></circle>
+                                                                    <circle
+                                                                        x-bind:cx="activePoint.x"
+                                                                        x-bind:cy="activePoint.forecastPoint.y"
+                                                                        r="2"
+                                                                        fill="#8b5cf6"
+                                                                        vector-effect="non-scaling-stroke"
+                                                                    ></circle>
+                                                                </g>
+                                                            </template>
 
-                                                    {{-- Outer Ring Handle --}}
-                                                    <circle
-                                                        x-bind:cx="activePoint.x"
-                                                        x-bind:cy="activePoint.y"
-                                                        r="6"
-                                                        fill="#ffffff"
-                                                        stroke="#0f172a"
-                                                        stroke-width="2.5"
-                                                        vector-effect="non-scaling-stroke"
-                                                        class="cursor-grab active:cursor-grabbing"
-                                                    ></circle>
+                                                            {{-- Historical Baseline Bead (Blue) --}}
+                                                            <template x-if="showActual && activePoint.baselinePoint">
+                                                                <g>
+                                                                    <circle
+                                                                        x-bind:cx="activePoint.x"
+                                                                        x-bind:cy="activePoint.baselinePoint.y"
+                                                                        r="8"
+                                                                        fill="#1c75f5"
+                                                                        fill-opacity="0.2"
+                                                                    ></circle>
+                                                                    <circle
+                                                                        x-bind:cx="activePoint.x"
+                                                                        x-bind:cy="activePoint.baselinePoint.y"
+                                                                        r="4"
+                                                                        fill="#ffffff"
+                                                                        stroke="#1c75f5"
+                                                                        stroke-width="2"
+                                                                        vector-effect="non-scaling-stroke"
+                                                                    ></circle>
+                                                                    <circle
+                                                                        x-bind:cx="activePoint.x"
+                                                                        x-bind:cy="activePoint.baselinePoint.y"
+                                                                        r="1.5"
+                                                                        fill="#1c75f5"
+                                                                        vector-effect="non-scaling-stroke"
+                                                                    ></circle>
+                                                                </g>
+                                                            </template>
+                                                        </g>
+                                                    </template>
 
-                                                    {{-- Center Bead --}}
-                                                    <circle
-                                                        x-bind:cx="activePoint.x"
-                                                        x-bind:cy="activePoint.y"
-                                                        r="2.5"
-                                                        x-bind:fill="activePoint.type === 'forecast' ? '#8b5cf6' : '#1c75f5'"
-                                                        vector-effect="non-scaling-stroke"
-                                                    ></circle>
+                                                    {{-- Historical point bead (Blue) --}}
+                                                    <template x-if="!activePoint.isFuture">
+                                                        <g>
+                                                            <circle
+                                                                x-bind:cx="activePoint.x"
+                                                                x-bind:cy="activePoint.y"
+                                                                r="11"
+                                                                fill="#1c75f5"
+                                                                fill-opacity="0.25"
+                                                                class="animate-pulse"
+                                                            ></circle>
+                                                            <circle
+                                                                x-bind:cx="activePoint.x"
+                                                                x-bind:cy="activePoint.y"
+                                                                r="5"
+                                                                fill="#ffffff"
+                                                                stroke="#1c75f5"
+                                                                stroke-width="2.5"
+                                                                vector-effect="non-scaling-stroke"
+                                                                class="cursor-grab active:cursor-grabbing"
+                                                            ></circle>
+                                                            <circle
+                                                                x-bind:cx="activePoint.x"
+                                                                x-bind:cy="activePoint.y"
+                                                                r="2"
+                                                                fill="#1c75f5"
+                                                                vector-effect="non-scaling-stroke"
+                                                            ></circle>
+                                                        </g>
+                                                    </template>
                                                 </g>
                                             </template>
                                         </svg>
