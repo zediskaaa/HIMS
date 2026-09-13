@@ -27,10 +27,13 @@ use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class SupplierController extends Controller implements HasMiddleware
 {
@@ -43,11 +46,13 @@ class SupplierController extends Controller implements HasMiddleware
     {
         return [
             'auth:web,admin,super_admin',
-            new Middleware('can:'.Permission::ViewSuppliers->value, only: ['index', 'show']),
+            new Middleware('can:'.Permission::ViewSuppliers->value, only: ['index', 'show', 'showLogo']),
             new Middleware('can:'.Permission::ViewSupplierSensitiveData->value, only: ['downloadDocument']),
             new Middleware('can:'.Permission::ManageSuppliers->value, only: [
                 'store',
                 'update',
+                'updateLogo',
+                'destroyLogo',
                 'addContact',
                 'deleteContact',
                 'uploadDocument',
@@ -279,6 +284,110 @@ class SupplierController extends Controller implements HasMiddleware
         $this->suppliers->update($supplier, $request->validated(), $request->user());
 
         return back()->with('success', 'Supplier information updated.');
+    }
+
+    /**
+     * Set the supplier's logo, replacing any previous one.
+     */
+    public function updateLogo(Request $request, Supplier $supplier): RedirectResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'logo' => [
+                'required',
+                'file',
+                'mimes:jpg,jpeg,png',
+                'mimetypes:image/jpeg,image/png',
+                'max:3072', // 3 MB max
+            ],
+        ], [
+            'logo.required' => 'Please select an image file to upload.',
+            'logo.file' => 'The uploaded file is not valid.',
+            'logo.mimes' => 'The supplier logo must be a file of type: JPG, JPEG, PNG.',
+            'logo.mimetypes' => 'The supplier logo must be a file of type: JPG, JPEG, PNG.',
+            'logo.max' => 'The supplier logo must not exceed 3 MB.',
+        ]);
+
+        $validator->after(function ($validator) use ($request) {
+            $file = $request->file('logo');
+            if (! $file || ! $file->isValid()) {
+                return;
+            }
+
+            // Image integrity check: verify decodable image headers and dimensions.
+            $imageInfo = @getimagesize($file->getRealPath());
+            if ($imageInfo === false || empty($imageInfo[0]) || empty($imageInfo[1])) {
+                $validator->errors()->add('logo', 'The uploaded file is corrupted or not a valid image.');
+
+                return;
+            }
+
+            if (! in_array($imageInfo['mime'], ['image/jpeg', 'image/png'], true)) {
+                $validator->errors()->add('logo', 'The uploaded image must be a valid JPG, JPEG, or PNG format.');
+
+                return;
+            }
+
+            if ($imageInfo[0] > 4096 || $imageInfo[1] > 4096) {
+                $validator->errors()->add('logo', 'The image dimensions cannot exceed 4096x4096 pixels.');
+            }
+        });
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        $previousPath = $supplier->logo_path;
+        $path = $request->file('logo')->store('supplier-logos/'.$supplier->id, 'local');
+        abort_if($path === false, 500, 'The supplier logo could not be stored.');
+
+        try {
+            $this->suppliers->updateLogo($supplier, $path, $request->user());
+        } catch (Throwable $exception) {
+            // The record was not updated, so leave no orphaned upload behind.
+            Storage::disk('local')->delete($path);
+
+            throw $exception;
+        }
+
+        // Drop the previous file only after the new one is committed, so a failed
+        // write can never leave the record pointing at a deleted image.
+        if ($previousPath && $previousPath !== $path) {
+            Storage::disk('local')->delete($previousPath);
+        }
+
+        return back()->with('success', 'Supplier logo updated.');
+    }
+
+    /**
+     * Remove the supplier's logo and fall back to the initials tile.
+     */
+    public function destroyLogo(Request $request, Supplier $supplier): RedirectResponse
+    {
+        $previousPath = $supplier->logo_path;
+
+        // Clear the record first: the worst possible failure is an orphaned file,
+        // never a record still pointing at an image that no longer exists.
+        $this->suppliers->updateLogo($supplier, null, $request->user());
+
+        if ($previousPath) {
+            Storage::disk('local')->delete($previousPath);
+        }
+
+        return back()->with('success', 'Supplier logo removed. The supplier initials are now shown.');
+    }
+
+    /**
+     * Safely stream the supplier's logo.
+     */
+    public function showLogo(Supplier $supplier): BinaryFileResponse
+    {
+        abort_unless($supplier->logo_path && Storage::disk('local')->exists($supplier->logo_path), 404);
+
+        return response()->file(Storage::disk('local')->path($supplier->logo_path), [
+            'Content-Type' => Storage::disk('local')->mimeType($supplier->logo_path) ?? 'image/jpeg',
+            'Cache-Control' => 'private, max-age=86400',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function addContact(Request $request, Supplier $supplier): RedirectResponse

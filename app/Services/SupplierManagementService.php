@@ -100,6 +100,35 @@ class SupplierManagementService
         }
     }
 
+    /**
+     * Set or clear the supplier's logo.
+     *
+     * The logo is branding, not compliance evidence: it is kept out of update()'s
+     * material-field guard and off every eligibility check, so changing it can never
+     * return a pending review or invalidate an approved accreditation.
+     */
+    public function updateLogo(Supplier $supplier, ?string $logoPath, User $actor): Supplier
+    {
+        return DB::transaction(function () use ($supplier, $logoPath, $actor): Supplier {
+            $supplier = Supplier::query()->whereKey($supplier->getKey())->lockForUpdate()->firstOrFail();
+            $previous = $supplier->logo_path;
+
+            $supplier->forceFill(['logo_path' => $logoPath])->save();
+
+            $this->audit->log(
+                AuditAction::UpdatedSupplier,
+                $actor,
+                $logoPath === null ? 'Removed the supplier logo.' : 'Updated the supplier logo.',
+                $supplier,
+                $supplier->name,
+                ['logo_path' => $previous],
+                ['logo_path' => $logoPath],
+            );
+
+            return $supplier;
+        });
+    }
+
     public function submitForReview(Supplier $supplier, User $actor): SupplierAccreditation
     {
         return DB::transaction(function () use ($supplier, $actor): SupplierAccreditation {

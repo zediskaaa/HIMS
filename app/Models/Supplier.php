@@ -108,6 +108,20 @@ class Supplier extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    public function hasLogo(): bool
+    {
+        return ! empty($this->logo_path);
+    }
+
+    public function logoUrl(): ?string
+    {
+        if (! $this->logo_path) {
+            return null;
+        }
+
+        return route('inventory.suppliers.logo', $this);
+    }
+
     public function effectiveAccreditationStatus(): SupplierAccreditationStatus
     {
         if ($this->accreditation_status === SupplierAccreditationStatus::Approved

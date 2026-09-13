@@ -90,6 +90,11 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::post('/inventory/suppliers', [SupplierController::class, 'store'])->name('inventory.suppliers.store');
     Route::get('/inventory/suppliers/{supplier}', [SupplierController::class, 'show'])->name('inventory.suppliers.show');
     Route::patch('/inventory/suppliers/{supplier}', [SupplierController::class, 'update'])->name('inventory.suppliers.update');
+    Route::post('/inventory/suppliers/{supplier}/logo', [SupplierController::class, 'updateLogo'])
+        ->middleware('throttle:10,1')
+        ->name('inventory.suppliers.logo.update');
+    Route::delete('/inventory/suppliers/{supplier}/logo', [SupplierController::class, 'destroyLogo'])->name('inventory.suppliers.logo.destroy');
+    Route::get('/inventory/suppliers/{supplier}/logo', [SupplierController::class, 'showLogo'])->name('inventory.suppliers.logo');
     Route::post('/inventory/suppliers/{supplier}/contacts', [SupplierController::class, 'addContact'])->name('inventory.suppliers.contacts.store');
     Route::post('/inventory/suppliers/{supplier}/documents', [SupplierController::class, 'uploadDocument'])->name('inventory.suppliers.documents.store');
     Route::get('/inventory/suppliers/{supplier}/documents/{document}', [SupplierController::class, 'downloadDocument'])->name('inventory.suppliers.documents.download');

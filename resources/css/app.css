@@ -147,6 +147,18 @@
         height: 0 !important;
     }
 
+    /*
+     * The supplier directory fits six columns into a card that narrows to about
+     * 700px once the app sidebar and the decision-summary aside are both in
+     * place. Trimming the shared cell padding here gives every column enough
+     * room to clear its own header, so the table never overflows the card.
+     */
+    .supplier-directory-table th,
+    .supplier-directory-table td {
+        padding-right: 0.75rem;
+        padding-left: 0.75rem;
+    }
+
     .loader {
         --color-1: currentColor;
         --size: 1.25px;

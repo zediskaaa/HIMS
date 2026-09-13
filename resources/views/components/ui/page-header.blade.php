@@ -4,8 +4,18 @@
     'breadcrumbs' => [],
 ])
 
-<div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-    <div class="min-w-0">
+{{--
+    `media` is an optional leading slot (a supplier logo, an avatar). It is not
+    declared in @props — matching card.blade.php's `actions`/`header` slots — and
+    every class below is guarded by @isset, so a caller that passes no media block
+    renders exactly the markup it did before.
+--}}
+<div class="flex flex-col gap-4 sm:flex-row @isset($media) sm:items-center @else sm:items-end sm:justify-between @endisset">
+    @isset($media)
+        <div class="shrink-0">{{ $media }}</div>
+    @endisset
+
+    <div class="min-w-0 @isset($media) flex-1 @endisset">
         @if (! empty($breadcrumbs))
             <nav aria-label="Breadcrumb" class="mb-1.5">
                 <ol class="flex items-center flex-wrap gap-1 text-xs text-neutral-500">

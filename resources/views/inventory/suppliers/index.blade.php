@@ -37,7 +37,11 @@
         </x-ui.alert>
     @endif
 
-    <div class="mt-5 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_21rem]">
+    {{-- The table needs roughly 700px to hold six columns. Splitting the layout
+         any earlier squeezes it to ~604px at 1280, which is narrower than its
+         own headers, so the summary aside only moves alongside once the row can
+         afford it. --}}
+    <div class="mt-5 grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_21rem]">
         <x-ui.card :padding="false">
             <x-slot:header>
                 <div>
@@ -98,13 +102,26 @@
                 </details>
             </form>
 
+            {{-- Fixed layout, so the six columns share whatever width the card
+                 has instead of sizing to their content. Auto layout handed the
+                 supplier column ~40% of the row because the truncating name
+                 still reported its full width as a minimum, which pushed the
+                 table past the card and drew a horizontal scrollbar. --}}
             <div class="hidden md:block">
-                <x-ui.table :sticky-header="false">
+                <x-ui.table :sticky-header="false" class="w-full table-fixed supplier-directory-table">
+                    <colgroup>
+                        <col class="w-[28%]">
+                        <col class="w-[16%]">
+                        <col class="w-[14%]">
+                        <col class="w-[13%]">
+                        <col class="w-[14%]">
+                        <col class="w-[15%]">
+                    </colgroup>
                     <x-ui.table.head>
                         <x-ui.table.th>Supplier</x-ui.table.th>
                         <x-ui.table.th>Categories</x-ui.table.th>
                         <x-ui.table.th>Lead time</x-ui.table.th>
-                        <x-ui.table.th>Performance</x-ui.table.th>
+                        <x-ui.table.th>Score</x-ui.table.th>
                         <x-ui.table.th>Status</x-ui.table.th>
                         <x-ui.table.th align="right">Action</x-ui.table.th>
                     </x-ui.table.head>
@@ -115,37 +132,36 @@
                                 $scorecard = $supplier->latestApprovedScorecard;
                                 $score = $scorecard ? max(0, min(100, (float) $scorecard->total_score)) : null;
                                 $selectUrl = route('inventory.suppliers', array_merge(request()->query(), ['supplier' => $supplier->id])).'#supplier-summary';
-                                $initials = str($supplier->name)->explode(' ')->filter()->take(2)->map(fn ($word) => mb_strtoupper(mb_substr($word, 0, 1)))->implode('');
                             @endphp
                             <x-ui.table.row @class(['!bg-primary-50/70' => $selectedSupplier?->is($supplier)])>
                                 <x-ui.table.td>
-                                    <div class="flex min-w-[12rem] items-center gap-3">
-                                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-100 text-xs font-bold text-primary-700">{{ $initials ?: '?' }}</span>
+                                    <div class="flex min-w-0 items-center gap-3">
+                                        <x-ui.supplier-logo :supplier="$supplier" size="md" />
                                         <div class="min-w-0">
-                                            <a href="{{ $selectUrl }}" class="block truncate font-semibold text-neutral-900 hover:text-primary-700 hover:underline" @if($selectedSupplier?->is($supplier)) aria-current="true" @endif>{{ $supplier->name }}</a>
-                                            <span class="block text-xs text-neutral-500">SUP-{{ str_pad((string) $supplier->id, 4, '0', STR_PAD_LEFT) }}{{ $supplier->trade_name ? ' · '.$supplier->trade_name : '' }}</span>
+                                            <a href="{{ $selectUrl }}" class="block truncate font-semibold text-neutral-900 hover:text-primary-700 hover:underline" title="{{ $supplier->name }}" @if($selectedSupplier?->is($supplier)) aria-current="true" @endif>{{ $supplier->name }}</a>
+                                            <span class="block truncate text-xs text-neutral-500">SUP-{{ str_pad((string) $supplier->id, 4, '0', STR_PAD_LEFT) }}{{ $supplier->trade_name ? ' · '.$supplier->trade_name : '' }}</span>
                                         </div>
                                     </div>
                                 </x-ui.table.td>
                                 <x-ui.table.td>
-                                    <span class="block max-w-40 truncate">{{ $categories->take(2)->join(', ') ?: 'No linked categories' }}</span>
-                                    <span class="block text-xs text-neutral-500">{{ $supplier->active_products_count }} active {{ str('item')->plural($supplier->active_products_count) }}</span>
+                                    <span class="block truncate" title="{{ $categories->take(2)->join(', ') }}">{{ $categories->take(2)->join(', ') ?: 'No linked categories' }}</span>
+                                    <span class="block truncate text-xs text-neutral-500">{{ $supplier->active_products_count }} active {{ str('item')->plural($supplier->active_products_count) }}</span>
                                 </x-ui.table.td>
                                 <x-ui.table.td>{{ $supplier->standard_lead_time_days !== null ? $supplier->standard_lead_time_days.' days' : 'Not set' }}</x-ui.table.td>
                                 <x-ui.table.td>
                                     @if ($score !== null)
                                         <div class="flex items-center gap-2">
-                                            <span class="w-9 font-semibold tabular-nums">{{ number_format($score, 0) }}%</span>
-                                            <span class="h-1.5 w-16 overflow-hidden rounded-full bg-neutral-200"><span class="block h-full rounded-full bg-primary-600" style="width: {{ $score }}%"></span></span>
+                                            <span class="w-9 shrink-0 font-semibold tabular-nums">{{ number_format($score, 0) }}%</span>
+                                            <span class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-neutral-200"><span class="block h-full rounded-full bg-primary-600" style="width: {{ $score }}%"></span></span>
                                         </div>
-                                        <span class="block text-xs text-neutral-500">Reviewed score</span>
+                                        <span class="block truncate text-xs text-neutral-500">Reviewed score</span>
                                     @else
-                                        <span class="text-sm text-neutral-500">Not reviewed</span>
+                                        <span class="block truncate text-sm text-neutral-500">Not reviewed</span>
                                     @endif
                                 </x-ui.table.td>
                                 <x-ui.table.td>
                                     <x-ui.badge :status="$supplier->status->value" dot>{{ $supplier->status->label() }}</x-ui.badge>
-                                    <span class="mt-1 block text-xs text-neutral-500">{{ $supplier->effectiveAccreditationStatus()->label() }}</span>
+                                    <span class="mt-1 block truncate text-xs text-neutral-500">{{ $supplier->effectiveAccreditationStatus()->label() }}</span>
                                 </x-ui.table.td>
                                 <x-ui.table.td align="right">
                                     <x-ui.button size="sm" variant="secondary" :href="route('inventory.suppliers.show', $supplier)" icon="eye">View</x-ui.button>
@@ -164,11 +180,10 @@
                         $categories = $supplier->supplierProducts->pluck('item.category.name')->filter()->unique();
                         $scorecard = $supplier->latestApprovedScorecard;
                         $selectUrl = route('inventory.suppliers', array_merge(request()->query(), ['supplier' => $supplier->id])).'#supplier-summary';
-                        $initials = str($supplier->name)->explode(' ')->filter()->take(2)->map(fn ($word) => mb_strtoupper(mb_substr($word, 0, 1)))->implode('');
                     @endphp
                     <a href="{{ $selectUrl }}" @class(['block p-4 transition-colors hover:bg-neutral-50', 'bg-primary-50/70' => $selectedSupplier?->is($supplier)])>
                         <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary-100 text-xs font-bold text-primary-700">{{ $initials ?: '?' }}</span>
+                            <x-ui.supplier-logo :supplier="$supplier" size="lg" />
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-start justify-between gap-3">
                                     <div><p class="truncate font-semibold text-neutral-900">{{ $supplier->name }}</p><p class="text-xs text-neutral-500">SUP-{{ str_pad((string) $supplier->id, 4, '0', STR_PAD_LEFT) }}</p></div>
@@ -192,7 +207,7 @@
             @endif
         </x-ui.card>
 
-        <aside id="supplier-summary" class="min-w-0 self-start xl:sticky xl:top-4">
+        <aside id="supplier-summary" class="min-w-0 max-w-xl self-start 2xl:sticky 2xl:top-4 2xl:max-w-none">
             <x-ui.card :padding="false">
                 <x-slot:header>
                     <div>
@@ -205,7 +220,6 @@
                     @php
                         $selectedCategories = $selectedSupplier->supplierProducts->pluck('item.category.name')->filter()->unique();
                         $selectedScorecard = $selectedSupplier->latestApprovedScorecard;
-                        $selectedInitials = str($selectedSupplier->name)->explode(' ')->filter()->take(2)->map(fn ($word) => mb_strtoupper(mb_substr($word, 0, 1)))->implode('');
                         $primaryContact = $canViewSensitiveData ? $selectedSupplier->contacts->firstWhere('is_primary', true) ?? $selectedSupplier->contacts->first() : null;
                         $activities = collect();
                         if ($canViewProcurement) {
@@ -241,7 +255,7 @@
 
                     <div class="p-4 sm:p-5">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-100 text-sm font-bold text-primary-700">{{ $selectedInitials ?: '?' }}</span>
+                            <x-ui.supplier-logo :supplier="$selectedSupplier" size="2xl" />
                             <div class="min-w-0">
                                 <h3 class="truncate font-semibold text-neutral-900">{{ $selectedSupplier->name }}</h3>
                                 <p class="text-xs text-neutral-500">SUP-{{ str_pad((string) $selectedSupplier->id, 4, '0', STR_PAD_LEFT) }}{{ $selectedSupplier->trade_name ? ' · '.$selectedSupplier->trade_name : '' }}</p>
@@ -319,18 +333,6 @@
             </x-ui.card>
         </aside>
     </div>
-
-    @if ($counts['total'] > 0)
-        <div class="mt-5 flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-            <div class="flex items-start gap-3">
-                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary-50 text-primary-600"><x-ui.icon name="chart-bar" class="h-4 w-4" /></span>
-                <div><p class="text-sm font-semibold text-neutral-900">Supplier insight</p><p class="mt-0.5 text-xs text-neutral-600">{{ $counts['eligible'] }} of {{ $counts['total'] }} suppliers are procurement eligible; {{ $counts['attention'] }} currently require compliance attention.</p></div>
-            </div>
-            @if ($counts['attention'] > 0)
-                <a href="{{ route('inventory.suppliers', ['compliance' => 'alerts']) }}" class="shrink-0 text-xs font-semibold text-primary-700 hover:underline">Review attention list</a>
-            @endif
-        </div>
-    @endif
 
     @can(\App\Enums\Permission::ManageSuppliers->value)
         <x-ui.modal name="create-supplier" title="Add supplier" maxWidth="2xl">
