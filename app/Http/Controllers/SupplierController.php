@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\AlertSeverity;
 use App\Enums\AuditAction;
 use App\Enums\Permission;
 use App\Enums\SupplierAccreditationStatus;
@@ -11,7 +12,9 @@ use App\Http\Requests\UpdateSupplierRequest;
 use App\Models\AuditLog;
 use App\Models\InventoryItem;
 use App\Models\ItemCategory;
+use App\Models\PurchaseOrder;
 use App\Models\Supplier;
+use App\Models\SupplierComplianceAlert;
 use App\Models\SupplierContract;
 use App\Models\SupplierDocument;
 use App\Models\SupplierPrice;
@@ -63,24 +66,39 @@ class SupplierController extends Controller implements HasMiddleware
 
     public function index(Request $request): View
     {
+        $canViewProcurement = $request->user()->can(Permission::ViewProcurement->value);
+        $canViewSensitiveData = $request->user()->can(Permission::ViewSupplierSensitiveData->value);
         $sorts = ['name', 'created_at', 'accreditation_expires_at'];
         $sort = in_array($request->query('sort'), $sorts, true) ? $request->query('sort') : 'name';
         $direction = $request->query('direction') === 'desc' ? 'desc' : 'asc';
 
         $suppliers = Supplier::query()
-            ->with(['supplierProducts' => fn ($query) => $query->where('is_active', true)->with('item.category')])
+            ->with([
+                'supplierProducts' => fn ($query) => $query->where('is_active', true)->with('item.category'),
+                'latestApprovedScorecard.processReview',
+            ])
             ->withCount([
                 'documents',
                 'supplierProducts as active_products_count' => fn ($query) => $query->where('is_active', true),
                 'complianceAlerts as active_compliance_alerts_count' => fn ($query) => $query->active(),
             ])
-            ->when($request->filled('search'), function ($query) use ($request): void {
+            ->when($canViewProcurement, fn ($query) => $query->withCount([
+                'purchaseOrders',
+                'purchaseOrders as open_purchase_orders_count' => fn ($orders) => $orders
+                    ->whereNull('received_at')
+                    ->where('status', '!=', 'cancelled'),
+            ]))
+            ->when($request->filled('search'), function ($query) use ($request, $canViewSensitiveData): void {
                 $term = $request->string('search')->trim()->toString();
-                $query->where(fn ($search) => $search
-                    ->whereRaw('INSTR(LOWER(name), LOWER(?)) > 0', [$term])
-                    ->orWhereRaw('INSTR(LOWER(trade_name), LOWER(?)) > 0', [$term])
-                    ->orWhereRaw('INSTR(LOWER(tax_number), LOWER(?)) > 0', [$term])
-                    ->orWhereRaw('INSTR(LOWER(email), LOWER(?)) > 0', [$term]));
+                $query->where(function ($search) use ($term, $canViewSensitiveData): void {
+                    $search->whereRaw('INSTR(LOWER(name), LOWER(?)) > 0', [$term])
+                        ->orWhereRaw('INSTR(LOWER(trade_name), LOWER(?)) > 0', [$term]);
+
+                    if ($canViewSensitiveData) {
+                        $search->orWhereRaw('INSTR(LOWER(tax_number), LOWER(?)) > 0', [$term])
+                            ->orWhereRaw('INSTR(LOWER(email), LOWER(?)) > 0', [$term]);
+                    }
+                });
             })
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('accreditation_status'), function ($query) use ($request): void {
@@ -119,18 +137,99 @@ class SupplierController extends Controller implements HasMiddleware
 
         $suppliers->getCollection()->each(fn (Supplier $supplier) => $supplier->setAttribute('computed_compliance_state', $supplier->complianceState()));
 
+        $selectedId = $request->integer('supplier') ?: $suppliers->first()?->id;
+        $selectedSupplier = $selectedId ? Supplier::query()
+            ->with([
+                'supplierProducts' => fn ($query) => $query->where('is_active', true)->with('item.category'),
+                'latestApprovedScorecard.processReview',
+                'complianceAlerts' => fn ($query) => $query->active()->orderBy('due_date')->limit(3),
+            ])
+            ->withCount([
+                'documents',
+                'supplierProducts as active_products_count' => fn ($query) => $query->where('is_active', true),
+                'complianceAlerts as active_compliance_alerts_count' => fn ($query) => $query->active(),
+            ])
+            ->find($selectedId) : null;
+
+        if (! $selectedSupplier && $suppliers->isNotEmpty()) {
+            $selectedSupplier = Supplier::query()
+                ->with([
+                    'supplierProducts' => fn ($query) => $query->where('is_active', true)->with('item.category'),
+                    'latestApprovedScorecard.processReview',
+                    'complianceAlerts' => fn ($query) => $query->active()->orderBy('due_date')->limit(3),
+                ])
+                ->withCount([
+                    'documents',
+                    'supplierProducts as active_products_count' => fn ($query) => $query->where('is_active', true),
+                    'complianceAlerts as active_compliance_alerts_count' => fn ($query) => $query->active(),
+                ])
+                ->find($suppliers->first()->id);
+        }
+
+        if ($selectedSupplier) {
+            $selectedSupplier->setAttribute('computed_compliance_state', $selectedSupplier->complianceState());
+
+            if ($canViewSensitiveData) {
+                $selectedSupplier->load(['contacts' => fn ($query) => $query
+                    ->where('is_active', true)
+                    ->orderByDesc('is_primary')
+                    ->orderBy('name')
+                    ->limit(2)]);
+            }
+
+            if ($canViewProcurement) {
+                $selectedSupplier->loadCount([
+                    'purchaseOrders',
+                    'purchaseOrders as received_purchase_orders_count' => fn ($orders) => $orders->whereNotNull('received_at'),
+                    'purchaseOrders as open_purchase_orders_count' => fn ($orders) => $orders
+                        ->whereNull('received_at')
+                        ->where('status', '!=', 'cancelled'),
+                ])->load(['purchaseOrders' => fn ($orders) => $orders
+                    ->latest('requested_at')
+                    ->latest('id')
+                    ->limit(3)]);
+            }
+        }
+
+        $supplierAttentionCount = Supplier::query()
+            ->whereHas('complianceAlerts', fn ($alerts) => $alerts->active())
+            ->count();
+        $activeComplianceAlerts = SupplierComplianceAlert::query()->active()->count();
+        $criticalComplianceAlerts = SupplierComplianceAlert::query()
+            ->active()
+            ->where('severity', AlertSeverity::Critical->value)
+            ->count();
+
+        $counts = [
+            'total' => Supplier::count(),
+            'active' => Supplier::where('status', SupplierStatus::Active)->count(),
+            'new_this_month' => Supplier::where('created_at', '>=', now()->startOfMonth())->count(),
+            'eligible' => Supplier::procurementEligible()->count(),
+            'pending' => Supplier::where('accreditation_status', SupplierAccreditationStatus::PendingReview)->count(),
+            'attention' => $supplierAttentionCount,
+            'active_alerts' => $activeComplianceAlerts,
+            'critical_alerts' => $criticalComplianceAlerts,
+        ];
+
+        if ($canViewProcurement) {
+            $counts['purchase_orders'] = PurchaseOrder::count();
+            $counts['open_purchase_orders'] = PurchaseOrder::query()
+                ->whereNull('received_at')
+                ->where('status', '!=', 'cancelled')
+                ->count();
+        }
+
         return view('inventory.suppliers.index', [
             'suppliers' => $suppliers,
+            'selectedSupplier' => $selectedSupplier,
             'filters' => $request->only(['search', 'status', 'accreditation_status', 'eligibility', 'product_category_id', 'compliance', 'expiry', 'contract', 'performance', 'sort', 'direction']),
             'operationalStatuses' => SupplierStatus::options(),
             'accreditationStatuses' => SupplierAccreditationStatus::options(),
             'businessStructures' => $this->businessStructures(),
             'productCategories' => ItemCategory::active()->orderBy('name')->pluck('name', 'id')->all(),
-            'counts' => [
-                'total' => Supplier::count(),
-                'eligible' => Supplier::procurementEligible()->count(),
-                'pending' => Supplier::where('accreditation_status', SupplierAccreditationStatus::PendingReview)->count(),
-            ],
+            'counts' => $counts,
+            'canViewProcurement' => $canViewProcurement,
+            'canViewSensitiveData' => $canViewSensitiveData,
         ]);
     }
 

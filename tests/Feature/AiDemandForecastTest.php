@@ -181,7 +181,10 @@ class AiDemandForecastTest extends TestCase
             ->assertSee('More filters')
             ->assertSee('Estimated Stock Risk')
             ->assertSee('Current Stock')
-            ->assertSee('At-risk items')
+            ->assertSee('Projected at-risk items')
+            ->assertSee('Forecast confidence')
+            ->assertSee('(review needed)')
+            ->assertSee('Low confidence: risk is preliminary - verify movement history before acting.')
             ->assertSee('Reorder units')
             ->assertSee('Forecast starts')
             ->assertSee('Units/day')
@@ -192,6 +195,7 @@ class AiDemandForecastTest extends TestCase
             ->assertSee('Historical baseline')
             ->assertSee('AI forecast')
             ->assertSee('data-chart-inspector', false)
+            ->assertSee('lg:h-72 xl:h-80', false)
             ->assertSee('Hover, drag, or use the arrow keys to inspect either line.')
             ->assertSee('<details hidden', false)
             ->assertSee('data-dashboard-secondary', false)
@@ -259,8 +263,10 @@ class AiDemandForecastTest extends TestCase
     public function test_dashboard_chart_scales_units_per_day_from_bucket_rates(): void
     {
         $script = file_get_contents(resource_path('js/app.js'));
+        $view = file_get_contents(resource_path('views/dashboard.blade.php'));
 
         $this->assertIsString($script);
+        $this->assertIsString($view);
         $this->assertStringContainsString(
             'hist.map((point) => Number(point.rate || 0))',
             $script,
@@ -271,6 +277,9 @@ class AiDemandForecastTest extends TestCase
         );
         $this->assertSame(2, substr_count($script, 'y: this.chartY(rate),'));
         $this->assertStringContainsString('y: this.chartY(baselineRate),', $script);
+        $this->assertStringContainsString('this.niceAxisStep(rawMaximum / 4) * 4', $script);
+        $this->assertStringContainsString('Array.from({ length: 5 }', $script);
+        $this->assertSame(5, substr_count($view, 'data-chart-grid-line'));
         $this->assertStringNotContainsString('y: this.chartY(point.quantity),', $script);
     }
 

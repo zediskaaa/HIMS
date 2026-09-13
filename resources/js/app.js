@@ -1424,7 +1424,34 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         const fore = this.currentForecastSeries();
         const histMax = Math.max(...hist.map((point) => Number(point.rate || 0)), 0);
         const foreMax = Math.max(...fore.map((point) => Number(point.rate || 0)), 0);
-        return Math.max(histMax, foreMax, 1);
+        const rawMaximum = Math.max(histMax, foreMax, 1);
+
+        return this.niceAxisStep(rawMaximum / 4) * 4;
+    },
+
+    niceAxisStep(value) {
+        const magnitude = 10 ** Math.floor(Math.log10(Math.max(Number(value) || 0, Number.EPSILON)));
+        const normalized = value / magnitude;
+        const niceNormalized = normalized <= 1
+            ? 1
+            : (normalized <= 2 ? 2 : (normalized <= 2.5 ? 2.5 : (normalized <= 5 ? 5 : 10)));
+
+        return niceNormalized * magnitude;
+    },
+
+    chartTicks() {
+        const maximum = this.chartMaximum();
+        const step = maximum / 4;
+
+        return Array.from({ length: 5 }, (_, index) => {
+            const y = 40 + ((165 / 4) * index);
+
+            return {
+                value: maximum - (step * index),
+                y,
+                top: (y / 240) * 100,
+            };
+        });
     },
 
     chartY(value) {

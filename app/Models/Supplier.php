@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Supplier extends Model
 {
@@ -83,6 +84,13 @@ class Supplier extends Model
     public function purchaseOrders(): HasMany
     {
         return $this->hasMany(PurchaseOrder::class);
+    }
+
+    public function latestApprovedScorecard(): HasOne
+    {
+        return $this->hasOne(SupplierScorecard::class)
+            ->ofMany(['id' => 'max'], fn (Builder $query) => $query
+                ->whereHas('processReview', fn (Builder $review) => $review->where('status', 'approved')));
     }
 
     public function creator(): BelongsTo

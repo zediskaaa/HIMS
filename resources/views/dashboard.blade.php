@@ -480,9 +480,13 @@
                                         <div class="pointer-events-none absolute left-0.5 top-0 z-10 select-none">
                                             <span class="text-[9px] font-semibold uppercase tracking-wider text-neutral-400">Units/day</span>
                                         </div>
-                                        <span class="pointer-events-none absolute left-0.5 top-5 z-10 select-none text-[10px] font-medium tabular-nums text-neutral-400" x-text="formatNumber(chartMaximum(), 1)"></span>
-                                        <span class="pointer-events-none absolute left-0.5 top-1/2 -translate-y-1/2 z-10 select-none text-[10px] font-medium tabular-nums text-neutral-400" x-text="formatNumber(chartMaximum() / 2, 1)"></span>
-                                        <span class="pointer-events-none absolute bottom-5 left-0.5 z-10 select-none text-[10px] font-medium tabular-nums text-neutral-400">0</span>
+                                        <template x-for="tick in chartTicks()" x-bind:key="`y-label-${tick.value}`">
+                                            <span
+                                                class="pointer-events-none absolute left-0.5 z-10 -translate-y-1/2 select-none text-[10px] font-medium tabular-nums text-neutral-400"
+                                                x-bind:style="`top: ${tick.top}%`"
+                                                x-text="formatNumber(tick.value, 1)"
+                                            ></span>
+                                        </template>
 
                                         {{-- Interactive Hover Tooltip Popover --}}
                                         <div
@@ -600,7 +604,7 @@
                                         </div>
 
                                         <svg
-                                            class="h-48 w-full cursor-crosshair select-none touch-none sm:h-52"
+                                            class="h-48 w-full cursor-crosshair select-none touch-none sm:h-52 lg:h-72 xl:h-80"
                                             viewBox="0 0 760 240"
                                             role="img"
                                             aria-labelledby="dashboard-demand-chart-title dashboard-demand-chart-description"
@@ -629,11 +633,12 @@
                                                 </linearGradient>
                                             </defs>
 
-                                            {{-- Horizontal Grid Lines --}}
-                                            <line x1="50" y1="40" x2="725" y2="40" stroke="#f1f5f9" stroke-width="1" vector-effect="non-scaling-stroke"></line>
-                                            <line x1="50" y1="95" x2="725" y2="95" stroke="#f1f5f9" stroke-width="1" vector-effect="non-scaling-stroke"></line>
-                                            <line x1="50" y1="150" x2="725" y2="150" stroke="#f1f5f9" stroke-width="1" vector-effect="non-scaling-stroke"></line>
-                                            <line x1="50" y1="205" x2="725" y2="205" stroke="#e2e8f0" stroke-width="1" vector-effect="non-scaling-stroke"></line>
+                                            {{-- Static SVG lines render reliably; their positions match chartTicks(). --}}
+                                            <line data-chart-grid-line x1="50" y1="40" x2="725" y2="40" stroke="#f1f5f9" stroke-width="1" vector-effect="non-scaling-stroke"></line>
+                                            <line data-chart-grid-line x1="50" y1="81.25" x2="725" y2="81.25" stroke="#f1f5f9" stroke-width="1" vector-effect="non-scaling-stroke"></line>
+                                            <line data-chart-grid-line x1="50" y1="122.5" x2="725" y2="122.5" stroke="#f1f5f9" stroke-width="1" vector-effect="non-scaling-stroke"></line>
+                                            <line data-chart-grid-line x1="50" y1="163.75" x2="725" y2="163.75" stroke="#f1f5f9" stroke-width="1" vector-effect="non-scaling-stroke"></line>
+                                            <line data-chart-grid-line x1="50" y1="205" x2="725" y2="205" stroke="#e2e8f0" stroke-width="1" vector-effect="non-scaling-stroke"></line>
 
                                             {{-- Subtle Forecast Boundary Line --}}
                                             <line x-bind:x1="transitionX()" y1="20" x-bind:x2="transitionX()" y2="205" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"></line>
@@ -833,12 +838,19 @@
 
                         <dl x-show="forecast" x-cloak class="mt-3 grid grid-cols-2 gap-3 border-y border-neutral-200 py-2.5">
                             <div>
-                                <dt class="text-[11px] text-neutral-500">At-risk items</dt>
+                                <dt class="text-[11px] text-neutral-500">Projected at-risk items</dt>
                                 <dd class="mt-0.5 text-lg font-semibold tabular-nums text-danger-700" x-text="lowStockRiskCount()"></dd>
                             </div>
                             <div>
-                                <dt class="text-[11px] text-neutral-500">Confidence</dt>
-                                <dd class="mt-0.5 text-sm font-semibold capitalize text-neutral-900" x-text="confidenceLabel()"></dd>
+                                <dt class="text-[11px] text-neutral-500">Forecast confidence</dt>
+                                <dd class="mt-0.5 flex flex-wrap items-baseline gap-x-1 text-sm font-semibold text-neutral-900">
+                                    <span class="capitalize" x-text="confidenceLabel()"></span>
+                                    <span
+                                        x-show="lowStockRiskCount() > 0 && confidenceLabel() === 'Low'"
+                                        x-cloak
+                                        class="text-[10px] font-medium normal-case text-warning-700"
+                                    >(review needed)</span>
+                                </dd>
                             </div>
                         </dl>
 
@@ -851,7 +863,13 @@
                         >
                             Review all <span class="mx-1" x-text="filteredItems().length"></span> forecast items
                         </button>
-                        <p class="mt-2 text-[10px] leading-relaxed text-neutral-400">Advisory only; no stock or purchase order is changed automatically.</p>
+                        <p
+                            class="mt-2 text-[10px] leading-relaxed"
+                            x-bind:class="lowStockRiskCount() > 0 && confidenceLabel() === 'Low' ? 'font-medium text-warning-700' : 'text-neutral-400'"
+                            x-text="lowStockRiskCount() > 0 && confidenceLabel() === 'Low'
+                                ? 'Low confidence: risk is preliminary - verify movement history before acting.'
+                                : 'Advisory only; no stock or purchase order is changed automatically.'"
+                        ></p>
                     </div>
                 </x-ui.card>
             </aside>

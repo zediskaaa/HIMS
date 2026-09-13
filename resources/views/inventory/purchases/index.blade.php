@@ -28,7 +28,7 @@
     </x-slot>
 
     @php
-        $defaultTab = 'enterprise_s2p';
+        $defaultTab = $supplierFilter ? 'orders_revisions' : 'enterprise_s2p';
         if (!auth()->user()?->canany(['create_requisition', 'manage_sourcing', 'issue_purchase_order', 'manage_procurement'])) {
             $defaultTab = 'orders_revisions';
         }
@@ -1118,7 +1118,13 @@
                 @endcan
 
                 {{-- Purchase Orders Ledger Table --}}
-                <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+                <div id="purchase-orders" class="scroll-mt-6 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+                    @if ($supplierFilter)
+                        <div class="mb-4 flex flex-col gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm text-primary-900 sm:flex-row sm:items-center sm:justify-between">
+                            <span>Showing purchase orders for <strong>{{ $supplierFilter->name }}</strong>.</span>
+                            <a href="{{ route('inventory.purchases') }}#purchase-orders" class="text-xs font-semibold text-primary-700 hover:underline">Clear supplier filter</a>
+                        </div>
+                    @endif
                     <div class="flex items-center justify-between border-b border-neutral-100 pb-4">
                         <div>
                             <h3 class="text-lg font-bold text-neutral-900">Purchase Orders Ledger &amp; Fulfillment ({{ $purchaseOrders->count() }})</h3>

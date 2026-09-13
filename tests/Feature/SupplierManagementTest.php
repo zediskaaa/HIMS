@@ -9,6 +9,7 @@ use App\Enums\SupplierStatus;
 use App\Models\AuditLog;
 use App\Models\InventoryItem;
 use App\Models\ItemCategory;
+use App\Models\KpiProcessReview;
 use App\Models\ProcurementRequest;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
@@ -18,6 +19,7 @@ use App\Models\SupplierDocument;
 use App\Models\SupplierPrice;
 use App\Models\SupplierProduct;
 use App\Models\SupplierQuote;
+use App\Models\SupplierScorecard;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -98,6 +100,110 @@ class SupplierManagementTest extends TestCase
             ->assertSee('No products linked')
             ->assertSee('No contracts recorded')
             ->assertSee('No defensible performance score yet');
+    }
+
+    public function test_supplier_analytics_renders_database_metrics_and_selected_supplier_summary(): void
+    {
+        $manager = $this->manager();
+        $supplier = $this->supplier([
+            'name' => 'Selected Clinical Vendor',
+            'contact_person' => 'Jordan Reyes',
+            'email' => 'selected.vendor@example.test',
+            'standard_lead_time_days' => 4,
+            'accreditation_status' => SupplierAccreditationStatus::Approved,
+            'accreditation_expires_at' => today()->addYear(),
+        ]);
+        $other = $this->supplier(['name' => 'Other Vendor']);
+        $item = $this->item('SELECTED-001');
+        PurchaseOrder::create([
+            'po_number' => 'PO-SELECTED-001',
+            'supplier_id' => $supplier->id,
+            'item_id' => $item->id,
+            'quantity' => 2,
+            'unit_cost' => 25,
+            'total_amount' => 50,
+            'status' => 'pending',
+            'requested_at' => now(),
+        ]);
+        $review = KpiProcessReview::create([
+            'review_number' => 'KPI-SUPPLIER-001',
+            'title' => 'Supplier scorecard review',
+            'period_start' => today()->subMonth(),
+            'period_end' => today(),
+            'evaluator_id' => $manager->id,
+            'status' => 'approved',
+            'approved_by_id' => User::factory()->administrator()->create()->id,
+            'approved_at' => now(),
+        ]);
+        SupplierScorecard::create([
+            'kpi_process_review_id' => $review->id,
+            'supplier_id' => $supplier->id,
+            'delivery_score' => 37,
+            'quality_score' => 38,
+            'fill_rate_score' => 17,
+            'total_score' => 92,
+            'recommendation' => 'preferred',
+        ]);
+
+        $this->actingAs($manager)->get('/inventory/suppliers?supplier='.$supplier->id)
+            ->assertOk()
+            ->assertViewHas('selectedSupplier', fn (?Supplier $selected) => $selected?->is($supplier) === true)
+            ->assertSee('Supplier Vendor Analytics')
+            ->assertSee('Selected supplier')
+            ->assertSee('Selected Clinical Vendor')
+            ->assertSee('selected.vendor@example.test')
+            ->assertSee('PO-SELECTED-001')
+            ->assertSee('92%')
+            ->assertSee('create-supplier')
+            ->assertSee('View purchase orders')
+            ->assertSee('Other Vendor');
+    }
+
+    public function test_supplier_analytics_does_not_expose_sensitive_search_or_create_controls_to_viewer(): void
+    {
+        $viewer = User::factory()->viewer()->create();
+        $supplier = $this->supplier([
+            'name' => 'Restricted Contact Vendor',
+            'email' => 'private.supplier@example.test',
+        ]);
+
+        $this->actingAs($viewer)->get('/inventory/suppliers?supplier='.$supplier->id)
+            ->assertOk()
+            ->assertSee('Contact details are restricted for your role.')
+            ->assertDontSee('private.supplier@example.test')
+            ->assertDontSee('Add Supplier')
+            ->assertDontSee('create-supplier');
+
+        $this->actingAs($viewer)->get('/inventory/suppliers?search=private.supplier%40example.test')
+            ->assertOk()
+            ->assertDontSee('Restricted Contact Vendor');
+    }
+
+    public function test_supplier_purchase_order_link_filters_the_existing_procurement_ledger(): void
+    {
+        $viewer = User::factory()->viewer()->create();
+        $selected = $this->supplier(['name' => 'Ledger Selected Vendor']);
+        $other = $this->supplier(['name' => 'Ledger Other Vendor']);
+        $item = $this->item('LEDGER-001');
+
+        foreach ([[$selected, 'PO-LEDGER-SELECTED'], [$other, 'PO-LEDGER-OTHER']] as [$supplier, $number]) {
+            PurchaseOrder::create([
+                'po_number' => $number,
+                'supplier_id' => $supplier->id,
+                'item_id' => $item->id,
+                'quantity' => 1,
+                'unit_cost' => 10,
+                'total_amount' => 10,
+                'status' => 'pending',
+            ]);
+        }
+
+        $this->actingAs($viewer)->get('/inventory/purchases?supplier_id='.$selected->id)
+            ->assertOk()
+            ->assertViewHas('supplierFilter', fn (?Supplier $supplier) => $supplier?->is($selected) === true)
+            ->assertSee('Showing purchase orders for')
+            ->assertSee('PO-LEDGER-SELECTED')
+            ->assertDontSee('PO-LEDGER-OTHER');
     }
 
     public function test_inventory_item_page_only_offers_procurement_eligible_suppliers(): void

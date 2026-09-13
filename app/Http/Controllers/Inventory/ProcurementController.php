@@ -59,10 +59,13 @@ class ProcurementController extends Controller implements HasMiddleware
         private readonly ProcurementAuditService $auditService
     ) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $items = InventoryItem::orderBy('name')->get();
         $suppliers = Supplier::procurementEligible()->orderBy('name')->get();
+        $supplierFilter = $request->integer('supplier_id')
+            ? Supplier::query()->find($request->integer('supplier_id'))
+            : null;
 
         // Legacy requests for backward compatibility
         $requests = ProcurementRequest::with(['item', 'supplier'])
@@ -90,6 +93,7 @@ class ProcurementController extends Controller implements HasMiddleware
 
         // Purchase Orders with line items and revisions
         $purchaseOrders = PurchaseOrder::with(['supplier', 'item', 'lines.item', 'revisions'])
+            ->when($supplierFilter, fn ($query) => $query->where('supplier_id', $supplierFilter->id))
             ->latest('requested_at')
             ->get();
 
@@ -109,7 +113,8 @@ class ProcurementController extends Controller implements HasMiddleware
             'categories',
             'approvalChains',
             'purchaseOrders',
-            'procurementAuditLogs'
+            'procurementAuditLogs',
+            'supplierFilter'
         ));
     }
 
