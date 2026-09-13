@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Inventory;
 use App\Enums\AlertStatus;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\ItemBatch;
 use App\Models\ItemCategory;
 use App\Models\PurchaseOrder;
 use App\Models\StockAlert;
@@ -88,15 +87,6 @@ class InventoryController extends Controller implements HasMiddleware
             ? PurchaseOrder::whereIn('status', ['draft', 'pending', 'submitted', 'approved'])->count()
             : null;
 
-        // Batches inside their item's expiry alert window, or already expired.
-        $expiringBatches = ItemBatch::with('item')
-            ->whereNotNull('expiry_date')
-            ->where('expiry_date', '<=', now()->addDays(90))
-            ->where('status', 'active')
-            ->orderBy('expiry_date')
-            ->take(5)
-            ->get();
-
         return view('dashboard', array_merge($this->liveSnapshot($request), compact(
             'totalSuppliers',
             'activeSuppliers',
@@ -105,7 +95,6 @@ class InventoryController extends Controller implements HasMiddleware
             'recentMovements',
             'pendingPurchaseOrders',
             'pendingPoCount',
-            'expiringBatches',
             'aiForecast',
             'forecastCategories'
         )));
@@ -114,7 +103,7 @@ class InventoryController extends Controller implements HasMiddleware
     /**
      * The 30s poll behind the dashboard's live alert panel.
      *
-     * Returns the alert table as rendered HTML rather than JSON rows so the
+     * Returns the compact alert summary as rendered HTML rather than JSON rows so the
      * markup stays defined in exactly one Blade partial, plus the counters
      * that sit in the stat tiles above it.
      */
@@ -123,7 +112,7 @@ class InventoryController extends Controller implements HasMiddleware
         $snapshot = $this->liveSnapshot($request);
 
         return response()->json(array_filter([
-            'alertsHtml' => view('inventory.partials.alerts-table', $snapshot)->render(),
+            'alertsHtml' => view('inventory.partials.dashboard-alerts', $snapshot)->render(),
             'openAlertCount' => $snapshot['openAlertCount'],
             'lowStockItems' => $snapshot['lowStockItems'],
             'outOfStockItems' => $snapshot['outOfStockItems'],

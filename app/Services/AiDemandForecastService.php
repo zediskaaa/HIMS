@@ -176,7 +176,7 @@ class AiDemandForecastService
 
     /**
      * @param  Collection<int, mixed>  $movements
-     * @return array<int, array{period_start: string, quantity: int}>
+     * @return array<int, array{period_start: string, quantity: int, days: int}>
      */
     private function consumptionSeries(Collection $movements, mixed $since, int $analysisDays): array
     {
@@ -188,6 +188,7 @@ class AiDemandForecastService
             $series[$index] = [
                 'period_start' => $since->copy()->addDays($index * $bucketDays)->toDateString(),
                 'quantity' => 0,
+                'days' => max(1, min($bucketDays, $analysisDays - ($index * $bucketDays))),
             ];
         }
 
@@ -543,17 +544,26 @@ class AiDemandForecastService
      * exact predicted_demand value; they are display buckets, not new demand.
      *
      * @param  array<string, mixed>  $item
-     * @return array<int, array{period_start: string, quantity: int}>
+     * @return array<int, array{period_start: string, quantity: int, days: int}>
      */
     private function forecastSeries(array $item, int $forecastDays, Carbon $generatedAt): array
     {
         $bucketCount = max(2, min(8, (int) ceil($forecastDays / 7)));
         $bucketDays = max(1, (int) ceil($forecastDays / $bucketCount));
-        $weights = match ($item['demand_trend']) {
+        $trendWeights = match ($item['demand_trend']) {
             'increasing' => range(1, $bucketCount),
             'decreasing' => range($bucketCount, 1),
             default => array_fill(0, $bucketCount, 1),
         };
+        $periodDays = collect(range(0, $bucketCount - 1))
+            ->map(fn (int $index): int => max(1, min(
+                $bucketDays,
+                $forecastDays - ($index * $bucketDays),
+            )))
+            ->all();
+        $weights = collect($trendWeights)
+            ->map(fn (int $weight, int $index): int => $weight * $periodDays[$index])
+            ->all();
         $weightTotal = array_sum($weights);
         $predictedDemand = max(0, (int) $item['predicted_demand']);
         $allocated = 0;
@@ -563,6 +573,7 @@ class AiDemandForecastService
                 $bucketCount,
                 $bucketDays,
                 $generatedAt,
+                $periodDays,
                 $predictedDemand,
                 $weightTotal,
                 &$allocated,
@@ -578,6 +589,7 @@ class AiDemandForecastService
                 return [
                     'period_start' => $generatedAt->copy()->startOfDay()->addDays($index * $bucketDays)->toDateString(),
                     'quantity' => $quantity,
+                    'days' => $periodDays[$index],
                 ];
             })
             ->all();

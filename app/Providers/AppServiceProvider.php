@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Observers\UserObserver;
 use App\Services\AuditLogger;
 use App\Services\HimsNotificationService;
+use App\Support\AuditBrowserLocation;
 use App\Support\AuthenticationPanel;
 use App\View\Composers\NotificationComposer;
 use Illuminate\Auth\Events\Failed;
@@ -88,7 +89,7 @@ class AppServiceProvider extends ServiceProvider
 
                 $request = app()->bound('request') ? request() : null;
                 if ($request && is_numeric($request->input('latitude')) && is_numeric($request->input('longitude'))) {
-                    \App\Support\AuditBrowserLocation::store($request, [
+                    AuditBrowserLocation::store($request, [
                         'latitude' => $request->input('latitude'),
                         'longitude' => $request->input('longitude'),
                         'accuracy' => $request->input('accuracy', 0),

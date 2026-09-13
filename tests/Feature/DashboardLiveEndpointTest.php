@@ -11,7 +11,7 @@ use Tests\TestCase;
 
 /**
  * `/dashboard/live` is what the Alpine poller hits every 30s. It returns the
- * alert table as rendered HTML plus the counters in the stat tiles, so the
+ * compact alert summary as rendered HTML plus the counters in the stat tiles, so the
  * page can reflect stock recorded elsewhere without a full reload.
  */
 class DashboardLiveEndpointTest extends TestCase
@@ -76,6 +76,7 @@ class DashboardLiveEndpointTest extends TestCase
         $this->assertSame(0, $response->json('openAlertCount'));
         $this->assertSame(0, $response->json('lowStockItems'));
         $this->assertSame(100, $response->json('totalOnHand'));
+        $this->assertStringContainsString('data-dashboard-alert-list', $response->json('alertsHtml'));
         $this->assertStringContainsString('No active alerts', $response->json('alertsHtml'));
     }
 

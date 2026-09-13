@@ -19,7 +19,6 @@
     <x-ui.page-header
         :title="$dashboardTitle"
         :subtitle="$dashboardSubtitle"
-        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), $dashboardTitle => null]"
     >
         <x-slot:actions>
             @canany([\App\Enums\Permission::IssueStock->value, \App\Enums\Permission::RecordMovements->value, \App\Enums\Permission::TransferStock->value])
@@ -47,7 +46,7 @@
         server process to keep alive, and nothing new to install.
     --}}
     <div
-        class="hims-dashboard space-y-4 xl:space-y-5"
+        class="hims-dashboard !mt-3 space-y-3 xl:space-y-4"
         x-data="dashboardLive({{ Js::from(route('dashboard.live')) }})"
         x-init="start()"
         @dashboard-refresh.window="refresh()"
@@ -64,10 +63,10 @@
             }
         @endphp
         @if ($pendingRecoveryCount > 0)
-            <div class="rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-sm mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div class="flex items-center gap-3">
-                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <div class="flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-center gap-2.5">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </span>
                     <div>
                         <h4 class="text-sm font-bold text-amber-950">
@@ -90,21 +89,25 @@
     @endcan
 
     {{-- Key figures --}}
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:gap-4">
         <x-ui.stat
             label="Tracked items"
-            :value="number_format($totalItems)"
             icon="cube"
             tone="primary"
-            :hint="number_format($totalOnHand).' units on hand'"
             :href="route('inventory.items')"
-        />
+            :compact="true"
+            x-ref="trackedItemsTile"
+        >
+            <x-slot:value><span data-stat-value>{{ number_format($totalItems) }}</span></x-slot:value>
+            <x-slot:hint><span data-stat-hint>{{ number_format($totalOnHand) }} units on hand</span></x-slot:hint>
+        </x-ui.stat>
 
         <x-ui.stat
             label="Needs reorder"
             icon="exclamation-triangle"
             :tone="$lowStockItems > 0 ? 'warning' : 'success'"
             :href="route('inventory.alerts')"
+            :compact="true"
             x-ref="lowStockTile"
         >
             <x-slot:value><span data-stat-value>{{ number_format($lowStockItems) }}</span></x-slot:value>
@@ -118,6 +121,7 @@
             icon="bell-alert"
             :tone="$openAlertCount > 0 ? 'danger' : 'success'"
             :href="route('inventory.alerts')"
+            :compact="true"
             x-ref="openAlertTile"
         >
             <x-slot:value><span data-stat-value>{{ number_format($openAlertCount) }}</span></x-slot:value>
@@ -127,63 +131,17 @@
         @can(\App\Enums\Permission::ViewProcurementSensitiveData->value)
         <x-ui.stat
             label="Inventory value"
-            :value="'₱'.number_format($totalInventoryValue, 2)"
             icon="chart-bar"
             tone="neutral"
             :hint="number_format($storageLocations).' storage locations'"
             :href="route('inventory.reports')"
-        />
+            :compact="true"
+            x-ref="inventoryValueTile"
+        >
+            <x-slot:value><span data-stat-value>₱{{ number_format($totalInventoryValue, 2) }}</span></x-slot:value>
+        </x-ui.stat>
         @endcan
     </div>
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3 xl:gap-5">
-        {{-- Stock alerts --}}
-        <x-ui.card class="lg:col-span-2" :padding="false">
-            <x-slot:header>
-                <h2 class="text-sm font-semibold text-neutral-900">Stock alerts</h2>
-                <p class="mt-0.5 text-xs text-neutral-500">
-                    Shortages and expiry risk needing attention
-                    <span class="text-neutral-400" x-text="statusLabel"></span>
-                </p>
-            </x-slot:header>
-
-            <x-slot:actions>
-                <x-ui.button variant="ghost" size="sm" :href="route('inventory.alerts')">View all</x-ui.button>
-            </x-slot:actions>
-
-            <div x-ref="alerts">
-                @include('inventory.partials.alerts-table')
-            </div>
-        </x-ui.card>
-
-        {{-- Expiring batches --}}
-        <x-ui.card title="Expiring soon" subtitle="Next 90 days, earliest first">
-            @forelse ($expiringBatches as $batch)
-                @php
-                    $days = (int) now()->startOfDay()->diffInDays($batch->expiry_date, false);
-                @endphp
-                <div class="flex items-start justify-between gap-3 py-3 border-b border-neutral-100
-                            first:pt-0 last:pb-0 last:border-0">
-                    <div class="min-w-0">
-                        <p class="text-sm font-medium text-neutral-900 truncate">
-                            {{ $batch->item?->name ?? 'Unknown item' }}
-                        </p>
-                        <p class="mt-0.5 text-xs text-neutral-500">
-                            Batch {{ $batch->batch_number }} &middot; {{ $batch->expiry_date->format('d M Y') }}
-                        </p>
-                    </div>
-
-                    <x-ui.badge :variant="$days < 0 ? 'danger' : ($days <= 30 ? 'warning' : 'neutral')">
-                        {{ $days < 0 ? abs($days).'d overdue' : $days.'d left' }}
-                    </x-ui.badge>
-                </div>
-            @empty
-                <p class="py-6 text-sm text-center text-neutral-500">
-                    No batches expiring in the next 90 days.
-                </p>
-            @endforelse
-        </x-ui.card>
-    </div>
-
     @can(\App\Enums\Permission::ViewReports->value)
         @php
             $dashboardForecastConfig = [
@@ -192,38 +150,45 @@
             ];
         @endphp
         <div
-            class="min-w-0"
+            class="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] xl:grid-cols-[minmax(0,2.1fr)_minmax(19rem,1fr)]"
             x-data="demandForecastDashboard({{ Js::from($dashboardForecastConfig) }})"
         >
-            <x-ui.card :padding="false">
-                <x-slot:header>
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-700">
-                            <x-ui.icon name="chart-bar" class="h-5 w-5" />
+            <x-ui.card class="min-w-0" :padding="false">
+                <header class="flex flex-col gap-2 border-b border-neutral-200 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex min-w-0 items-center gap-2.5">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-700">
+                            <x-ui.icon name="chart-bar" class="h-4 w-4" />
                         </span>
                         <div class="min-w-0">
                             <h2 class="text-sm font-semibold text-neutral-900">AI-Based Stock Demand Forecasting</h2>
-                            <p class="mt-0.5 max-w-2xl text-xs text-neutral-500">
-                                Predict upcoming inventory demand using historical stock movement and consumption data.
-                            </p>
+                            <p class="truncate text-[11px] text-neutral-500">Historical baseline and AI forecast in one decision view.</p>
                         </div>
                     </div>
-                </x-slot:header>
 
-                <x-slot:actions>
-                    <x-ui.button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        icon="eye"
-                        x-on:click="$dispatch('open-modal', 'dashboard-demand-forecast')"
-                        x-bind:disabled="!forecast"
-                    >
-                        View Full Forecast
-                    </x-ui.button>
-                </x-slot:actions>
+                    <div class="flex items-center gap-2 sm:shrink-0">
+                        <span
+                            x-show="forecast"
+                            x-cloak
+                            class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset"
+                            x-bind:class="sourceClasses()"
+                        >
+                            <span class="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true"></span>
+                            <span x-text="forecast?.source_label"></span>
+                        </span>
+                        <x-ui.button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            icon="eye"
+                            x-on:click="$dispatch('open-modal', 'dashboard-demand-forecast')"
+                            x-bind:disabled="!forecast"
+                        >
+                            Forecast details
+                        </x-ui.button>
+                    </div>
+                </header>
 
-                <div class="space-y-4 p-4 sm:p-5">
+                <div class="space-y-3 p-3">
                     <div class="sr-only" aria-live="polite" x-text="success"></div>
                     <div
                         x-show="error"
@@ -238,18 +203,6 @@
                         class="rounded-lg border border-success-200 bg-success-50 px-3 py-2 text-sm text-success-700"
                         x-text="success"
                     ></div>
-
-                    <div x-show="forecast" x-cloak class="flex flex-wrap items-center gap-2">
-                        <span
-                            class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset"
-                            x-bind:class="sourceClasses()"
-                        >
-                            <span class="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true"></span>
-                            <span x-text="forecast?.source_label"></span>
-                        </span>
-                        <span class="text-xs text-neutral-500" x-text="forecast?.forecast_period"></span>
-                        <span class="text-xs text-neutral-400" x-text="`Generated ${formatDate(forecast?.generated_at)}`"></span>
-                    </div>
 
                     <div
                         x-show="forecast?.notice"
@@ -267,14 +220,14 @@
                         @can(\App\Enums\Permission::GenerateForecasts->value)
                             x-on:submit.prevent="generateForecast()"
                         @endcan
-                        class="grid min-w-0 gap-3 border-y border-neutral-200 bg-neutral-50 p-3 sm:grid-cols-2 lg:grid-cols-6 lg:items-end"
+                        class="grid min-w-0 gap-2.5 rounded-lg border border-neutral-200 bg-neutral-50 p-2.5 sm:grid-cols-2 lg:grid-cols-6 lg:items-end"
                     >
                         @csrf
                         <input type="hidden" name="analysis_days" value="90">
                         <input type="hidden" name="return_to" value="dashboard">
 
                         {{-- Item Selection --}}
-                        <div class="min-w-0 space-y-1.5 sm:col-span-2 lg:col-span-2">
+                        <div class="min-w-0 space-y-1.5 sm:col-span-2 lg:col-span-3">
                             <div class="flex items-center justify-between">
                                 <label for="dashboard-forecast-item" class="block text-xs font-medium text-neutral-700">Select Item</label>
                                 <button
@@ -317,6 +270,49 @@
                             </select>
                         </div>
 
+                        <div class="flex min-w-0 items-end">
+                            <x-ui.button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                icon="funnel"
+                                class="w-full"
+                                x-on:click="filtersOpen = !filtersOpen"
+                                x-bind:aria-expanded="filtersOpen"
+                                aria-controls="dashboard-forecast-filters"
+                            >
+                                <span x-text="filtersOpen ? 'Hide filters' : 'More filters'"></span>
+                                <span
+                                    x-show="activeFilterCount() > 0"
+                                    x-cloak
+                                    class="rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold text-primary-700"
+                                    x-text="activeFilterCount()"
+                                ></span>
+                            </x-ui.button>
+                        </div>
+
+                        <div class="flex min-w-0 items-end">
+                            @can(\App\Enums\Permission::GenerateForecasts->value)
+                                <x-ui.button
+                                    type="submit"
+                                    size="sm"
+                                    icon="arrow-path"
+                                    class="w-full"
+                                    x-bind:disabled="loading"
+                                >
+                                    <span x-text="loading ? 'Generating...' : 'Generate Forecast'"></span>
+                                </x-ui.button>
+                            @else
+                                <p class="text-xs text-neutral-500">Generation requires forecast permission.</p>
+                            @endcan
+                        </div>
+
+                        <div
+                            id="dashboard-forecast-filters"
+                            x-show="filtersOpen"
+                            x-cloak
+                            class="grid min-w-0 gap-3 rounded-lg border border-neutral-200 bg-white p-3 sm:col-span-2 sm:grid-cols-3 lg:col-span-6"
+                        >
                         {{-- Item category --}}
                         <div class="min-w-0 space-y-1.5">
                             <label for="dashboard-forecast-category" class="block text-xs font-medium text-neutral-700">Item category</label>
@@ -349,7 +345,17 @@
 
                         {{-- Search item --}}
                         <div class="min-w-0 space-y-1.5">
-                            <label for="dashboard-forecast-search" class="block text-xs font-medium text-neutral-700">Search item</label>
+                            <div class="flex items-center justify-between gap-2">
+                                <label for="dashboard-forecast-search" class="block text-xs font-medium text-neutral-700">Search item</label>
+                                <button
+                                    type="button"
+                                    x-show="activeFilterCount() > 0"
+                                    x-on:click="clearFilters()"
+                                    class="text-[11px] font-medium text-primary-700 hover:text-primary-800"
+                                >
+                                    Clear filters
+                                </button>
+                            </div>
                             <input
                                 id="dashboard-forecast-search"
                                 type="search"
@@ -359,21 +365,6 @@
                                 class="block min-h-10 w-full rounded-md border-neutral-300 text-sm shadow-sm placeholder:text-neutral-400 focus:border-primary-500 focus:ring-primary-500/30"
                             >
                         </div>
-
-                        <div class="flex min-w-0 items-end sm:col-span-2 lg:col-span-6">
-                            @can(\App\Enums\Permission::GenerateForecasts->value)
-                                <x-ui.button
-                                    type="submit"
-                                    size="sm"
-                                    icon="arrow-path"
-                                    class="w-full sm:w-auto"
-                                    x-bind:disabled="loading"
-                                >
-                                    <span x-text="loading ? 'Generating...' : 'Generate Forecast'"></span>
-                                </x-ui.button>
-                            @else
-                                <p class="text-xs text-neutral-500">Generation requires forecast permission.</p>
-                            @endcan
                         </div>
 
                         <p
@@ -395,136 +386,128 @@
                         </p>
                     </div>
 
-                    <div x-show="forecast" x-cloak class="space-y-4">
-                        {{-- Compact Forecast Summary Tiles --}}
-                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                            <div class="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
-                                <dt class="text-xs font-medium text-neutral-500">Forecast Period</dt>
-                                <dd class="mt-1 text-base font-semibold tabular-nums text-neutral-900 sm:text-lg" x-text="forecast?.forecast_period || `Next ${forecastDays} days`"></dd>
-                                <p class="mt-0.5 text-[11px] text-neutral-400">Demand forecast window</p>
+                    <div x-show="forecast" x-cloak class="space-y-3">
+                        {{-- Compact forecast summary strip --}}
+                        <dl class="grid grid-cols-2 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 sm:grid-cols-5">
+                            <div class="border-b border-r border-neutral-200 p-2.5 sm:border-b-0">
+                                <dt class="text-[11px] font-medium uppercase tracking-wide text-neutral-500">Forecast period</dt>
+                                <dd class="mt-1 text-sm font-semibold tabular-nums text-neutral-900" x-text="forecast?.forecast_period || `Next ${forecastDays} days`"></dd>
                             </div>
 
-                            <div class="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
-                                <dt class="text-xs font-medium text-neutral-500">Predicted demand</dt>
-                                <dd class="mt-1 text-base font-semibold tabular-nums text-neutral-900 sm:text-lg">
+                            <div class="border-b border-neutral-200 p-2.5 sm:border-b-0 sm:border-r">
+                                <dt class="text-[11px] font-medium uppercase tracking-wide text-neutral-500">Predicted demand</dt>
+                                <dd class="mt-1 text-sm font-semibold tabular-nums text-neutral-900">
                                     <span x-text="formatNumber(summaryPredictedDemand())"></span>
-                                    <span class="text-xs font-normal text-neutral-500">units</span>
+                                    <span class="text-[11px] font-normal text-neutral-500">units</span>
                                 </dd>
-                                <p class="mt-0.5 text-[11px] font-medium text-primary-700" x-text="trendLabel()"></p>
                             </div>
 
-                            <div class="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
-                                <dt class="text-xs font-medium text-neutral-500">Current Stock</dt>
-                                <dd class="mt-1 text-base font-semibold tabular-nums text-neutral-900 sm:text-lg">
+                            <div class="border-b border-r border-neutral-200 p-2.5 sm:border-b-0">
+                                <dt class="text-[11px] font-medium uppercase tracking-wide text-neutral-500">Current Stock</dt>
+                                <dd class="mt-1 text-sm font-semibold tabular-nums text-neutral-900">
                                     <span x-text="formatNumber(summaryCurrentStock())"></span>
-                                    <span class="text-xs font-normal text-neutral-500">units</span>
+                                    <span class="text-[11px] font-normal text-neutral-500">units</span>
                                 </dd>
-                                <p class="mt-0.5 text-[11px] text-neutral-400" x-text="selectedItem() ? (selectedItem().category || 'In warehouse') : 'Filtered total on hand'"></p>
                             </div>
 
-                            <div class="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
-                                <dt class="text-xs font-medium text-neutral-500">Estimated Stock Risk</dt>
+                            <div class="border-b border-neutral-200 p-2.5 sm:border-b-0 sm:border-r">
+                                <dt class="text-[11px] font-medium uppercase tracking-wide text-neutral-500">Estimated Stock Risk</dt>
                                 <dd class="mt-1">
                                     <span
-                                        class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset"
+                                        class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset"
                                         x-bind:class="riskClasses(summaryStockRisk())"
                                         x-text="`${summaryStockRisk()} risk`"
                                     ></span>
                                 </dd>
-                                <p class="mt-1 text-[11px] text-neutral-500">
-                                    <span x-text="lowStockRiskCount()"></span> <span class="text-danger-700 font-medium">At-risk items</span>
-                                </p>
                             </div>
 
-                            <div class="col-span-2 rounded-lg border border-neutral-200 bg-white p-3 shadow-sm sm:col-span-1">
-                                <dt class="text-xs font-medium text-neutral-500">Reorder units</dt>
-                                <dd class="mt-1 text-base font-semibold tabular-nums text-neutral-900 sm:text-lg">
+                            <div class="col-span-2 p-2.5 sm:col-span-1">
+                                <dt class="text-[11px] font-medium uppercase tracking-wide text-neutral-500">Reorder units</dt>
+                                <dd class="mt-1 text-sm font-semibold tabular-nums text-neutral-900">
                                     <span x-text="formatNumber(summaryRecommendedReorder())"></span>
-                                    <span class="text-xs font-normal text-neutral-500">units</span>
+                                    <span class="text-[11px] font-normal text-neutral-500">units</span>
                                 </dd>
-                                <p class="mt-0.5 text-[11px] text-neutral-400">
-                                    Confidence: <span class="font-medium text-neutral-700 capitalize" x-text="confidenceLabel()"></span>
-                                </p>
                             </div>
-                        </div>
+                        </dl>
 
                         {{-- Combined Demand vs Forecast Card --}}
                         <section class="min-w-0 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm" aria-labelledby="dashboard-forecast-overview-title">
-                            <header class="flex flex-col gap-3 border-b border-neutral-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                            <header class="flex flex-col gap-2 border-b border-neutral-200 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <div class="flex items-center gap-2">
                                         <h3 id="dashboard-forecast-overview-title" class="text-sm font-semibold text-neutral-900">Demand vs Forecast</h3>
                                         <template x-if="selectedItem()">
                                             <span class="inline-flex items-center gap-1 rounded-md bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700 ring-1 ring-inset ring-primary-600/20">
                                                 <span class="truncate max-w-[200px]" x-text="selectedItem().item_name"></span>
-                                                <button type="button" x-on:click="selectedItemId = ''" class="hover:text-primary-900" title="Clear item focus">
+                                                <button type="button" x-on:click="selectedItemId = ''" class="hover:text-primary-900" aria-label="Clear selected item">
                                                     <x-ui.icon name="x-mark" class="h-3 w-3" />
                                                 </button>
                                             </span>
                                         </template>
                                     </div>
-                                    <p class="mt-0.5 text-xs text-neutral-500">
-                                        Demand forecast · Historical consumption and projected inventory demand
-                                    </p>
                                 </div>
 
-                                {{-- Simple Clean Legend with Interactive Scrubber Hint --}}
-                                <div class="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-neutral-600">
-                                    <span class="inline-flex items-center gap-2">
+                                {{-- Interactive legend and scrubber guidance --}}
+                                <div class="flex flex-wrap items-center gap-2 text-[11px] text-neutral-600 sm:gap-3">
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center gap-2 rounded-md px-1.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                        x-bind:class="showActual ? 'text-neutral-800' : 'text-neutral-400 line-through'"
+                                        x-bind:aria-pressed="showActual"
+                                        x-on:click="toggleSeries('actual')"
+                                    >
                                         <span class="h-1 w-4 rounded-full bg-primary-600"></span>
-                                        <span class="font-medium text-neutral-800">Historical demand</span>
-                                    </span>
-                                    <span class="inline-flex items-center gap-2">
-                                        <span class="h-0.5 w-4 border-t-2 border-dashed border-emerald-600"></span>
-                                        <span class="font-medium text-neutral-800">Forecast demand</span>
-                                    </span>
-                                    <span class="inline-flex items-center gap-1.5 text-neutral-500">
-                                        <span class="h-3.5 border-l border-dashed border-neutral-300"></span>
-                                        <span>Forecast starts</span>
-                                    </span>
-                                    <span class="inline-flex items-center gap-1.5 rounded-md bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-700 ring-1 ring-inset ring-primary-600/20">
-                                        <span class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
-                                        <span>Drag or hover line to inspect</span>
-                                    </span>
+                                        <span class="font-medium">Historical baseline</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center gap-2 rounded-md px-1.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                        x-bind:class="showForecast ? 'text-neutral-800' : 'text-neutral-400 line-through'"
+                                        x-bind:aria-pressed="showForecast"
+                                        x-on:click="toggleSeries('forecast')"
+                                    >
+                                        <span class="h-0.5 w-4 border-t-2 border-dashed border-violet-600"></span>
+                                        <span class="font-medium">AI forecast</span>
+                                    </button>
                                 </div>
                             </header>
 
-                            <div class="min-w-0 px-3 py-4 sm:px-5">
-                                <div x-show="hasChartData()" class="relative min-w-0 select-none">
-                                    {{-- Interactive Floating Tooltip --}}
+                            <div class="min-w-0 px-3 py-2.5">
+                                <div x-show="hasChartData()" class="min-w-0 select-none">
                                     <div
-                                        x-show="activePoint"
-                                        x-cloak
-                                        class="pointer-events-none absolute z-20 transition-all duration-75"
-                                        x-bind:style="`left: ${Math.max(12, Math.min(88, activePoint?.percentageX ?? 50))}%; top: ${Math.max(6, (activePoint?.percentageY ?? 50) - 16)}%; transform: translate(-50%, -100%);`"
+                                        data-chart-inspector
+                                        class="mb-2 flex min-h-9 items-center rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-[11px] text-neutral-600"
                                     >
-                                        <div class="rounded-lg border border-neutral-700 bg-neutral-900/95 px-3 py-2 text-white shadow-xl backdrop-blur-sm">
-                                            <div class="flex items-center justify-between gap-3 text-[11px]">
-                                                <span class="text-neutral-300 font-medium" x-text="activePoint?.formattedDate"></span>
+                                        <template x-if="!activePoint">
+                                            <p>Hover, drag, or use the arrow keys to inspect either line.</p>
+                                        </template>
+                                        <template x-if="activePoint">
+                                            <div class="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
+                                                <span class="font-medium text-neutral-700" x-text="activePoint?.formattedDate"></span>
                                                 <span
-                                                    class="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
-                                                    x-bind:class="activePoint?.type === 'actual' ? 'bg-primary-500/30 text-primary-300 border border-primary-400/30' : 'bg-emerald-500/30 text-emerald-300 border border-emerald-400/30'"
-                                                    x-text="activePoint?.type === 'actual' ? 'Historical demand' : 'Forecast demand'"
+                                                    class="rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
+                                                    x-bind:class="activePoint?.type === 'forecast' ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-primary-200 bg-primary-50 text-primary-700'"
+                                                    x-text="activePoint?.type === 'forecast' ? 'AI forecast' : (activePoint?.type === 'baseline' ? 'Historical baseline' : 'Historical demand')"
                                                 ></span>
+                                                <span class="font-semibold tabular-nums text-neutral-900">
+                                                    <span x-text="formatNumber(activePoint?.value, 1)"></span>
+                                                    <span class="font-normal text-neutral-500">units/day</span>
+                                                </span>
+                                                <span class="hidden text-neutral-300 sm:inline">&bull;</span>
+                                                <span class="tabular-nums text-neutral-500" x-text="`${formatNumber(activePoint?.quantity)} units across ${activePoint?.days || 1} ${(activePoint?.days || 1) === 1 ? 'day' : 'days'}`"></span>
                                             </div>
-                                            <p class="mt-1 text-sm font-bold tabular-nums text-white">
-                                                <span x-text="formatNumber(activePoint?.quantity)"></span>
-                                                <span class="text-xs font-normal text-neutral-300">units</span>
-                                                <template x-if="activePoint?.type === 'forecast'">
-                                                    <span class="ml-1 text-[10px] font-normal text-emerald-400">· AI Projected</span>
-                                                </template>
-                                            </p>
-                                        </div>
+                                        </template>
                                     </div>
 
                                     <div class="relative min-w-0">
                                         {{-- Y-axis scale figures --}}
-                                        <span class="absolute left-0 top-1 text-[10px] tabular-nums text-neutral-400" x-text="formatNumber(chartMaximum())"></span>
-                                        <span class="absolute left-0 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-neutral-400" x-text="formatNumber(Math.round(chartMaximum() / 2))"></span>
+                                        <span class="absolute left-0 top-1 text-[10px] tabular-nums text-neutral-400" x-text="formatNumber(chartMaximum(), 1)"></span>
+                                        <span class="absolute left-0 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-neutral-400" x-text="formatNumber(chartMaximum() / 2, 1)"></span>
                                         <span class="absolute bottom-5 left-0 text-[10px] tabular-nums text-neutral-400">0</span>
+                                        <span class="absolute -left-1 top-8 -rotate-90 origin-top-left text-[9px] font-medium uppercase tracking-wide text-neutral-400">Units/day</span>
 
                                         <svg
-                                            class="h-64 w-full cursor-crosshair select-none touch-none"
+                                            class="h-48 w-full cursor-crosshair select-none touch-none sm:h-52"
                                             viewBox="0 0 760 240"
                                             role="img"
                                             aria-labelledby="dashboard-demand-chart-title dashboard-demand-chart-description"
@@ -533,20 +516,21 @@
                                             x-on:pointermove="onChartPointerMove($event)"
                                             x-on:pointerup="onChartPointerUp($event)"
                                             x-on:pointercancel="onChartPointerCancel($event)"
+                                            x-on:pointerleave="onChartPointerLeave()"
                                             tabindex="0"
                                             x-on:keydown.arrow-left.prevent="stepPoint(-1)"
                                             x-on:keydown.arrow-right.prevent="stepPoint(1)"
                                         >
                                             <title id="dashboard-demand-chart-title">Demand vs Forecast: Historical and forecast inventory demand</title>
-                                            <desc id="dashboard-demand-chart-description">The blue solid line shows recorded consumption buckets. The green dashed line shows forecast demand buckets calculated from the validated period forecast and demand trend.</desc>
+                                            <desc id="dashboard-demand-chart-description">The blue solid line shows recorded consumption extended as a recent-use baseline. The violet dashed line overlays the AI forecast across the same future periods.</desc>
                                             <defs>
                                                 <linearGradient id="dashboard-historical-area" x1="0" y1="0" x2="0" y2="1">
                                                     <stop offset="0%" stop-color="#1c75f5" stop-opacity="0.22"></stop>
                                                     <stop offset="100%" stop-color="#1c75f5" stop-opacity="0.01"></stop>
                                                 </linearGradient>
                                                 <linearGradient id="dashboard-forecast-area" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stop-color="#10b981" stop-opacity="0.18"></stop>
-                                                    <stop offset="100%" stop-color="#10b981" stop-opacity="0.01"></stop>
+                                                    <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.18"></stop>
+                                                    <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.01"></stop>
                                                 </linearGradient>
                                             </defs>
 
@@ -557,26 +541,26 @@
                                             <line x1="50" y1="205" x2="725" y2="205" stroke="#e2e8f0" stroke-width="1" vector-effect="non-scaling-stroke"></line>
 
                                             {{-- Subtle Forecast Boundary Line --}}
-                                            <line x1="470" y1="20" x2="470" y2="205" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"></line>
+                                            <line x-bind:x1="transitionX()" y1="20" x-bind:x2="transitionX()" y2="205" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"></line>
 
                                             {{-- Gradient Fills --}}
-                                            <path x-bind:d="historicalAreaPath()" fill="url(#dashboard-historical-area)"></path>
-                                            <path x-bind:d="forecastAreaPath()" fill="url(#dashboard-forecast-area)"></path>
+                                            <path x-show="showActual" x-bind:d="historicalAreaPath()" fill="url(#dashboard-historical-area)"></path>
+                                            <path x-show="showForecast" x-bind:d="forecastAreaPath()" fill="url(#dashboard-forecast-area)"></path>
 
-                                            {{-- Actual Demand Line (Solid Blue) --}}
-                                            <path x-bind:d="seriesPath(historicalPoints())" fill="none" stroke="#1c75f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                                            {{-- Recorded demand plus the recent-use baseline (solid blue) --}}
+                                            <path x-show="showActual" x-bind:d="seriesPath(historicalBaselinePoints())" fill="none" stroke="#1c75f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
 
-                                            {{-- AI Forecast Line (Dashed Green) --}}
-                                            <path x-bind:d="seriesPath(forecastPointsWithTransition())" fill="none" stroke="#10b981" stroke-width="3" stroke-dasharray="6 4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                                            {{-- AI Forecast Line (Dashed Violet) --}}
+                                            <path x-show="showForecast" x-bind:d="seriesPath(forecastPoints())" fill="none" stroke="#8b5cf6" stroke-width="3" stroke-dasharray="6 4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
 
                                             {{-- Historical Data Markers --}}
-                                            <template x-for="point in historicalPoints()" x-bind:key="`hist-${point.date}`">
-                                                <circle x-bind:cx="point.x" x-bind:cy="point.y" r="3" fill="#1c75f5" fill-opacity="0.6" vector-effect="non-scaling-stroke"></circle>
+                                            <template x-for="point in historicalBaselinePoints()" x-bind:key="`hist-${point.type}-${point.date}`">
+                                                <circle x-show="showActual" x-bind:cx="point.x" x-bind:cy="point.y" r="3" fill="#1c75f5" fill-opacity="0.6" vector-effect="non-scaling-stroke"></circle>
                                             </template>
 
                                             {{-- Forecast Point Markers --}}
                                             <template x-for="point in forecastPoints()" x-bind:key="`fore-${point.date}`">
-                                                <circle x-bind:cx="point.x" x-bind:cy="point.y" r="3.5" fill="#ffffff" stroke="#10b981" stroke-width="2" vector-effect="non-scaling-stroke"></circle>
+                                                <circle x-show="showForecast" x-bind:cx="point.x" x-bind:cy="point.y" r="3.5" fill="#ffffff" stroke="#8b5cf6" stroke-width="2" vector-effect="non-scaling-stroke"></circle>
                                             </template>
 
                                             {{-- Interactive Timeline Scrubber Line & Handle (Moves dynamically with hover, drag, and click) --}}
@@ -599,7 +583,7 @@
                                                         x-bind:cx="activePoint.x"
                                                         x-bind:cy="activePoint.y"
                                                         r="11"
-                                                        x-bind:fill="activePoint.type === 'forecast' ? '#10b981' : '#1c75f5'"
+                                                        x-bind:fill="activePoint.type === 'forecast' ? '#8b5cf6' : '#1c75f5'"
                                                         fill-opacity="0.2"
                                                         class="animate-pulse"
                                                     ></circle>
@@ -621,7 +605,7 @@
                                                         x-bind:cx="activePoint.x"
                                                         x-bind:cy="activePoint.y"
                                                         r="2.5"
-                                                        x-bind:fill="activePoint.type === 'forecast' ? '#10b981' : '#1c75f5'"
+                                                        x-bind:fill="activePoint.type === 'forecast' ? '#8b5cf6' : '#1c75f5'"
                                                         vector-effect="non-scaling-stroke"
                                                     ></circle>
                                                 </g>
@@ -633,15 +617,15 @@
                                     <div class="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-neutral-100 pt-2 text-xs text-neutral-500">
                                         <div class="flex items-center justify-between gap-2">
                                             <span class="tabular-nums font-medium text-neutral-700" x-text="chartStartLabel(historicalSeries())"></span>
-                                            <span class="hidden text-neutral-400 sm:inline">Historical demand</span>
+                                            <span class="hidden text-neutral-400 sm:inline">Recorded history</span>
                                         </div>
                                         <div class="flex items-center gap-1.5 px-3 font-semibold text-neutral-800">
                                             <span class="h-2 w-2 rounded-full bg-neutral-600"></span>
-                                            <span>Forecast starts (<span class="tabular-nums text-primary-700" x-text="chartTransitionLabel()"></span>)</span>
+                                            <span>Comparison starts (<span class="tabular-nums text-primary-700" x-text="chartTransitionLabel()"></span>)</span>
                                         </div>
                                         <div class="flex items-center justify-between gap-2">
-                                            <span class="hidden text-neutral-400 sm:inline">Forecast demand</span>
-                                            <span class="tabular-nums font-semibold text-emerald-700" x-text="chartEndLabel(forecastSeries())"></span>
+                                            <span class="hidden text-neutral-400 sm:inline">AI forecast horizon</span>
+                                            <span class="tabular-nums font-semibold text-violet-700" x-text="chartEndLabel(forecastSeries())"></span>
                                         </div>
                                     </div>
                                 </div>
@@ -651,166 +635,66 @@
                                 </div>
                             </div>
 
-                            {{-- Compact Top Risk Items Table --}}
-                            <div class="border-t border-neutral-200">
-                                <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                                    <div>
-                                        <h4 class="text-sm font-semibold text-neutral-900">Forecasted inventory items</h4>
-                                        <p class="mt-0.5 text-xs text-neutral-500">
-                                            <span x-text="filteredItems().length"></span> matching results; highest risk first. Click an item to plot its demand curve.
-                                        </p>
-                                    </div>
-                                    <div class="flex items-center gap-3">
-                                        <button
-                                            type="button"
-                                            x-show="selectedItemId"
-                                            x-cloak
-                                            x-on:click="selectedItemId = ''"
-                                            class="text-xs font-medium text-primary-700 hover:text-primary-800"
-                                        >
-                                            Show all items
-                                        </button>
-                                        <button
-                                            type="button"
-                                            x-on:click="clearFilters()"
-                                            class="text-xs font-medium text-neutral-500 hover:text-neutral-700"
-                                        >
-                                            Clear filters
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {{-- Desktop & Tablet Table (Responsive, 100% width, no horizontal scrollbar) --}}
-                                <div class="hidden md:block overflow-hidden border-y border-neutral-200 bg-white">
-                                    <table class="w-full text-left text-xs">
-                                        <thead class="border-b border-neutral-200 bg-neutral-50 text-neutral-500">
-                                            <tr>
-                                                <th scope="col" class="w-[30%] px-4 py-2.5 font-semibold text-neutral-700">Item</th>
-                                                <th scope="col" class="w-[10%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Current Stock</th>
-                                                <th scope="col" class="w-[10%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Historical</th>
-                                                <th scope="col" class="w-[12%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Predicted Demand</th>
-                                                <th scope="col" class="w-[12%] px-2.5 py-2.5 text-center font-semibold text-neutral-700">Stock risk</th>
-                                                <th scope="col" class="w-[10%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Reorder</th>
-                                                <th scope="col" class="w-[8%] px-2.5 py-2.5 font-semibold text-neutral-700">Confidence</th>
-                                                <th scope="col" class="w-[8%] px-3 py-2.5 text-right font-semibold text-neutral-700">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-neutral-100">
-                                            <template x-for="item in topItems()" x-bind:key="item.item_id">
-                                                <tr
-                                                    class="cursor-pointer transition-colors hover:bg-neutral-50"
-                                                    x-bind:class="selectedItemId === String(item.item_id) ? 'bg-primary-50/80 ring-1 ring-inset ring-primary-300' : ''"
-                                                    x-on:click="selectItem(item.item_id)"
-                                                >
-                                                    <td class="px-4 py-2.5">
-                                                        <div class="flex items-center gap-2">
-                                                            <span
-                                                                x-show="selectedItemId === String(item.item_id)"
-                                                                class="h-1.5 w-1.5 rounded-full bg-primary-600"
-                                                                aria-hidden="true"
-                                                            ></span>
-                                                            <div class="min-w-0">
-                                                                <p class="truncate font-semibold text-neutral-900" x-text="item.item_name"></p>
-                                                                <p class="text-neutral-500" x-text="item.sku"></p>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-2.5 py-2.5 text-right tabular-nums text-neutral-700" x-text="formatNumber(item.current_stock)"></td>
-                                                    <td class="px-2.5 py-2.5 text-right tabular-nums text-neutral-700" x-text="item.historical_consumption == null ? '—' : formatNumber(item.historical_consumption)"></td>
-                                                    <td class="px-2.5 py-2.5 text-right font-bold tabular-nums text-neutral-900" x-text="formatNumber(item.predicted_demand)"></td>
-                                                    <td class="px-2.5 py-2.5 text-center">
-                                                        <span class="inline-flex rounded-full px-2 py-0.5 font-semibold text-[11px] ring-1 ring-inset whitespace-nowrap" x-bind:class="riskClasses(item.risk_level)" x-text="`${item.risk_level} risk`"></span>
-                                                    </td>
-                                                    <td class="px-2.5 py-2.5 text-right font-semibold tabular-nums text-neutral-900" x-text="formatNumber(item.recommended_reorder_quantity)"></td>
-                                                    <td class="px-2.5 py-2.5 capitalize text-neutral-700 text-[11px]" x-text="item.confidence"></td>
-                                                    <td class="px-3 py-2.5 text-right">
-                                                        <button
-                                                            type="button"
-                                                            class="rounded px-2 py-1 text-xs font-medium"
-                                                            x-bind:class="selectedItemId === String(item.item_id) ? 'bg-primary-600 text-white' : 'text-primary-700 hover:bg-primary-50'"
-                                                            x-text="selectedItemId === String(item.item_id) ? 'Active' : 'Plot Curve'"
-                                                        ></button>
-                                                    </td>
-                                                </tr>
-                                            </template>
-                                            <tr x-show="topItems().length === 0">
-                                                <td colspan="8" class="px-4 py-8 text-center text-sm text-neutral-500">No forecast items match the current filters.</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                {{-- Mobile Card List (Zero horizontal scrolling on smartphones) --}}
-                                <div class="md:hidden space-y-2.5 p-3">
-                                    <template x-for="item in topItems()" x-bind:key="item.item_id">
-                                        <div
-                                            class="cursor-pointer rounded-xl border p-3 transition-colors space-y-2"
-                                            x-bind:class="selectedItemId === String(item.item_id) ? 'border-primary-300 bg-primary-50/70 shadow-xs' : 'border-neutral-200 bg-white hover:bg-neutral-50/80'"
-                                            x-on:click="selectItem(item.item_id)"
-                                        >
-                                            <div class="flex items-start justify-between gap-2">
-                                                <div class="min-w-0 flex-1">
-                                                    <p class="font-semibold text-neutral-900 text-xs leading-snug" x-text="item.item_name"></p>
-                                                    <p class="text-[11px] text-neutral-500" x-text="item.sku"></p>
-                                                </div>
-                                                <span class="inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset whitespace-nowrap" x-bind:class="riskClasses(item.risk_level)" x-text="`${item.risk_level} risk`"></span>
-                                            </div>
-
-                                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-lg bg-neutral-50 p-2 text-center text-[11px]">
-                                                <div class="rounded bg-white/80 py-1 border border-neutral-100">
-                                                    <span class="block text-[10px] text-neutral-500">Current</span>
-                                                    <span class="font-semibold text-neutral-800 tabular-nums" x-text="formatNumber(item.current_stock)"></span>
-                                                </div>
-                                                <div class="rounded bg-white/80 py-1 border border-neutral-100">
-                                                    <span class="block text-[10px] text-neutral-500">Historical</span>
-                                                    <span class="font-medium text-neutral-600 tabular-nums" x-text="item.historical_consumption == null ? '—' : formatNumber(item.historical_consumption)"></span>
-                                                </div>
-                                                <div class="rounded bg-white/80 py-1 border border-neutral-100">
-                                                    <span class="block text-[10px] text-neutral-500">Forecast</span>
-                                                    <span class="font-bold text-neutral-900 tabular-nums" x-text="formatNumber(item.predicted_demand)"></span>
-                                                </div>
-                                                <div class="rounded bg-white/80 py-1 border border-neutral-100">
-                                                    <span class="block text-[10px] text-primary-700">Reorder</span>
-                                                    <span class="font-bold text-primary-700 tabular-nums" x-text="formatNumber(item.recommended_reorder_quantity)"></span>
-                                                </div>
-                                            </div>
-
-                                            <div class="flex items-center justify-between pt-1">
-                                                <span class="text-[11px] text-neutral-500">Confidence: <span class="capitalize font-medium text-neutral-700" x-text="item.confidence"></span></span>
-                                                <button
-                                                    type="button"
-                                                    class="rounded px-2.5 py-1 text-xs font-medium"
-                                                    x-bind:class="selectedItemId === String(item.item_id) ? 'bg-primary-600 text-white' : 'text-primary-700 bg-primary-50'"
-                                                    x-text="selectedItemId === String(item.item_id) ? 'Active Curve' : 'Plot Curve'"
-                                                ></button>
-                                            </div>
-                                        </div>
-                                    </template>
-                                    <div x-show="topItems().length === 0" class="py-6 text-center text-sm text-neutral-500">
-                                        No forecast items match the current filters.
-                                    </div>
-                                </div>
-                            </div>
-
-                            {{-- Advisory Insight --}}
-                            <aside class="flex items-start gap-3 border-t border-neutral-200 bg-neutral-50 px-4 py-3">
-                                <x-ui.icon name="arrow-trending-up" class="mt-0.5 h-4 w-4 shrink-0 text-primary-700" />
-                                <div class="min-w-0">
-                                    <h4 class="text-xs font-semibold text-neutral-900" x-text="forecast?.source === 'ai' ? 'AI Insight' : 'Forecast Insight'"></h4>
-                                    <p class="mt-0.5 text-sm text-neutral-700" x-text="insight()"></p>
-                                </div>
-                            </aside>
                         </section>
 
-                        <div class="mt-3 flex flex-col gap-2 text-xs text-neutral-400 sm:flex-row sm:items-center sm:justify-between">
-                            <p>Recommendations are advisory and never modify inventory or purchase orders automatically.</p>
-                            <button type="button" x-on:click="$dispatch('open-modal', 'dashboard-demand-forecast')" class="self-start font-medium text-primary-700 hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:self-auto">
-                                View all <span x-text="filteredItems().length"></span> results
-                            </button>
-                        </div>
                     </div>
                 </div>
             </x-ui.card>
+
+            <aside class="space-y-4" aria-label="Dashboard attention panels">
+                <x-ui.card :padding="false">
+                    <x-slot:header>
+                        <h2 class="text-sm font-semibold text-neutral-900">Inventory attention</h2>
+                        <p class="mt-0.5 text-xs text-neutral-500">
+                            Highest-priority live alerts <span class="text-neutral-400" x-text="statusLabel"></span>
+                        </p>
+                    </x-slot:header>
+
+                    <x-slot:actions>
+                        <x-ui.button variant="ghost" size="sm" :href="route('inventory.alerts')">View all</x-ui.button>
+                    </x-slot:actions>
+
+                    <div data-dashboard-alerts>
+                        @include('inventory.partials.dashboard-alerts')
+                    </div>
+                </x-ui.card>
+
+                <x-ui.card :padding="false">
+                    <div class="p-3">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-700">
+                                <x-ui.icon name="arrow-trending-up" class="h-4 w-4" />
+                            </span>
+                            <div class="min-w-0">
+                                <h2 class="text-sm font-semibold text-neutral-900" x-text="forecast?.source === 'ai' ? 'AI forecast insight' : 'Forecast insight'"></h2>
+                                <p class="mt-1 text-xs leading-relaxed text-neutral-600" x-text="forecast ? insight() : 'Generate a forecast to see demand and reorder guidance.'"></p>
+                            </div>
+                        </div>
+
+                        <dl x-show="forecast" x-cloak class="mt-3 grid grid-cols-2 gap-3 border-y border-neutral-200 py-2.5">
+                            <div>
+                                <dt class="text-[11px] text-neutral-500">At-risk items</dt>
+                                <dd class="mt-0.5 text-lg font-semibold tabular-nums text-danger-700" x-text="lowStockRiskCount()"></dd>
+                            </div>
+                            <div>
+                                <dt class="text-[11px] text-neutral-500">Confidence</dt>
+                                <dd class="mt-0.5 text-sm font-semibold capitalize text-neutral-900" x-text="confidenceLabel()"></dd>
+                            </div>
+                        </dl>
+
+                        <button
+                            type="button"
+                            x-show="forecast"
+                            x-cloak
+                            x-on:click="$dispatch('open-modal', 'dashboard-demand-forecast')"
+                            class="mt-3 inline-flex text-xs font-semibold text-primary-700 hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                        >
+                            Review all <span class="mx-1" x-text="filteredItems().length"></span> forecast items
+                        </button>
+                        <p class="mt-2 text-[10px] leading-relaxed text-neutral-400">Advisory only; no stock or purchase order is changed automatically.</p>
+                    </div>
+                </x-ui.card>
+            </aside>
 
             <x-ui.modal name="dashboard-demand-forecast" title="Full Demand Forecast" maxWidth="6xl">
                 <div class="space-y-4">
@@ -928,8 +812,45 @@
                 </x-slot:footer>
             </x-ui.modal>
         </div>
+    @else
+        <x-ui.card :padding="false">
+            <x-slot:header>
+                <h2 class="text-sm font-semibold text-neutral-900">Inventory attention</h2>
+                <p class="mt-0.5 text-xs text-neutral-500">
+                    Highest-priority live alerts <span class="text-neutral-400" x-text="statusLabel"></span>
+                </p>
+            </x-slot:header>
+
+            <x-slot:actions>
+                <x-ui.button variant="ghost" size="sm" :href="route('inventory.alerts')">View all</x-ui.button>
+            </x-slot:actions>
+
+            <div data-dashboard-alerts>
+                @include('inventory.partials.dashboard-alerts')
+            </div>
+        </x-ui.card>
     @endcan
 
+    <details class="group overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm" data-dashboard-secondary>
+        <summary class="flex cursor-pointer list-none flex-col gap-2 px-4 py-3 marker:content-none sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h2 class="text-sm font-semibold text-neutral-900">Operational details</h2>
+                <p class="mt-0.5 text-xs text-neutral-500">Purchase orders, stock movements, suppliers, and storage summaries.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-xs sm:shrink-0">
+                <span class="rounded-full bg-danger-50 px-2 py-0.5 font-medium text-danger-700">{{ number_format($outOfStockItems) }} out of stock</span>
+                @can(\App\Enums\Permission::ViewProcurementSensitiveData->value)
+                    <span class="rounded-full bg-warning-50 px-2 py-0.5 font-medium text-warning-700">{{ number_format($pendingPoCount) }} pending POs</span>
+                @endcan
+                <span class="inline-flex items-center gap-1 font-semibold text-primary-700">
+                    <span class="group-open:hidden">Show details</span>
+                    <span class="hidden group-open:inline">Hide details</span>
+                    <x-ui.icon name="chevron-down" class="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+                </span>
+            </div>
+        </summary>
+
+        <div class="border-t border-neutral-200 bg-neutral-50/60 p-3">
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-12 2xl:gap-5">
         {{-- Operational snapshot. The supplier and purchase-order figures are
              procurement's business, so an account without it sees the stock
@@ -1094,7 +1015,10 @@
             </x-ui.table>
         </x-ui.card>
     </div>
+        </div>
+    </details>
     </div>{{-- /dashboardLive --}}
+
 
     {{-- HIMS AI Inventory Assistant Floating Chatbot --}}
     @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::ViewReports->value])
@@ -1625,5 +1549,5 @@
         </section>
     </aside>
     @endcanany
-</x-app-layout>
 
+</x-app-layout>

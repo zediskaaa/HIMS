@@ -94,7 +94,9 @@ class AiDemandForecastTest extends TestCase
         $this->assertSame(70, $cached['items'][0]['historical_consumption']);
         $this->assertSame(0.78, $cached['items'][0]['average_daily_consumption']);
         $this->assertSame(70, collect($cached['items'][0]['historical_series'])->sum('quantity'));
+        $this->assertSame(90, collect($cached['items'][0]['historical_series'])->sum('days'));
         $this->assertSame(42, collect($cached['items'][0]['forecast_series'])->sum('quantity'));
+        $this->assertSame(30, collect($cached['items'][0]['forecast_series'])->sum('days'));
         $this->assertLessThan(
             $cached['items'][0]['forecast_series'][4]['quantity'],
             $cached['items'][0]['forecast_series'][0]['quantity'],
@@ -167,26 +169,41 @@ class AiDemandForecastTest extends TestCase
         $this->actingAs($manager)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('Predict upcoming inventory demand using historical stock movement and consumption data.')
+            ->assertSee('Historical baseline and AI forecast in one decision view.')
             ->assertSee('Demand vs Forecast')
-            ->assertSee('Demand forecast')
-            ->assertSee('Historical consumption and projected inventory demand')
             ->assertSee('Select Item')
             ->assertSee('All Inventory Items (Overall Hospital Demand)')
+            ->assertSee('More filters')
             ->assertSee('Estimated Stock Risk')
             ->assertSee('Current Stock')
             ->assertSee('At-risk items')
             ->assertSee('Reorder units')
-            ->assertSee('Historical demand')
-            ->assertSee('Forecast demand')
-            ->assertSee('Forecast starts')
-            ->assertSee('Forecasted inventory items')
+            ->assertSee('Comparison starts')
+            ->assertSee('Units/day')
+            ->assertSee('Inventory attention')
+            ->assertSee('AI forecast insight')
+            ->assertSee('Forecast details')
+            ->assertSee('Historical baseline')
+            ->assertSee('AI forecast')
+            ->assertSee('data-chart-inspector', false)
+            ->assertSee('Hover, drag, or use the arrow keys to inspect either line.')
+            ->assertSee('data-dashboard-secondary', false)
             ->assertSee('Clinical Consumables')
             ->assertSee('Full Demand Forecast')
             ->assertSee('Explanation')
+            ->assertSee('data-dashboard-alerts', false)
             ->assertSee('demandForecastDashboard(', false)
+            ->assertSee('x-on:click="toggleSeries(\'actual\')"', false)
+            ->assertSee('x-on:click="toggleSeries(\'forecast\')"', false)
+            ->assertSee('seriesPath(historicalBaselinePoints())', false)
+            ->assertSee('seriesPath(forecastPoints())', false)
+            ->assertSee('lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]', false)
+            ->assertSee('x-ref="trackedItemsTile"', false)
+            ->assertSee('x-ref="inventoryValueTile"', false)
             ->assertSee('x-on:submit.prevent="generateForecast()"', false)
             ->assertSee('data-no-loading', false)
+            ->assertDontSee('Forecasted inventory items')
+            ->assertDontSee('forecastPointsWithTransition()', false)
             ->assertDontSee('Price Recommendations');
     }
 
@@ -205,6 +222,30 @@ class AiDemandForecastTest extends TestCase
             ->assertJsonPath('message', 'No active inventory items are available to forecast.');
 
         Http::assertNothingSent();
+    }
+
+    public function test_chart_series_preserves_partial_bucket_durations(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+        $item = $this->item();
+        $this->consume($item, 14, 4);
+
+        Http::fake(['*' => Http::response([], 503)]);
+
+        $response = $this->actingAs($manager)
+            ->postJson(route('inventory.demand-forecast.refresh'), [
+                'analysis_days' => 90,
+                'forecast_days' => 7,
+                'return_to' => 'dashboard',
+            ])
+            ->assertOk();
+
+        $historical = collect($response->json('forecast.items.0.historical_series'));
+        $forecast = collect($response->json('forecast.items.0.forecast_series'));
+
+        $this->assertSame(90, $historical->sum('days'));
+        $this->assertSame([4, 3], $forecast->pluck('days')->all());
+        $this->assertSame(7, $forecast->sum('days'));
     }
 
     public function test_missing_api_key_uses_a_clearly_labeled_statistical_fallback(): void

@@ -1117,6 +1117,7 @@ startLoadingIndicators();
 Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     forecast: initialForecast,
     endpoint,
+    analysisDays: String(initialForecast?.analysis_days ?? 90),
     forecastDays: String(initialForecast?.forecast_days ?? 30),
     selectedItemId: '',
     category: '',
@@ -1127,11 +1128,53 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     success: '',
     activePoint: null,
     isDragging: false,
+    filtersOpen: false,
+    showActual: true,
+    showForecast: true,
 
     init() {
         this.$nextTick(() => {
             this.resetActivePointToTransition();
         });
+        ['selectedItemId', 'category', 'risk', 'search'].forEach((property) => {
+            this.$watch(property, () => {
+                this.$nextTick(() => this.clearActivePoint());
+            });
+        });
+    },
+
+    clearActivePoint() {
+        this.activePoint = null;
+    },
+
+    activeFilterCount() {
+        return [this.category, this.risk, this.search.trim()].filter(Boolean).length;
+    },
+
+    clearFilters() {
+        this.selectedItemId = '';
+        this.category = '';
+        this.risk = '';
+        this.search = '';
+        this.clearActivePoint();
+        this.$nextTick(() => {
+            this.resetActivePointToTransition();
+        });
+    },
+
+    toggleSeries(type) {
+        if (type === 'actual') {
+            this.showActual = !this.showActual;
+            if (!this.showActual && !this.showForecast) {
+                this.showForecast = true;
+            }
+        } else if (type === 'forecast') {
+            this.showForecast = !this.showForecast;
+            if (!this.showForecast && !this.showActual) {
+                this.showActual = true;
+            }
+        }
+        this.resetActivePointToTransition();
     },
 
     resetActivePointToTransition() {
@@ -1252,28 +1295,55 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
 
     aggregateSeries(field) {
         const totals = new Map();
+        const windowDays = field === 'historical_series'
+            ? Number(this.forecast?.analysis_days || 90)
+            : Number(this.forecast?.forecast_days || 30);
 
         this.filteredItems().forEach((item) => {
             const series = Array.isArray(item[field]) ? item[field] : [];
-            series.forEach((point) => {
+            const fallbackDays = Math.max(1, Math.ceil(windowDays / Math.max(1, series.length)));
+
+            series.forEach((point, index) => {
                 const date = String(point.period_start || '');
                 if (date === '') return;
 
-                totals.set(date, (totals.get(date) || 0) + Number(point.quantity || 0));
+                const inferredDays = Math.max(1, Math.min(fallbackDays, windowDays - (index * fallbackDays)));
+                const days = Math.max(1, Number(point.days || inferredDays));
+                const current = totals.get(date) || { quantity: 0, days };
+                current.quantity += Number(point.quantity || 0);
+                current.days = Math.max(current.days, days);
+                totals.set(date, current);
             });
         });
 
-        return Array.from(totals, ([date, quantity]) => ({ date, quantity }))
-            .sort((left, right) => left.date.localeCompare(right.date));
+        return Array.from(totals, ([date, point]) => ({
+            date,
+            quantity: point.quantity,
+            days: point.days,
+            rate: point.quantity / point.days,
+        })).sort((left, right) => left.date.localeCompare(right.date));
     },
 
     currentHistoricalSeries() {
         const sel = this.selectedItem();
         if (sel) {
             const series = Array.isArray(sel.historical_series) ? sel.historical_series : [];
+            const windowDays = Number(this.forecast?.analysis_days || 90);
+            const fallbackDays = Math.max(1, Math.ceil(windowDays / Math.max(1, series.length)));
+
             return series
                 .filter((p) => p.period_start)
-                .map((p) => ({ date: p.period_start, quantity: Number(p.quantity || 0) }))
+                .map((p, index) => {
+                    const inferredDays = Math.max(1, Math.min(fallbackDays, windowDays - (index * fallbackDays)));
+                    const days = Math.max(1, Number(p.days || inferredDays));
+                    const quantity = Number(p.quantity || 0);
+                    return {
+                        date: p.period_start,
+                        quantity,
+                        days,
+                        rate: quantity / days,
+                    };
+                })
                 .sort((a, b) => a.date.localeCompare(b.date));
         }
         return this.aggregateSeries('historical_series');
@@ -1283,9 +1353,22 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         const sel = this.selectedItem();
         if (sel) {
             const series = Array.isArray(sel.forecast_series) ? sel.forecast_series : [];
+            const windowDays = Number(this.forecast?.forecast_days || 30);
+            const fallbackDays = Math.max(1, Math.ceil(windowDays / Math.max(1, series.length)));
+
             return series
                 .filter((p) => p.period_start)
-                .map((p) => ({ date: p.period_start, quantity: Number(p.quantity || 0) }))
+                .map((p, index) => {
+                    const inferredDays = Math.max(1, Math.min(fallbackDays, windowDays - (index * fallbackDays)));
+                    const days = Math.max(1, Number(p.days || inferredDays));
+                    const quantity = Number(p.quantity || 0);
+                    return {
+                        date: p.period_start,
+                        quantity,
+                        days,
+                        rate: quantity / days,
+                    };
+                })
                 .sort((a, b) => a.date.localeCompare(b.date));
         }
         return this.aggregateSeries('forecast_series');
@@ -1303,9 +1386,42 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         return this.currentHistoricalSeries().length > 0 && this.currentForecastSeries().length > 0;
     },
 
+    baselineDailyRate() {
+        const sel = this.selectedItem();
+        if (sel) {
+            if (sel.average_daily_consumption != null && Number(sel.average_daily_consumption) > 0) {
+                return Number(sel.average_daily_consumption);
+            }
+            const hist = this.currentHistoricalSeries();
+            const totalQty = hist.reduce((sum, p) => sum + Number(p.quantity || 0), 0);
+            const totalDays = hist.reduce((sum, p) => sum + Math.max(1, Number(p.days || 1)), 0);
+            return totalDays > 0 ? totalQty / totalDays : 0;
+        }
+
+        const items = this.filteredItems();
+        if (items.length === 0) return 0;
+
+        let hasAvg = false;
+        let sumAvg = 0;
+        items.forEach((item) => {
+            if (item.average_daily_consumption != null) {
+                hasAvg = true;
+                sumAvg += Number(item.average_daily_consumption);
+            }
+        });
+        if (hasAvg && sumAvg > 0) return sumAvg;
+
+        const hist = this.currentHistoricalSeries();
+        const totalQty = hist.reduce((sum, p) => sum + Number(p.quantity || 0), 0);
+        const totalDays = hist.reduce((sum, p) => sum + Math.max(1, Number(p.days || 1)), 0);
+        return totalDays > 0 ? totalQty / totalDays : 0;
+    },
+
     chartMaximum() {
-        const histMax = Math.max(...this.currentHistoricalSeries().map((point) => Number(point.quantity || 0)), 0);
-        const foreMax = Math.max(...this.currentForecastSeries().map((point) => Number(point.quantity || 0)), 0);
+        const hist = this.currentHistoricalSeries();
+        const fore = this.currentForecastSeries();
+        const histMax = Math.max(...hist.map((point) => Number(point.quantity || 0)), 0);
+        const foreMax = Math.max(...fore.map((point) => Number(point.quantity || 0)), 0);
         return Math.max(histMax, foreMax, 1);
     },
 
@@ -1325,14 +1441,23 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         const endX = this.transitionX();
         const step = series.length === 1 ? 0 : (endX - startX) / (series.length - 1);
 
-        return series.map((point, index) => ({
-            x: Math.round((startX + (step * index)) * 10) / 10,
-            y: this.chartY(point.quantity),
-            date: point.date,
-            quantity: point.quantity,
-            type: 'actual',
-            label: 'Actual Demand',
-        }));
+        return series.map((point, index) => {
+            const days = Math.max(1, Number(point.days || 1));
+            const quantity = Number(point.quantity || 0);
+            const rate = point.rate != null ? Number(point.rate) : (quantity / days);
+
+            return {
+                x: Math.round((startX + (step * index)) * 10) / 10,
+                y: this.chartY(point.quantity),
+                date: point.date,
+                formattedDate: this.formatDateLabel(point.date),
+                quantity,
+                days,
+                value: rate,
+                type: 'actual',
+                label: 'Historical Demand',
+            };
+        });
     },
 
     forecastPoints() {
@@ -1344,40 +1469,72 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         const count = series.length;
         const step = (endX - startX) / count;
 
-        return series.map((point, index) => ({
-            x: Math.round((startX + (step * (index + 1))) * 10) / 10,
-            y: this.chartY(point.quantity),
-            date: point.date,
-            quantity: point.quantity,
-            type: 'forecast',
-            label: 'AI Forecast',
-        }));
+        return series.map((point, index) => {
+            const days = Math.max(1, Number(point.days || 1));
+            const quantity = Number(point.quantity || 0);
+            const rate = point.rate != null ? Number(point.rate) : (quantity / days);
+
+            return {
+                x: Math.round((startX + (step * (index + 1))) * 10) / 10,
+                y: this.chartY(point.quantity),
+                date: point.date,
+                formattedDate: this.formatDateLabel(point.date),
+                quantity,
+                days,
+                value: rate,
+                type: 'forecast',
+                label: 'AI Forecast',
+            };
+        });
     },
 
-    forecastPointsWithTransition() {
+    historicalBaselinePoints() {
         const hist = this.historicalPoints();
+        if (hist.length === 0) return [];
+
         const fore = this.forecastPoints();
-        if (fore.length === 0) return [];
+        if (fore.length === 0) return hist;
 
-        const transitionY = hist.length > 0 ? hist[hist.length - 1].y : fore[0].y;
-        const connector = {
-            x: this.transitionX(),
-            y: transitionY,
-            date: hist.length > 0 ? hist[hist.length - 1].date : fore[0].date,
-            quantity: hist.length > 0 ? hist[hist.length - 1].quantity : fore[0].quantity,
-            type: 'boundary',
-            label: 'Forecast Transition',
-        };
+        const baselineRate = this.baselineDailyRate();
 
-        return [connector, ...fore];
+        const baselineFuture = fore.map((fp) => {
+            const days = fp.days || 1;
+            const quantity = Math.round(baselineRate * days);
+            return {
+                x: fp.x,
+                y: this.chartY(quantity),
+                date: fp.date,
+                formattedDate: this.formatDateLabel(fp.date),
+                quantity,
+                days,
+                value: baselineRate,
+                type: 'baseline',
+                label: 'Historical Baseline',
+            };
+        });
+
+        return [...hist, ...baselineFuture];
     },
 
     allChartPoints() {
-        return [...this.historicalPoints(), ...this.forecastPoints()];
+        const points = [];
+        if (this.showActual) {
+            points.push(...this.historicalBaselinePoints());
+        }
+        if (this.showForecast) {
+            this.forecastPoints().forEach((fp) => {
+                if (!points.some((p) => Math.abs(p.x - fp.x) < 2 && Math.abs(p.y - fp.y) < 2)) {
+                    points.push(fp);
+                }
+            });
+        }
+        return points.length > 0
+            ? points.sort((a, b) => a.x - b.x)
+            : [...this.historicalPoints(), ...this.forecastPoints()];
     },
 
     seriesPath(points) {
-        if (points.length === 0) return '';
+        if (!Array.isArray(points) || points.length === 0) return '';
         return points.map((point, index) => (
             `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`
         )).join(' ');
@@ -1395,18 +1552,21 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     },
 
     forecastAreaPath() {
-        const points = this.forecastPointsWithTransition();
-        if (points.length === 0) return '';
+        const hist = this.historicalPoints();
+        const fore = this.forecastPoints();
+        if (fore.length === 0) return '';
 
         const baseline = 205;
-        return `M ${points[0].x} ${baseline} L ${points[0].x} ${points[0].y} ${points
-            .slice(1)
+        const startX = this.transitionX();
+        const startY = hist.length > 0 ? hist[hist.length - 1].y : fore[0].y;
+
+        return `M ${startX} ${baseline} L ${startX} ${startY} ${fore
             .map((p) => `L ${p.x} ${p.y}`)
-            .join(' ')} L ${points[points.length - 1].x} ${baseline} Z`;
+            .join(' ')} L ${fore[fore.length - 1].x} ${baseline} Z`;
     },
 
     areaPath(points) {
-        if (points.length === 0) return '';
+        if (!Array.isArray(points) || points.length === 0) return '';
 
         return `M ${points[0].x} 205 L ${points[0].x} ${points[0].y} ${points
             .slice(1)
@@ -1459,6 +1619,10 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     },
 
     onChartMouseLeave() {
+        this.isDragging = false;
+    },
+
+    onChartPointerLeave() {
         this.isDragging = false;
     },
 
@@ -2618,6 +2782,727 @@ Alpine.data('himsAiAssistant', ({
         }
     },
 }));
+
+Alpine.data('himsAiAssistant', ({
+    endpoint,
+    conversationsEndpoint = '/dashboard/ai-assistant/conversations',
+    activeEndpoint = '/dashboard/ai-assistant/conversations/active',
+    conversationShowBase = '/dashboard/ai-assistant/conversations',
+    knownItems = []
+}) => ({
+    isOpen: false,
+    endpoint,
+    conversationsEndpoint,
+    activeEndpoint,
+    conversationShowBase,
+    knownItems: Array.isArray(knownItems) ? knownItems : [],
+
+    // Active conversation state
+    conversationId: null,
+    conversationTitle: '',
+    messages: [],
+    input: '',
+    isLoading: false,
+    loadingStatus: 'Looking into that...',
+    errorMessage: '',
+    selectedFile: null,
+    isDraggingOver: false,
+    allowedExtensions: ['pdf', 'csv', 'xlsx', 'docx', 'txt', 'jpg', 'jpeg', 'png'],
+    maxFileSize: 35 * 1024 * 1024, // 35MB
+
+    // History and navigation state
+    viewMode: 'chat', // 'chat' | 'history'
+    conversationsList: [],
+    isHistoryLoading: false,
+    showNewChatConfirm: false,
+    hasRestoredActive: false,
+
+    init() {
+        this.restoreActiveConversation();
+    },
+
+    async restoreActiveConversation() {
+        if (this.hasRestoredActive) return;
+        try {
+            const resp = await fetch(this.activeEndpoint, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.status === 'success' && data.conversation) {
+                    this.conversationId = data.conversation.id;
+                    this.conversationTitle = data.conversation.title;
+                    this.messages = Array.isArray(data.conversation.messages) ? data.conversation.messages : [];
+                }
+            }
+        } catch (e) {
+            // Silently fallback to clean empty chat state
+        } finally {
+            this.hasRestoredActive = true;
+        }
+    },
+
+    toggle() {
+        this.isOpen = !this.isOpen;
+        if (this.isOpen) {
+            if (!this.hasRestoredActive) {
+                this.restoreActiveConversation();
+            }
+            this.$nextTick(() => {
+                this.scrollToBottom();
+                if (this.viewMode === 'chat') {
+                    this.$refs.chatInput?.focus();
+                }
+            });
+        }
+    },
+
+    close() {
+        // CLOSE CHATBOT ≠ NEW CHAT: Only hide the UI, preserve current conversation
+        this.isOpen = false;
+        this.viewMode = 'chat';
+        this.showNewChatConfirm = false;
+    },
+
+    requestNewChat() {
+        if (this.messages.length > 0) {
+            this.showNewChatConfirm = true;
+        } else {
+            this.startNewChat();
+        }
+    },
+
+    cancelNewChat() {
+        this.showNewChatConfirm = false;
+    },
+
+    startNewChat() {
+        this.showNewChatConfirm = false;
+        this.conversationId = null;
+        this.conversationTitle = '';
+        this.messages.forEach(m => {
+            if (m.attachment?.previewUrl && m.attachment.previewUrl.startsWith('blob:') && typeof URL !== 'undefined' && URL.revokeObjectURL) {
+                try {
+                    URL.revokeObjectURL(m.attachment.previewUrl);
+                } catch (e) {}
+            }
+        });
+        this.messages = [];
+        this.errorMessage = '';
+        this.removeFile(true);
+        this.viewMode = 'chat';
+        this.$nextTick(() => {
+            this.$refs.chatInput?.focus();
+        });
+    },
+
+    clearChat() {
+        this.requestNewChat();
+    },
+
+    async toggleHistory() {
+        if (this.viewMode === 'history') {
+            this.viewMode = 'chat';
+            this.$nextTick(() => this.scrollToBottom());
+        } else {
+            this.viewMode = 'history';
+            await this.loadConversations();
+        }
+    },
+
+    async loadConversations() {
+        this.isHistoryLoading = true;
+        try {
+            const resp = await fetch(this.conversationsEndpoint, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                this.conversationsList = Array.isArray(data.conversations) ? data.conversations : [];
+            }
+        } catch (e) {
+            console.error('Failed to load conversations', e);
+        } finally {
+            this.isHistoryLoading = false;
+        }
+    },
+
+    get groupedConversations() {
+        const groups = {};
+        for (const conv of this.conversationsList) {
+            const group = conv.date_group || 'Previous';
+            if (!groups[group]) {
+                groups[group] = [];
+            }
+            groups[group].push(conv);
+        }
+        return groups;
+    },
+
+    async selectConversation(id) {
+        if (this.conversationId === id && this.messages.length > 0) {
+            this.viewMode = 'chat';
+            this.$nextTick(() => this.scrollToBottom());
+            return;
+        }
+
+        this.isLoading = true;
+        this.viewMode = 'chat';
+        try {
+            const url = `${this.conversationShowBase}/${id}`;
+            const resp = await fetch(url, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.status === 'success' && data.conversation) {
+                    this.conversationId = data.conversation.id;
+                    this.conversationTitle = data.conversation.title;
+                    this.messages = Array.isArray(data.conversation.messages) ? data.conversation.messages : [];
+                    this.$nextTick(() => this.scrollToBottom());
+                }
+            }
+        } catch (e) {
+            this.errorMessage = 'Failed to load selected conversation.';
+        } finally {
+            this.isLoading = false;
+        }
+    },
+
+    scrollToBottom() {
+        this.$nextTick(() => {
+            const container = this.$refs.messagesContainer;
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+        });
+    },
+
+    formatTime() {
+        return new Intl.DateTimeFormat(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+        }).format(new Date());
+    },
+
+    copiedIndex: null,
+
+    async copyMessage(content, index) {
+        if (!content) return;
+        try {
+            await navigator.clipboard.writeText(content);
+            this.copiedIndex = index;
+            setTimeout(() => {
+                if (this.copiedIndex === index) {
+                    this.copiedIndex = null;
+                }
+            }, 2000);
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+        }
+    },
+
+    formatBytes(bytes) {
+        if (!bytes || bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    },
+
+    validateAndSetFile(file) {
+        if (!file) return;
+
+        if (file.size === 0) {
+            this.errorMessage = 'The attached file is empty (0 bytes).';
+            return;
+        }
+
+        if (file.size > this.maxFileSize) {
+            this.errorMessage = 'File size exceeds the 35MB limit.';
+            return;
+        }
+
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        if (!this.allowedExtensions.includes(ext)) {
+            this.errorMessage = `Unsupported file type (.${ext}). Supported: PDF, CSV, XLSX, DOCX, TXT, JPG, PNG.`;
+            return;
+        }
+
+        let typeCategory = 'document';
+        let previewUrl = null;
+        if (['csv', 'xlsx'].includes(ext)) {
+            typeCategory = 'spreadsheet';
+        } else if (['jpg', 'jpeg', 'png'].includes(ext)) {
+            typeCategory = 'image';
+            if (typeof URL !== 'undefined' && URL.createObjectURL) {
+                try {
+                    previewUrl = URL.createObjectURL(file);
+                } catch (e) {}
+            }
+        } else if (ext === 'txt') {
+            typeCategory = 'text';
+        }
+
+        this.selectedFile = {
+            file,
+            name: file.name,
+            size: this.formatBytes(file.size),
+            rawSize: file.size,
+            type: typeCategory,
+            extension: ext,
+            previewUrl,
+        };
+        this.errorMessage = '';
+    },
+
+    handleFileSelect(event) {
+        const file = event.target.files?.[0];
+        if (file) {
+            this.validateAndSetFile(file);
+        }
+        if (this.$refs.fileInput) {
+            this.$refs.fileInput.value = '';
+        }
+    },
+
+    handleFileDrop(event) {
+        this.isDraggingOver = false;
+        const dt = event.dataTransfer;
+        if (dt && dt.files && dt.files.length > 0) {
+            this.validateAndSetFile(dt.files[0]);
+        }
+    },
+
+    removeFile(revokeUrl = true) {
+        if (revokeUrl && this.selectedFile?.previewUrl && typeof URL !== 'undefined' && URL.revokeObjectURL) {
+            try {
+                URL.revokeObjectURL(this.selectedFile.previewUrl);
+            } catch (e) {}
+        }
+        this.selectedFile = null;
+        if (this.$refs.fileInput) {
+            this.$refs.fileInput.value = '';
+        }
+    },
+
+    triggerFileInput() {
+        this.$refs.fileInput?.click();
+    },
+
+    formatMarkdown(text) {
+        if (!text) return '';
+
+        // 1. Strip emojis, symbols, and pictographs, then sanitize HTML entities
+        let escaped = text
+            .replace(/[\p{Extended_Pictographic}\uFE0E\uFE0F\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{1F100}-\u{1F64F}\u{1F680}-\u{1F6FF}]/gu, '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+
+        // 2. Protect multi-line code blocks
+        const codeBlocks = [];
+        escaped = escaped.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+            const id = `___CODEBLOCK_${codeBlocks.length}___`;
+            codeBlocks.push(`<pre class="my-2.5 overflow-x-auto rounded-xl bg-neutral-900 p-3 text-[11px] font-mono leading-relaxed text-neutral-100 shadow-inner border border-neutral-800"><code>${code.trim()}</code></pre>`);
+            return id;
+        });
+
+        // 3. Render inline codes / identifiers as seamless consistent text (no badge, pill, or background)
+        const inlineCodes = [];
+        escaped = escaped.replace(/`([^`]+)`/g, (match, code) => {
+            const id = `___INLINECODE_${inlineCodes.length}___`;
+            inlineCodes.push(`<span class="font-medium text-neutral-900">${code}</span>`);
+            return id;
+        });
+
+        // 4. Parse Tables
+        escaped = escaped.replace(/((?:^|\n)\|[^\n]+\|\r?\n\|[\s:-|-]+\|\r?\n(?:\|[^\n]+\|\r?\n?)+)/g, (match) => {
+            const lines = match.trim().split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            if (lines.length < 2) return match;
+
+            const headerCells = lines[0].split('|').slice(1, -1).map(c => c.trim());
+            const bodyRows = lines.slice(2);
+
+            let html = '<div class="my-3 overflow-x-auto rounded-xl border border-neutral-200/80 shadow-xs"><table class="min-w-full divide-y divide-neutral-200 text-left text-xs">';
+            html += '<thead class="bg-neutral-100/80 font-semibold text-neutral-900"><tr>';
+            for (const h of headerCells) {
+                html += `<th class="px-3 py-2 text-[10px] font-bold tracking-wider text-neutral-700 uppercase">${h}</th>`;
+            }
+            html += '</tr></thead><tbody class="divide-y divide-neutral-100 bg-white">';
+            for (const row of bodyRows) {
+                const cells = row.split('|').slice(1, -1).map(c => c.trim());
+                html += '<tr class="hover:bg-neutral-50/70 transition-colors">';
+                for (const cell of cells) {
+                    html += `<td class="px-3 py-2 text-neutral-800 text-[11px]">${cell}</td>`;
+                }
+                html += '</tr>';
+            }
+            html += '</tbody></table></div>';
+            return '\n' + html + '\n';
+        });
+
+        // 5. Headings:
+        // # H1
+        escaped = escaped.replace(/^#\s+(.*?)$/gm, '<h3 class="mt-4 mb-2 text-sm font-bold text-neutral-900 tracking-tight flex items-center gap-1.5 border-b border-neutral-200/60 pb-1.5">$1</h3>');
+        // ## H2
+        escaped = escaped.replace(/^##\s+(.*?)$/gm, '<h4 class="mt-3.5 mb-1.5 text-xs sm:text-sm font-bold text-neutral-900 tracking-tight flex items-center gap-1.5">$1</h4>');
+        // ### H3
+        escaped = escaped.replace(/^###\s+(.*?)$/gm, '<h5 class="mt-3 mb-1 text-xs font-bold text-neutral-900 flex items-center gap-1.5 text-primary-950">$1</h5>');
+        // #### H4
+        escaped = escaped.replace(/^####\s+(.*?)$/gm, '<h6 class="mt-2.5 mb-1 text-xs font-semibold text-neutral-800 uppercase tracking-wider">$1</h6>');
+
+        // 6. Blockquotes: > quote
+        escaped = escaped.replace(/^>\s+(.*?)$/gm, '<blockquote class="my-2 border-l-3 border-primary-500 bg-primary-50/40 py-1.5 px-3 rounded-r-lg text-xs italic text-neutral-700">$1</blockquote>');
+
+        // 7. Lists (Must be parsed before bold & italic so asterisks in bullets do not interfere with inline markup):
+        // Process unordered lists (- item or * item)
+        escaped = escaped.replace(/(?:^|\n)((?:[ \t]*[-*]\s+.*(?:\n|$))+)/g, (match) => {
+            const items = match.trim().split('\n').map(line => {
+                const content = line.replace(/^[ \t]*[-*]\s+/, '').trim();
+                return `<li class="relative pl-1 leading-relaxed">${content}</li>`;
+            });
+            return '\n<ul class="my-2 ml-4 list-disc space-y-1 text-neutral-700 text-xs leading-relaxed marker:text-primary-500">' + items.join('') + '</ul>\n';
+        });
+
+        // Process ordered lists (1. item, 2. item)
+        escaped = escaped.replace(/(?:^|\n)((?:[ \t]*\d+\.\s+.*(?:\n|$))+)/g, (match) => {
+            const items = match.trim().split('\n').map(line => {
+                const content = line.replace(/^[ \t]*\d+\.\s+/, '').trim();
+                return `<li class="relative pl-1 leading-relaxed">${content}</li>`;
+            });
+            return '\n<ol class="my-2 ml-4 list-decimal space-y-1 text-neutral-700 text-xs leading-relaxed marker:font-semibold marker:text-neutral-500">' + items.join('') + '</ol>\n';
+        });
+
+        // 8. Bold & Italic & Strikethrough (Selective emphasis on necessary terms):
+        // Bold + Italic: ***text***
+        escaped = escaped.replace(/\*\*\*([^\*\n]+?)\*\*\*/g, '<strong class="font-bold text-neutral-950 font-semibold"><em class="italic">$1</em></strong>');
+        // Bold: **text** or __text__
+        escaped = escaped.replace(/\*\*([^\*\n]+?)\*\*/g, '<strong class="font-bold text-neutral-950 font-semibold">$1</strong>');
+        escaped = escaped.replace(/__([^_\n]+?)__/g, '<strong class="font-bold text-neutral-950 font-semibold">$1</strong>');
+        // Italic: *text* or _text_ (non-whitespace bounded)
+        escaped = escaped.replace(/(?<!\*)\*([^\*\n\s](?:[^\*\n]*?[^\*\n\s])?)\*(?!\*)/g, '<em class="italic text-neutral-800">$1</em>');
+        escaped = escaped.replace(/(?<!_)_([^_\n\s](?:[^_\n]*?[^_\n\s])?)_(?!_)/g, '<em class="italic text-neutral-800">$1</em>');
+        // Strikethrough: ~~text~~
+        escaped = escaped.replace(/~~([^~\n]+?)~~/g, '<del class="line-through text-neutral-500">$1</del>');
+
+        // 9. Links: [Title](url)
+        escaped = escaped.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, title, url) => {
+            const safeUrl = url.startsWith('/') || url.startsWith('http') ? url : '#';
+            return `<a href="${safeUrl}" class="inline-flex items-center gap-1 font-semibold text-primary-600 underline hover:text-primary-800 transition-colors" target="_self">${title}</a>`;
+        });
+
+        // 10. Process paragraphs and line breaks:
+        const paragraphs = escaped.split(/\n\s*\n/);
+        const formatted = paragraphs.map(para => {
+            const trimmed = para.trim();
+            if (!trimmed) return '';
+            if (/^<(h[1-6]|ul|ol|table|blockquote|pre|div)\b/i.test(trimmed)) {
+                return trimmed;
+            }
+            const withBreaks = trimmed.replace(/\n/g, '<br>');
+            return `<p class="my-1.5 leading-relaxed text-neutral-700">${withBreaks}</p>`;
+        }).filter(p => p.length > 0).join('\n');
+
+        // 11. Restore protected inline codes and code blocks
+        let finalHtml = formatted;
+        inlineCodes.forEach((codeHtml, i) => {
+            finalHtml = finalHtml.replace(`___INLINECODE_${i}___`, codeHtml);
+        });
+        codeBlocks.forEach((codeHtml, i) => {
+            finalHtml = finalHtml.replace(`___CODEBLOCK_${i}___`, codeHtml);
+        });
+
+        return finalHtml;
+    },
+
+    /**
+     * Extract an item name from the prompt or from known items catalog.
+     */
+    extractItemName(text) {
+        if (!text) return null;
+        const trimmed = text.trim();
+
+        // 1. Check known items list if available
+        if (Array.isArray(this.knownItems) && this.knownItems.length > 0) {
+            const sorted = [...this.knownItems].sort((a, b) => b.length - a.length);
+            for (const item of sorted) {
+                if (!item || item.length < 3) continue;
+                const regex = new RegExp(`\\b${item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+                if (regex.test(trimmed)) {
+                    return item;
+                }
+                const simplified = item.replace(/\s*\([^)]*\)/g, '').trim();
+                if (simplified && simplified.length >= 3 && simplified !== item) {
+                    const simpleRegex = new RegExp(`\\b${simplified.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+                    if (simpleRegex.test(trimmed)) {
+                        return simplified;
+                    }
+                }
+            }
+        }
+
+        // 2. Pattern extraction from common query templates
+        const patterns = [
+            /\b(?:why is|why are)\s+(.+?)\s+(?:at high risk|considered high risk|considered low stock|high risk|low stock|low in stock|critical|at risk|failing|delayed|short)\b/i,
+            /\b(?:what is|what\'s|check|show|get)\s+(?:the\s+)?(?:predicted\s+demand|stock|quantity|level|status|lead time|details|record|info|history)\s+(?:for|of|on)\s+(.+?)(?:\?|\.|$)/i,
+            /\b(?:tell me about|information on|details on|status of|status on|update on)\s+(.+?)(?:\?|\.|$)/i,
+            /\bhow many\s+(.+?)\s+(?:do we have|are left|in stock|are in warehouse|available|on hand)\b/i,
+            /\b(?:review|inspect|check)\s+(.+?)(?:\?|\.|$)/i,
+        ];
+
+        const genericExclusions = [
+            'this item', 'that item', 'the item', 'these items', 'those items', 'an item', 'item', 'items',
+            'this', 'that', 'our inventory', 'the inventory', 'inventory', 'stock', 'it', 'everything', 'anything',
+        ];
+
+        for (const pattern of patterns) {
+            const match = trimmed.match(pattern);
+            if (match && match[1]) {
+                let candidate = match[1].trim().replace(/[?!.,;:]+$/, '').trim();
+                const lower = candidate.toLowerCase();
+                if (!genericExclusions.includes(lower) && candidate.length >= 2 && candidate.length <= 40) {
+                    return candidate;
+                }
+            }
+        }
+
+        return null;
+    },
+
+    /**
+     * Determine context-aware status message matching user's intent and attachment.
+     */
+    determineStatusMessage(text, attachment = null) {
+        const trimmed = (text || '').trim();
+        const normalized = trimmed.toLowerCase();
+
+        if (attachment) {
+            if (attachment.type === 'image') {
+                const detectedItem = this.extractItemName(trimmed);
+                if (detectedItem) return `Reviewing ${detectedItem}...`;
+                return 'Analyzing the attached image...';
+            }
+
+            if (attachment.type === 'spreadsheet') {
+                if (/\b(reorder|order|restock|replenish|procure|purchase|mag-reorder|i-reorder)\b/i.test(normalized)) {
+                    return 'Reviewing reorder needs...';
+                }
+                if (/\b(low stock|low in stock|low on stock|running out|paubos|critical stock|shortage)\b/i.test(normalized)) {
+                    return 'Checking low-stock items...';
+                }
+                if (/\b(forecast|demand|predicted|projection|trend)\b/i.test(normalized)) {
+                    return 'Analyzing demand data...';
+                }
+                const detectedItem = this.extractItemName(trimmed);
+                if (detectedItem) return `Reviewing ${detectedItem}...`;
+                return 'Reviewing your inventory file...';
+            }
+
+            if (['document', 'text'].includes(attachment.type)) {
+                if (/\b(summar(?:y|ize|ise|ies|izing)?|overview|status|sitwasyon|kalagayan|kabuuan|lagom)\b/i.test(normalized)) {
+                    return 'Preparing your inventory summary...';
+                }
+                const detectedItem = this.extractItemName(trimmed);
+                if (detectedItem) return `Reviewing ${detectedItem}...`;
+                return 'Reviewing your report...';
+            }
+        }
+
+        if (!trimmed) return 'Looking into that...';
+
+        // 1. Item-specific inquiry
+        const detectedItem = this.extractItemName(trimmed);
+        if (detectedItem) {
+            return `Reviewing ${detectedItem}...`;
+        }
+
+        // 2. Expiry
+        if (/\b(expir(?:y|e|ed|ing)?|shelf life|spoiled|panis)\b/i.test(normalized)) {
+            return 'Checking expiring inventory...';
+        }
+
+        // 3. Reorder
+        if (/\b(reorder|order|restock|replenish|procure|purchase|mag-reorder|i-reorder)\b/i.test(normalized)) {
+            return 'Reviewing reorder needs...';
+        }
+
+        // 4. Out of stock / unavailable
+        if (/\b(out of stock|zero stock|depleted|walang stock|ubos|unavailable)\b/i.test(normalized)) {
+            return 'Checking unavailable items...';
+        }
+
+        // 5. Low stock / running out
+        if (/\b(low stock|low in stock|low on stock|running out|paubos|critical stock|shortage)\b/i.test(normalized)) {
+            return 'Checking low-stock items...';
+        }
+
+        // 6. Stock movement
+        if (/\b(movement|movements|stock movement|stock in|stock out|issued|dispensed|transferred)\b/i.test(normalized)) {
+            if (/\b(this month|monthly|buwan)\b/i.test(normalized)) {
+                return 'Reviewing recent stock movements...';
+            }
+            if (/\b(this week|weekly|linggo)\b/i.test(normalized)) {
+                return "Reviewing this week's inventory activity...";
+            }
+            return 'Reviewing recent stock movements...';
+        }
+
+        if (/\b(this week|what happened.*week|nangyari.*linggo)\b/i.test(normalized)) {
+            return "Reviewing this week's inventory activity...";
+        }
+
+        // 7. Demand forecast explanation
+        if (/\b(explain.*forecast|paliwanag.*forecast|meaning.*forecast)\b/i.test(normalized)) {
+            return 'Reviewing the demand forecast...';
+        }
+
+        // 8. Demand forecast / predicted demand
+        if (/\b(forecast|predicted demand|projection|projected|demand trend)\b/i.test(normalized)) {
+            return 'Checking demand forecast...';
+        }
+
+        // 9. Risk analysis
+        if (/\b(risk|at-risk|high risk|peligro|delikado)\b/i.test(normalized)) {
+            return 'Checking inventory risk...';
+        }
+
+        // 10. Inventory summary
+        if (/\b(summar(?:y|ize|ise|ies|izing)?|overview|status|sitwasyon|kalagayan|kabuuan|lagom)\b/i.test(normalized)) {
+            return 'Preparing your inventory summary...';
+        }
+
+        // 11. General inventory question
+        if (/\b(inventory|stock|supplies|gamot|items|bodega)\b/i.test(normalized)) {
+            return 'Reviewing inventory data...';
+        }
+
+        return 'Looking into that...';
+    },
+
+    async sendSuggested(text) {
+        this.input = text;
+        await this.sendMessage();
+    },
+
+    async sendMessage() {
+        const text = this.input.trim();
+        const attached = this.selectedFile ? { ...this.selectedFile } : null;
+
+        if ((!text && !attached) || this.isLoading) return;
+
+        this.errorMessage = '';
+        this.input = '';
+        this.removeFile(false);
+
+        this.loadingStatus = this.determineStatusMessage(text, attached);
+        this.isLoading = true;
+
+        const userMsg = {
+            role: 'user',
+            content: text || (attached ? `Please analyze this attached file (${attached.name}).` : ''),
+            attachment: attached,
+            time: this.formatTime(),
+        };
+        this.messages.push(userMsg);
+        this.scrollToBottom();
+
+        const historyPayload = this.messages.slice(-6).map((m) => ({
+            role: m.role,
+            content: m.content,
+        }));
+
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+            let response;
+
+            if (attached && attached.file) {
+                const formData = new FormData();
+                if (text) {
+                    formData.append('message', text);
+                }
+                if (this.conversationId) {
+                    formData.append('conversation_id', this.conversationId);
+                }
+                formData.append('attachment', attached.file);
+                formData.append('history', JSON.stringify(historyPayload));
+
+                response = await fetch(this.endpoint, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': csrfToken || '',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-Session-Activity': 'passive',
+                    },
+                    body: formData,
+                });
+            } else {
+                response = await fetch(this.endpoint, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken || '',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-Session-Activity': 'passive',
+                    },
+                    body: JSON.stringify({
+                        message: text,
+                        conversation_id: this.conversationId,
+                        history: historyPayload,
+                    }),
+                });
+            }
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(data.message || (data.errors && data.errors.attachment ? data.errors.attachment[0] : null) || 'The assistant is temporarily unavailable. Please try again.');
+            }
+
+            if (data.conversation_id) {
+                this.conversationId = data.conversation_id;
+            }
+            if (data.conversation_title) {
+                this.conversationTitle = data.conversation_title;
+            }
+
+            this.messages.push({
+                role: 'assistant',
+                content: data.reply || 'No response generated.',
+                time: this.formatTime(),
+                source: data.source || 'ai',
+                statusHint: data.status_hint || null,
+            });
+        } catch (err) {
+            this.errorMessage = err instanceof Error ? err.message : 'Unable to get an AI response right now.';
+            this.messages.push({
+                role: 'assistant',
+                content: "I'm unable to generate an AI response right now. Please try again.",
+                time: this.formatTime(),
+                isError: true,
+            });
+        } finally {
+            this.isLoading = false;
+            this.scrollToBottom();
+        }
+    },
+}));
+
 
 Alpine.data('himsCameraScanner', himsCameraScanner);
 
