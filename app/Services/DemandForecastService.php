@@ -33,12 +33,9 @@ use Illuminate\Support\Collection;
  * adjusted: the rate over the later half of the window is taken as the rate the
  * item is being consumed at now, so an item being drawn down faster lately
  * orders more. It is floored at the average, so an item tapering off is forecast
- * at its recorded rate rather than below it — a horizon projecting less than the
- * history has ever delivered reads as a stock-out the data does not support, and
- * draws the forecast line under the baseline the screen sets beside it. For the
- * same reason the chart draws that rate flat across the horizon rather than
- * ramping to it: the flat line continues the history where the ramp stepped away
- * from it.
+ * at its recorded rate rather than below it. The AI-facing service keeps this
+ * validated horizon total intact while distributing it across chart buckets
+ * using the recent recorded trend.
  *
  * That is as far as it goes — a seasonal or regression model would fit a
  * hospital's yearly patterns better but needs years of history to beat a moving

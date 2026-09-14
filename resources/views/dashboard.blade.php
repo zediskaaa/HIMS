@@ -158,7 +158,7 @@
                         </span>
                         <div class="min-w-0">
                             <h2 class="text-sm font-semibold text-neutral-900">AI-Based Stock Demand Forecasting</h2>
-                            <p class="truncate text-[11px] text-neutral-500">Historical baseline and AI forecast in one decision view.</p>
+                            <p class="truncate text-[11px] text-neutral-500">Recorded demand and AI forecast in one decision view.</p>
                         </div>
                     </div>
 
@@ -191,15 +191,19 @@
                         x-show="error"
                         x-cloak
                         role="alert"
-                        class="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-700"
-                        x-text="error"
-                    ></div>
-                    <div
-                        x-show="success"
-                        x-cloak
-                        class="rounded-lg border border-success-200 bg-success-50 px-3 py-2 text-sm text-success-700"
-                        x-text="success"
-                    ></div>
+                        class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-700"
+                    >
+                        <span x-text="error"></span>
+                        <button
+                            type="button"
+                            x-show="failedForecastDays"
+                            x-on:click="retryForecast()"
+                            x-bind:disabled="loading"
+                            class="rounded-md px-2 py-1 text-xs font-semibold text-danger-700 ring-1 ring-inset ring-danger-300 hover:bg-danger-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-500 disabled:opacity-60"
+                        >
+                            Retry
+                        </button>
+                    </div>
 
                     <div
                         x-show="forecast?.notice"
@@ -210,19 +214,7 @@
                         <p class="mt-0.5 text-xs text-warning-700" x-text="forecast?.notice"></p>
                     </div>
 
-                    <form
-                        method="POST"
-                        action="{{ route('inventory.demand-forecast.refresh') }}"
-                        data-no-loading
-                        @can(\App\Enums\Permission::GenerateForecasts->value)
-                            x-on:submit.prevent="generateForecast()"
-                        @endcan
-                        class="grid min-w-0 gap-2.5 rounded-lg border border-neutral-200 bg-neutral-50 p-2.5 sm:grid-cols-2 lg:grid-cols-6 lg:items-end"
-                    >
-                        @csrf
-                        <input type="hidden" name="analysis_days" value="90">
-                        <input type="hidden" name="return_to" value="dashboard">
-
+                    <div class="grid min-w-0 gap-2.5 rounded-lg border border-neutral-200 bg-neutral-50 p-2.5 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
                         {{-- Item Selection --}}
                         <div class="min-w-0 space-y-1.5 sm:col-span-2 lg:col-span-3">
                             <div class="flex items-center justify-between">
@@ -256,6 +248,7 @@
                                 id="dashboard-forecast-period"
                                 name="forecast_days"
                                 x-model="forecastDays"
+                                x-on:change="updateForecastPeriod($event.target.value)"
                                 @cannot(\App\Enums\Permission::GenerateForecasts->value) disabled @endcannot
                                 class="block min-h-10 w-full rounded-md border-neutral-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500/30 disabled:bg-neutral-100"
                             >
@@ -288,27 +281,11 @@
                             </x-ui.button>
                         </div>
 
-                        <div class="flex min-w-0 items-end">
-                            @can(\App\Enums\Permission::GenerateForecasts->value)
-                                <x-ui.button
-                                    type="submit"
-                                    size="sm"
-                                    icon="arrow-path"
-                                    class="w-full"
-                                    x-bind:disabled="loading"
-                                >
-                                    <span x-text="loading ? 'Generating...' : 'Generate Forecast'"></span>
-                                </x-ui.button>
-                            @else
-                                <p class="text-xs text-neutral-500">Generation requires forecast permission.</p>
-                            @endcan
-                        </div>
-
                         <div
                             id="dashboard-forecast-filters"
                             x-show="filtersOpen"
                             x-cloak
-                            class="grid min-w-0 gap-3 rounded-lg border border-neutral-200 bg-white p-3 sm:col-span-2 sm:grid-cols-3 lg:col-span-6"
+                            class="grid min-w-0 gap-3 rounded-lg border border-neutral-200 bg-white p-3 sm:col-span-2 sm:grid-cols-3 lg:col-span-5"
                         >
                         {{-- Item category --}}
                         <div class="min-w-0 space-y-1.5">
@@ -364,34 +341,38 @@
                         </div>
                         </div>
 
-                        <p
-                            x-show="isForecastWindowChanged()"
+                        <div
+                            x-show="loading"
                             x-cloak
-                            class="text-xs text-warning-700 sm:col-span-2 lg:col-span-6"
+                            role="status"
+                            aria-live="polite"
+                            class="flex items-center gap-2 text-xs text-primary-700 sm:col-span-2 lg:col-span-5"
                         >
-                            Generate the forecast to apply the selected period.
-                        </p>
-                    </form>
+                            <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600 motion-reduce:animate-none" aria-hidden="true"></span>
+                            <span x-text="loadingPeriodLabel()"></span>
+                            <span class="text-neutral-500">Current chart remains available while new data loads.</span>
+                        </div>
+                    </div>
 
                     <div x-show="!forecast" class="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-4 py-7 text-center">
                         <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-primary-50 text-primary-700">
                             <x-ui.icon name="chart-bar" class="h-5 w-5" />
                         </span>
-                        <p class="mt-3 text-sm font-medium text-neutral-800">No forecast generated yet</p>
+                        <p class="mt-3 text-sm font-medium text-neutral-800">Forecast data unavailable</p>
                         <p class="mx-auto mt-1 max-w-xl text-xs text-neutral-500">
-                            Generate an advisory forecast from recorded HIMS inventory history. No inventory record or purchase order will be changed.
+                            Forecasts are calculated from recorded HIMS inventory history. No inventory record or purchase order is changed.
                         </p>
                     </div>
 
                     <div x-show="forecast" x-cloak class="space-y-3">
                         {{-- Compact forecast summary strip --}}
-                        <dl class="grid grid-cols-2 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 sm:grid-cols-5">
-                            <div class="border-b border-r border-neutral-200 p-2.5 sm:border-b-0">
+                        <dl class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-neutral-200 bg-neutral-200 sm:grid-cols-3 xl:grid-cols-6">
+                            <div class="bg-neutral-50 p-2.5">
                                 <dt class="text-[11px] font-medium uppercase tracking-wide text-neutral-500">Forecast period</dt>
                                 <dd class="mt-1 text-sm font-semibold tabular-nums text-neutral-900" x-text="forecast?.forecast_period || `Next ${forecastDays} days`"></dd>
                             </div>
 
-                            <div class="border-b border-neutral-200 p-2.5 sm:border-b-0 sm:border-r">
+                            <div class="bg-neutral-50 p-2.5">
                                 <dt class="text-[11px] font-medium uppercase tracking-wide text-neutral-500">Predicted demand</dt>
                                 <dd class="mt-1 text-sm font-semibold tabular-nums text-neutral-900">
                                     <span x-text="formatNumber(summaryPredictedDemand())"></span>
@@ -399,7 +380,15 @@
                                 </dd>
                             </div>
 
-                            <div class="border-b border-r border-neutral-200 p-2.5 sm:border-b-0">
+                            <div class="bg-neutral-50 p-2.5">
+                                <dt class="text-[11px] font-medium uppercase tracking-wide text-neutral-500">Daily forecast</dt>
+                                <dd class="mt-1 text-sm font-semibold tabular-nums text-neutral-900">
+                                    <span x-text="formatNumber(summaryPredictedDailyDemand(), 1)"></span>
+                                    <span class="text-[11px] font-normal text-neutral-500">units/day</span>
+                                </dd>
+                            </div>
+
+                            <div class="bg-neutral-50 p-2.5">
                                 <dt class="text-[11px] font-medium uppercase tracking-wide text-neutral-500">Current Stock</dt>
                                 <dd class="mt-1 text-sm font-semibold tabular-nums text-neutral-900">
                                     <span x-text="formatNumber(summaryCurrentStock())"></span>
@@ -407,7 +396,7 @@
                                 </dd>
                             </div>
 
-                            <div class="border-b border-neutral-200 p-2.5 sm:border-b-0 sm:border-r">
+                            <div class="bg-neutral-50 p-2.5">
                                 <dt class="text-[11px] font-medium uppercase tracking-wide text-neutral-500">Estimated Stock Risk</dt>
                                 <dd class="mt-1">
                                     <span
@@ -418,7 +407,7 @@
                                 </dd>
                             </div>
 
-                            <div class="col-span-2 p-2.5 sm:col-span-1">
+                            <div class="bg-neutral-50 p-2.5">
                                 <dt class="text-[11px] font-medium uppercase tracking-wide text-neutral-500">Reorder units</dt>
                                 <dd class="mt-1 text-sm font-semibold tabular-nums text-neutral-900">
                                     <span x-text="formatNumber(summaryRecommendedReorder())"></span>
@@ -428,7 +417,11 @@
                         </dl>
 
                         {{-- Combined Demand vs Forecast Card --}}
-                        <section class="min-w-0 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm" aria-labelledby="dashboard-forecast-overview-title">
+                        <section
+                            class="min-w-0 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm"
+                            aria-labelledby="dashboard-forecast-overview-title"
+                            x-bind:aria-busy="loading"
+                        >
                             <header class="flex flex-col gap-2 border-b border-neutral-200 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <div class="flex items-center gap-2">
@@ -454,7 +447,7 @@
                                         x-on:click="toggleSeries('actual')"
                                     >
                                         <span class="h-1 w-4 rounded-full bg-primary-600"></span>
-                                        <span class="font-medium">Historical baseline</span>
+                                        <span class="font-medium">Historical demand</span>
                                     </button>
                                     <button
                                         type="button"
@@ -476,11 +469,20 @@
                                         x-on:pointerenter="isHovering = true"
                                         x-on:pointerleave="onChartPointerLeave($event)"
                                     >
+                                        <div
+                                            x-show="loading"
+                                            x-cloak
+                                            class="pointer-events-none absolute right-2 top-2 z-20 inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-white/95 px-2 py-1 text-[11px] font-medium text-primary-700 shadow-sm backdrop-blur-sm"
+                                        >
+                                            <span class="h-3 w-3 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600 motion-reduce:animate-none" aria-hidden="true"></span>
+                                            Updating forecast
+                                        </div>
+
                                         {{-- Y-axis scale figures (cleanly positioned without overlapping text) --}}
                                         <div class="pointer-events-none absolute left-0.5 top-0 z-10 select-none">
                                             <span class="text-[9px] font-semibold uppercase tracking-wider text-neutral-400">Units/day</span>
                                         </div>
-                                        <template x-for="tick in chartTicks()" x-bind:key="`y-label-${tick.value}`">
+                                        <template x-for="(tick, index) in displayChartTicks()" x-bind:key="`y-label-${index}`">
                                             <span
                                                 class="pointer-events-none absolute left-0.5 z-10 -translate-y-1/2 select-none text-[10px] font-medium tabular-nums text-neutral-400"
                                                 x-bind:style="`top: ${tick.top}%`"
@@ -545,41 +547,6 @@
                                                         </div>
                                                     </template>
 
-                                                    {{-- Historical Baseline Row --}}
-                                                    <template x-if="showActual && (activePoint?.baselinePoint || activePoint?.type === 'baseline')">
-                                                        <div class="mt-1.5 border-t border-dashed border-neutral-100 pt-1.5">
-                                                            <div class="flex items-center justify-between gap-3">
-                                                                <div class="flex items-center gap-1.5">
-                                                                    <span class="h-2 w-2 rounded-full bg-primary-500"></span>
-                                                                    <span class="text-[11px] text-neutral-500">Baseline:</span>
-                                                                </div>
-                                                                <div class="text-right tabular-nums">
-                                                                    <span class="text-[11px] font-medium text-neutral-700" x-text="formatNumber(activePoint?.baselinePoint?.value ?? baselineDailyRate(), 1)"></span>
-                                                                    <span class="text-[10px] font-normal text-neutral-400">units/day</span>
-                                                                </div>
-                                                            </div>
-
-                                                            {{-- Variance comparison --}}
-                                                            <template x-if="activePoint?.variancePercent != null">
-                                                                <div class="mt-1 flex items-center justify-between rounded bg-neutral-50 px-1.5 py-0.5 text-[10px]">
-                                                                    <span class="text-neutral-500">vs Baseline:</span>
-                                                                    <span
-                                                                        class="font-semibold tabular-nums"
-                                                                        x-bind:class="{
-                                                                            'text-emerald-600': activePoint?.varianceDirection === 'higher',
-                                                                            'text-amber-600': activePoint?.varianceDirection === 'lower',
-                                                                            'text-neutral-500': activePoint?.varianceDirection === 'equal'
-                                                                        }"
-                                                                        x-text="activePoint?.varianceDirection === 'higher'
-                                                                            ? `+${activePoint.variancePercent}% higher`
-                                                                            : (activePoint?.varianceDirection === 'lower'
-                                                                                ? `-${activePoint.variancePercent}% lower`
-                                                                                : 'Equal to baseline')"
-                                                                    ></span>
-                                                                </div>
-                                                            </template>
-                                                        </div>
-                                                    </template>
                                                 </div>
                                             </template>
 
@@ -621,7 +588,7 @@
                                             x-on:keydown.arrow-right.prevent="stepPoint(1)"
                                         >
                                             <title id="dashboard-demand-chart-title">Demand vs Forecast: Historical and forecast inventory demand</title>
-                                            <desc id="dashboard-demand-chart-description">The blue solid line shows recorded consumption extended as a recent-use baseline. The violet dashed line overlays the AI forecast across the same future periods.</desc>
+                                            <desc id="dashboard-demand-chart-description">The blue solid line shows recorded consumption. The violet dashed line continues from the historical boundary with the validated AI forecast.</desc>
                                             <defs>
                                                 <linearGradient id="dashboard-historical-area" x1="0" y1="0" x2="0" y2="1">
                                                     <stop offset="0%" stop-color="#1c75f5" stop-opacity="0.22"></stop>
@@ -640,26 +607,37 @@
                                             <line data-chart-grid-line x1="50" y1="163.75" x2="725" y2="163.75" stroke="#f1f5f9" stroke-width="1" vector-effect="non-scaling-stroke"></line>
                                             <line data-chart-grid-line x1="50" y1="205" x2="725" y2="205" stroke="#e2e8f0" stroke-width="1" vector-effect="non-scaling-stroke"></line>
 
+                                            {{-- Forecast horizon wash keeps the two time regions legible without relying on line color. --}}
+                                            <rect
+                                                x-bind:x="displayTransitionX()"
+                                                y="20"
+                                                x-bind:width="Math.max(0, 725 - displayTransitionX())"
+                                                height="185"
+                                                rx="4"
+                                                fill="#8b5cf6"
+                                                fill-opacity="0.035"
+                                            ></rect>
+
                                             {{-- Subtle Forecast Boundary Line --}}
-                                            <line x-bind:x1="transitionX()" y1="20" x-bind:x2="transitionX()" y2="205" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"></line>
+                                            <line x-bind:x1="displayTransitionX()" y1="20" x-bind:x2="displayTransitionX()" y2="205" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"></line>
 
                                             {{-- Gradient Fills --}}
-                                            <path x-show="showActual" x-bind:d="historicalAreaPath()" fill="url(#dashboard-historical-area)"></path>
-                                            <path x-show="showForecast" x-bind:d="forecastAreaPath()" fill="url(#dashboard-forecast-area)"></path>
+                                            <path x-show="showActual" x-bind:d="displayHistoricalAreaPath()" fill="url(#dashboard-historical-area)"></path>
+                                            <path x-show="showForecast" x-bind:d="displayForecastAreaPath()" fill="url(#dashboard-forecast-area)"></path>
 
-                                            {{-- Recorded demand plus the recent-use baseline (solid blue) --}}
-                                            <path x-show="showActual" x-bind:d="seriesPath(chartLinePoints(historicalBaselinePoints(), 725))" fill="none" stroke="#1c75f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                                            {{-- Recorded demand (solid blue) --}}
+                                            <path x-show="showActual" x-bind:d="seriesPath(displayHistoricalRenderPoints())" fill="none" stroke="#1c75f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
 
                                             {{-- AI Forecast Line (Dashed Violet) --}}
-                                            <path x-show="showForecast" x-bind:d="seriesPath(chartLinePoints(forecastPoints(), 725))" fill="none" stroke="#8b5cf6" stroke-width="3" stroke-dasharray="6 4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                                            <path x-show="showForecast" x-bind:d="seriesPath(chartLinePoints(displayForecastRenderPoints(), 725))" fill="none" stroke="#8b5cf6" stroke-width="3" stroke-dasharray="6 4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
 
                                             {{-- Historical Data Markers --}}
-                                            <template x-for="point in historicalBaselinePoints()" x-bind:key="`hist-${point.type}-${point.date}`">
+                                            <template x-for="(point, index) in displayHistoricalPoints()" x-bind:key="`hist-${index}`">
                                                 <circle x-show="showActual" x-bind:cx="point.x" x-bind:cy="point.y" r="3" fill="#1c75f5" fill-opacity="0.6" vector-effect="non-scaling-stroke"></circle>
                                             </template>
 
                                             {{-- Forecast Point Markers --}}
-                                            <template x-for="point in forecastPoints()" x-bind:key="`fore-${point.date}`">
+                                            <template x-for="(point, index) in displayForecastPoints()" x-bind:key="`fore-${index}`">
                                                 <circle x-show="showForecast" x-bind:cx="point.x" x-bind:cy="point.y" r="3.5" fill="#ffffff" stroke="#8b5cf6" stroke-width="2" vector-effect="non-scaling-stroke"></circle>
                                             </template>
 
@@ -678,7 +656,7 @@
                                                         vector-effect="non-scaling-stroke"
                                                     ></line>
 
-                                                    {{-- Future point beads: if in forecast region, show both AI Forecast bead & Baseline bead --}}
+                                                    {{-- Forecast point bead --}}
                                                     <template x-if="activePoint.isFuture">
                                                         <g>
                                                             {{-- AI Forecast Bead (Violet) --}}
@@ -712,34 +690,6 @@
                                                                 </g>
                                                             </template>
 
-                                                            {{-- Historical Baseline Bead (Blue) --}}
-                                                            <template x-if="showActual && activePoint.baselinePoint">
-                                                                <g>
-                                                                    <circle
-                                                                        x-bind:cx="activePoint.x"
-                                                                        x-bind:cy="activePoint.baselinePoint.y"
-                                                                        r="8"
-                                                                        fill="#1c75f5"
-                                                                        fill-opacity="0.2"
-                                                                    ></circle>
-                                                                    <circle
-                                                                        x-bind:cx="activePoint.x"
-                                                                        x-bind:cy="activePoint.baselinePoint.y"
-                                                                        r="4"
-                                                                        fill="#ffffff"
-                                                                        stroke="#1c75f5"
-                                                                        stroke-width="2"
-                                                                        vector-effect="non-scaling-stroke"
-                                                                    ></circle>
-                                                                    <circle
-                                                                        x-bind:cx="activePoint.x"
-                                                                        x-bind:cy="activePoint.baselinePoint.y"
-                                                                        r="1.5"
-                                                                        fill="#1c75f5"
-                                                                        vector-effect="non-scaling-stroke"
-                                                                    ></circle>
-                                                                </g>
-                                                            </template>
                                                         </g>
                                                     </template>
 
@@ -779,7 +729,10 @@
                                     </div>
 
                                     {{-- Chronological X-axis Labels --}}
-                                    <div class="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-neutral-100 pt-2 text-xs text-neutral-500">
+                                    <div
+                                        class="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-neutral-100 pt-2 text-xs text-neutral-500 transition-opacity duration-150 motion-reduce:transition-none"
+                                        x-bind:class="chartAnimating ? 'opacity-60' : 'opacity-100'"
+                                    >
                                         <div class="flex items-center justify-between gap-2">
                                             <span class="tabular-nums font-medium text-neutral-700" x-text="chartStartLabel(historicalSeries())"></span>
                                             <span class="hidden text-neutral-400 sm:inline">Recorded history</span>
@@ -796,7 +749,7 @@
                                 </div>
 
                                 <div x-show="!hasChartData()" class="border-y border-neutral-100 py-12 text-center text-sm text-neutral-500">
-                                    Generate a fresh forecast to plot the historical and predicted demand curves.
+                                    Historical and forecast series are not available for the current selection.
                                 </div>
                             </div>
 
@@ -832,7 +785,7 @@
                             </span>
                             <div class="min-w-0">
                                 <h2 class="text-sm font-semibold text-neutral-900" x-text="forecast?.source === 'ai' ? 'AI forecast insight' : 'Forecast insight'"></h2>
-                                <p class="mt-1 text-xs leading-relaxed text-neutral-600" x-text="forecast ? insight() : 'Generate a forecast to see demand and reorder guidance.'"></p>
+                                <p class="mt-1 text-xs leading-relaxed text-neutral-600" x-text="forecast ? insight() : 'Forecast data is unavailable for demand and reorder guidance.'"></p>
                             </div>
                         </div>
 

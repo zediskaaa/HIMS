@@ -83,7 +83,7 @@ class DemandForecastDemoSeeder extends Seeder
 
         // Kept in step with AiDemandForecastService::cacheKey(). A stale version
         // here means reseeding writes new history the dashboard never reads.
-        Cache::forget('demand-forecast:v2:90:30');
+        Cache::forget('demand-forecast:v3:90:30');
 
         $this->command?->info(
             self::EXPECTED_ITEMS.' forecasting demo items and '.(self::EXPECTED_ITEMS * 24)

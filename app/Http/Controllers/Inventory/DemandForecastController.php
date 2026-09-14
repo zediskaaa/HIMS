@@ -117,6 +117,7 @@ class DemandForecastController extends Controller implements HasMiddleware
             'analysis_days' => ['nullable', 'integer', 'min:7', 'max:365'],
             'forecast_days' => ['nullable', 'integer', 'min:7', 'max:180'],
             'return_to' => ['nullable', 'in:dashboard,forecast'],
+            'reuse_cached' => ['nullable', 'boolean'],
         ]);
 
         $analysisDays = (int) ($validated['analysis_days'] ?? DemandForecastService::DEFAULT_ANALYSIS_DAYS);
@@ -124,9 +125,20 @@ class DemandForecastController extends Controller implements HasMiddleware
         $route = ($validated['return_to'] ?? 'forecast') === 'dashboard'
             ? 'dashboard'
             : 'inventory.demand-forecast';
+        $usedCachedForecast = false;
 
         try {
-            $forecast = $this->aiForecasts->generate($request->user(), $analysisDays, $forecastDays);
+            $forecast = null;
+
+            // Automatic dashboard updates reuse a period-specific result when
+            // one is available. Manual refreshes keep their
+            // existing meaning and always ask for a fresh forecast.
+            if ($request->boolean('reuse_cached')) {
+                $forecast = $this->aiForecasts->cached($analysisDays, $forecastDays);
+                $usedCachedForecast = $forecast !== null;
+            }
+
+            $forecast ??= $this->aiForecasts->generate($request->user(), $analysisDays, $forecastDays);
         } catch (RuntimeException $exception) {
             if ($exception->getMessage() === 'No active inventory items are available to forecast.') {
                 if ($request->expectsJson()) {
@@ -163,9 +175,11 @@ class DemandForecastController extends Controller implements HasMiddleware
             );
         }
 
-        $message = $forecast['source'] === 'ai'
-            ? 'AI demand forecast generated from the latest inventory history.'
-            : 'Gemini was unavailable. A clearly labeled statistical forecast is shown instead.';
+        $message = $usedCachedForecast
+            ? "The {$forecastDays}-day forecast was loaded from the latest saved result."
+            : ($forecast['source'] === 'ai'
+                ? 'AI demand forecast generated from the latest inventory history.'
+                : 'Gemini was unavailable. A clearly labeled statistical forecast is shown instead.');
 
         if ($request->expectsJson()) {
             return response()->json([

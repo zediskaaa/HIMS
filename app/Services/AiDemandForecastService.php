@@ -57,8 +57,8 @@ class AiDemandForecastService
      * Gemini request per page view when the model is unavailable.
      *
      * @return array<string, mixed>|null Null only when there is nothing to
-     *                                  forecast; the screens show their own
-     *                                  empty state for that.
+     *                                   forecast; the screens show their own
+     *                                   empty state for that.
      */
     public function ensure(User $actor, int $analysisDays, int $forecastDays): ?array
     {
@@ -299,19 +299,10 @@ class AiDemandForecastService
      */
     private function consumptionSeries(Collection $movements, mixed $since, int $analysisDays): array
     {
-        // The window is split evenly rather than into fixed-width buckets. Ninety
-        // days does not divide by six, so rounding the width up would leave a stub
-        // at the end of the window — and a stub that short holds one movement or
-        // none at all. The last point on the chart then read as demand collapsing
-        // to zero days after the most recent movement was recorded.
-        //
-        // Six is chosen against the demo hospital's movement count, not the window
-        // length: twelve buckets across the ninety days left roughly two movements
-        // in each, and a two-movement week is noise rather than a trend. Halving
-        // the count doubles what each bucket holds, which settles the zigzag and
-        // lands the final point near the rate the forecast opens on instead of on
-        // whichever spike landed in the last week.
-        $bucketCount = max(1, min(6, $analysisDays));
+        // Weekly-scale buckets preserve the real pattern without turning
+        // intermittent ward issues into a dense daily zero/spike chart. They
+        // are distributed evenly so the final point is not a misleading stub.
+        $bucketCount = max(1, min(18, (int) ceil($analysisDays / 7)));
         $baseDays = intdiv($analysisDays, $bucketCount);
         $remainder = $analysisDays % $bucketCount;
 
@@ -692,35 +683,30 @@ class AiDemandForecastService
     }
 
     /**
-     * Allocate the validated period total into a compact chart series.
+     * Allocate the validated period total into a readable time series.
      *
-     * The line is flat on purpose. `predicted_demand` is projected from the rate
-     * over the later half of the window, so the flat rate it divides down to is
-     * the rate the recorded history has just been running at — the level the line
-     * has to pick up from. Opening at the item's average instead drew the
-     * forecast starting below the history it is meant to continue whenever demand
-     * was rising, which reads as a drop the recommendation never makes.
+     * Gemini validates the horizon total rather than inventing daily values.
+     * The display shape comes from the last six real historical bucket rates:
+     * a bounded least-squares slope carries their direction forward, while the
+     * validated predicted total remains the hard constraint. The chart draws a
+     * separate boundary connector from the final historical observation.
      *
-     * The buckets always add back to the exact predicted_demand value; they are
-     * display buckets, not new demand. Their durations are uneven wherever the
-     * horizon does not divide evenly, which is why the rate is applied per
-     * bucket rather than the total being split by bucket count. Rounding is
-     * carried forward in a running total rather than applied bucket by bucket,
-     * so the leftover lands spread across the horizon instead of collecting in
-     * the final bucket as a step the line does not otherwise have.
+     * Short horizons use daily buckets; longer horizons use three-, five-, or
+     * seven-day periods. Cumulative weighted rounding keeps every value
+     * non-negative and makes the series add back to predicted_demand exactly.
      *
      * @param  array<string, mixed>  $item
      * @return array<int, array{period_start: string, quantity: int, days: int}>
      */
     private function forecastSeries(array $item, int $forecastDays, Carbon $generatedAt): array
     {
-        // The horizon is split evenly rather than into fixed-width buckets, the
-        // same way the historical series splits its window. Ninety days does not
-        // divide by eight, so rounding the width up to twelve left the final
-        // bucket six days long while every other held twelve — a bucket drawn the
-        // same width as its neighbours but measuring half the demand, and dating
-        // the end of the chart a fortnight short of where the forecast stops.
-        $bucketCount = max(2, min(8, (int) ceil($forecastDays / 7)));
+        $targetBucketDays = match (true) {
+            $forecastDays <= 14 => 1,
+            $forecastDays <= 30 => 3,
+            $forecastDays <= 60 => 5,
+            default => 7,
+        };
+        $bucketCount = max(1, (int) ceil($forecastDays / $targetBucketDays));
         $baseDays = intdiv($forecastDays, $bucketCount);
         $remainder = $forecastDays % $bucketCount;
 
@@ -735,23 +721,62 @@ class AiDemandForecastService
         }
 
         $predictedDemand = max(0, (int) $item['predicted_demand']);
-        $totalDays = max(1, array_sum($periodDays));
-        $dailyRate = $predictedDemand / $totalDays;
-        $cumulativeDays = 0;
+        $historicalRates = collect($item['historical_series'] ?? [])
+            ->map(fn (array $point): float => max(0, (int) ($point['quantity'] ?? 0))
+                / max(1, (int) ($point['days'] ?? 1)))
+            ->take(-6)
+            ->values();
+        $latestRate = (float) ($historicalRates->last() ?? 0.0);
+        $slope = 0.0;
+
+        if ($historicalRates->count() >= 2) {
+            $meanX = ($historicalRates->count() - 1) / 2;
+            $meanY = (float) $historicalRates->average();
+            $numerator = 0.0;
+            $denominator = 0.0;
+
+            foreach ($historicalRates as $index => $rate) {
+                $numerator += ($index - $meanX) * ($rate - $meanY);
+                $denominator += ($index - $meanX) ** 2;
+            }
+
+            $rawSlope = $denominator > 0 ? $numerator / $denominator : 0.0;
+            $maximumStep = max($meanY, $latestRate, 0.01) * 0.20;
+            $slope = max(-$maximumStep, min($maximumStep, $rawSlope));
+        }
+
+        $weights = collect($periodDays)
+            ->map(fn (int $days, int $index): float => max(0.0, $latestRate + ($slope * $index)) * $days)
+            ->all();
+        $totalWeight = array_sum($weights);
+        if ($totalWeight <= 0) {
+            $weights = $periodDays;
+            $totalWeight = array_sum($weights);
+        }
+        $quantities = array_fill(0, $bucketCount, 0);
+
+        if ($predictedDemand > 0) {
+            $cumulativeWeight = 0.0;
+            $allocated = 0;
+            for ($index = 0; $index < $bucketCount; $index++) {
+                $cumulativeWeight += $weights[$index];
+                $target = min($predictedDemand, (int) round($predictedDemand * $cumulativeWeight / $totalWeight));
+                $quantities[$index] = $target - $allocated;
+                $allocated = $target;
+            }
+        }
+
         $cumulativeQuantity = 0;
 
         return collect($periodDays)
             ->map(function (int $days, int $index) use (
-                $dailyRate,
                 $generatedAt,
                 $predictedDemand,
                 $periodStart,
-                &$cumulativeDays,
+                $quantities,
                 &$cumulativeQuantity,
             ): array {
-                $cumulativeDays += $days;
-                $quantity = min($predictedDemand, (int) round($dailyRate * $cumulativeDays))
-                    - $cumulativeQuantity;
+                $quantity = min($predictedDemand - $cumulativeQuantity, $quantities[$index]);
                 $cumulativeQuantity += $quantity;
 
                 return [
@@ -838,12 +863,12 @@ class AiDemandForecastService
 
     private function cacheKey(int $analysisDays, int $forecastDays): string
     {
-        return "demand-forecast:v2:{$analysisDays}:{$forecastDays}";
+        return "demand-forecast:v3:{$analysisDays}:{$forecastDays}";
     }
 
     private function lockKey(int $analysisDays, int $forecastDays): string
     {
-        return "demand-forecast:v2:warmup:{$analysisDays}:{$forecastDays}";
+        return "demand-forecast:v3:warmup:{$analysisDays}:{$forecastDays}";
     }
 
     private function fallbackMinutes(): int

@@ -1133,8 +1133,19 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     filtersOpen: false,
     showActual: true,
     showForecast: true,
+    forecastCache: {},
+    forecastRequest: null,
+    forecastRequestId: 0,
+    failedForecastDays: null,
+    chartAnimation: null,
+    chartAnimationFrame: null,
+    chartAnimationProgress: 1,
+    chartAnimating: false,
 
     init() {
+        if (this.forecast) {
+            this.forecastCache[this.forecastCacheKey(this.forecast.forecast_days)] = this.forecast;
+        }
         this.$nextTick(() => {
             this.resetActivePointToTransition();
         });
@@ -1276,6 +1287,11 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         return sel ? Number(sel.predicted_demand || 0) : this.predictedDemand();
     },
 
+    summaryPredictedDailyDemand() {
+        return this.summaryPredictedDemand()
+            / Math.max(1, Number(this.forecast?.forecast_days || 1));
+    },
+
     summaryCurrentStock() {
         const sel = this.selectedItem();
         if (sel) return Number(sel.current_stock || 0);
@@ -1388,37 +1404,6 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         return this.currentHistoricalSeries().length > 0 && this.currentForecastSeries().length > 0;
     },
 
-    baselineDailyRate() {
-        const sel = this.selectedItem();
-        if (sel) {
-            if (sel.average_daily_consumption != null && Number(sel.average_daily_consumption) > 0) {
-                return Number(sel.average_daily_consumption);
-            }
-            const hist = this.currentHistoricalSeries();
-            const totalQty = hist.reduce((sum, p) => sum + Number(p.quantity || 0), 0);
-            const totalDays = hist.reduce((sum, p) => sum + Math.max(1, Number(p.days || 1)), 0);
-            return totalDays > 0 ? totalQty / totalDays : 0;
-        }
-
-        const items = this.filteredItems();
-        if (items.length === 0) return 0;
-
-        let hasAvg = false;
-        let sumAvg = 0;
-        items.forEach((item) => {
-            if (item.average_daily_consumption != null) {
-                hasAvg = true;
-                sumAvg += Number(item.average_daily_consumption);
-            }
-        });
-        if (hasAvg && sumAvg > 0) return sumAvg;
-
-        const hist = this.currentHistoricalSeries();
-        const totalQty = hist.reduce((sum, p) => sum + Number(p.quantity || 0), 0);
-        const totalDays = hist.reduce((sum, p) => sum + Math.max(1, Number(p.days || 1)), 0);
-        return totalDays > 0 ? totalQty / totalDays : 0;
-    },
-
     chartMaximum() {
         const hist = this.currentHistoricalSeries();
         const fore = this.currentForecastSeries();
@@ -1456,6 +1441,190 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
 
     chartY(value) {
         return Math.round((205 - ((Number(value) / this.chartMaximum()) * 165)) * 10) / 10;
+    },
+
+    captureChartGeometry() {
+        return {
+            historical: this.historicalPoints(),
+            forecast: this.forecastPoints(),
+            historicalLine: this.historicalRenderPoints(),
+            transitionX: this.transitionX(),
+            ticks: this.chartTicks(),
+        };
+    },
+
+    sampleChartPoints(points, count) {
+        if (!Array.isArray(points) || points.length === 0 || count <= 0) return [];
+        if (points.length === 1 || count === 1) {
+            return Array.from({ length: count }, () => ({ ...points[0] }));
+        }
+
+        return Array.from({ length: count }, (_, index) => {
+            const position = (index / (count - 1)) * (points.length - 1);
+            const leftIndex = Math.floor(position);
+            const rightIndex = Math.min(points.length - 1, Math.ceil(position));
+            const fraction = position - leftIndex;
+            const left = points[leftIndex];
+            const right = points[rightIndex];
+
+            return {
+                ...right,
+                x: left.x + ((right.x - left.x) * fraction),
+                y: left.y + ((right.y - left.y) * fraction),
+            };
+        });
+    },
+
+    interpolateChartPoints(fromPoints, toPoints) {
+        if (!this.chartAnimation) return toPoints;
+
+        const count = Math.max(fromPoints.length, toPoints.length);
+        if (count === 0) return [];
+
+        const from = this.sampleChartPoints(fromPoints.length > 0 ? fromPoints : toPoints, count);
+        const to = this.sampleChartPoints(toPoints.length > 0 ? toPoints : fromPoints, count);
+        const progress = this.chartAnimationProgress;
+
+        return to.map((point, index) => ({
+            ...point,
+            index,
+            x: Math.round((from[index].x + ((point.x - from[index].x) * progress)) * 10) / 10,
+            y: Math.round((from[index].y + ((point.y - from[index].y) * progress)) * 10) / 10,
+        }));
+    },
+
+    displayHistoricalPoints() {
+        if (!this.chartAnimation) return this.historicalPoints();
+        return this.interpolateChartPoints(
+            this.chartAnimation.from.historical,
+            this.chartAnimation.to.historical,
+        );
+    },
+
+    displayForecastPoints() {
+        if (!this.chartAnimation) return this.forecastPoints();
+        return this.interpolateChartPoints(
+            this.chartAnimation.from.forecast,
+            this.chartAnimation.to.forecast,
+        );
+    },
+
+    displayForecastRenderPoints() {
+        return this.forecastRenderPoints(
+            this.displayForecastPoints(),
+            this.displayHistoricalRenderPoints(),
+            this.displayTransitionX(),
+        );
+    },
+
+    displayHistoricalRenderPoints() {
+        if (!this.chartAnimation) return this.historicalRenderPoints();
+        return this.interpolateChartPoints(
+            this.chartAnimation.from.historicalLine,
+            this.chartAnimation.to.historicalLine,
+        );
+    },
+
+    displayTransitionX() {
+        if (!this.chartAnimation) return this.transitionX();
+
+        const { from, to } = this.chartAnimation;
+        return from.transitionX + ((to.transitionX - from.transitionX) * this.chartAnimationProgress);
+    },
+
+    displayChartTicks() {
+        if (!this.chartAnimation) return this.chartTicks();
+
+        const { from, to } = this.chartAnimation;
+        return to.ticks.map((tick, index) => ({
+            ...tick,
+            value: from.ticks[index].value
+                + ((tick.value - from.ticks[index].value) * this.chartAnimationProgress),
+            top: from.ticks[index].top
+                + ((tick.top - from.ticks[index].top) * this.chartAnimationProgress),
+        }));
+    },
+
+    displayHistoricalAreaPath() {
+        const shape = this.displayHistoricalRenderPoints();
+        if (shape.length === 0) return '';
+
+        const baseline = 205;
+        return `M ${shape[0].x} ${baseline} L ${shape[0].x} ${shape[0].y} ${shape
+            .slice(1)
+            .map((point) => `L ${point.x} ${point.y}`)
+            .join(' ')} L ${shape[shape.length - 1].x} ${baseline} Z`;
+    },
+
+    displayForecastAreaPath() {
+        const historical = this.displayHistoricalRenderPoints();
+        const forecast = this.chartLinePoints(this.displayForecastRenderPoints(), 725);
+        if (forecast.length === 0) return '';
+
+        const baseline = 205;
+        const startX = this.displayTransitionX();
+        const startY = historical.length > 0 ? historical[historical.length - 1].y : forecast[0].y;
+
+        return `M ${startX} ${baseline} L ${startX} ${startY} ${forecast
+            .map((point) => `L ${point.x} ${point.y}`)
+            .join(' ')} L ${forecast[forecast.length - 1].x} ${baseline} Z`;
+    },
+
+    applyForecast(forecast) {
+        if (!forecast) return;
+
+        const from = this.chartAnimation
+            ? {
+                historical: this.displayHistoricalPoints(),
+                forecast: this.displayForecastPoints(),
+                historicalLine: this.displayHistoricalRenderPoints(),
+                transitionX: this.displayTransitionX(),
+                ticks: this.displayChartTicks(),
+            }
+            : this.captureChartGeometry();
+        if (this.chartAnimationFrame) cancelAnimationFrame(this.chartAnimationFrame);
+
+        // Hold the old geometry through Alpine's update, then interpolate it
+        // into the newly calculated period rather than replacing the SVG.
+        this.chartAnimation = { from, to: from };
+        this.chartAnimationProgress = 0;
+        this.chartAnimating = true;
+        this.clearActivePoint();
+        this.forecast = forecast;
+
+        this.$nextTick(() => {
+            const to = this.captureChartGeometry();
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (reduceMotion) {
+                this.chartAnimation = null;
+                this.chartAnimationProgress = 1;
+                this.chartAnimating = false;
+                this.resetActivePointToTransition();
+                return;
+            }
+
+            this.chartAnimation = { from, to };
+            const startedAt = performance.now();
+            const duration = 280;
+
+            const animate = (now) => {
+                const elapsed = Math.min(1, (now - startedAt) / duration);
+                this.chartAnimationProgress = 1 - ((1 - elapsed) ** 3);
+
+                if (elapsed < 1) {
+                    this.chartAnimationFrame = requestAnimationFrame(animate);
+                    return;
+                }
+
+                this.chartAnimation = null;
+                this.chartAnimationFrame = null;
+                this.chartAnimationProgress = 1;
+                this.chartAnimating = false;
+                this.$nextTick(() => this.resetActivePointToTransition());
+            };
+
+            this.chartAnimationFrame = requestAnimationFrame(animate);
+        });
     },
 
     chartAnalysisDays() {
@@ -1527,9 +1696,8 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         const originX = 50;
         const pxPerDay = this.chartPxPerDay();
 
-        // The horizon opens the day after the analysis window closes, so its
-        // first bucket is plotted exactly on the boundary rather than a bucket
-        // width past it.
+        // Each value represents a complete forecast bucket, so plot it at the
+        // bucket end. forecastRenderPoints() adds the explicit boundary anchor.
         let elapsedDays = this.chartAnalysisDays();
 
         return series.map((point) => {
@@ -1537,8 +1705,8 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
             const quantity = Number(point.quantity || 0);
             const rate = point.rate != null ? Number(point.rate) : (quantity / days);
 
-            const x = originX + (pxPerDay * elapsedDays);
             elapsedDays += days;
+            const x = originX + (pxPerDay * elapsedDays);
 
             return {
                 x: Math.round(x * 10) / 10,
@@ -1550,43 +1718,51 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
                 value: rate,
                 type: 'forecast',
                 label: 'AI Forecast',
-                confidence: this.selectedItem()?.confidence ?? null,
+                confidence: this.selectedItem()?.confidence ?? this.confidenceLabel().toLowerCase(),
             };
         });
     },
 
-    historicalBaselinePoints() {
+    forecastRenderPoints(
+        forecast = this.forecastPoints(),
+        historical = this.historicalRenderPoints(),
+        transition = this.transitionX(),
+    ) {
+        if (forecast.length === 0) return [];
+
+        const latestHistorical = historical[historical.length - 1];
+        if (!latestHistorical) return forecast;
+
+        return [{
+            ...forecast[0],
+            x: transition,
+            y: latestHistorical.y,
+            value: latestHistorical.value,
+            quantity: 0,
+            type: 'forecast-start',
+        }, ...forecast];
+    },
+
+    historicalRenderPoints() {
         const hist = this.historicalPoints();
         if (hist.length === 0) return [];
 
         const fore = this.forecastPoints();
         if (fore.length === 0) return hist;
 
-        const baselineRate = this.baselineDailyRate();
-
-        const baselineFuture = fore.map((fp) => {
-            const days = fp.days || 1;
-            const quantity = Math.round(baselineRate * days);
-            return {
-                x: fp.x,
-                y: this.chartY(baselineRate),
-                date: fp.date,
-                formattedDate: this.formatPeriodLabel(fp.date, days),
-                quantity,
-                days,
-                value: baselineRate,
-                type: 'baseline',
-                label: 'Historical Baseline',
-            };
-        });
-
-        return [...hist, ...baselineFuture];
+        const last = hist[hist.length - 1];
+        return [...hist, {
+            ...last,
+            x: this.transitionX(),
+            date: fore[0].date,
+            type: 'history-end',
+            label: 'Historical Demand',
+        }];
     },
 
     allChartPoints() {
         const hist = this.historicalPoints();
         const fore = this.forecastPoints();
-        const baselineFuture = this.historicalBaselinePoints().filter((p) => p.type === 'baseline');
 
         const timelineMap = new Map();
 
@@ -1598,8 +1774,6 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         // 2. Add future points: prioritize forecast point for primary positioning if forecast is visible
         if (this.showForecast) {
             fore.forEach((p) => timelineMap.set(p.date, p));
-        } else if (this.showActual) {
-            baselineFuture.forEach((p) => timelineMap.set(p.date, p));
         }
 
         const points = Array.from(timelineMap.values()).sort((a, b) => a.x - b.x);
@@ -1614,17 +1788,9 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     },
 
     /**
-     * Carry a plotted series out to the far edge of its window.
-     *
-     * Buckets are plotted where their period opens, so the final bucket's own
-     * span was left undrawn: the recorded line stopped a bucket short of the
-     * boundary and the forecast stopped short of the horizon end printed on the
-     * axis, which read on screen as the lines being cut off. The last bucket's
-     * value carried across its own period is what that bucket measured, so the
-     * segment is drawn rather than the space left blank.
-     *
-     * Stroke and fill geometry only — markers and hover keep reading the bucket
-     * arrays themselves, so no extra point becomes selectable.
+     * Keep animated stroke and fill geometry pinned to the window edge.
+     * Markers and hover continue to use the actual bucket arrays, so any
+     * temporary edge point never becomes selectable.
      */
     chartLinePoints(points, edgeX) {
         if (!Array.isArray(points) || points.length === 0) return [];
@@ -1633,49 +1799,6 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         if (last.x >= edgeX) return points;
 
         return [...points, { ...last, x: edgeX }];
-    },
-
-    historicalAreaPath() {
-        // The fill has to trace the same stroke it sits under. The history
-        // buckets alone stop a bucket short of the boundary; extending them at
-        // the last bucket's rate instead made the shading jut out past the
-        // line, because by then the line is ramping down to the baseline. The
-        // baseline series' first point is exactly where the two agree.
-        const points = this.historicalPoints();
-        const boundary = this.historicalBaselinePoints()
-            .find((point) => point.type === 'baseline');
-
-        const shape = boundary ? [...points, boundary] : points;
-        if (shape.length === 0) return '';
-
-        const baseline = 205;
-        return `M ${shape[0].x} ${baseline} L ${shape[0].x} ${shape[0].y} ${shape
-            .slice(1)
-            .map((p) => `L ${p.x} ${p.y}`)
-            .join(' ')} L ${shape[shape.length - 1].x} ${baseline} Z`;
-    },
-
-    forecastAreaPath() {
-        const hist = this.historicalPoints();
-        const fore = this.chartLinePoints(this.forecastPoints(), 725);
-        if (fore.length === 0) return '';
-
-        const baseline = 205;
-        const startX = this.transitionX();
-        const startY = hist.length > 0 ? hist[hist.length - 1].y : fore[0].y;
-
-        return `M ${startX} ${baseline} L ${startX} ${startY} ${fore
-            .map((p) => `L ${p.x} ${p.y}`)
-            .join(' ')} L ${fore[fore.length - 1].x} ${baseline} Z`;
-    },
-
-    areaPath(points) {
-        if (!Array.isArray(points) || points.length === 0) return '';
-
-        return `M ${points[0].x} 205 L ${points[0].x} ${points[0].y} ${points
-            .slice(1)
-            .map((point) => `L ${point.x} ${point.y}`)
-            .join(' ')} L ${points[points.length - 1].x} 205 Z`;
     },
 
     chartStartLabel(series) {
@@ -1793,22 +1916,11 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     setActivePoint(point) {
         if (!point) return;
 
-        const isFuture = point.x >= (this.transitionX() - 2) || point.type === 'forecast' || point.type === 'baseline';
+        const isFuture = point.x >= (this.transitionX() - 2) || point.type === 'forecast';
         const forecastPoints = this.forecastPoints();
-        const baselinePoints = this.historicalBaselinePoints();
 
         const forecastPoint = forecastPoints.find((p) => p.date === point.date)
             || (point.type === 'forecast' ? point : null);
-        const baselinePoint = baselinePoints.find((p) => p.date === point.date && (p.type === 'baseline' || p.type === 'actual'))
-            || (point.type === 'baseline' ? point : null);
-
-        let variancePercent = null;
-        let varianceDirection = 'equal';
-        if (forecastPoint && baselinePoint && baselinePoint.value > 0) {
-            const diff = (forecastPoint.value ?? 0) - (baselinePoint.value ?? 0);
-            variancePercent = Math.round((Math.abs(diff) / baselinePoint.value) * 100);
-            varianceDirection = diff > 0 ? 'higher' : (diff < 0 ? 'lower' : 'equal');
-        }
 
         const primary = (isFuture && this.showForecast && forecastPoint) ? forecastPoint : point;
 
@@ -1816,9 +1928,6 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
             ...primary,
             isFuture,
             forecastPoint,
-            baselinePoint,
-            variancePercent,
-            varianceDirection,
             formattedDate: this.formatPeriodLabel(point.date, point.days),
             percentageX: Math.round((primary.x / 760) * 1000) / 10,
             percentageY: Math.round((primary.y / 240) * 1000) / 10,
@@ -1896,10 +2005,6 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         }
 
         return `No filtered items are projected to run low. Predicted demand is ${this.formatNumber(this.predictedDemand())} units for this period.`;
-    },
-
-    isForecastWindowChanged() {
-        return this.forecast && Number(this.forecastDays) !== Number(this.forecast.forecast_days);
     },
 
     clearFilters() {
@@ -1983,21 +2088,68 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         }).format(date);
     },
 
-    async generateForecast() {
-        if (this.loading) return;
+    forecastCacheKey(days) {
+        return `${Number(this.analysisDays)}:${Number(days)}`;
+    },
 
+    loadingPeriodLabel() {
+        return this.loading ? `Updating ${Number(this.forecastDays)}-day forecast` : '';
+    },
+
+    retryForecast() {
+        if (!this.failedForecastDays) return;
+        this.forecastDays = String(this.failedForecastDays);
+        this.updateForecastPeriod(this.failedForecastDays, true);
+    },
+
+    async updateForecastPeriod(value, force = false) {
+        const days = Number(value);
+        const allowedPeriods = [7, 14, 30, 60, 90];
+        if (!allowedPeriods.includes(days)) {
+            this.forecastDays = String(this.forecast?.forecast_days ?? 30);
+            return;
+        }
+
+        this.forecastDays = String(days);
+        if (!force && Number(this.forecast?.forecast_days) === days) {
+            if (this.forecastRequest) {
+                this.forecastRequest.abort();
+                this.forecastRequest = null;
+                this.forecastRequestId += 1;
+                this.loading = false;
+            }
+            this.error = '';
+            this.failedForecastDays = null;
+            return;
+        }
+
+        const cacheKey = this.forecastCacheKey(days);
+        if (!force && this.forecastCache[cacheKey]) {
+            this.forecastRequest?.abort();
+            this.forecastRequest = null;
+            this.forecastRequestId += 1;
+            this.loading = false;
+            this.error = '';
+            this.success = `${days}-day forecast updated.`;
+            this.failedForecastDays = null;
+            this.applyForecast(this.forecastCache[cacheKey]);
+            return;
+        }
+
+        this.forecastRequest?.abort();
+        const request = new AbortController();
+        const requestId = ++this.forecastRequestId;
+        this.forecastRequest = request;
         this.loading = true;
         this.error = '';
         this.success = '';
-        window.dispatchEvent(new CustomEvent('hims-loading-start', {
-            detail: { message: 'Generating forecast...' },
-        }));
 
         try {
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
             const response = await fetch(this.endpoint, {
                 method: 'POST',
                 credentials: 'same-origin',
+                signal: request.signal,
                 headers: {
                     Accept: 'application/json',
                     'Content-Type': 'application/json',
@@ -2005,29 +2157,35 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
                     'X-Requested-With': 'XMLHttpRequest',
                 },
                 body: JSON.stringify({
-                    analysis_days: 90,
-                    forecast_days: Number(this.forecastDays),
+                    analysis_days: Number(this.analysisDays),
+                    forecast_days: days,
                     return_to: 'dashboard',
+                    reuse_cached: !force,
                 }),
             });
             const payload = await response.json().catch(() => ({}));
 
             if (!response.ok || !payload.forecast) {
-                throw new Error(payload.message || 'The forecast could not be generated. Try again.');
+                throw new Error(payload.message || 'The forecast could not be generated.');
             }
+            if (requestId !== this.forecastRequestId) return;
 
-            this.forecast = payload.forecast;
-            this.success = payload.message || 'Forecast generated successfully.';
-            this.$nextTick(() => {
-                this.resetActivePointToTransition();
-            });
+            this.forecastCache[cacheKey] = payload.forecast;
+            this.failedForecastDays = null;
+            this.success = `${days}-day forecast updated.`;
+            this.applyForecast(payload.forecast);
         } catch (error) {
-            this.error = error instanceof Error
-                ? error.message
-                : 'The forecast could not be generated. Try again.';
+            if (error instanceof DOMException && error.name === 'AbortError') return;
+            if (requestId !== this.forecastRequestId) return;
+
+            this.failedForecastDays = days;
+            this.forecastDays = String(this.forecast?.forecast_days ?? 30);
+            this.error = `Unable to update the ${days}-day forecast. Please try again.`;
         } finally {
-            this.loading = false;
-            window.dispatchEvent(new CustomEvent('hims-loading-stop'));
+            if (requestId === this.forecastRequestId) {
+                this.loading = false;
+                this.forecastRequest = null;
+            }
         }
     },
 }));
