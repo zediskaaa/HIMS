@@ -3919,29 +3919,6 @@ Alpine.data('procurementWorkspace', ({
         return Number(item.current_stock || 0) <= Number(item.reorder_point || 0);
     },
 
-    smartAdvisory() {
-        const item = this.selectedItem();
-        const supplier = this.selectedSupplier();
-        const terms = this.selectedTerms();
-        if (!item) return null;
-
-        const isLow = this.isStockLow();
-        const suggested = Number(item.suggested_order_quantity || 0);
-        const leadTime = Number(terms?.lead_time_days || supplier?.lead_time_days || item.lead_time_days || 7);
-
-        const parts = [];
-        if (isLow) {
-            parts.push(`Stock Warning: On-hand (${this.formatNumber(item.current_stock)} ${item.unit}) is at or below reorder threshold (${this.formatNumber(item.reorder_point)} ${item.unit}).`);
-        }
-        if (suggested > 0) {
-            parts.push(`Replenishment Advisory: Reorder of ${this.formatNumber(suggested)} ${item.unit} suggested based on 90-day demand (${this.formatNumber(item.recent_demand)} ${item.unit}) and buffer calculation.`);
-        }
-        if (supplier) {
-            parts.push(`Supplier Delivery: ~${leadTime} days standard lead time with ${supplier.score !== null ? Number(supplier.score).toFixed(1) + '% scorecard rating' : 'procurement accreditation'}.`);
-        }
-
-        return parts.length ? parts.join(' · ') : `Current on-hand inventory is ${this.formatNumber(item.current_stock)} ${item.unit}. Operating at standard stock level.`;
-    },
 
     useSuggestedQuantity() {
         const suggested = Number(this.selectedItem()?.suggested_order_quantity || 0);
@@ -3983,6 +3960,69 @@ Alpine.data('procurementWorkspace', ({
             day: 'numeric',
             year: 'numeric',
         }).format(date);
+    },
+}));
+
+Alpine.data('himsToastNotifications', (initialToasts = []) => ({
+    toasts: [],
+
+    init() {
+        if (Array.isArray(initialToasts)) {
+            initialToasts.forEach((toast) => {
+                this.addToast(toast);
+            });
+        }
+    },
+
+    addToast(payload) {
+        if (!payload || !payload.message) return;
+
+        const duration = Number(payload.duration || 5000);
+        const toast = {
+            id: payload.id || `toast-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            type: payload.type || 'success',
+            title: payload.title || '',
+            message: payload.message,
+            visible: true,
+            progress: 100,
+            duration,
+            remaining: duration,
+            interval: null,
+            isPaused: false,
+        };
+
+        this.startTimer(toast);
+        this.toasts.push(toast);
+    },
+
+    startTimer(toast) {
+        const step = 50;
+        toast.interval = setInterval(() => {
+            if (toast.isPaused) return;
+
+            toast.remaining -= step;
+            toast.progress = Math.max(0, (toast.remaining / toast.duration) * 100);
+
+            if (toast.remaining <= 0) {
+                this.dismiss(toast);
+            }
+        }, step);
+    },
+
+    pauseTimer(toast) {
+        toast.isPaused = true;
+    },
+
+    resumeTimer(toast) {
+        toast.isPaused = false;
+    },
+
+    dismiss(toast) {
+        if (toast.interval) clearInterval(toast.interval);
+        toast.visible = false;
+        setTimeout(() => {
+            this.toasts = this.toasts.filter((t) => t.id !== toast.id);
+        }, 300);
     },
 }));
 

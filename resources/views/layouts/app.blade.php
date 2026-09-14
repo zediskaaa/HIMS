@@ -64,29 +64,13 @@
                         <div>{{ $header }}</div>
                     @endisset
 
-                    @if (session('status') || session('success'))
-                        <x-ui.alert variant="success" dismissible>
-                            {{ session('status') ?? session('success') }}
-                        </x-ui.alert>
-                    @endif
-
-                    @if (session('error'))
-                        <x-ui.alert variant="danger" dismissible>{{ session('error') }}</x-ui.alert>
-                    @endif
-
-                    {{-- Controllers that redirect with a neutral notice — an
-                         already-received purchase order, say — used to flash
-                         into nothing, because only success and error rendered. --}}
-                    @if (session('info'))
-                        <x-ui.alert variant="info" dismissible>{{ session('info') }}</x-ui.alert>
-                    @endif
-
                     {{ $slot }}
                 </div>
             </main>
         </div>
     </div>
 
+    @include('layouts.partials.toast-notifications')
     @include('layouts.partials.loading-overlay')
     @include('layouts.partials.decision-confirmation')
 

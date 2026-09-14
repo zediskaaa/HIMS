@@ -70,24 +70,6 @@
     <div class="py-5" x-data="procurementWorkspace({{ Js::from($procurementWorkspaceConfig) }})">
         <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
 
-            {{-- Flash Notification Banners --}}
-            @if(session('success'))
-                <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 flex items-center justify-between shadow-sm">
-                    <div class="flex items-center gap-2">
-                        <svg class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                        <span class="font-medium">{{ session('success') }}</span>
-                    </div>
-                </div>
-            @endif
-
-            @if(session('info'))
-                <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 flex items-center justify-between shadow-sm">
-                    <div class="flex items-center gap-2">
-                        <svg class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        <span class="font-medium">{{ session('info') }}</span>
-                    </div>
-                </div>
-            @endif
 
             @if($errors->any())
                 <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 shadow-sm">
@@ -1102,21 +1084,6 @@
                                         </p>
                                     </div>
 
-                                    {{-- Data-backed Smart Procurement Advisory --}}
-                                    <div x-show="selectedItem()" x-cloak class="rounded-lg border border-primary-200 bg-primary-50/70 p-3 text-xs text-primary-950 flex items-start gap-2.5 shadow-2xs">
-                                        <div class="rounded-md bg-white p-1 text-primary-700 shadow-2xs ring-1 ring-primary-200/60 shrink-0 mt-0.5">
-                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                            </svg>
-                                        </div>
-                                        <div class="min-w-0 space-y-0.5">
-                                            <p class="font-semibold text-primary-900 flex items-center gap-1.5">
-                                                <span>Procurement &amp; Demand Advisory</span>
-                                                <span class="rounded bg-primary-100 px-1.5 py-0.2 text-[9px] font-bold uppercase text-primary-800 tracking-wider">HIMS Intelligence</span>
-                                            </p>
-                                            <p class="text-[11px] leading-relaxed text-primary-800" x-text="smartAdvisory()"></p>
-                                        </div>
-                                    </div>
 
                                     {{-- Collapsed by default; opened automatically when the browser blocks an invalid submit
                                          or when the server returns a validation error for one of these fields. --}}
@@ -1304,9 +1271,10 @@
                                         'receive_url' => route('inventory.purchases.receive', $po),
                                         'receiving_url' => route('inventory.receiving.index'),
                                     ];
+                                    $isNewPo = session('new_po_id') && (string) session('new_po_id') === (string) $po->id;
                                 @endphp
 
-                                <article class="p-4 transition-colors hover:bg-neutral-50/80" data-purchase-order-row>
+                                <article class="p-4 transition-colors {{ $isNewPo ? 'bg-emerald-50/60 ring-1 ring-inset ring-emerald-300/80 rounded-lg' : 'hover:bg-neutral-50/80' }}" data-purchase-order-row>
                                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                         <div class="min-w-0 space-y-1">
                                             <div class="flex flex-wrap items-center gap-2">
@@ -1315,6 +1283,12 @@
                                                     <span>{{ $po->po_number }}</span>
                                                 </button>
                                                 <x-ui.badge :status="$po->status" :variant="$statusVariant" dot>{{ $statusLabel }}</x-ui.badge>
+                                                @if($isNewPo)
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 animate-pulse">
+                                                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-600"></span>
+                                                        Just Issued
+                                                    </span>
+                                                @endif
                                                 @if($isOverdue)
                                                     <span class="inline-flex items-center rounded-full bg-danger-50 px-2 py-0.5 text-[10px] font-semibold text-danger-700 ring-1 ring-inset ring-danger-600/20">Overdue</span>
                                                 @endif

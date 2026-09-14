@@ -71,7 +71,8 @@ class PurchaseOrderController extends Controller implements HasMiddleware
             );
 
             return redirect()->route('inventory.purchases')
-                ->with('success', "Purchase order {$po->po_number} created from trusted catalog pricing.");
+                ->with('success', "Purchase order {$po->po_number} created from trusted catalog pricing.")
+                ->with('new_po_id', $po->id);
         } catch (DomainException $exception) {
             return redirect()->route('inventory.purchases')
                 ->withInput()
