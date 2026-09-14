@@ -6,11 +6,11 @@ use App\Enums\MovementType;
 use App\Enums\Permission;
 use App\Enums\PurchaseOrderStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StorePurchaseOrderRequest;
 use App\Models\InventoryItem;
 use App\Models\PurchaseOrder;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
-use App\Rules\ProcurementEligibleSupplier;
 use App\Services\InventoryAutomationService;
 use App\Services\Procurement\BudgetEncumbranceService;
 use App\Services\Procurement\POConversionService;
@@ -62,65 +62,21 @@ class PurchaseOrderController extends Controller implements HasMiddleware
         return view('inventory.purchases.index', compact('purchaseOrders', 'suppliers', 'items'));
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StorePurchaseOrderRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'supplier_id' => ['required', new ProcurementEligibleSupplier],
-            'item_id' => ['required', 'exists:inventory_items,id'],
-            'cost_center_id' => ['nullable', 'exists:cost_centers,id'],
-            'quantity' => ['required', 'integer', 'min:1'],
-            'unit_cost' => ['required', 'numeric', 'min:0'],
-            'payment_terms' => ['nullable', 'string', 'max:100'],
-            'incoterms' => ['nullable', 'string', 'max:30'],
-            'status' => ['nullable', 'string'],
-            'notes' => ['nullable', 'string', 'max:255'],
-        ]);
+        try {
+            $po = $this->poConversionService->createDirectPurchaseOrder(
+                $request->validated(),
+                $request->user(),
+            );
 
-        $quantity = (int) $validated['quantity'];
-        $unitCost = (float) $validated['unit_cost'];
-        $totalAmount = round($quantity * $unitCost, 2);
-
-        $po = PurchaseOrder::create([
-            ...$validated,
-            'po_number' => 'PO-'.now()->format('YmdHis'),
-            'total_amount' => $totalAmount,
-            'total_encumbered_amount' => $totalAmount,
-            'currency' => 'PHP',
-            'exchange_rate' => 1.0,
-            'payment_terms' => $validated['payment_terms'] ?? 'Net 30',
-            'incoterms' => $validated['incoterms'] ?? 'DDP',
-            'version' => 'PO-REV1',
-            'revision_number' => 1,
-            'status' => $validated['status'] ?? 'pending',
-        ]);
-
-        // Automatically create primary PO Line Item
-        $po->lines()->create([
-            'item_id' => $po->item_id,
-            'line_number' => 1,
-            'ordered_quantity' => $quantity,
-            'received_quantity' => 0,
-            'invoiced_quantity' => 0,
-            'unit_price' => $unitCost,
-            'total_line_amount' => $totalAmount,
-            'line_status' => 'open',
-        ]);
-
-        $po->cxml_payload = app(POConversionService::class)->generateCxmlPayload($po);
-        $po->save();
-
-        $this->budgetService->convertSoftToHardEncumbrance($po);
-
-        $this->auditService->record(
-            auth()->user(),
-            'PurchaseOrder',
-            $po->id,
-            'issued_purchase_order',
-            null,
-            ['po_number' => $po->po_number, 'amount' => $totalAmount]
-        );
-
-        return redirect()->route('inventory.purchases')->with('success', 'Purchase order created successfully.');
+            return redirect()->route('inventory.purchases')
+                ->with('success', "Purchase order {$po->po_number} created from trusted catalog pricing.");
+        } catch (DomainException $exception) {
+            return redirect()->route('inventory.purchases')
+                ->withInput()
+                ->withErrors(['purchase_order' => $exception->getMessage()]);
+        }
     }
 
     /**

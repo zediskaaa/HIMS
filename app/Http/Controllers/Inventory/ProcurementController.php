@@ -18,6 +18,7 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Models\SourcingRfq;
 use App\Models\Supplier;
+use App\Models\SupplierProduct;
 use App\Models\SupplierQuote;
 use App\Rules\ProcurementEligibleSupplier;
 use App\Services\Procurement\ApprovalRoutingEngine;
@@ -25,6 +26,7 @@ use App\Services\Procurement\BudgetEncumbranceService;
 use App\Services\Procurement\EvaluationEngine;
 use App\Services\Procurement\POConversionService;
 use App\Services\Procurement\ProcurementAuditService;
+use App\Services\DemandForecastService;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -56,16 +58,49 @@ class ProcurementController extends Controller implements HasMiddleware
         private readonly EvaluationEngine $evaluationEngine,
         private readonly ApprovalRoutingEngine $approvalEngine,
         private readonly POConversionService $poConversionService,
-        private readonly ProcurementAuditService $auditService
+        private readonly ProcurementAuditService $auditService,
+        private readonly DemandForecastService $demandForecastService,
     ) {}
 
     public function index(Request $request): View
     {
-        $items = InventoryItem::orderBy('name')->get();
-        $suppliers = Supplier::procurementEligible()->orderBy('name')->get();
+        $forecastRows = $this->demandForecastService->forecastAll();
+        $items = $forecastRows->pluck('item')->values();
+        $itemProcurementContext = $forecastRows->mapWithKeys(fn (array $row): array => [
+            (string) $row['item_id'] => [
+                'current_stock' => (int) $row['current_stock'],
+                'reorder_point' => (int) $row['reorder_point'],
+                'recent_demand' => (int) $row['historical_usage'],
+                'average_daily_usage' => (float) $row['average_daily_usage'],
+                'suggested_order_quantity' => (int) $row['suggested_order_quantity'],
+                'trend' => $row['trend']->label(),
+            ],
+        ]);
+        $suppliers = Supplier::procurementEligible()
+            ->with('latestApprovedScorecard')
+            ->orderBy('name')
+            ->get();
+        $supplierProducts = SupplierProduct::query()
+            ->with(['supplier', 'item', 'prices.contract'])
+            ->where('is_active', true)
+            ->whereIn('supplier_id', $suppliers->modelKeys())
+            ->whereIn('item_id', $items->pluck('id'))
+            ->get();
+        $supplierCatalogTerms = $supplierProducts->mapWithKeys(function (SupplierProduct $product): array {
+            try {
+                $terms = $this->poConversionService->catalogTerms($product->supplier, $product->item, $product);
+            } catch (DomainException) {
+                return [];
+            }
+
+            return ["{$product->supplier_id}:{$product->item_id}" => $terms];
+        });
         $supplierFilter = $request->integer('supplier_id')
             ? Supplier::query()->find($request->integer('supplier_id'))
             : null;
+        $poSearch = trim((string) $request->string('po_search'));
+        $poStatus = trim((string) $request->string('po_status'));
+        $poDate = trim((string) $request->string('po_date'));
 
         // Legacy requests for backward compatibility
         $requests = ProcurementRequest::with(['item', 'supplier'])
@@ -91,11 +126,55 @@ class ProcurementController extends Controller implements HasMiddleware
         // Pending & Active Approval Chains
         $approvalChains = ApprovalChain::with(['steps.approver'])->latest('id')->get();
 
-        // Purchase Orders with line items and revisions
-        $purchaseOrders = PurchaseOrder::with(['supplier', 'item', 'lines.item', 'revisions'])
+        $closedStatuses = ['received', 'fulfilled', 'cancelled', 'rejected', 'amended'];
+        $poMetrics = [
+            'open' => PurchaseOrder::whereNotIn('status', $closedStatuses)->count(),
+            'pending_approval' => PurchaseOrder::whereIn('status', ['submitted', 'pending', 'pending_approval'])->count(),
+            'in_transit' => PurchaseOrder::whereIn('status', ['dispatched', 'acknowledged', 'partially_fulfilled'])->count(),
+            'overdue' => PurchaseOrder::whereNotIn('status', $closedStatuses)
+                ->whereNotNull('delivery_date')
+                ->whereDate('delivery_date', '<', today())
+                ->count(),
+        ];
+
+        $purchaseOrderQuery = PurchaseOrder::with([
+            'supplier',
+            'item.category',
+            'lines.item',
+            'revisions',
+            'purchaseRequest',
+            'costCenter',
+            'createdBy',
+            'approvalChain.steps.approver',
+            'shipments',
+        ])
             ->when($supplierFilter, fn ($query) => $query->where('supplier_id', $supplierFilter->id))
+            ->when($poSearch !== '', fn ($query) => $query->where(function ($searchQuery) use ($poSearch): void {
+                $searchQuery->where('po_number', 'like', "%{$poSearch}%")
+                    ->orWhereHas('supplier', fn ($supplier) => $supplier->where('name', 'like', "%{$poSearch}%"))
+                    ->orWhereHas('item', fn ($item) => $item->where('name', 'like', "%{$poSearch}%"))
+                    ->orWhereHas('lines.item', fn ($item) => $item->where('name', 'like', "%{$poSearch}%"));
+            }))
+            ->when($poStatus !== '', fn ($query) => $query->where('status', $poStatus))
+            ->when(in_array($poDate, ['7', '30', '90'], true), fn ($query) => $query
+                ->where('requested_at', '>=', now()->subDays((int) $poDate)))
+            ->when($poDate === 'overdue', fn ($query) => $query
+                ->whereNotIn('status', $closedStatuses)
+                ->whereNotNull('delivery_date')
+                ->whereDate('delivery_date', '<', today()));
+
+        $purchaseOrders = $purchaseOrderQuery
             ->latest('requested_at')
-            ->get();
+            ->paginate(10, ['*'], 'po_page')
+            ->withQueryString();
+        $poStatusOptions = PurchaseOrder::query()
+            ->select('status')
+            ->distinct()
+            ->orderBy('status')
+            ->pluck('status')
+            ->filter()
+            ->mapWithKeys(fn (string $status): array => [$status => Str::headline($status)]);
+        $poFilters = compact('poSearch', 'poStatus', 'poDate');
 
         // Procurement Audit Logs
         $procurementAuditLogs = ProcurementAuditLog::with('user')
@@ -113,6 +192,11 @@ class ProcurementController extends Controller implements HasMiddleware
             'categories',
             'approvalChains',
             'purchaseOrders',
+            'itemProcurementContext',
+            'supplierCatalogTerms',
+            'poMetrics',
+            'poStatusOptions',
+            'poFilters',
             'procurementAuditLogs',
             'supplierFilter'
         ));

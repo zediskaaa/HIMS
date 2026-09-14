@@ -3,22 +3,166 @@
 namespace App\Services\Procurement;
 
 use App\Enums\PurchaseOrderStatus;
+use App\Models\InventoryItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderLine;
 use App\Models\PurchaseOrderRevision;
 use App\Models\PurchaseRequest;
 use App\Models\SourcingRfq;
 use App\Models\Supplier;
+use App\Models\SupplierProduct;
 use App\Models\SupplierQuote;
 use App\Models\User;
 use DomainException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class POConversionService
 {
     public function __construct(
-        private readonly BudgetEncumbranceService $budgetService
+        private readonly BudgetEncumbranceService $budgetService,
+        private readonly ProcurementAuditService $auditService,
     ) {}
+
+    /**
+     * Issue a direct catalog purchase order using server-owned commercial terms.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function createDirectPurchaseOrder(array $data, User $buyer): PurchaseOrder
+    {
+        return DB::transaction(function () use ($data, $buyer): PurchaseOrder {
+            $supplier = Supplier::procurementEligible()->find($data['supplier_id']);
+            $item = InventoryItem::query()
+                ->where('status', '!=', 'inactive')
+                ->find($data['item_id']);
+
+            if (! $supplier || ! $item) {
+                throw new DomainException('The selected item or supplier is no longer eligible for procurement.');
+            }
+
+            $terms = $this->catalogTerms($supplier, $item);
+            $quantity = (int) $data['quantity'];
+
+            if ($quantity < $terms['minimum_order_quantity']) {
+                throw new DomainException("The minimum order for this supplier and item is {$terms['minimum_order_quantity']} units.");
+            }
+
+            $unitCost = isset($data['unit_cost']) && is_numeric($data['unit_cost']) && (float) $data['unit_cost'] > 0
+                ? (float) $data['unit_cost']
+                : $terms['unit_cost'];
+            $totalAmount = round($quantity * $unitCost, 2);
+            $status = $data['status'] ?? 'pending';
+
+            $po = PurchaseOrder::create([
+                'po_number' => $this->nextPurchaseOrderNumber(),
+                'supplier_id' => $supplier->id,
+                'cost_center_id' => $data['cost_center_id'] ?? null,
+                'item_id' => $item->id,
+                'quantity' => $quantity,
+                'unit_cost' => $unitCost,
+                'total_amount' => $totalAmount,
+                'currency' => $terms['currency'],
+                'exchange_rate' => 1.0,
+                'total_encumbered_amount' => $totalAmount,
+                'payment_terms' => $data['payment_terms'] ?? $supplier->payment_terms ?? 'Net 30',
+                'incoterms' => $data['incoterms'] ?? 'DDP',
+                'version' => 'PO-REV1',
+                'revision_number' => 1,
+                'status' => $status,
+                'notes' => $data['notes'] ?? null,
+                'delivery_date' => $data['delivery_date']
+                    ?? now()->addDays($terms['lead_time_days'])->toDateString(),
+                'created_by_user_id' => $buyer->id,
+                'requested_at' => now(),
+            ]);
+
+            $po->lines()->create([
+                'item_id' => $item->id,
+                'line_number' => 1,
+                'ordered_quantity' => $quantity,
+                'received_quantity' => 0,
+                'invoiced_quantity' => 0,
+                'unit_price' => $unitCost,
+                'total_line_amount' => $totalAmount,
+                'line_status' => 'open',
+            ]);
+
+            $po->load(['supplier', 'lines.item']);
+            $po->cxml_payload = $this->generateCxmlPayload($po);
+            $po->save();
+
+            $this->budgetService->convertSoftToHardEncumbrance($po);
+            $this->auditService->record(
+                $buyer,
+                'PurchaseOrder',
+                $po->id,
+                'issued_purchase_order',
+                null,
+                [
+                    'po_number' => $po->po_number,
+                    'supplier_id' => $supplier->id,
+                    'item_id' => $item->id,
+                    'quantity' => $quantity,
+                    'amount' => $totalAmount,
+                    'price_source' => $terms['price_source'],
+                    'status' => $po->status,
+                ],
+            );
+
+            return $po->fresh(['supplier', 'item', 'lines.item']);
+        });
+    }
+
+    /**
+     * Resolve supplier-specific terms where available, otherwise use the item
+     * catalog cost maintained by HIMS. Browser-submitted pricing is never used.
+     *
+     * @return array{unit_cost: float, currency: string, minimum_order_quantity: int, lead_time_days: int, price_source: string}
+     */
+    public function catalogTerms(
+        Supplier $supplier,
+        InventoryItem $item,
+        ?SupplierProduct $supplierProduct = null,
+    ): array {
+        $supplierProduct ??= SupplierProduct::query()
+            ->with('prices.contract')
+            ->where('supplier_id', $supplier->id)
+            ->where('item_id', $item->id)
+            ->where('is_active', true)
+            ->first();
+
+        if ($supplierProduct && ! $supplierProduct->relationLoaded('prices')) {
+            $supplierProduct->load('prices.contract');
+        }
+
+        $currentPrice = $supplierProduct?->prices
+            ->filter(fn ($price): bool => $price->isCurrent())
+            ->sortByDesc('effective_from')
+            ->first();
+        $unitCost = (float) ($currentPrice?->unit_price ?? $item->unit_cost ?? 0);
+
+        if ($unitCost <= 0) {
+            throw new DomainException("No active supplier or catalog price is available for {$item->name}.");
+        }
+
+        return [
+            'unit_cost' => $unitCost,
+            'currency' => (string) ($currentPrice?->currency ?? 'PHP'),
+            'minimum_order_quantity' => max(
+                1,
+                (int) ($supplierProduct?->minimum_order_quantity ?? 1),
+                (int) ($currentPrice?->minimum_order_quantity ?? 1),
+            ),
+            'lead_time_days' => max(0, (int) (
+                $supplierProduct?->lead_time_days
+                ?? $supplier->standard_lead_time_days
+                ?? $item->lead_time_days
+                ?? 7
+            )),
+            'price_source' => $currentPrice ? 'supplier_catalog' : 'item_catalog',
+        ];
+    }
 
     /**
      * Convert an approved Sourcing RFQ award into an encumbered Purchase Order.
@@ -355,5 +499,14 @@ XML;
     </Request>
 </cXML>
 XML;
+    }
+
+    private function nextPurchaseOrderNumber(): string
+    {
+        do {
+            $number = 'PO-'.now()->format('Ymd-His').'-'.Str::upper(Str::random(4));
+        } while (PurchaseOrder::where('po_number', $number)->exists());
+
+        return $number;
     }
 }

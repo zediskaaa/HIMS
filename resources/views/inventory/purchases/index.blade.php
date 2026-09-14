@@ -1,25 +1,22 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-                <div class="flex items-center gap-2">
-                    <span class="rounded-md bg-primary-100 px-2.5 py-0.5 text-xs font-semibold text-primary-800">Enterprise S2P / P2P</span>
-                    <span class="text-xs text-neutral-500">• ISO 9001 &amp; SOX 404 Compliant Controls</span>
-                </div>
-                <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Procurement &amp; Strategic Sourcing</h2>
-                <p class="text-sm text-neutral-600">Enterprise requisition intake, sealed-bid sourcing, landed cost normalization, DOA approvals, and encumbered purchase orders.</p>
+                <span class="rounded-md bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700 ring-1 ring-inset ring-primary-200">Operational workspace</span>
+                <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Procurement &amp; Purchase Orders</h2>
+                <p class="text-sm text-neutral-600">Prepare catalog-backed orders, track fulfillment, and move approved deliveries into receiving.</p>
             </div>
-            @canany([\App\Enums\Permission::ViewSuppliers->value, \App\Enums\Permission::GenerateForecasts->value])
+            @canany([\App\Enums\Permission::ViewSuppliers->value, \App\Enums\Permission::ViewInventory->value])
             <div class="flex flex-wrap items-center gap-2">
                 @can(\App\Enums\Permission::ViewSuppliers->value)
                     <x-ui.button variant="secondary" :href="route('inventory.suppliers')" icon="truck">Suppliers</x-ui.button>
                 @endcan
-                @can(\App\Enums\Permission::GenerateForecasts->value)
-                <a href="{{ route('inventory.demand-forecast') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50">
+                @can(\App\Enums\Permission::ViewInventory->value)
+                <a href="{{ route('inventory.receiving.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50">
                     <svg class="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
-                    Demand Forecasts
+                    Receiving
                 </a>
                 @endcan
             </div>
@@ -28,13 +25,49 @@
     </x-slot>
 
     @php
-        $defaultTab = $supplierFilter ? 'orders_revisions' : 'enterprise_s2p';
-        if (!auth()->user()?->canany(['create_requisition', 'manage_sourcing', 'issue_purchase_order', 'manage_procurement'])) {
-            $defaultTab = 'orders_revisions';
-        }
+        $defaultTab = 'orders_revisions';
+        $canIssuePurchaseOrder = auth()->user()?->can(\App\Enums\Permission::IssuePurchaseOrder->value) ?? false;
+        $procurementWorkspaceConfig = [
+            'activeTab' => $defaultTab,
+            'items' => $canIssuePurchaseOrder ? $items->map(function ($item) use ($itemProcurementContext) {
+                $context = $itemProcurementContext->get((string) $item->id, []);
+
+                return [
+                    'id' => $item->id,
+                    'name' => $item->name,
+                    'sku' => $item->sku,
+                    'unit' => $item->unit ?: 'unit',
+                    'category' => $item->category?->name ?? 'Uncategorized',
+                    'current_stock' => $context['current_stock'] ?? 0,
+                    'reorder_point' => $context['reorder_point'] ?? (int) $item->reorder_level,
+                    'recent_demand' => $context['recent_demand'] ?? 0,
+                    'average_daily_usage' => $context['average_daily_usage'] ?? 0,
+                    'suggested_order_quantity' => $context['suggested_order_quantity'] ?? 0,
+                    'trend' => $context['trend'] ?? 'Not enough data',
+                    'catalog_unit_cost' => (float) $item->unit_cost,
+                    'lead_time_days' => (int) ($item->lead_time_days ?: 7),
+                ];
+            })->values() : [],
+            'suppliers' => $canIssuePurchaseOrder ? $suppliers->map(fn ($supplier) => [
+                'id' => $supplier->id,
+                'name' => $supplier->name,
+                'status' => $supplier->status->value,
+                'lead_time_days' => (int) ($supplier->standard_lead_time_days ?: 7),
+                'score' => $supplier->latestApprovedScorecard?->total_score !== null
+                    ? (float) $supplier->latestApprovedScorecard->total_score
+                    : null,
+            ])->values() : [],
+            'supplierTerms' => $canIssuePurchaseOrder ? $supplierCatalogTerms : [],
+            'initial' => [
+                'itemId' => old('item_id'),
+                'supplierId' => old('supplier_id'),
+                'quantity' => old('quantity', 1),
+                'deliveryDate' => old('delivery_date'),
+            ],
+        ];
     @endphp
 
-    <div class="py-6" x-data="{ activeTab: '{{ $defaultTab }}', selectedPoCxml: '', selectedPoNumber: '', showCxmlModal: false }">
+    <div class="py-5" x-data="procurementWorkspace({{ Js::from($procurementWorkspaceConfig) }})">
         <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
 
             {{-- Flash Notification Banners --}}
@@ -70,50 +103,50 @@
                 </div>
             @endif
 
-            {{-- Metric Cards --}}
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+            {{-- Compact operational status strip --}}
+            <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-neutral-200 bg-neutral-200 lg:grid-cols-4">
+                <div class="bg-white p-3">
                     <div class="flex items-center justify-between">
-                        <p class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Committed Encumbrance</p>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Open purchase orders</p>
                         <span class="rounded-full bg-emerald-50 p-1.5 text-emerald-600">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </span>
                     </div>
-                    <p class="mt-2 text-2xl font-bold text-neutral-900">₱{{ number_format($purchaseOrders->sum('total_encumbered_amount'), 2) }}</p>
-                    <p class="mt-1 text-xs text-neutral-500">Across {{ $purchaseOrders->count() }} active orders</p>
+                    <p class="mt-1 text-xl font-bold tabular-nums text-neutral-900">{{ $poMetrics['open'] }}</p>
+                    <p class="text-xs text-neutral-500">Active commitments</p>
                 </div>
 
-                <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+                <div class="bg-white p-3">
                     <div class="flex items-center justify-between">
-                        <p class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Sourcing RFQs</p>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Pending approval</p>
                         <span class="rounded-full bg-blue-50 p-1.5 text-blue-600">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
                         </span>
                     </div>
-                    <p class="mt-2 text-2xl font-bold text-neutral-900">{{ $rfqs->count() }}</p>
-                    <p class="mt-1 text-xs text-neutral-500">{{ $rfqs->where('status.value', 'published')->count() }} open for bidding</p>
+                    <p class="mt-1 text-xl font-bold tabular-nums text-neutral-900">{{ $poMetrics['pending_approval'] }}</p>
+                    <p class="text-xs text-neutral-500">Awaiting authorization</p>
                 </div>
 
-                <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+                <div class="bg-white p-3">
                     <div class="flex items-center justify-between">
-                        <p class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Pending DOA Steps</p>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-neutral-500">In fulfillment</p>
                         <span class="rounded-full bg-amber-50 p-1.5 text-amber-600">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </span>
                     </div>
-                    <p class="mt-2 text-2xl font-bold text-neutral-900">{{ $approvalChains->where('status', 'pending')->count() }}</p>
-                    <p class="mt-1 text-xs text-neutral-500">Awaiting executive authorization</p>
+                    <p class="mt-1 text-xl font-bold tabular-nums text-neutral-900">{{ $poMetrics['in_transit'] }}</p>
+                    <p class="text-xs text-neutral-500">Dispatched or partial</p>
                 </div>
 
-                <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+                <div class="bg-white p-3">
                     <div class="flex items-center justify-between">
-                        <p class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Accredited Suppliers</p>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Overdue delivery</p>
                         <span class="rounded-full bg-purple-50 p-1.5 text-purple-600">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         </span>
                     </div>
-                    <p class="mt-2 text-2xl font-bold text-neutral-900">{{ $suppliers->count() }}</p>
-                    <p class="mt-1 text-xs text-neutral-500">Procurement eligible &amp; verified</p>
+                    <p class="mt-1 text-xl font-bold tabular-nums {{ $poMetrics['overdue'] > 0 ? 'text-danger-700' : 'text-neutral-900' }}">{{ $poMetrics['overdue'] }}</p>
+                    <p class="text-xs text-neutral-500">Past required date</p>
                 </div>
             </div>
 
@@ -963,293 +996,514 @@
             </div>
             @endcan
 
-            {{-- ======================================================== TAB 5: Purchase Orders, Revisions & cXML Payloads --}}
-            <div x-show="activeTab === 'orders_revisions'" class="space-y-6">
-                @can('issue_purchase_order')
-                {{-- Issue Direct Purchase Order Card --}}
-                <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm"
-                     x-data="{
-                         poQuantity: 100,
-                         poUnitCost: 50.00,
-                         selectedPoUom: 'units',
-                         poItemChanged(event) {
-                             const opt = event.target.options[event.target.selectedIndex];
-                             if (opt && opt.dataset.cost) {
-                                 this.poUnitCost = parseFloat(opt.dataset.cost);
-                                 this.selectedPoUom = opt.dataset.uom || 'units';
-                             }
-                         },
-                         get poTotalEncumbered() {
-                             const q = parseFloat(this.poQuantity) || 0;
-                             const c = parseFloat(this.poUnitCost) || 0;
-                             return (q * c).toFixed(2);
-                         }
-                     }">
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-neutral-100 pb-4 gap-2">
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <h3 class="text-lg font-bold text-neutral-900">Issue Direct Purchase Order &amp; Encumbrance Contract</h3>
-                                <span class="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">Hard Commitment</span>
-                            </div>
-                            <p class="text-sm text-neutral-500">Issue legally binding purchase contract, commit departmental funds, and dispatch cXML OrderRequest document.</p>
-                        </div>
-                        <div class="flex items-center gap-2 self-start sm:self-auto">
-                            <span class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Autogenerated Reference:</span>
-                            <span class="rounded bg-neutral-100 border border-neutral-200 px-2.5 py-1 text-xs font-mono font-bold text-neutral-700 shadow-inner">PO-{{ date('Ymd') }}-AUTO</span>
-                        </div>
-                    </div>
-
-                    <form method="POST" action="{{ route('inventory.purchases.orders.store') }}" class="mt-4 grid gap-4 md:grid-cols-3">
-                        @csrf
-
-                        {{-- Accredited Supplier Dropdown --}}
-                        <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Accredited Supplier Counterparty</label>
-                            <select name="supplier_id" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
-                                <option value="">Select Supplier</option>
-                                @foreach($suppliers as $s)
-                                    <option value="{{ $s->id }}">
-                                        {{ $s->name }} (Accreditation: {{ $s->effectiveAccreditationStatus()->value }})
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        {{-- Cost Center Dropdown --}}
-                        <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Cost Center (Encumbrance)</label>
-                            <select name="cost_center_id" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
-                                <option value="">Select Cost Center</option>
-                                @foreach($costCenters as $cc)
-                                    @php $avail = $cc->currentBudget()?->availableBudget() ?? 1000000; @endphp
-                                    <option value="{{ $cc->id }}">
-                                        {{ $cc->name }} ({{ $cc->code }}) — Avail: ₱{{ number_format($avail, 2) }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        {{-- Item Master Dropdown --}}
-                        <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Item Master Code</label>
-                            <select name="item_id" @change="poItemChanged($event)" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
-                                <option value="">Select Item from Catalog</option>
-                                @foreach($items as $item)
-                                    <option value="{{ $item->id }}" data-cost="{{ $item->unit_cost }}" data-uom="{{ $item->unit }}" data-sku="{{ $item->sku }}">
-                                        {{ $item->name }} ({{ $item->sku }}) — Catalog: ₱{{ number_format($item->unit_cost, 2) }} / {{ $item->unit ?: 'unit' }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        {{-- Quantity (Strict Numbers Only) --}}
-                        <div>
-                            <div class="flex items-center justify-between mb-1">
-                                <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-600">Ordered Quantity</label>
-                                <span class="text-xs text-neutral-500 font-medium" x-show="selectedPoUom">Unit: <strong class="text-neutral-800" x-text="selectedPoUom"></strong></span>
-                            </div>
-                            <input type="number" name="quantity" min="1" step="1" inputmode="numeric" x-model.number="poQuantity"
-                                   onkeydown="return ['Backspace','Delete','ArrowLeft','ArrowRight','Tab'].includes(event.key) || /^[0-9]$/.test(event.key)"
-                                   class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required />
-                        </div>
-
-                        {{-- Unit Cost (Strict Numbers Only) --}}
-                        <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Contracted Unit Cost (₱)</label>
-                            <input type="number" step="0.01" min="0.01" name="unit_cost" inputmode="decimal" x-model.number="poUnitCost"
-                                   class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required />
-                        </div>
-
-                        {{-- Payment Terms Dropdown --}}
-                        <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Payment Terms</label>
-                            <select name="payment_terms" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500">
-                                <option value="Net 30" selected>Net 30 (Standard 30 Days)</option>
-                                <option value="Net 60">Net 60 (Extended Capital 60 Days)</option>
-                                <option value="Net 15">Net 15 (Expedited 15 Days)</option>
-                                <option value="COD">COD (Cash on Delivery)</option>
-                                <option value="Advance">Advance (100% Pre-payment)</option>
-                            </select>
-                        </div>
-
-                        {{-- Incoterms Dropdown --}}
-                        <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Incoterms (Delivery Terms)</label>
-                            <select name="incoterms" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500">
-                                <option value="DDP" selected>DDP - Delivered Duty Paid (Hospital Receiving Dock)</option>
-                                <option value="FOB">FOB - Free On Board (Vendor Origin Port)</option>
-                                <option value="CIF">CIF - Cost, Insurance &amp; Freight</option>
-                                <option value="EXW">EXW - Ex Works (Factory Floor Pickup)</option>
-                            </select>
-                        </div>
-
-                        {{-- Status Dropdown --}}
-                        <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Initial PO Status</label>
-                            <select name="status" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500">
-                                <option value="issued" selected>Issued (Committed &amp; Bound)</option>
-                                <option value="dispatched">Dispatched (Direct EDI / cXML Push)</option>
-                                <option value="pending">Pending Vendor Confirmation</option>
-                            </select>
-                        </div>
-
-                        {{-- Delivery Notes --}}
-                        <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Delivery Instructions / Notes</label>
-                            <input type="text" name="notes" placeholder="e.g. Deliver to Central Receiving Dock, Bldg B" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" />
-                        </div>
-
-                        {{-- Live Total & Encumbrance Commitment Box --}}
-                        <div class="md:col-span-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 shadow-sm">
-                            <div>
-                                <span class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Live Committed Hard Encumbrance:</span>
-                                <div class="flex items-baseline gap-2 mt-0.5">
-                                    <span class="text-2xl font-black text-emerald-700">₱<span x-text="Number(poTotalEncumbered).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })"></span></span>
-                                    <span class="text-xs text-neutral-500 font-medium">(<span x-text="poQuantity"></span> <span x-text="selectedPoUom"></span> @ ₱<span x-text="parseFloat(poUnitCost || 0).toFixed(2)"></span>)</span>
+            {{-- ======================================================== PRIMARY: Purchase Order Workspace --}}
+            <div x-show="activeTab === 'orders_revisions'" x-cloak class="space-y-4">
+                <div class="grid items-start gap-4 {{ $canIssuePurchaseOrder ? 'lg:grid-cols-[minmax(19rem,0.82fr)_minmax(0,1.65fr)]' : '' }}">
+                    @can(\App\Enums\Permission::IssuePurchaseOrder->value)
+                        <section class="order-2 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm lg:order-1" aria-labelledby="create-po-heading">
+                            <header class="border-b border-neutral-200 bg-neutral-50/50 px-4 py-3.5">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div class="flex items-center gap-2.5">
+                                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-50 text-primary-700 ring-1 ring-inset ring-primary-200/60">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                                        </span>
+                                        <div>
+                                            <h3 id="create-po-heading" class="text-sm font-bold text-neutral-900">Prepare Purchase Order</h3>
+                                            <p class="text-[11px] text-neutral-500">Real-time catalog pricing &amp; compliance</p>
+                                        </div>
+                                    </div>
+                                    <span class="rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-semibold text-primary-700 ring-1 ring-inset ring-primary-200">Catalog PO</span>
                                 </div>
-                            </div>
-                            <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-emerald-700">
-                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                Execute Purchase Order &amp; Dispatch cXML
-                            </button>
-                        </div>
-                    </form>
-                </div>
-                @endcan
+                            </header>
 
-                {{-- Purchase Orders Ledger Table --}}
-                <div id="purchase-orders" class="scroll-mt-6 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-                    @if ($supplierFilter)
-                        <div class="mb-4 flex flex-col gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm text-primary-900 sm:flex-row sm:items-center sm:justify-between">
-                            <span>Showing purchase orders for <strong>{{ $supplierFilter->name }}</strong>.</span>
-                            <a href="{{ route('inventory.purchases') }}#purchase-orders" class="text-xs font-semibold text-primary-700 hover:underline">Clear supplier filter</a>
-                        </div>
-                    @endif
-                    <div class="flex items-center justify-between border-b border-neutral-100 pb-4">
-                        <div>
-                            <h3 class="text-lg font-bold text-neutral-900">Purchase Orders Ledger &amp; Fulfillment ({{ $purchaseOrders->count() }})</h3>
-                            <p class="text-sm text-neutral-500">Legally binding encumbrance, revision histories, and B2B cXML OrderRequest payloads.</p>
-                        </div>
-                        <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">cXML / EDI 850 Dispatch</span>
-                    </div>
+                            @if($items->isEmpty() || $suppliers->isEmpty() || $costCenters->isEmpty())
+                                <div class="p-4">
+                                    <div class="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-4 py-6 text-center">
+                                        <p class="text-sm font-medium text-neutral-800">Purchase order setup is incomplete</p>
+                                        <p class="mt-1 text-xs text-neutral-500">An active item, eligible supplier, and active cost center are required.</p>
+                                    </div>
+                                </div>
+                            @else
+                                <form id="direct-po-form" x-ref="purchaseOrderForm" method="POST" action="{{ route('inventory.purchases.orders.store') }}" class="space-y-4 p-4" data-loading-text="Creating purchase order..." x-on:submit="if (! $refs.purchaseOrderForm.checkValidity()) { $refs.poTerms.open = true }">
+                                    @csrf
 
-                    <div class="mt-4 overflow-x-auto">
-                        <table class="w-full text-left text-sm text-neutral-700">
-                            <thead class="bg-neutral-50 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                                <tr>
-                                    <th class="px-3.5 py-3">PO Number &amp; Version</th>
-                                    <th class="px-3.5 py-3">Supplier Counterparty</th>
-                                    <th class="px-3.5 py-3">Line Items &amp; Qty</th>
-                                    <th class="px-3.5 py-3">Cost Center</th>
-                                    @can('view_procurement_sensitive_data')
-                                    <th class="px-3.5 py-3">Commercial Terms</th>
-                                    <th class="px-3.5 py-3">Total Encumbered</th>
-                                    @endcan
-                                    <th class="px-3.5 py-3">Status</th>
-                                    <th class="px-3.5 py-3">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-neutral-200">
-                                @forelse($purchaseOrders as $po)
-                                    <tr class="hover:bg-neutral-50">
-                                        <td class="px-3.5 py-3">
-                                            <p class="font-bold text-neutral-900 font-mono text-xs">{{ $po->po_number }}</p>
-                                            <span class="inline-flex rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-mono text-neutral-600">{{ $po->version }}</span>
-                                        </td>
-                                        <td class="px-3.5 py-3">
-                                            <p class="font-semibold text-neutral-900">{{ $po->supplier?->name }}</p>
-                                            @can('view_supplier_sensitive_data')
-                                            <p class="text-[11px] text-neutral-500">{{ $po->supplier?->email ?? $po->supplier?->phone }}</p>
-                                            @endcan
-                                        </td>
-                                        <td class="px-3.5 py-3">
-                                            @if($po->lines->isNotEmpty())
-                                                <p class="font-medium text-neutral-800">{{ $po->lines->first()->item?->name }}</p>
-                                                <p class="text-[11px] text-neutral-500">{{ $po->lines->sum('ordered_quantity') }} {{ $po->lines->first()->item?->unit ?: 'units' }} ({{ $po->lines->count() }} line(s))</p>
-                                            @else
-                                                <p class="font-medium text-neutral-800">{{ $po->item?->name ?? 'Direct Item' }}</p>
-                                                <p class="text-[11px] text-neutral-500">{{ $po->quantity }} {{ $po->item?->unit ?: 'units' }}</p>
-                                            @endif
-                                        </td>
-                                        <td class="px-3.5 py-3">
-                                            @if($po->costCenter)
-                                                <span class="rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-700">{{ $po->costCenter->code }}</span>
-                                            @else
-                                                <span class="text-xs text-neutral-400">General Fund</span>
-                                            @endif
-                                        </td>
-                                        @can('view_procurement_sensitive_data')
-                                        <td class="px-3.5 py-3">
-                                            <span class="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] font-mono text-neutral-700">{{ $po->payment_terms ?: 'Net 30' }}</span>
-                                            <span class="rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-mono text-blue-700">{{ $po->incoterms ?: 'DDP' }}</span>
-                                        </td>
-                                        <td class="px-3.5 py-3 font-bold text-neutral-900">₱{{ number_format($po->total_amount, 2) }}</td>
-                                        @endcan
-                                        <td class="px-3.5 py-3">
-                                            @php
-                                                $poStatusClasses = match($po->status) {
-                                                    'received', 'fulfilled' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                                                    'dispatched' => 'bg-blue-50 text-blue-700 border-blue-200',
-                                                    'issued' => 'bg-purple-50 text-purple-700 border-purple-200',
-                                                    'pending' => 'bg-amber-50 text-amber-700 border-amber-200',
-                                                    default => 'bg-neutral-100 text-neutral-700 border-neutral-200',
-                                                };
-                                            @endphp
-                                            <span class="rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wider {{ $poStatusClasses }}">
-                                                {{ $po->status }}
+                                    <x-ui.field name="item_id" label="Inventory item" type="select" required x-model="itemId">
+                                        <option value="">Select an active item</option>
+                                        @foreach($items as $item)
+                                            <option value="{{ $item->id }}" @selected((string) old('item_id') === (string) $item->id)>{{ $item->name }} ({{ $item->sku }})</option>
+                                        @endforeach
+                                    </x-ui.field>
+
+                                    {{-- Item context: only the figures that decide whether to reorder. --}}
+                                    <div x-show="selectedItem()" x-cloak class="rounded-md border border-neutral-200 bg-neutral-50 p-2.5">
+                                        <p class="truncate text-[10px] font-semibold uppercase tracking-wide text-neutral-500" x-text="selectedItem()?.category"></p>
+                                        <dl class="mt-1.5 grid grid-cols-3 gap-2">
+                                            <div>
+                                                <dt class="text-[10px] uppercase tracking-wide text-neutral-500">On hand</dt>
+                                                <dd class="mt-0.5 text-sm font-semibold tabular-nums text-neutral-900"><span x-text="formatNumber(selectedItem()?.current_stock)"></span> <span class="text-[10px] font-normal text-neutral-500" x-text="selectedItem()?.unit"></span></dd>
+                                            </div>
+                                            <div>
+                                                <dt class="text-[10px] uppercase tracking-wide text-neutral-500">Reorder point</dt>
+                                                <dd class="mt-0.5 text-sm font-semibold tabular-nums" x-bind:class="Number(selectedItem()?.current_stock || 0) <= Number(selectedItem()?.reorder_point || 0) ? 'text-danger-700' : 'text-neutral-900'" x-text="formatNumber(selectedItem()?.reorder_point)"></dd>
+                                            </div>
+                                            <div>
+                                                <dt class="text-[10px] uppercase tracking-wide text-neutral-500">90-day demand</dt>
+                                                <dd class="mt-0.5 text-sm font-semibold tabular-nums text-neutral-900"><span x-text="formatNumber(selectedItem()?.recent_demand)"></span> <span class="text-[10px] font-normal text-neutral-500" x-text="selectedItem()?.trend"></span></dd>
+                                            </div>
+                                        </dl>
+                                        <button
+                                            type="button"
+                                            x-show="Number(selectedItem()?.suggested_order_quantity || 0) > 0"
+                                            x-on:click="useSuggestedQuantity()"
+                                            class="mt-2.5 flex w-full items-center justify-between gap-2 rounded-md border border-primary-200 bg-white px-2.5 py-1.5 text-left text-xs text-primary-800 transition-colors hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                        >
+                                            <span class="inline-flex items-center gap-1.5 font-medium">
+                                                <svg class="h-3.5 w-3.5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                                                <span>Suggested reorder quantity</span>
                                             </span>
-                                        </td>
-                                        <td class="px-3.5 py-3">
-                                            <div class="flex items-center gap-2">
-                                                @can('receive_purchase_order')
-                                                    @if($po->status !== 'received' && $po->status !== 'fulfilled')
-                                                        <form method="POST" action="{{ route('inventory.purchases.receive', $po) }}" class="inline"
-                                                              data-confirm-title="Receive Purchase Order"
-                                                              data-confirm-message="Are you sure you want to receive this delivery into stock?"
-                                                              data-confirm-label="Receive Delivery">
-                                                            @csrf
-                                                            <button type="submit" class="rounded bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-primary-700 shadow-sm">
-                                                                Receive
-                                                            </button>
-                                                        </form>
-                                                    @else
-                                                        <span class="text-xs text-emerald-700 font-semibold inline-flex items-center gap-1">
-                                                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                                            Stock Posted
-                                                        </span>
-                                                    @endif
-                                                @else
-                                                    @if($po->status === 'received' || $po->status === 'fulfilled')
-                                                        <span class="text-xs text-emerald-700 font-semibold inline-flex items-center gap-1">
-                                                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                                            Stock Posted
-                                                        </span>
-                                                    @else
-                                                        <span class="text-xs text-neutral-400 italic">Pending Delivery</span>
-                                                    @endif
-                                                @endcan
+                                            <span class="font-semibold tabular-nums text-primary-900">
+                                                <span x-text="formatNumber(selectedItem()?.suggested_order_quantity)"></span>
+                                                <span x-text="selectedItem()?.unit"></span>
+                                                <span class="ml-1 rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-bold text-primary-800 shadow-2xs">Apply</span>
+                                            </span>
+                                        </button>
+                                    </div>
 
-                                                @if($po->cxml_payload)
-                                                    <button type="button"
-                                                            @click="selectedPoCxml = {{ json_encode($po->cxml_payload) }}; selectedPoNumber = '{{ $po->po_number }}'; showCxmlModal = true;"
-                                                            class="rounded border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs font-mono text-neutral-600 hover:bg-neutral-100">
-                                                        cXML
-                                                    </button>
+                                    <div class="grid gap-3 sm:grid-cols-2">
+                                        <div class="min-w-0 space-y-1.5">
+                                            <label for="po-quantity" class="block text-sm font-medium text-neutral-700">Quantity <span class="text-danger-600">*</span></label>
+                                            <input id="po-quantity" name="quantity" type="number" inputmode="numeric" step="1" x-bind:min="minimumOrderQuantity()" max="1000000" x-model.number="quantity" required class="block min-h-10 w-full rounded-md border border-neutral-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30">
+                                            <p class="text-xs text-neutral-500">Minimum: <span class="font-medium" x-text="formatNumber(minimumOrderQuantity())"></span> <span x-text="selectedItem()?.unit || 'units'"></span></p>
+                                            @error('quantity')<p class="text-xs font-medium text-danger-600">{{ $message }}</p>@enderror
+                                        </div>
+
+                                        <x-ui.field name="delivery_date" id="po-delivery-date" label="Required delivery" type="date" :value="old('delivery_date')" min="{{ today()->toDateString() }}" x-model="deliveryDate" hint="Optional; supplier lead time is used when blank." />
+                                    </div>
+
+                                    <x-ui.field name="supplier_id" label="Eligible supplier" type="select" required x-model="supplierId">
+                                        <option value="">Select an accredited supplier</option>
+                                        @foreach($suppliers as $supplier)
+                                            <option value="{{ $supplier->id }}" @selected((string) old('supplier_id') === (string) $supplier->id)>{{ $supplier->name }}</option>
+                                        @endforeach
+                                    </x-ui.field>
+
+                                    <div x-show="selectedSupplier()" x-cloak class="rounded-md border border-primary-100 bg-primary-50/60 p-2.5">
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <p class="text-xs font-semibold text-primary-900" x-text="selectedSupplier()?.name"></p>
+                                            <template x-if="selectedSupplier()?.score !== null">
+                                                <span class="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-primary-700 ring-1 ring-inset ring-primary-200">Score <span x-text="formatNumber(selectedSupplier()?.score, 1)"></span>%</span>
+                                            </template>
+                                        </div>
+                                        <p class="mt-0.5 text-[11px] text-primary-700">
+                                            Procurement eligible
+                                            · <span x-text="`${selectedTerms()?.lead_time_days || 0}-day lead time`"></span>
+                                            · <span x-text="`min ${formatNumber(selectedTerms()?.minimum_order_quantity)}`"></span>
+                                            · <span x-text="selectedTerms()?.price_source === 'supplier_catalog' ? 'supplier contract price' : 'item catalog price'"></span>
+                                        </p>
+                                    </div>
+
+                                    {{-- Data-backed Smart Procurement Advisory --}}
+                                    <div x-show="selectedItem()" x-cloak class="rounded-lg border border-primary-200 bg-primary-50/70 p-3 text-xs text-primary-950 flex items-start gap-2.5 shadow-2xs">
+                                        <div class="rounded-md bg-white p-1 text-primary-700 shadow-2xs ring-1 ring-primary-200/60 shrink-0 mt-0.5">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="min-w-0 space-y-0.5">
+                                            <p class="font-semibold text-primary-900 flex items-center gap-1.5">
+                                                <span>Procurement &amp; Demand Advisory</span>
+                                                <span class="rounded bg-primary-100 px-1.5 py-0.2 text-[9px] font-bold uppercase text-primary-800 tracking-wider">HIMS Intelligence</span>
+                                            </p>
+                                            <p class="text-[11px] leading-relaxed text-primary-800" x-text="smartAdvisory()"></p>
+                                        </div>
+                                    </div>
+
+                                    {{-- Collapsed by default; opened automatically when the browser blocks an invalid submit
+                                         or when the server returns a validation error for one of these fields. --}}
+                                    <details x-ref="poTerms" @if($errors->hasAny(['cost_center_id', 'payment_terms', 'incoterms', 'notes'])) open @endif class="rounded-md border border-neutral-200 bg-neutral-50">
+                                        <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">Order terms and instructions</summary>
+                                        <div class="grid gap-3 border-t border-neutral-200 p-3 sm:grid-cols-2">
+                                            <x-ui.field name="cost_center_id" label="Cost center" type="select" required>
+                                                <option value="">Select active cost center</option>
+                                                @foreach($costCenters as $costCenter)
+                                                    <option value="{{ $costCenter->id }}" @selected((string) old('cost_center_id') === (string) $costCenter->id)>{{ $costCenter->name }} ({{ $costCenter->code }})</option>
+                                                @endforeach
+                                            </x-ui.field>
+
+                                            <x-ui.field name="payment_terms" label="Payment terms" type="select" value="Net 30">
+                                                @foreach(['Net 15', 'Net 30', 'Net 60', 'COD'] as $term)
+                                                    <option value="{{ $term }}" @selected(old('payment_terms', 'Net 30') === $term)>{{ $term }}</option>
+                                                @endforeach
+                                            </x-ui.field>
+
+                                            <x-ui.field name="incoterms" label="Delivery terms" type="select" value="DDP">
+                                                @foreach(['DDP', 'FOB', 'CIF', 'EXW'] as $term)
+                                                    <option value="{{ $term }}" @selected(old('incoterms', 'DDP') === $term)>{{ $term }}</option>
+                                                @endforeach
+                                            </x-ui.field>
+
+                                            <x-ui.field name="notes" label="Delivery instructions" placeholder="Receiving dock or handling notes" :value="old('notes')" />
+                                        </div>
+                                    </details>
+
+                                    <div class="rounded-lg border border-primary-100 bg-primary-50/60 p-3">
+                                        <div class="flex items-end justify-between gap-3">
+                                            <div>
+                                                <p class="text-[10px] font-medium uppercase tracking-wide text-primary-700">Estimated commitment</p>
+                                                <p class="mt-0.5 text-xl font-semibold tabular-nums text-primary-900" x-text="formatCurrency(orderTotal(), selectedTerms()?.currency)"></p>
+                                                <p class="mt-0.5 text-[10px] text-primary-700">Expected <span class="font-medium" x-text="expectedDeliveryLabel()"></span></p>
+                                            </div>
+                                            <x-ui.button type="button" size="sm" x-on:click="openPurchaseOrderReview($refs.purchaseOrderForm)" x-bind:disabled="!selectedItem() || !selectedSupplier() || trustedUnitCost() <= 0" icon="clipboard-document-check">Review Purchase Order</x-ui.button>
+                                        </div>
+                                    </div>
+                                </form>
+                            @endif
+                        </section>
+                    @endcan
+
+                    <section id="purchase-orders" class="order-1 min-w-0 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm lg:order-2" aria-labelledby="purchase-order-pipeline-heading">
+                        <header class="border-b border-neutral-200 bg-neutral-50/50 px-4 py-3.5">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <div class="flex items-center gap-2.5">
+                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200/60">
+                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                    </span>
+                                    <div>
+                                        <h3 id="purchase-order-pipeline-heading" class="text-sm font-bold text-neutral-900">
+                                            Purchase Order Pipeline
+                                            <span class="ml-1 text-xs font-normal text-neutral-500">({{ $purchaseOrders->total() }})</span>
+                                        </h3>
+                                        <p class="text-[11px] text-neutral-500">Recent Purchase Orders dispatched through ERP and catalog workflow</p>
+                                    </div>
+                                </div>
+                                @can(\App\Enums\Permission::ViewInventory->value)
+                                    <x-ui.button variant="secondary" size="sm" :href="route('inventory.receiving.index')" icon="archive-box">Receiving Dock</x-ui.button>
+                                @endcan
+                            </div>
+
+                            <form method="GET" action="{{ route('inventory.purchases') }}#purchase-orders" class="mt-3 space-y-2">
+                                <div class="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_auto_auto_auto]">
+                                    <label class="sr-only" for="po-search">Search purchase orders</label>
+                                    <input id="po-search" name="po_search" type="search" value="{{ $poFilters['poSearch'] }}" placeholder="Search PO, item, supplier..." class="min-h-9 min-w-0 rounded-md border border-neutral-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30">
+                                    <label class="sr-only" for="po-status">Status</label>
+                                    <select id="po-status" name="po_status" class="min-h-9 rounded-md border border-neutral-300 px-2 text-xs text-neutral-700 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                                        <option value="">All statuses</option>
+                                        @foreach($poStatusOptions as $value => $label)<option value="{{ $value }}" @selected($poFilters['poStatus'] === $value)>{{ $label }}</option>@endforeach
+                                    </select>
+                                    <label class="sr-only" for="po-date">Created date</label>
+                                    <select id="po-date" name="po_date" class="min-h-9 rounded-md border border-neutral-300 px-2 text-xs text-neutral-700 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                                        <option value="">Any date</option>
+                                        <option value="7" @selected($poFilters['poDate'] === '7')>Last 7 days</option>
+                                        <option value="30" @selected($poFilters['poDate'] === '30')>Last 30 days</option>
+                                        <option value="90" @selected($poFilters['poDate'] === '90')>Last 90 days</option>
+                                        <option value="overdue" @selected($poFilters['poDate'] === 'overdue')>Overdue delivery</option>
+                                    </select>
+                                    <div class="flex gap-1.5">
+                                        <x-ui.button type="submit" size="sm">Apply</x-ui.button>
+                                        @if($poFilters['poSearch'] !== '' || $poFilters['poStatus'] !== '' || $poFilters['poDate'] !== '' || $supplierFilter)
+                                            <x-ui.button variant="ghost" size="sm" :href="route('inventory.purchases').'#purchase-orders'">Clear</x-ui.button>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                {{-- Secondary filters stay collapsed so the toolbar keeps a single line. --}}
+                                <details class="rounded-md border border-neutral-200 bg-neutral-50">
+                                    <summary class="flex cursor-pointer flex-wrap items-center gap-2 px-3 py-2 text-xs font-semibold text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                                        More filters
+                                        @if($supplierFilter)
+                                            <span class="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-semibold text-primary-800">{{ $supplierFilter->name }}</span>
+                                        @endif
+                                    </summary>
+                                    <div class="grid gap-2 border-t border-neutral-200 p-3 sm:grid-cols-2">
+                                        <div>
+                                            <label for="po-supplier" class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Supplier</label>
+                                            <select id="po-supplier" name="supplier_id" class="min-h-9 w-full rounded-md border border-neutral-300 px-2 text-xs text-neutral-700 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                                                <option value="">All suppliers</option>
+                                                @foreach($suppliers as $supplier)
+                                                    <option value="{{ $supplier->id }}" @selected($supplierFilter?->id === $supplier->id)>{{ $supplier->name }}</option>
+                                                @endforeach
+                                                @if($supplierFilter && ! $suppliers->contains('id', $supplierFilter->id))
+                                                    <option value="{{ $supplierFilter->id }}" selected>{{ $supplierFilter->name }} (not currently eligible)</option>
+                                                @endif
+                                            </select>
+                                        </div>
+                                        <p class="self-end text-[11px] text-neutral-500">Combines with the toolbar filters when you press Apply.</p>
+                                    </div>
+                                </details>
+                            </form>
+                        </header>
+
+                        <div class="divide-y divide-neutral-200">
+                            @forelse($purchaseOrders as $po)
+                                @php
+                                    $statusEnum = \App\Enums\PurchaseOrderStatus::tryFrom((string) $po->status);
+                                    $statusLabel = $statusEnum?->label() ?? \Illuminate\Support\Str::headline((string) $po->status);
+                                    $statusVariant = match(true) {
+                                        in_array($po->status, ['approved', 'received', 'fulfilled'], true) => 'success',
+                                        in_array($po->status, ['submitted', 'pending', 'pending_approval', 'acknowledged', 'partially_fulfilled'], true) => 'warning',
+                                        in_array($po->status, ['cancelled', 'rejected'], true) => 'danger',
+                                        in_array($po->status, ['dispatched', 'issued'], true) => 'primary',
+                                        default => 'neutral',
+                                    };
+                                    $poLines = $po->lines->isNotEmpty() ? $po->lines : collect();
+                                    $primaryItem = $poLines->first()?->item ?? $po->item;
+                                    $orderedQuantity = $poLines->isNotEmpty() ? (int) $poLines->sum('ordered_quantity') : (int) $po->quantity;
+                                    $receivedQuantity = $poLines->isNotEmpty() ? (int) $poLines->sum('received_quantity') : ($po->received_at ? $orderedQuantity : 0);
+                                    $expectedDelivery = $po->shipments->sortByDesc('id')->first()?->estimated_delivery_date ?? $po->delivery_date;
+                                    $isOverdue = $expectedDelivery && $expectedDelivery->lt(today()) && !in_array($po->status, ['received', 'fulfilled', 'cancelled', 'rejected'], true);
+                                    $canReceiveThisPo = in_array($po->status, ['approved', 'dispatched', 'acknowledged', 'partially_fulfilled', 'issued', 'pending'], true);
+                                    $poDetail = [
+                                        'number' => $po->po_number,
+                                        'version' => $po->version,
+                                        'status' => $statusLabel,
+                                        'supplier' => $po->supplier?->name ?? 'Supplier unavailable',
+                                        'item' => $primaryItem?->name ?? 'Multiple items',
+                                        'quantity' => $orderedQuantity,
+                                        'received_quantity' => $receivedQuantity,
+                                        'unit' => $primaryItem?->unit ?: 'units',
+                                        'amount' => auth()->user()?->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ? (float) $po->total_amount : null,
+                                        'currency' => $po->currency ?: 'PHP',
+                                        'payment_terms' => auth()->user()?->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ? $po->payment_terms : null,
+                                        'incoterms' => auth()->user()?->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ? $po->incoterms : null,
+                                        'created_at' => optional($po->requested_at ?? $po->created_at)->toDateString(),
+                                        'delivery_date' => $expectedDelivery?->toDateString(),
+                                        'received_at' => $po->received_at?->toDateString(),
+                                        'cost_center' => auth()->user()?->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ? $po->costCenter?->name : null,
+                                        'purchase_request' => $po->purchaseRequest?->pr_number,
+                                        'created_by' => $po->createdBy?->name,
+                                        'approval_status' => $po->approvalChain?->status,
+                                        'approval_steps' => $po->approvalChain?->steps->map(fn ($step) => [
+                                            'number' => $step->step_number,
+                                            'role' => \Illuminate\Support\Str::headline($step->required_role),
+                                            'status' => \Illuminate\Support\Str::headline($step->status->value ?? $step->status),
+                                            'approver' => $step->approver?->name,
+                                        ])->values() ?? [],
+                                        'lines' => $poLines->map(fn ($line) => [
+                                            'item' => $line->item?->name ?? 'Unavailable item',
+                                            'ordered' => (int) $line->ordered_quantity,
+                                            'received' => (int) $line->received_quantity,
+                                            'unit' => $line->item?->unit ?: 'units',
+                                            'amount' => auth()->user()?->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ? (float) $line->total_line_amount : null,
+                                        ])->values(),
+                                        'shipments' => $po->shipments->sortByDesc('id')->map(fn ($shipment) => [
+                                            'number' => $shipment->shipment_number,
+                                            'status' => \Illuminate\Support\Str::headline((string) $shipment->status),
+                                            'eta' => optional($shipment->estimated_delivery_date)->toDateString(),
+                                            'delivered' => optional($shipment->actual_delivery_date)->toDateString(),
+                                        ])->values(),
+                                        'revisions' => $po->revisions->map(fn ($revision) => [
+                                            'code' => $revision->change_order_code,
+                                            'status' => \Illuminate\Support\Str::headline((string) $revision->status),
+                                            'delta' => (float) $revision->delta_amount,
+                                            'variance' => (float) $revision->variance_percentage,
+                                            'requires_doa' => (bool) $revision->requires_doa_reapproval,
+                                        ])->values(),
+                                        'cxml' => auth()->user()?->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ? $po->cxml_payload : null,
+                                        'can_receive' => $canReceiveThisPo
+                                            && (auth()->user()?->can(\App\Enums\Permission::ReceivePurchaseOrder->value) ?? false),
+                                        'receive_url' => route('inventory.purchases.receive', $po),
+                                        'receiving_url' => route('inventory.receiving.index'),
+                                    ];
+                                @endphp
+
+                                <article class="p-4 transition-colors hover:bg-neutral-50/80" data-purchase-order-row>
+                                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                        <div class="min-w-0 space-y-1">
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <button type="button" x-on:click="openPurchaseOrderDetails({{ Js::from($poDetail) }})" class="font-mono text-xs font-bold text-primary-700 hover:text-primary-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 flex items-center gap-1">
+                                                    <svg class="h-3.5 w-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                                                    <span>{{ $po->po_number }}</span>
+                                                </button>
+                                                <x-ui.badge :status="$po->status" :variant="$statusVariant" dot>{{ $statusLabel }}</x-ui.badge>
+                                                @if($isOverdue)
+                                                    <span class="inline-flex items-center rounded-full bg-danger-50 px-2 py-0.5 text-[10px] font-semibold text-danger-700 ring-1 ring-inset ring-danger-600/20">Overdue</span>
+                                                @endif
+                                                @if($po->revisions->isNotEmpty())
+                                                    <span class="inline-flex items-center rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-mono text-neutral-600">Rev {{ $po->revision_number }}</span>
                                                 @endif
                                             </div>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="8" class="px-3.5 py-6 text-center text-sm text-neutral-500">No purchase orders issued yet. Issue one above.</td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+                                            <p class="truncate text-sm font-semibold text-neutral-900">{{ $primaryItem?->name ?? 'Multiple-item order' }}</p>
+                                            <div class="flex flex-wrap items-center gap-x-2 text-xs text-neutral-500">
+                                                <span class="font-medium text-neutral-700">{{ $po->supplier?->name ?? 'Supplier unavailable' }}</span>
+                                                <span>&bull;</span>
+                                                <span>{{ number_format($orderedQuantity) }} {{ $primaryItem?->unit ?: 'units' }}</span>
+                                                @if($poLines->count() > 1)
+                                                    <span>&bull;</span>
+                                                    <span class="text-neutral-400">{{ $poLines->count() }} items</span>
+                                                @endif
+                                            </div>
+                                        </div>
 
+                                        <div class="grid shrink-0 grid-cols-2 gap-x-6 gap-y-1 text-xs sm:text-right">
+                                            @can(\App\Enums\Permission::ViewProcurementSensitiveData->value)
+                                                <div><p class="text-[10px] uppercase tracking-wider text-neutral-400 font-semibold">Total Amount</p><p class="font-bold tabular-nums text-neutral-900">₱{{ number_format((float) $po->total_amount, 2) }}</p></div>
+                                            @endcan
+                                            <div>
+                                                <p class="text-[10px] uppercase tracking-wider text-neutral-400 font-semibold">Expected Delivery</p>
+                                                <p class="font-semibold tabular-nums {{ $isOverdue ? 'text-danger-700 font-bold' : 'text-neutral-700' }}">{{ $expectedDelivery?->format('M j, Y') ?? 'Not scheduled' }}</p>
+                                            </div>
+                                            <div><p class="text-[10px] uppercase tracking-wider text-neutral-400 font-semibold">Created Date</p><p class="font-medium tabular-nums text-neutral-600">{{ optional($po->requested_at ?? $po->created_at)->format('M j, Y') }}</p></div>
+                                            <div>
+                                                <p class="text-[10px] uppercase tracking-wider text-neutral-400 font-semibold">Fulfillment</p>
+                                                <p class="font-medium tabular-nums {{ $receivedQuantity >= $orderedQuantity && $orderedQuantity > 0 ? 'text-success-700 font-semibold' : 'text-neutral-600' }}">
+                                                    {{ number_format($receivedQuantity) }} / {{ number_format($orderedQuantity) }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-100 pt-2.5">
+                                        <div class="flex items-center gap-2">
+                                            <x-ui.button type="button" variant="secondary" size="sm" x-on:click="openPurchaseOrderDetails({{ Js::from($poDetail) }})">View details</x-ui.button>
+                                            @if($po->cxml_payload)
+                                                @can(\App\Enums\Permission::ViewProcurementSensitiveData->value)
+                                                    <button type="button" x-on:click="selectedPoCxml = {{ Js::from($po->cxml_payload) }}; selectedPoNumber = '{{ $po->po_number }}'; showCxmlModal = true" class="rounded px-2 py-1 text-[11px] font-mono text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 focus-visible:outline-none">cXML</button>
+                                                @endcan
+                                            @endif
+                                        </div>
+                                        @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
+                                            @if($canReceiveThisPo)
+                                                <form method="POST" action="{{ route('inventory.purchases.receive', $po) }}" data-confirm-title="Receive Purchase Order" data-confirm-message="Confirm that this delivery is physically present at the dock before posting into inventory." data-confirm-label="Receive delivery">
+                                                    @csrf
+                                                    <x-ui.button type="submit" size="sm" icon="check-badge">Receive delivery</x-ui.button>
+                                                </form>
+                                            @elseif(in_array($po->status, ['received', 'fulfilled'], true))
+                                                <span class="inline-flex items-center gap-1 text-xs font-semibold text-success-700">
+                                                    <svg class="h-3.5 w-3.5 text-success-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                    Stock posted
+                                                </span>
+                                            @endif
+                                        @endcan
+                                    </div>
+                                </article>
+                            @empty
+                                <div class="px-5 py-12 text-center">
+                                    <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-500"><x-ui.icon name="document-text" class="h-5 w-5" /></span>
+                                    <p class="mt-3 text-sm font-medium text-neutral-800">No purchase orders found</p>
+                                    <p class="mt-1 text-xs text-neutral-500">{{ collect($poFilters)->filter()->isNotEmpty() || $supplierFilter ? 'Clear the filters to view other orders.' : 'Create the first catalog purchase order when stock needs replenishment.' }}</p>
+                                </div>
+                            @endforelse
+                        </div>
+
+                        @if($purchaseOrders->hasPages())<footer class="border-t border-neutral-200 bg-neutral-50 px-4 py-3">{{ $purchaseOrders->onEachSide(1)->links() }}</footer>@endif
+                    </section>
+                </div>
+
+                @can(\App\Enums\Permission::IssuePurchaseOrder->value)
+                    <x-ui.modal name="review-purchase-order" title="Review purchase order" maxWidth="lg">
+                        <div class="space-y-4">
+                            <div class="rounded-lg border border-warning-200 bg-warning-50 px-3 py-2.5 text-xs text-warning-800">Confirm the item, supplier, quantity, and delivery timing. Creating this order commits funds but does not change stock.</div>
+                            <dl class="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
+                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500">Item</dt><dd class="text-right text-sm font-medium text-neutral-900" x-text="selectedItem()?.name"></dd></div>
+                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500">Quantity</dt><dd class="text-right text-sm font-medium tabular-nums text-neutral-900"><span x-text="formatNumber(quantity)"></span> <span x-text="selectedItem()?.unit"></span></dd></div>
+                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500">Supplier</dt><dd class="text-right text-sm font-medium text-neutral-900" x-text="selectedSupplier()?.name"></dd></div>
+                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500">Expected delivery</dt><dd class="text-right text-sm font-medium tabular-nums text-neutral-900" x-text="expectedDeliveryLabel()"></dd></div>
+                                <div class="flex justify-between gap-4 bg-neutral-50 px-3 py-3"><dt class="text-xs font-semibold text-neutral-700">Estimated total</dt><dd class="text-right text-base font-semibold tabular-nums text-neutral-900" x-text="formatCurrency(orderTotal(), selectedTerms()?.currency)"></dd></div>
+                            </dl>
+                            <p class="text-xs text-neutral-500">The server will re-check supplier compliance, minimum quantity, catalog pricing, and authorization before saving.</p>
+                            <div class="flex justify-end gap-2">
+                                <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'review-purchase-order')">Back</x-ui.button>
+                                <x-ui.button type="submit" form="direct-po-form" data-loading-text="Creating purchase order...">Confirm &amp; create PO</x-ui.button>
+                            </div>
+                        </div>
+                    </x-ui.modal>
+                @endcan
+
+                <x-ui.modal name="purchase-order-details" title="Purchase order details" maxWidth="2xl">
+                    <template x-if="selectedPo">
+                        <div class="space-y-4">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div class="min-w-0"><p class="font-mono text-sm font-bold text-primary-700" x-text="selectedPo.number"></p><p class="mt-0.5 text-xs text-neutral-500"><span x-text="selectedPo.version || 'Original issue'"></span> · <span x-text="selectedPo.status"></span><template x-if="selectedPo.approval_status"><span> · Approval <span x-text="selectedPo.approval_status"></span></span></template></p></div>
+                                <div class="text-right"><p class="text-xs text-neutral-500">Supplier</p><p class="text-sm font-semibold text-neutral-900" x-text="selectedPo.supplier"></p></div>
+                            </div>
+                            <div class="grid gap-px overflow-hidden rounded-lg border border-neutral-200 bg-neutral-200 sm:grid-cols-3">
+                                <div class="bg-neutral-50 p-3"><p class="text-[10px] uppercase tracking-wide text-neutral-500">Ordered</p><p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900"><span x-text="formatNumber(selectedPo.quantity)"></span> <span x-text="selectedPo.unit"></span></p></div>
+                                <div class="bg-neutral-50 p-3"><p class="text-[10px] uppercase tracking-wide text-neutral-500">Received</p><p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900" x-text="`${formatNumber(selectedPo.received_quantity)} / ${formatNumber(selectedPo.quantity)}`"></p></div>
+                                <div class="bg-neutral-50 p-3"><p class="text-[10px] uppercase tracking-wide text-neutral-500">Expected delivery</p><p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900" x-text="formatDate(selectedPo.delivery_date)"></p></div>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Order lines</h4>
+                                <div class="mt-2 divide-y divide-neutral-100 rounded-lg border border-neutral-200">
+                                    <template x-for="(line, index) in selectedPo.lines" x-bind:key="index">
+                                        <div class="flex items-center justify-between gap-4 px-3 py-2.5 text-sm">
+                                            <div class="min-w-0"><p class="truncate font-medium text-neutral-900" x-text="line.item"></p><p class="text-xs text-neutral-500" x-text="`${formatNumber(line.received)} of ${formatNumber(line.ordered)} ${line.unit} received`"></p></div>
+                                            <span x-show="line.amount !== null" class="shrink-0 font-semibold tabular-nums text-neutral-800" x-text="formatCurrency(line.amount, selectedPo.currency)"></span>
+                                        </div>
+                                    </template>
+                                    <div x-show="selectedPo.lines.length === 0" class="px-3 py-3 text-sm text-neutral-500"><span x-text="selectedPo.item"></span></div>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Delivery &amp; receiving</h4>
+                                <dl class="mt-2 grid gap-3 text-sm sm:grid-cols-2">
+                                    <div><dt class="text-xs text-neutral-500">Raised</dt><dd class="mt-0.5 font-medium text-neutral-900" x-text="formatDate(selectedPo.created_at)"></dd></div>
+                                    <div><dt class="text-xs text-neutral-500">Stock posted</dt><dd class="mt-0.5 font-medium text-neutral-900" x-text="selectedPo.received_at ? formatDate(selectedPo.received_at) : 'Not yet received'"></dd></div>
+                                </dl>
+                                <template x-if="selectedPo.shipments.length > 0">
+                                    <ul class="mt-2 divide-y divide-neutral-100 rounded-lg border border-neutral-200">
+                                        <template x-for="shipment in selectedPo.shipments" x-bind:key="shipment.number">
+                                            <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
+                                                <span class="font-mono font-medium text-neutral-800" x-text="shipment.number"></span>
+                                                <span class="text-neutral-500" x-text="shipment.status"></span>
+                                                <span class="tabular-nums text-neutral-700" x-text="shipment.delivered ? 'Delivered ' + formatDate(shipment.delivered) : 'ETA ' + formatDate(shipment.eta)"></span>
+                                            </li>
+                                        </template>
+                                    </ul>
+                                </template>
+                            </div>
+                            <dl class="grid gap-3 text-sm sm:grid-cols-2">
+                                <div x-show="selectedPo.purchase_request"><dt class="text-xs text-neutral-500">Purchase request</dt><dd class="mt-0.5 font-medium text-neutral-900" x-text="selectedPo.purchase_request"></dd></div>
+                                <div x-show="selectedPo.cost_center"><dt class="text-xs text-neutral-500">Cost center</dt><dd class="mt-0.5 font-medium text-neutral-900" x-text="selectedPo.cost_center"></dd></div>
+                                <div x-show="selectedPo.payment_terms"><dt class="text-xs text-neutral-500">Commercial terms</dt><dd class="mt-0.5 font-medium text-neutral-900" x-text="`${selectedPo.payment_terms || ''} · ${selectedPo.incoterms || ''}`"></dd></div>
+                                <div x-show="selectedPo.created_by"><dt class="text-xs text-neutral-500">Raised by</dt><dd class="mt-0.5 font-medium text-neutral-900" x-text="selectedPo.created_by"></dd></div>
+                                <div x-show="selectedPo.amount !== null"><dt class="text-xs text-neutral-500">Total commitment</dt><dd class="mt-0.5 font-semibold tabular-nums text-neutral-900" x-text="formatCurrency(selectedPo.amount, selectedPo.currency)"></dd></div>
+                            </dl>
+                            <div x-show="selectedPo.approval_steps.length > 0">
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Approval history</h4>
+                                <div class="mt-2 space-y-2">
+                                    <template x-for="step in selectedPo.approval_steps" x-bind:key="step.number">
+                                        <div class="flex items-center justify-between rounded-md border border-neutral-200 px-3 py-2 text-xs"><span x-text="`Step ${step.number} · ${step.role}`"></span><span class="font-medium text-neutral-700" x-text="`${step.status}${step.approver ? ` · ${step.approver}` : ''}`"></span></div>
+                                    </template>
+                                </div>
+                            </div>
+                            <div x-show="selectedPo.revisions.length > 0">
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Change orders</h4>
+                                <div class="mt-2 divide-y divide-neutral-100 rounded-lg border border-neutral-200">
+                                    <template x-for="revision in selectedPo.revisions" x-bind:key="revision.code">
+                                        <div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
+                                            <span class="font-mono font-medium text-neutral-800" x-text="revision.code"></span>
+                                            <span class="text-neutral-500" x-text="revision.status"></span>
+                                            <span class="tabular-nums text-neutral-700" x-text="formatCurrency(revision.delta, selectedPo.currency) + ' (' + formatNumber(revision.variance, 2) + '%)'"></span>
+                                            <span x-show="revision.requires_doa" class="rounded-full bg-warning-50 px-2 py-0.5 text-[10px] font-semibold text-warning-700">Re-approval required</span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <x-slot name="footer">
+                        <template x-if="selectedPo">
+                            <div class="flex w-full flex-wrap items-center justify-end gap-2">
+                                <template x-if="selectedPo.cxml">
+                                    <button type="button" x-on:click="selectedPoCxml = selectedPo.cxml; selectedPoNumber = selectedPo.number; showCxmlModal = true" class="mr-auto rounded-md px-2 py-1 font-mono text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">cXML payload</button>
+                                </template>
+                                @can(\App\Enums\Permission::ViewInventory->value)
+                                    <a x-bind:href="selectedPo.receiving_url" class="inline-flex min-h-9 items-center gap-2 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">View receiving</a>
+                                @endcan
+                                @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
+                                    <template x-if="selectedPo.can_receive">
+                                        <form method="POST" x-bind:action="selectedPo.receive_url" data-confirm-title="Receive Purchase Order" data-confirm-message="Confirm that this delivery is physically present before posting it into stock." data-confirm-label="Receive delivery">
+                                            @csrf
+                                            <x-ui.button type="submit" size="sm">Receive delivery</x-ui.button>
+                                        </form>
+                                    </template>
+                                @endcan
+                            </div>
+                        </template>
+                    </x-slot>
+                </x-ui.modal>
+            </div>
             {{-- ======================================================== TAB 6: Standard Canvassing (Stages 1-5 Preserved) --}}
             <div x-show="activeTab === 'legacy_canvass'" class="space-y-6">
                 {{-- Stage 1 --}}
@@ -1421,124 +1675,16 @@
                     <x-ui.loader id="supplier-quotes-api-status" size="sm" label="Loading supplier quotes from API..." class="mt-3 text-sm text-[var(--muted)]" />
                 </div>
 
-                @can('issue_purchase_order')
-                {{-- Stage 4: Purchase order --}}
-                <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm"
-                     x-data="{
-                         s4Qty: 100,
-                         s4Cost: 50.00,
-                         get s4Total() {
-                             return ((parseFloat(this.s4Qty) || 0) * (parseFloat(this.s4Cost) || 0)).toFixed(2);
-                         }
-                     }">
-                    <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
-                        <h3 class="text-lg font-semibold text-[var(--text)]">Stage 4 • Purchase order</h3>
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs text-[var(--muted)]">Autogenerated Reference:</span>
-                            <span class="rounded bg-neutral-100 border border-neutral-200 px-2 py-0.5 text-xs font-mono font-bold text-neutral-700">PO-{{ date('Ymd') }}-AUTO</span>
+                <div class="rounded-xl border border-primary-100 bg-primary-50/50 p-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h3 class="text-sm font-semibold text-primary-900">Continue to purchase orders</h3>
+                            <p class="mt-1 text-xs text-primary-700">Order creation, status tracking, details, and receiving actions are consolidated in the primary workspace.</p>
                         </div>
+                        <x-ui.button type="button" size="sm" x-on:click="activeTab = 'orders_revisions'; window.scrollTo({ top: 0, behavior: 'smooth' })">
+                            Open PO workspace
+                        </x-ui.button>
                     </div>
-                    <form method="POST" action="{{ route('inventory.purchases.orders.store') }}" class="mt-4 grid gap-4 md:grid-cols-2">
-                        @csrf
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Supplier</label>
-                            <select id="po-supplier-select" name="supplier_id" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" required>
-                                <option value="">Select supplier</option>
-                                @foreach($suppliers as $supplier)
-                                    <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Cost Center</label>
-                            <select name="cost_center_id" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2">
-                                <option value="">Select cost center</option>
-                                @foreach($costCenters as $cc)
-                                    <option value="{{ $cc->id }}">{{ $cc->name }} ({{ $cc->code }})</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Item</label>
-                            <select id="po-item-select" name="item_id" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" required>
-                                <option value="">Select item</option>
-                                @foreach($items as $item)
-                                    <option value="{{ $item->id }}">{{ $item->name }} ({{ $item->sku }})</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Quantity</label>
-                            <input type="number" name="quantity" min="1" step="1" inputmode="numeric" x-model.number="s4Qty"
-                                   onkeydown="return ['Backspace','Delete','ArrowLeft','ArrowRight','Tab'].includes(event.key) || /^[0-9]$/.test(event.key)"
-                                   class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" required />
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Unit cost (₱)</label>
-                            <input type="number" step="0.01" min="0.01" name="unit_cost" inputmode="decimal" x-model.number="s4Cost"
-                                   class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" required />
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Payment Terms</label>
-                            <select name="payment_terms" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2">
-                                <option value="Net 30" selected>Net 30 (30 Days)</option>
-                                <option value="Net 60">Net 60 (60 Days)</option>
-                                <option value="Net 15">Net 15 (15 Days)</option>
-                                <option value="COD">COD (Cash on Delivery)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Incoterms</label>
-                            <select name="incoterms" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2">
-                                <option value="DDP" selected>DDP - Delivered Duty Paid</option>
-                                <option value="FOB">FOB - Free on Board</option>
-                                <option value="CIF">CIF - Cost, Insurance &amp; Freight</option>
-                                <option value="EXW">EXW - Ex Works</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Notes</label>
-                            <input type="text" name="notes" placeholder="Delivery dock instructions..." class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                        </div>
-                        <div class="md:col-span-2 rounded-xl border border-[var(--border)] bg-[var(--background)] p-3 flex items-center justify-between">
-                            <div>
-                                <span class="text-xs text-[var(--muted)]">Computed Total Encumbrance:</span>
-                                <p class="text-lg font-bold text-[var(--text)]">₱<span x-text="Number(s4Total).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })"></span></p>
-                            </div>
-                            <button type="submit" class="rounded-xl bg-[var(--primary)] px-5 py-2 font-semibold text-white shadow hover:opacity-90">
-                                Create purchase order
-                            </button>
-                        </div>
-                    </form>
-                </div>
-                @endcan
-
-                {{-- Purchase orders table --}}
-                <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-[var(--text)]">Purchase orders</h3>
-                    <div class="mt-4 overflow-x-auto">
-                        <table class="min-w-full text-left text-sm">
-                            <thead>
-                                <tr class="border-b border-[var(--border)] text-[var(--muted)]">
-                                    <th class="px-3 py-2">PO number</th>
-                                    <th class="px-3 py-2">Supplier</th>
-                                    <th class="px-3 py-2">Item</th>
-                                    <th class="px-3 py-2">Quantity</th>
-                                    @can('view_procurement_sensitive_data')
-                                    <th class="px-3 py-2">Unit cost</th>
-                                    @endcan
-                                    <th class="px-3 py-2">Status</th>
-                                    <th class="px-3 py-2">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="purchase-orders-table-body" class="divide-y divide-[var(--border)]">
-                                <tr>
-                                    <td colspan="{{ auth()->user()?->can('view_procurement_sensitive_data') ? 7 : 6 }}" class="px-3 py-4 text-[var(--muted)]">Loading purchase orders from API...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <x-ui.loader id="purchase-orders-api-status" size="sm" label="Loading purchase orders from API..." class="mt-3 text-sm text-[var(--muted)]" />
                 </div>
             </div>
 
@@ -1588,7 +1734,7 @@
             @endcan
 
             {{-- B2B cXML Modal Viewer --}}
-            <div x-show="showCxmlModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+            <div x-show="showCxmlModal" x-cloak class="fixed inset-0 z-[60] overflow-y-auto" style="display: none;">
                 <div class="flex min-h-screen items-center justify-center p-4">
                     <div class="fixed inset-0 bg-neutral-900/60 transition-opacity" @click="showCxmlModal = false"></div>
                     <div class="relative w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl transition-all">
@@ -1696,6 +1842,25 @@
             @endcan
         }
 
+        function renderReceiveForm(order) {
+            if (order.status === 'received') {
+                return '<span class="text-sm text-[var(--muted)]">Received</span>';
+            }
+
+            @can(\App\Enums\Permission::RecordMovements->value)
+                return `
+                    <form method="POST" action="/inventory/purchases/${order.id}/receive">
+                        <input type="hidden" name="_token" value="${csrfToken()}">
+                        <button type="submit" class="rounded-lg bg-[var(--primary)] px-3 py-1.5 text-xs font-semibold text-white">
+                            Receive
+                        </button>
+                    </form>
+                `;
+            @else
+                return '<span class="text-sm text-[var(--muted)]">Awaiting delivery</span>';
+            @endcan
+        }
+
         function renderProcurementRequests(requests) {
             const container = document.getElementById('procurement-requests-list');
             if (!requests.length) {
@@ -1732,69 +1897,6 @@
                     <span class="rounded bg-neutral-100 px-2 py-1 text-xs">${escapeHtml(q.status || 'submitted')}</span>
                 </div>
             `).join('');
-        }
-
-        function renderReceiveForm(order) {
-            if (order.status === 'received') {
-                return '<span class="text-sm text-[var(--muted)]">Received</span>';
-            }
-
-            @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
-                return `
-                    <form method="POST" action="/inventory/purchases/${order.id}/receive"
-                          data-confirm-title="Confirm purchase receipt"
-                          data-confirm-message="Are you sure you want to receive this purchase order? This will add the ordered stock to inventory."
-                          data-confirm-label="Receive Order">
-                        <input type="hidden" name="_token" value="${csrfToken()}">
-                        <button type="submit" class="rounded-lg bg-[var(--primary)] px-3 py-1.5 text-xs font-semibold text-white">
-                            Receive
-                        </button>
-                    </form>
-                `;
-            @else
-                return '<span class="text-sm text-[var(--muted)]">Awaiting delivery</span>';
-            @endcan
-        }
-
-        function renderOrderStatus(status) {
-            const tone = status === 'received'
-                ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-[var(--primary-light)] text-[var(--primary)]';
-
-            return `<span class="rounded-full ${tone} px-2 py-1 text-xs font-semibold uppercase tracking-[0.2em]">${escapeHtml(status)}</span>`;
-        }
-
-        async function loadPurchaseOrdersFromApi() {
-            const status = document.getElementById('purchase-orders-api-status');
-            const tbody = document.getElementById('purchase-orders-table-body');
-
-            try {
-                const payload = await fetchApiJson('/api/v1/purchase-orders');
-                const items = payload.data || [];
-
-                if (items.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="{{ auth()->user()?->can('view_procurement_sensitive_data') ? 7 : 6 }}" class="px-3 py-4 text-[var(--muted)]">No purchase orders found via API.</td></tr>`;
-                } else {
-                    tbody.innerHTML = items.map(order => `
-                        <tr>
-                            <td class="px-3 py-2 font-medium text-[var(--text)]">${escapeHtml(order.po_number)}</td>
-                            <td class="px-3 py-2">${order.supplier ? escapeHtml(order.supplier.name) : '-'}</td>
-                            <td class="px-3 py-2">${order.item ? escapeHtml(order.item.name) : '-'}</td>
-                            <td class="px-3 py-2">${order.quantity}</td>
-                            @can('view_procurement_sensitive_data')
-                            <td class="px-3 py-2">${formatCurrency(order.unit_cost)}</td>
-                            @endcan
-                            <td class="px-3 py-2">${renderOrderStatus(order.status)}</td>
-                            <td class="px-3 py-2">${renderReceiveForm(order)}</td>
-                        </tr>
-                    `).join('');
-                }
-
-                status.textContent = 'Purchase orders loaded from API.';
-            } catch (error) {
-                console.error(error);
-                status.textContent = 'Unable to load purchase orders from API. Check console for details.';
-            }
         }
 
         async function loadDemandPlansFromApi() {
@@ -1837,8 +1939,8 @@
         }
 
         async function loadItemsAndSuppliersForForm() {
-            const itemSelectIds = ['request-item-select', 'po-item-select'];
-            const supplierSelectIds = ['request-supplier-select', 'po-supplier-select'];
+            const itemSelectIds = ['request-item-select'];
+            const supplierSelectIds = ['request-supplier-select'];
 
             try {
                 const [itemsPayload, suppliersPayload] = await Promise.all([
@@ -1871,7 +1973,6 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            loadPurchaseOrdersFromApi();
             loadDemandPlansFromApi();
             loadProcurementRequestsFromApi();
             loadSupplierQuotesFromApi();

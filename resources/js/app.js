@@ -3845,6 +3845,147 @@ Alpine.data('himsAiAssistant', ({
 }));
 
 
+Alpine.data('procurementWorkspace', ({
+    activeTab = 'orders_revisions',
+    items = [],
+    suppliers = [],
+    supplierTerms = {},
+    initial = {},
+} = {}) => ({
+    activeTab,
+    items,
+    suppliers,
+    supplierTerms,
+    itemId: String(initial.itemId || ''),
+    supplierId: String(initial.supplierId || ''),
+    quantity: Number(initial.quantity || 1),
+    deliveryDate: String(initial.deliveryDate || ''),
+    selectedPo: null,
+    selectedPoCxml: '',
+    selectedPoNumber: '',
+    showCxmlModal: false,
+
+    selectedItem() {
+        return this.items.find((item) => String(item.id) === String(this.itemId)) || null;
+    },
+
+    selectedSupplier() {
+        return this.suppliers.find((supplier) => String(supplier.id) === String(this.supplierId)) || null;
+    },
+
+    selectedTerms() {
+        const item = this.selectedItem();
+        const supplier = this.selectedSupplier();
+        if (!item || !supplier) return null;
+
+        return this.supplierTerms[`${supplier.id}:${item.id}`] || {
+            unit_cost: Number(item.catalog_unit_cost || 0),
+            currency: 'PHP',
+            minimum_order_quantity: 1,
+            lead_time_days: Number(supplier.lead_time_days || item.lead_time_days || 7),
+            price_source: 'item_catalog',
+        };
+    },
+
+    trustedUnitCost() {
+        return Number(this.selectedTerms()?.unit_cost || 0);
+    },
+
+    orderTotal() {
+        return Math.max(0, Number(this.quantity || 0)) * this.trustedUnitCost();
+    },
+
+    minimumOrderQuantity() {
+        return Math.max(1, Number(this.selectedTerms()?.minimum_order_quantity || 1));
+    },
+
+    expectedDeliveryLabel() {
+        if (this.deliveryDate) return this.formatDate(this.deliveryDate);
+
+        const date = new Date();
+        date.setHours(12, 0, 0, 0);
+        date.setDate(date.getDate() + Math.max(0, Number(this.selectedTerms()?.lead_time_days || 7)));
+
+        return new Intl.DateTimeFormat(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+        }).format(date);
+    },
+
+    isStockLow() {
+        const item = this.selectedItem();
+        if (!item) return false;
+        return Number(item.current_stock || 0) <= Number(item.reorder_point || 0);
+    },
+
+    smartAdvisory() {
+        const item = this.selectedItem();
+        const supplier = this.selectedSupplier();
+        const terms = this.selectedTerms();
+        if (!item) return null;
+
+        const isLow = this.isStockLow();
+        const suggested = Number(item.suggested_order_quantity || 0);
+        const leadTime = Number(terms?.lead_time_days || supplier?.lead_time_days || item.lead_time_days || 7);
+
+        const parts = [];
+        if (isLow) {
+            parts.push(`Stock Warning: On-hand (${this.formatNumber(item.current_stock)} ${item.unit}) is at or below reorder threshold (${this.formatNumber(item.reorder_point)} ${item.unit}).`);
+        }
+        if (suggested > 0) {
+            parts.push(`Replenishment Advisory: Reorder of ${this.formatNumber(suggested)} ${item.unit} suggested based on 90-day demand (${this.formatNumber(item.recent_demand)} ${item.unit}) and buffer calculation.`);
+        }
+        if (supplier) {
+            parts.push(`Supplier Delivery: ~${leadTime} days standard lead time with ${supplier.score !== null ? Number(supplier.score).toFixed(1) + '% scorecard rating' : 'procurement accreditation'}.`);
+        }
+
+        return parts.length ? parts.join(' · ') : `Current on-hand inventory is ${this.formatNumber(item.current_stock)} ${item.unit}. Operating at standard stock level.`;
+    },
+
+    useSuggestedQuantity() {
+        const suggested = Number(this.selectedItem()?.suggested_order_quantity || 0);
+        if (suggested > 0) this.quantity = Math.max(suggested, this.minimumOrderQuantity());
+    },
+
+    openPurchaseOrderReview(form) {
+        if (!form || !form.reportValidity()) return;
+        this.$dispatch('open-modal', 'review-purchase-order');
+    },
+
+    openPurchaseOrderDetails(order) {
+        this.selectedPo = order;
+        this.$dispatch('open-modal', 'purchase-order-details');
+    },
+
+    formatCurrency(value, currency = 'PHP') {
+        return new Intl.NumberFormat('en-PH', {
+            style: 'currency',
+            currency: currency || 'PHP',
+            minimumFractionDigits: 2,
+        }).format(Number(value || 0));
+    },
+
+    formatNumber(value, digits = 0) {
+        return new Intl.NumberFormat(undefined, {
+            minimumFractionDigits: digits,
+            maximumFractionDigits: digits,
+        }).format(Number(value || 0));
+    },
+
+    formatDate(value) {
+        if (!value) return 'Not specified';
+        const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+        if (Number.isNaN(date.getTime())) return String(value);
+
+        return new Intl.DateTimeFormat(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+        }).format(date);
+    },
+}));
+
 Alpine.data('himsCameraScanner', himsCameraScanner);
 
 Alpine.start();

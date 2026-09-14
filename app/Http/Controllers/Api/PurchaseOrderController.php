@@ -8,12 +8,17 @@ use App\Http\Requests\StorePurchaseOrderRequest;
 use App\Http\Requests\UpdatePurchaseOrderRequest;
 use App\Http\Resources\PurchaseOrderResource;
 use App\Models\PurchaseOrder;
+use App\Services\Procurement\POConversionService;
+use DomainException;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use Illuminate\Validation\ValidationException;
 
 class PurchaseOrderController extends Controller implements HasMiddleware
 {
+    public function __construct(private readonly POConversionService $poConversionService) {}
+
     public static function middleware(): array
     {
         return [
@@ -38,8 +43,16 @@ class PurchaseOrderController extends Controller implements HasMiddleware
 
     public function store(StorePurchaseOrderRequest $request)
     {
-        $data = $request->validated();
-        $po = PurchaseOrder::create($data);
+        try {
+            $po = $this->poConversionService->createDirectPurchaseOrder(
+                $request->validated(),
+                $request->user(),
+            );
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages([
+                'purchase_order' => $exception->getMessage(),
+            ]);
+        }
 
         return (new PurchaseOrderResource($po))->response()->setStatusCode(201);
     }
