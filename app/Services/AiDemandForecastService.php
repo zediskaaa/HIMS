@@ -21,6 +21,8 @@ use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
+use function defer;
+
 class AiDemandForecastService
 {
     public function __construct(
@@ -39,6 +41,123 @@ class AiDemandForecastService
     }
 
     /**
+     * The forecast the screens open on, generating it when nobody has yet.
+     *
+     * Opening a forecast screen used to show an empty state until somebody
+     * pressed Generate. That made the first person to log in do the waiting,
+     * for a forecast that is advisory and read by everyone. This returns a
+     * usable result on the very first request: recorded consumption is
+     * summarised to a statistical forecast in the same request (database work
+     * only, no network call), and the Gemini pass that replaces it is deferred
+     * until after the response has been sent, so nobody waits on the model to
+     * see the screen.
+     *
+     * The deferred pass is claimed under a lock and retried no more often than
+     * the fallback TTL, because a page anyone can open must not turn into one
+     * Gemini request per page view when the model is unavailable.
+     *
+     * @return array<string, mixed>|null Null only when there is nothing to
+     *                                  forecast; the screens show their own
+     *                                  empty state for that.
+     */
+    public function ensure(User $actor, int $analysisDays, int $forecastDays): ?array
+    {
+        $analysisDays = max(7, min(365, $analysisDays));
+        $forecastDays = max(7, min(180, $forecastDays));
+
+        $existing = $this->cached($analysisDays, $forecastDays);
+        if ($existing !== null && ! $this->isPendingAi($existing)) {
+            return $existing;
+        }
+
+        // A recent fallback is already the best answer available right now.
+        // Recomputing it would repeat the aggregation on every view during a
+        // Gemini outage, and the fallback is the same computation either way.
+        if ($existing !== null) {
+            $this->scheduleAiWarmup($actor, $analysisDays, $forecastDays);
+
+            return $existing;
+        }
+
+        $fallback = $this->statisticalEnvelope($analysisDays, $forecastDays);
+        if ($fallback === null) {
+            return null;
+        }
+
+        // Shorter than the AI result's lifetime on purpose: it is a placeholder
+        // that keeps the screen useful until the deferred pass replaces it, and
+        // a stale one must not outlive the demand it describes. It doubles as
+        // the backoff window for a Gemini that keeps failing.
+        Cache::put(
+            $this->cacheKey($analysisDays, $forecastDays),
+            $fallback + ['pending' => true],
+            now()->addMinutes($this->fallbackMinutes()),
+        );
+        $this->scheduleAiWarmup($actor, $analysisDays, $forecastDays);
+
+        return $fallback;
+    }
+
+    /**
+     * Queue the Gemini pass for after the response has been sent.
+     *
+     * The lock is what keeps a burst of page views on an empty cache down to a
+     * single model call: whoever claims it runs the warm-up, and the rest of
+     * the burst reads the placeholder that was just cached.
+     */
+    private function scheduleAiWarmup(User $actor, int $analysisDays, int $forecastDays): void
+    {
+        $claim = Cache::lock($this->lockKey($analysisDays, $forecastDays), 300);
+
+        if (! $claim->get()) {
+            return;
+        }
+
+        defer(function () use ($actor, $analysisDays, $forecastDays): void {
+            try {
+                $this->generate($actor, $analysisDays, $forecastDays);
+            } catch (Throwable $exception) {
+                // The screen already has the statistical forecast, so a failed
+                // warm-up costs the next visitor nothing but a quieter notice.
+                report($exception);
+            }
+        });
+    }
+
+    /**
+     * Summarise recorded consumption without asking the model.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function statisticalEnvelope(int $analysisDays, int $forecastDays): ?array
+    {
+        $prepared = $this->prepareData($analysisDays, $forecastDays);
+
+        if ($prepared->isEmpty()) {
+            return null;
+        }
+
+        return $this->resultEnvelope(
+            'statistical',
+            $this->statisticalItems($prepared),
+            $analysisDays,
+            $forecastDays,
+            $this->fallbackNotice('warmup'),
+        );
+    }
+
+    /**
+     * Whether a cached result is the statistical placeholder waiting for the
+     * deferred AI pass rather than a finished forecast.
+     *
+     * @param  array<string, mixed>  $forecast
+     */
+    private function isPendingAi(array $forecast): bool
+    {
+        return ($forecast['pending'] ?? false) === true;
+    }
+
+    /**
      * Generate a new recommendation snapshot. Gemini failures return the
      * deterministic moving-average result under an explicit statistical label.
      *
@@ -48,7 +167,7 @@ class AiDemandForecastService
     {
         $analysisDays = max(7, min(365, $analysisDays));
         $forecastDays = max(7, min(180, $forecastDays));
-        $wasRefresh = $this->cached($analysisDays, $forecastDays) !== null;
+        $wasRefresh = $this->hasRealForecast($analysisDays, $forecastDays);
         $prepared = $this->prepareData($analysisDays, $forecastDays);
 
         if ($prepared->isEmpty()) {
@@ -700,6 +819,10 @@ class AiDemandForecastService
 
     private function fallbackNotice(string $failureType): string
     {
+        if ($failureType === 'warmup') {
+            return 'The AI pass that refines this forecast runs in the background; these results have not been sent to Gemini yet.';
+        }
+
         $reason = match ($failureType) {
             'missing_api_key' => 'Gemini is not configured on the server.',
             'gemini_authentication_failed' => 'Gemini rejected the configured credential.',
@@ -716,5 +839,29 @@ class AiDemandForecastService
     private function cacheKey(int $analysisDays, int $forecastDays): string
     {
         return "demand-forecast:v2:{$analysisDays}:{$forecastDays}";
+    }
+
+    private function lockKey(int $analysisDays, int $forecastDays): string
+    {
+        return "demand-forecast:v2:warmup:{$analysisDays}:{$forecastDays}";
+    }
+
+    private function fallbackMinutes(): int
+    {
+        return max(1, (int) config('services.gemini.forecast_fallback_minutes', 10));
+    }
+
+    /**
+     * Whether a finished forecast is already cached for this scope.
+     *
+     * Distinguishes the placeholder written by ensure() from a real result, so
+     * a background warm-up that lands first is still the item's first
+     * generation rather than a refresh of the statistical fallback it replaced.
+     */
+    private function hasRealForecast(int $analysisDays, int $forecastDays): bool
+    {
+        $forecast = $this->cached($analysisDays, $forecastDays);
+
+        return $forecast !== null && ! $this->isPendingAi($forecast);
     }
 }

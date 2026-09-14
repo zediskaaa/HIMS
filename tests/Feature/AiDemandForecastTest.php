@@ -664,6 +664,100 @@ class AiDemandForecastTest extends TestCase
         ]);
     }
 
+    /**
+     * The screen a signed-in user opens first has to already carry a forecast.
+     * Waiting for somebody to press Generate meant the panel was empty on the
+     * very page it exists for, so the first view fills the cache itself: the
+     * recorded consumption is summarised in the request, and the model pass
+     * that refines it is deferred until after the response has been sent.
+     */
+    public function test_the_dashboard_fills_an_empty_forecast_cache_without_being_asked(): void
+    {
+        config()->set('services.gemini.forecast_fallback_minutes', 10);
+
+        $manager = User::factory()->inventoryManager()->create();
+        $item = $this->item();
+        $this->consume($item, 45, 20);
+
+        Http::fake([
+            '*' => Http::response([
+                'candidates' => [[
+                    'content' => ['parts' => [[
+                        'text' => json_encode(['items' => [[
+                            'item_id' => $item->id,
+                            'predicted_demand' => 20,
+                            'risk_level' => 'high',
+                            'reorder_priority' => 'high',
+                            'recommended_reorder_quantity' => 15,
+                            'projected_stock_status' => 'low_stock',
+                            'demand_trend' => 'stable',
+                            'confidence' => 'medium',
+                            'explanation' => 'Recorded consumption continues above available stock.',
+                        ]]], JSON_THROW_ON_ERROR),
+                    ]]],
+                ]],
+            ]),
+        ]);
+
+        $this->actingAs($manager)->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Statistical Forecast')
+            ->assertSee('Bandages');
+
+        // Nobody waits on the model to see the screen: the page renders the
+        // recorded-consumption summary while the Gemini pass is still queued.
+        Http::assertNothingSent();
+        $this->assertSame('statistical', Cache::get('demand-forecast:v2:90:30')['source']);
+    }
+
+    public function test_a_forecast_generated_from_a_page_view_is_audited_as_generated_not_refreshed(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+        $item = $this->item();
+        $this->consume($item, 30, 12);
+
+        $this->actingAs($manager)->get(route('dashboard'))->assertOk();
+
+        $this->assertSame('statistical', Cache::get('demand-forecast:v2:90:30')['source']);
+
+        Http::fake([
+            '*' => Http::response([
+                'candidates' => [[
+                    'content' => ['parts' => [[
+                        'text' => json_encode(['items' => [[
+                            'item_id' => $item->id,
+                            'predicted_demand' => 18,
+                            'risk_level' => 'medium',
+                            'reorder_priority' => 'medium',
+                            'recommended_reorder_quantity' => 11,
+                            'projected_stock_status' => 'low_stock',
+                            'demand_trend' => 'stable',
+                            'confidence' => 'medium',
+                            'explanation' => 'Consumption remains steady against the reorder level.',
+                        ]]], JSON_THROW_ON_ERROR),
+                    ]]],
+                ]],
+            ]),
+        ]);
+
+        // Refreshing replaces the placeholder, and because the placeholder was
+        // never a finished forecast the run is the first generation for this
+        // window rather than a refresh of a forecast nobody had generated.
+        $this->actingAs($manager)
+            ->post(route('inventory.demand-forecast.refresh'))
+            ->assertSessionHas('success');
+
+        $this->assertSame('ai', Cache::get('demand-forecast:v2:90:30')['source']);
+        $this->assertDatabaseHas('audit_logs', [
+            'user_id' => $manager->id,
+            'action' => AuditAction::GeneratedDemandForecast->value,
+            'outcome' => 'success',
+        ]);
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => AuditAction::RefreshedDemandForecast->value,
+        ]);
+    }
+
     private function item(): InventoryItem
     {
         return InventoryItem::create([

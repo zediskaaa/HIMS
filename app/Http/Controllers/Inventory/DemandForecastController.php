@@ -57,7 +57,12 @@ class DemandForecastController extends Controller implements HasMiddleware
         $forecastDays = max(7, min(180, $forecastDays));
 
         $forecasts = $this->forecasts->forecastAll($analysisDays, $forecastDays);
-        $aiForecast = $this->aiForecasts->cached($analysisDays, $forecastDays);
+
+        // Opening the screen fills an empty cache by itself. Anyone who may read
+        // this page already sees the same recorded consumption in the table
+        // below, and the run is claimed under a lock, so the model is asked for
+        // at most once per window however many people arrive at once.
+        $aiForecast = $this->aiForecasts->ensure($request->user(), $analysisDays, $forecastDays);
         $aiItems = collect($aiForecast['items'] ?? []);
 
         $risk = in_array($request->query('risk'), ['high', 'medium', 'low'], true)

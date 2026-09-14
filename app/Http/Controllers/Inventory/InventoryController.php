@@ -11,6 +11,7 @@ use App\Models\StockAlert;
 use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
+use App\Models\User;
 use App\Services\AiDemandForecastService;
 use App\Services\DemandForecastService;
 use App\Services\InventoryReportService;
@@ -55,12 +56,7 @@ class InventoryController extends Controller implements HasMiddleware
         $canViewSuppliers = $request->user()->can(Permission::ViewSuppliers->value);
         $canViewProcurementFinancials = $request->user()->can(Permission::ViewProcurementSensitiveData->value);
         $canViewForecasts = $request->user()->can(Permission::ViewReports->value);
-        $aiForecast = $canViewForecasts
-            ? $this->aiForecasts->cached(
-                DemandForecastService::DEFAULT_ANALYSIS_DAYS,
-                DemandForecastService::DEFAULT_FORECAST_DAYS,
-            )
-            : null;
+        $aiForecast = $canViewForecasts ? $this->dashboardForecast($request->user()) : null;
         $forecastCategories = $canViewForecasts
             ? ItemCategory::query()->active()->orderBy('name')->get(['id', 'name'])
             : collect();
@@ -119,6 +115,26 @@ class InventoryController extends Controller implements HasMiddleware
             'totalOnHand' => $snapshot['totalOnHand'],
             'totalInventoryValue' => $snapshot['totalInventoryValue'],
         ], fn (mixed $value): bool => $value !== null));
+    }
+
+    /**
+     * The forecast panel's data, filled in automatically on first view.
+     *
+     * /dashboard is where login lands, so waiting for somebody to press
+     * Generate meant the forecast was missing on exactly the screen it is meant
+     * to open on. Only the people who may generate a forecast start the model
+     * call; a viewer who may read one but not generate it gets whatever is
+     * already cached and the recorded-consumption table when nothing is.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function dashboardForecast(User $user): ?array
+    {
+        $days = [DemandForecastService::DEFAULT_ANALYSIS_DAYS, DemandForecastService::DEFAULT_FORECAST_DAYS];
+
+        return $user->can(Permission::GenerateForecasts->value)
+            ? $this->aiForecasts->ensure($user, ...$days)
+            : $this->aiForecasts->cached(...$days);
     }
 
     /**

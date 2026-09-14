@@ -43,6 +43,11 @@ return [
         'timeout' => (int) env('GEMINI_TIMEOUT', 30),
         'forecast_cache_minutes' => (int) env('GEMINI_FORECAST_CACHE_MINUTES', 360),
         'forecast_max_items' => (int) env('GEMINI_FORECAST_MAX_ITEMS', 100),
+        // How long the statistical placeholder stays on the screens before the
+        // deferred AI pass replaces it. It is also the floor between warm-up
+        // attempts, so a Gemini outage costs one request per window rather than
+        // one per page view.
+        'forecast_fallback_minutes' => (int) env('GEMINI_FORECAST_FALLBACK_MINUTES', 10),
     ],
 
 ];
