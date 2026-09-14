@@ -5,7 +5,6 @@ namespace App\Services\Procurement;
 use App\Enums\PurchaseOrderStatus;
 use App\Models\InventoryItem;
 use App\Models\PurchaseOrder;
-use App\Models\PurchaseOrderLine;
 use App\Models\PurchaseOrderRevision;
 use App\Models\PurchaseRequest;
 use App\Models\SourcingRfq;
@@ -22,6 +21,7 @@ class POConversionService
     public function __construct(
         private readonly BudgetEncumbranceService $budgetService,
         private readonly ProcurementAuditService $auditService,
+        private readonly ApprovalRoutingEngine $approvalEngine,
     ) {}
 
     /**
@@ -48,16 +48,13 @@ class POConversionService
                 throw new DomainException("The minimum order for this supplier and item is {$terms['minimum_order_quantity']} units.");
             }
 
-            $unitCost = isset($data['unit_cost']) && is_numeric($data['unit_cost']) && (float) $data['unit_cost'] > 0
-                ? (float) $data['unit_cost']
-                : $terms['unit_cost'];
+            $unitCost = $terms['unit_cost'];
             $totalAmount = round($quantity * $unitCost, 2);
-            $status = $data['status'] ?? 'pending';
 
             $po = PurchaseOrder::create([
                 'po_number' => $this->nextPurchaseOrderNumber(),
                 'supplier_id' => $supplier->id,
-                'cost_center_id' => $data['cost_center_id'] ?? null,
+                'cost_center_id' => $data['cost_center_id'],
                 'item_id' => $item->id,
                 'quantity' => $quantity,
                 'unit_cost' => $unitCost,
@@ -69,7 +66,7 @@ class POConversionService
                 'incoterms' => $data['incoterms'] ?? 'DDP',
                 'version' => 'PO-REV1',
                 'revision_number' => 1,
-                'status' => $status,
+                'status' => PurchaseOrderStatus::PendingApproval->value,
                 'notes' => $data['notes'] ?? null,
                 'delivery_date' => $data['delivery_date']
                     ?? now()->addDays($terms['lead_time_days'])->toDateString(),
@@ -93,6 +90,7 @@ class POConversionService
             $po->save();
 
             $this->budgetService->convertSoftToHardEncumbrance($po);
+            $this->approvalEngine->routePurchaseOrder($po, $buyer);
             $this->auditService->record(
                 $buyer,
                 'PurchaseOrder',
@@ -180,7 +178,7 @@ class POConversionService
             throw new DomainException("Compliance Block: Supplier '{$awardedQuote->supplier->name}' is currently not eligible for procurement awards.");
         }
 
-        return DB::transaction(function () use ($rfq, $awardedQuote, $buyer) {
+        return DB::transaction(function () use ($rfq, $awardedQuote) {
             $totalAmount = $awardedQuote->totalLandedCost();
             $poNumber = 'PO-'.now()->format('Ymd').'-'.str_pad((string) mt_rand(1, 9999), 4, '0', STR_PAD_LEFT);
 
@@ -266,7 +264,7 @@ class POConversionService
      */
     public function convertCatalogPRToPO(PurchaseRequest $pr, User $buyer): PurchaseOrder
     {
-        return DB::transaction(function () use ($pr, $buyer) {
+        return DB::transaction(function () use ($pr) {
             $firstLine = $pr->lines()->first();
             $supplier = $firstLine?->contract?->supplier
                 ?? Supplier::procurementEligible()->first();

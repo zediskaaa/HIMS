@@ -52,7 +52,7 @@ class DocumentTrackingService
                 : (DocumentType::tryFrom($data['document_type']) ?? DocumentType::Other);
 
             $prefix = $docType->numberPrefix();
-            $trackingNumber = "DOC-{$prefix}-" . now()->format('Ym') . '-' . Str::upper(Str::random(5));
+            $trackingNumber = "DOC-{$prefix}-".now()->format('Ym').'-'.Str::upper(Str::random(5));
 
             $retentionClass = $data['retention_class'] ?? $this->determineRetentionClass($docType);
             $retentionUntil = LogisticsDocument::defaultRetentionDate($retentionClass);
@@ -90,7 +90,7 @@ class DocumentTrackingService
                     'event_type' => 'dock_receiving',
                     'releasing_party_name' => $document->supplier?->name ?? 'External Issuer / Carrier',
                     'receiving_user_id' => $uploader->id,
-                    'receiving_party_name' => $uploader->name . ' (Records Custodian)',
+                    'receiving_party_name' => $uploader->name.' (Records Custodian)',
                     'origin_location' => 'External Issuance',
                     'destination_location' => 'HIMS Secure Logistics Repository',
                     'package_condition' => 'good_order',
@@ -182,7 +182,7 @@ class DocumentTrackingService
             $checksum = hash_file('sha256', $newFile->getRealPath());
 
             $newVersionNumber = (int) $locked->version_number + 1;
-            $trackingNumber = "DOC-{$locked->document_type->numberPrefix()}-" . now()->format('Ym') . '-' . Str::upper(Str::random(5));
+            $trackingNumber = "DOC-{$locked->document_type->numberPrefix()}-".now()->format('Ym').'-'.Str::upper(Str::random(5));
 
             $newDoc = LogisticsDocument::create([
                 'tracking_number' => $trackingNumber,
@@ -240,14 +240,36 @@ class DocumentTrackingService
      */
     public function downloadDocument(LogisticsDocument $document): StreamedResponse
     {
-        if (empty($document->file_path) || ! Storage::disk($document->disk)->exists($document->file_path)) {
+        if (empty($document->file_path) || empty($document->disk)) {
             abort(404, 'The requested document file could not be found on storage.');
         }
 
-        return Storage::disk($document->disk)->download(
-            $document->file_path,
-            $document->original_name ?? $document->file_name
-        );
+        try {
+            $disk = Storage::disk($document->disk);
+            $exists = $disk->exists($document->file_path);
+        } catch (\Throwable $exception) {
+            report($exception);
+            abort(404, 'The requested document file could not be accessed on storage.');
+        }
+
+        if (! $exists) {
+            abort(404, 'The requested document file could not be found on storage.');
+        }
+
+        $downloadName = basename(str_replace('\\', '/',
+            $document->original_name ?: ($document->file_name ?: $document->file_path)
+        ));
+        $downloadName = preg_replace('/[\x00-\x1F\x7F]/', '', $downloadName) ?: 'document';
+        $headers = in_array($document->mime_type, self::ALLOWED_MIMES, true)
+            ? ['Content-Type' => $document->mime_type]
+            : [];
+
+        try {
+            return $disk->download($document->file_path, $downloadName, $headers);
+        } catch (\Throwable $exception) {
+            report($exception);
+            abort(404, 'The requested document file could not be accessed on storage.');
+        }
     }
 
     private function validateFile(UploadedFile $file): void

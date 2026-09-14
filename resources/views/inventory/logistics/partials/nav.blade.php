@@ -1,4 +1,4 @@
-<div class="border-b border-neutral-200 bg-white" x-data="{ openDropdown: null }">
+<div class="border-b border-neutral-200 bg-white print:hidden" x-data="{ openDropdown: null }">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-2.5">
         {{-- Mobile / Small Screen Quick Selector (< sm) --}}
         <div class="sm:hidden">

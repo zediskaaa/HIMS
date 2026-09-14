@@ -153,6 +153,7 @@ class RoleAuthorizationAuditTest extends TestCase
             'quantity' => 10,
             'unit_cost' => 125.50,
             'total_amount' => 1255.00,
+            'payment_terms' => 'Net 60',
             'status' => 'issued',
             'notes' => 'Confidential commercial note',
         ]);
@@ -162,8 +163,8 @@ class RoleAuthorizationAuditTest extends TestCase
             ->assertOk()
             ->assertDontSee('Sourcing Events &amp; RFQs', false)
             ->assertDontSee('Comparative Evaluation &amp; Landed Cost Matrix', false)
-            ->assertDontSee('Commercial Terms')
-            ->assertDontSee('Total Encumbered');
+            ->assertDontSee('1,255.00')
+            ->assertDontSee('Net 60');
 
         Sanctum::actingAs($viewer, ['*']);
         $this->getJson("/api/v1/purchase-orders/{$purchaseOrder->id}")
@@ -177,8 +178,8 @@ class RoleAuthorizationAuditTest extends TestCase
             ->assertOk()
             ->assertSee('Sourcing Events &amp; RFQs', false)
             ->assertSee('Comparative Evaluation &amp; Landed Cost Matrix', false)
-            ->assertSee('Commercial Terms')
-            ->assertSee('Total Encumbered');
+            ->assertSee('1,255.00')
+            ->assertSee('Net 60');
     }
 
     public function test_historical_stock_movements_cannot_be_updated_or_deleted_through_api(): void

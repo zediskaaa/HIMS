@@ -6,12 +6,12 @@ use App\Enums\ApprovalChainType;
 use App\Enums\ApprovalStepStatus;
 use App\Enums\NotificationDestination;
 use App\Enums\NotificationPriority;
+use App\Enums\PurchaseOrderStatus;
 use App\Enums\UserRole;
 use App\Models\ApprovalChain;
 use App\Models\ApprovalStep;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
-use App\Models\SourcingRfq;
 use App\Models\User;
 use App\Services\HimsNotificationService;
 use DomainException;
@@ -19,7 +19,11 @@ use Illuminate\Support\Facades\DB;
 
 class ApprovalRoutingEngine
 {
-    public function __construct(private readonly HimsNotificationService $notifications) {}
+    public function __construct(
+        private readonly HimsNotificationService $notifications,
+        private readonly BudgetEncumbranceService $budgetService,
+        private readonly ProcurementAuditService $auditService,
+    ) {}
 
     /**
      * Determine and instantiate an Approval Chain for a Purchase Request.
@@ -125,7 +129,7 @@ class ApprovalRoutingEngine
     public function approveStep(
         ApprovalChain $chain,
         User $approver,
-        string $decisionNotes = null
+        ?string $decisionNotes = null
     ): ApprovalStep {
         $approvedStep = DB::transaction(function () use ($chain, $approver, $decisionNotes) {
             $step = $chain->currentPendingStep();
@@ -160,6 +164,26 @@ class ApprovalRoutingEngine
                 $chain->save();
 
                 $this->applyApprovedStateToTarget($chain);
+            }
+
+            $this->auditService->record(
+                $approver,
+                'ApprovalChain',
+                $chain->id,
+                'approved_procurement_step',
+                ['step' => $step->step_number, 'status' => 'pending'],
+                ['step' => $step->step_number, 'status' => 'approved', 'target_type' => $chain->chain_type->value, 'target_id' => $chain->target_id],
+            );
+
+            if ($chain->status === 'approved' && $chain->chain_type === ApprovalChainType::PurchaseOrder) {
+                $this->auditService->record(
+                    $approver,
+                    'PurchaseOrder',
+                    $chain->target_id,
+                    'approved_purchase_order',
+                    ['status' => PurchaseOrderStatus::PendingApproval->value],
+                    ['status' => PurchaseOrderStatus::Approved->value],
+                );
             }
 
             return $step;
@@ -197,6 +221,26 @@ class ApprovalRoutingEngine
 
             $this->applyRejectedStateToTarget($chain, $rejectionReason);
 
+            $this->auditService->record(
+                $approver,
+                'ApprovalChain',
+                $chain->id,
+                'rejected_procurement_step',
+                ['step' => $step->step_number, 'status' => 'pending'],
+                ['step' => $step->step_number, 'status' => 'rejected', 'target_type' => $chain->chain_type->value, 'target_id' => $chain->target_id],
+            );
+
+            if ($chain->chain_type === ApprovalChainType::PurchaseOrder) {
+                $this->auditService->record(
+                    $approver,
+                    'PurchaseOrder',
+                    $chain->target_id,
+                    'rejected_purchase_order',
+                    ['status' => PurchaseOrderStatus::PendingApproval->value],
+                    ['status' => PurchaseOrderStatus::Cancelled->value, 'reason' => $rejectionReason],
+                );
+            }
+
             return $step;
         });
     }
@@ -210,6 +254,11 @@ class ApprovalRoutingEngine
             $pr = PurchaseRequest::find($chain->target_id);
             if ($pr && $pr->requester_id === $approver->id) {
                 throw new DomainException("Segregation of Duties Violation: Requester cannot approve their own Purchase Request #{$pr->pr_number}.");
+            }
+        } elseif ($chain->chain_type === ApprovalChainType::PurchaseOrder) {
+            $po = PurchaseOrder::find($chain->target_id);
+            if ($po && $po->created_by_user_id === $approver->id) {
+                throw new DomainException("Segregation of Duties Violation: Issuer cannot approve their own Purchase Order #{$po->po_number}.");
             }
         }
     }
@@ -280,7 +329,19 @@ class ApprovalRoutingEngine
                 $pr->save();
 
                 // Release the soft commitment back to cost center
-                app(BudgetEncumbranceService::class)->releaseSoftCommitment($pr);
+                $this->budgetService->releaseSoftCommitment($pr);
+            }
+        } elseif ($chain->chain_type === ApprovalChainType::PurchaseOrder) {
+            $po = PurchaseOrder::find($chain->target_id);
+            if ($po) {
+                $po->status = PurchaseOrderStatus::Cancelled->value;
+                $po->notes = trim(implode("\n", array_filter([
+                    $po->notes,
+                    "Approval rejected: {$reason}",
+                ])));
+                $po->save();
+
+                $this->budgetService->releaseHardEncumbrance($po);
             }
         }
     }

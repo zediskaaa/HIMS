@@ -22,6 +22,7 @@ use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Throwable;
 
 class PurchaseOrderController extends Controller implements HasMiddleware
 {
@@ -77,6 +78,12 @@ class PurchaseOrderController extends Controller implements HasMiddleware
             return redirect()->route('inventory.purchases')
                 ->withInput()
                 ->withErrors(['purchase_order' => $exception->getMessage()]);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return redirect()->route('inventory.purchases')
+                ->withInput()
+                ->withErrors(['purchase_order' => 'The purchase order could not be created. No records were saved.']);
         }
     }
 
@@ -88,6 +95,13 @@ class PurchaseOrderController extends Controller implements HasMiddleware
     {
         if ($purchaseOrder->status === 'received' || $purchaseOrder->status === PurchaseOrderStatus::Fulfilled->value) {
             return redirect()->route('inventory.purchases')->with('info', 'This purchase order has already been received.');
+        }
+
+        $status = PurchaseOrderStatus::tryFrom((string) $purchaseOrder->status);
+
+        if (! ($status?->canReceiveStock() ?? in_array($purchaseOrder->status, ['approved', 'dispatched', 'acknowledged', 'partially_fulfilled', 'partially_received', 'issued'], true))) {
+            return redirect()->route('inventory.purchases')
+                ->withErrors(['receive' => 'This purchase order must be approved before stock can be received.']);
         }
 
         $fallbackLocationId = StorageLocation::query()->orderBy('id')->value('id');

@@ -2,20 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AuditAction;
 use App\Enums\DocumentType;
 use App\Enums\MovementType;
-use App\Enums\Permission;
 use App\Enums\PurchaseOrderStatus;
 use App\Enums\UserRole;
+use App\Models\AuditLog;
 use App\Models\ChainOfCustodyLog;
+use App\Models\CostCenter;
 use App\Models\GoodsReceiptNote;
 use App\Models\GoodsReceiptNoteLine;
-use App\Models\InspectionAcceptanceReport;
 use App\Models\InventoryItem;
 use App\Models\LogisticsDocument;
 use App\Models\PurchaseOrder;
-use App\Models\PurchaseOrderLine;
-use App\Models\Shipment;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Models\User;
@@ -84,6 +83,29 @@ class DocumentTrackingAndLogisticsTest extends TestCase
         ]);
 
         return compact('supplier', 'location', 'item', 'buyer', 'inspector', 'custodian');
+    }
+
+    private function createDownloadableDocument(User $uploader, string $contents = "%PDF-1.4\nprotected logistics record\n"): LogisticsDocument
+    {
+        $path = 'logistics_documents/sales-invoice-88192.pdf';
+
+        Storage::disk('local')->put($path, $contents);
+
+        return LogisticsDocument::create([
+            'tracking_number' => 'DOC-SI-202609-88192',
+            'document_type' => DocumentType::SalesInvoice,
+            'title' => 'Zuellig Pharma Electronic Sales Invoice',
+            'reference_number' => 'SI-88192',
+            'status' => 'verified',
+            'file_path' => $path,
+            'file_name' => 'sales-invoice-88192.pdf',
+            'original_name' => 'Zuellig Pharma Sales Invoice SI-88192.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => strlen($contents),
+            'disk' => 'local',
+            'sha256_checksum' => hash('sha256', $contents),
+            'uploaded_by_id' => $uploader->id,
+        ]);
     }
 
     public function test_liquidated_damages_calculated_on_delayed_po_delivery_per_coa_gam_app_61(): void
@@ -346,6 +368,113 @@ class DocumentTrackingAndLogisticsTest extends TestCase
         $this->assertEquals(200, $response->getStatusCode());
     }
 
+    public function test_authorized_document_download_returns_the_stored_file_and_records_one_audit_event(): void
+    {
+        Storage::fake('local');
+        extract($this->createSetup());
+        $contents = "%PDF-1.4\nprotected logistics record\n";
+        $document = $this->createDownloadableDocument($buyer, $contents);
+
+        $response = $this->actingAs($buyer)
+            ->get(route('inventory.logistics.documents.download', $document));
+
+        $response->assertOk()
+            ->assertDownload('Zuellig Pharma Sales Invoice SI-88192.pdf')
+            ->assertHeader('content-type', 'application/pdf');
+        $this->assertSame($contents, $response->streamedContent());
+
+        $audit = AuditLog::query()
+            ->where('action', AuditAction::DownloadedLogisticsDocument->value)
+            ->where('target_type', $document->getMorphClass())
+            ->where('target_id', (string) $document->id)
+            ->sole();
+
+        $this->assertSame($buyer->id, $audit->user_id);
+        $this->assertSame($document->tracking_number, $audit->target_reference);
+    }
+
+    public function test_each_successful_document_download_records_exactly_one_audit_event(): void
+    {
+        Storage::fake('local');
+        extract($this->createSetup());
+        $document = $this->createDownloadableDocument($buyer);
+
+        $this->actingAs($buyer)
+            ->get(route('inventory.logistics.documents.download', $document))
+            ->assertOk();
+        $this->get(route('inventory.logistics.documents.download', $document))
+            ->assertOk();
+
+        $audits = AuditLog::query()
+            ->where('action', AuditAction::DownloadedLogisticsDocument->value)
+            ->where('target_type', $document->getMorphClass())
+            ->where('target_id', (string) $document->id)
+            ->get();
+
+        $this->assertCount(2, $audits);
+        $this->assertCount(2, $audits->pluck('event_id')->unique());
+    }
+
+    public function test_missing_document_record_or_file_returns_not_found_without_a_download_audit(): void
+    {
+        Storage::fake('local');
+        extract($this->createSetup());
+        $document = $this->createDownloadableDocument($buyer);
+        Storage::disk('local')->delete($document->file_path);
+
+        $this->actingAs($buyer)
+            ->get(route('inventory.logistics.documents.download', $document))
+            ->assertNotFound();
+
+        $this->get(route('inventory.logistics.documents.download', 999999))
+            ->assertNotFound();
+
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => AuditAction::DownloadedLogisticsDocument->value,
+            'target_type' => $document->getMorphClass(),
+            'target_id' => (string) $document->id,
+        ]);
+    }
+
+    public function test_inaccessible_document_storage_returns_not_found_without_a_download_audit(): void
+    {
+        Storage::fake('local');
+        extract($this->createSetup());
+        $document = $this->createDownloadableDocument($buyer);
+        $document->update(['disk' => 'unconfigured-logistics-disk']);
+
+        $this->actingAs($buyer)
+            ->get(route('inventory.logistics.documents.download', $document))
+            ->assertNotFound();
+
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => AuditAction::DownloadedLogisticsDocument->value,
+            'target_type' => $document->getMorphClass(),
+            'target_id' => (string) $document->id,
+        ]);
+    }
+
+    public function test_user_without_sensitive_logistics_access_cannot_download_document(): void
+    {
+        Storage::fake('local');
+        extract($this->createSetup());
+        $document = $this->createDownloadableDocument($buyer);
+        $viewer = User::factory()->create([
+            'role' => UserRole::Viewer,
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($viewer)
+            ->get(route('inventory.logistics.documents.download', $document))
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => AuditAction::DownloadedLogisticsDocument->value,
+            'target_type' => $document->getMorphClass(),
+            'target_id' => (string) $document->id,
+        ]);
+    }
+
     public function test_chain_of_custody_log_is_strictly_append_only_and_immutable(): void
     {
         extract($this->createSetup());
@@ -396,9 +525,199 @@ class DocumentTrackingAndLogisticsTest extends TestCase
         ], $buyer);
     }
 
-    public function test_web_routes_and_controllers_render_screens_with_role_authorization(): void
+    public function test_iar_print_view_is_a_standalone_data_driven_multipage_document(): void
     {
         extract($this->createSetup());
+
+        $costCenter = CostCenter::create([
+            'name' => 'Central Pharmacy and Medical Supply Cost Center',
+            'code' => 'CPMSC-2026-OPERATIONS',
+            'department' => 'Hospital Central Pharmacy, Therapeutics, and Medical Supply Operations',
+            'is_active' => true,
+        ]);
+
+        $item->update([
+            'name' => 'Sterile temperature-controlled injectable medicine with an intentionally long stock description for wrapped report table validation',
+            'unit_cost' => 300.00,
+        ]);
+
+        $po = PurchaseOrder::create([
+            'po_number' => 'PO-REPORT-2026-000178-LONG-REFERENCE',
+            'supplier_id' => $supplier->id,
+            'cost_center_id' => $costCenter->id,
+            'item_id' => $item->id,
+            'quantity' => 171,
+            'unit_cost' => 300.00,
+            'total_amount' => 51300.00,
+            'delivery_date' => now()->toDateString(),
+            'status' => PurchaseOrderStatus::Approved->value,
+            'created_by_user_id' => $buyer->id,
+            'entity_name' => 'St. Jude General Hospital Central Institutional Medical Center',
+            'fund_cluster' => '01 — Regular Agency Fund / Medical Supply Operations',
+        ]);
+
+        $grn = GoodsReceiptNote::create([
+            'grn_number' => 'GRN-REPORT-2026-000178',
+            'purchase_order_id' => $po->id,
+            'supplier_id' => $supplier->id,
+            'received_by_id' => $buyer->id,
+            'received_at' => now(),
+            'receipt_status' => 'received',
+            'dr_number' => 'DR-REPORT-2026-000178',
+            'sales_invoice_number' => 'SI-REPORT-2026-000178',
+        ]);
+
+        foreach (range(1, 18) as $lineNumber) {
+            GoodsReceiptNoteLine::create([
+                'goods_receipt_note_id' => $grn->id,
+                'item_id' => $item->id,
+                'ordered_quantity' => $lineNumber,
+                'received_quantity' => $lineNumber,
+                'accepted_quantity' => $lineNumber,
+                'unit_cost' => 300.00,
+                'batch_number' => 'BATCH-'.str_pad((string) $lineNumber, 3, '0', STR_PAD_LEFT),
+                'expiry_date' => now()->addYears(2),
+            ]);
+        }
+
+        $iar = app(InspectionAcceptanceService::class)->createFromReceipt($grn, [], $buyer);
+        $iar->update([
+            'inspection_date' => now(),
+            'inspected_by_id' => $inspector->id,
+            'inspection_status' => 'in_order',
+            'inspection_findings' => 'All delivered lots were inspected against the purchase specification and attached Certificate of Analysis; labels, seals, and recorded quantities were verified.',
+            'acceptance_date' => now(),
+            'accepted_by_id' => $custodian->id,
+            'delivery_status' => 'complete',
+            'status' => 'accepted',
+            'notes' => 'Accepted in full after technical verification and document reconciliation.',
+        ]);
+
+        LogisticsDocument::create([
+            'tracking_number' => 'DOC-COA-REPORT-2026-000178',
+            'document_type' => DocumentType::CertificateOfAnalysis,
+            'title' => 'Manufacturer Certificate of Analysis — Delivered Lots',
+            'reference_number' => 'COA-LOT-2026-178',
+            'inspection_acceptance_report_id' => $iar->id,
+            'status' => 'verified',
+            'uploaded_by_id' => $buyer->id,
+        ]);
+
+        $response = $this->actingAs($buyer)
+            ->get(route('inventory.logistics.iar.print', $iar));
+
+        $response->assertOk()
+            ->assertSee('<!DOCTYPE html>', false)
+            ->assertSee('data-iar-document', false)
+            ->assertSee('St. Jude General Hospital Central Institutional Medical Center')
+            ->assertSee('Hospital Central Pharmacy, Therapeutics, and Medical Supply Operations')
+            ->assertSee('CPMSC-2026-OPERATIONS')
+            ->assertSee('SI-REPORT-2026-000178')
+            ->assertSee('BATCH-018')
+            ->assertSee('&#8369;51,300.00', false)
+            ->assertSee('Technical Inspector')
+            ->assertSee('Property Custodian')
+            ->assertSee('Certificate of Analysis (COA) / CPR')
+            ->assertSee('@bottom-right', false)
+            ->assertSee('counter(pages)', false)
+            ->assertSee('display: table-header-group', false)
+            ->assertSee('page-break-inside: avoid', false)
+            ->assertDontSee('Search items, POs')
+            ->assertDontSee('Print GAM App. 50')
+            ->assertDontSee('127.0.0.1')
+            ->assertDontSee('localhost');
+
+        $this->get(route('inventory.logistics.iar.show', $iar))
+            ->assertOk()
+            ->assertSee(route('inventory.logistics.iar.print', ['iar' => $iar, 'print' => 1]), false);
+    }
+
+    public function test_iar_print_view_does_not_fabricate_missing_optional_metadata(): void
+    {
+        extract($this->createSetup());
+
+        $po = PurchaseOrder::create([
+            'po_number' => 'PO-REPORT-MISSING-01',
+            'supplier_id' => $supplier->id,
+            'item_id' => $item->id,
+            'quantity' => 1,
+            'unit_cost' => 1000.00,
+            'total_amount' => 1000.00,
+            'delivery_date' => now()->toDateString(),
+            'status' => PurchaseOrderStatus::Approved->value,
+            'created_by_user_id' => $buyer->id,
+            'entity_name' => '',
+            'fund_cluster' => '',
+        ]);
+
+        $grn = GoodsReceiptNote::create([
+            'grn_number' => 'GRN-REPORT-MISSING-01',
+            'purchase_order_id' => $po->id,
+            'supplier_id' => $supplier->id,
+            'received_by_id' => $buyer->id,
+            'received_at' => now(),
+            'receipt_status' => 'received',
+        ]);
+
+        GoodsReceiptNoteLine::create([
+            'goods_receipt_note_id' => $grn->id,
+            'item_id' => $item->id,
+            'ordered_quantity' => 1,
+            'received_quantity' => 1,
+            'accepted_quantity' => 1,
+            'unit_cost' => 1000.00,
+        ]);
+
+        $iar = app(InspectionAcceptanceService::class)->createFromReceipt($grn, [], $buyer);
+
+        $this->actingAs($buyer)
+            ->get(route('inventory.logistics.iar.print', $iar))
+            ->assertOk()
+            ->assertSee('Organization not recorded')
+            ->assertSee('Not recorded')
+            ->assertDontSee('Hospital Central Pharmacy &amp; Supply')
+            ->assertDontSee('HIMS-101-02');
+    }
+
+    public function test_user_without_sensitive_logistics_access_cannot_print_an_iar(): void
+    {
+        extract($this->createSetup());
+
+        $po = PurchaseOrder::create([
+            'po_number' => 'PO-REPORT-AUTH-01',
+            'supplier_id' => $supplier->id,
+            'item_id' => $item->id,
+            'quantity' => 1,
+            'unit_cost' => 1000.00,
+            'total_amount' => 1000.00,
+            'delivery_date' => now()->toDateString(),
+            'status' => PurchaseOrderStatus::Approved->value,
+            'created_by_user_id' => $buyer->id,
+        ]);
+        $grn = GoodsReceiptNote::create([
+            'grn_number' => 'GRN-REPORT-AUTH-01',
+            'purchase_order_id' => $po->id,
+            'supplier_id' => $supplier->id,
+            'received_by_id' => $buyer->id,
+            'received_at' => now(),
+            'receipt_status' => 'received',
+        ]);
+        $iar = app(InspectionAcceptanceService::class)->createFromReceipt($grn, [], $buyer);
+        $viewer = User::factory()->create([
+            'role' => UserRole::Viewer,
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($viewer)
+            ->get(route('inventory.logistics.iar.print', $iar))
+            ->assertForbidden();
+    }
+
+    public function test_web_routes_and_controllers_render_screens_with_role_authorization(): void
+    {
+        Storage::fake('local');
+        extract($this->createSetup());
+        $this->createDownloadableDocument($buyer);
 
         // Authenticate as authorized InventoryManager
         $this->actingAs($buyer);
@@ -410,7 +729,9 @@ class DocumentTrackingAndLogisticsTest extends TestCase
 
         $this->get(route('inventory.logistics.documents'))
             ->assertStatus(200)
-            ->assertSee('Document Tracking Registry');
+            ->assertSee('Document Tracking Registry')
+            ->assertSee('data-hims-download', false)
+            ->assertSee('data-loading-text="Preparing document..."', false);
 
         $this->get(route('inventory.logistics.shipments'))
             ->assertStatus(200)

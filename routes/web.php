@@ -201,6 +201,7 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::get('/inventory/logistics/iar', [LogisticsController::class, 'iarIndex'])->name('inventory.logistics.iar.index');
     Route::post('/inventory/logistics/receipts/{goodsReceiptNote}/iar', [LogisticsController::class, 'generateIarFromReceipt'])->name('inventory.logistics.iar.generate');
     Route::get('/inventory/logistics/iar/{iar}', [LogisticsController::class, 'iarShow'])->name('inventory.logistics.iar.show');
+    Route::get('/inventory/logistics/iar/{iar}/print', [LogisticsController::class, 'iarPrint'])->name('inventory.logistics.iar.print');
     Route::post('/inventory/logistics/iar/{iar}/technical-inspection', [LogisticsController::class, 'performTechnicalInspection'])->name('inventory.logistics.iar.technical-inspection');
     Route::post('/inventory/logistics/iar/{iar}/custodial-acceptance', [LogisticsController::class, 'approveCustodialAcceptance'])->name('inventory.logistics.iar.custodial-acceptance');
     Route::post('/inventory/logistics/iar/{iar}/transmit-coa', [LogisticsController::class, 'transmitToCoa'])->name('inventory.logistics.iar.transmit-coa');

@@ -15,7 +15,7 @@ class BudgetEncumbranceService
     /**
      * Synchronously validates whether a cost center has sufficient uncommitted budget.
      */
-    public function validateBudgetAvailability(CostCenter $costCenter, float $amount, int $fiscalYear = null): bool
+    public function validateBudgetAvailability(CostCenter $costCenter, float $amount, ?int $fiscalYear = null): bool
     {
         $fiscalYear = $fiscalYear ?? (int) date('Y');
 
@@ -34,7 +34,7 @@ class BudgetEncumbranceService
      * Reserve soft commitment upon Purchase Request submission.
      * Uses row-level lock (SELECT FOR UPDATE) to prevent concurrent budget exhaustion.
      */
-    public function reserveSoftCommitment(PurchaseRequest $request, User $actor = null): CostCenterBudget
+    public function reserveSoftCommitment(PurchaseRequest $request, ?User $actor = null): CostCenterBudget
     {
         return DB::transaction(function () use ($request) {
             $year = (int) ($request->submitted_at?->format('Y') ?? date('Y'));
@@ -137,6 +137,37 @@ class BudgetEncumbranceService
 
             $po->total_encumbered_amount = $poAmount;
             $po->cost_center_id = $costCenterId;
+            $po->save();
+        });
+    }
+
+    /**
+     * Release a purchase-order commitment when its approval chain is rejected.
+     */
+    public function releaseHardEncumbrance(PurchaseOrder $po): void
+    {
+        DB::transaction(function () use ($po): void {
+            if (! $po->cost_center_id) {
+                return;
+            }
+
+            $year = (int) ($po->requested_at?->format('Y') ?? date('Y'));
+            $budget = CostCenterBudget::where('cost_center_id', $po->cost_center_id)
+                ->where('fiscal_year', $year)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $budget) {
+                return;
+            }
+
+            $amount = (float) ($po->total_encumbered_amount > 0
+                ? $po->total_encumbered_amount
+                : $po->total_amount);
+            $budget->hard_encumbered = max(0, (float) $budget->hard_encumbered - $amount);
+            $budget->save();
+
+            $po->total_encumbered_amount = 0;
             $po->save();
         });
     }

@@ -207,7 +207,8 @@ class UiNavigationAuthorizationTest extends TestCase
 
         $this->actingAs($manager)->get('/inventory/suppliers')
             ->assertOk()
-            ->assertSee('Back to Procurement');
+            ->assertSee(route('inventory.purchases'), false)
+            ->assertSee('Procurement');
 
         $this->actingAs($manager)->get('/inventory/demand-forecast')
             ->assertOk()

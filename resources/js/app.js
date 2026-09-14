@@ -906,6 +906,7 @@ const startLoadingIndicators = () => {
     const overlay = document.querySelector('[data-hims-loading-overlay]');
     const overlayMessage = overlay?.querySelector('[data-hims-loading-message]');
     const processingForms = new WeakSet();
+    const processingDownloads = new WeakSet();
     const nativeFetch = window.fetch.bind(window);
     let activeApiRequests = 0;
     let pageTransitionPending = false;
@@ -946,6 +947,12 @@ const startLoadingIndicators = () => {
         document.querySelectorAll('[data-hims-navigation-active]').forEach((link) => {
             link.removeAttribute('aria-busy');
             link.removeAttribute('data-hims-navigation-active');
+        });
+        document.querySelectorAll('[data-hims-download-active]').forEach((link) => {
+            link.removeAttribute('aria-busy');
+            link.removeAttribute('aria-disabled');
+            link.removeAttribute('data-hims-download-active');
+            processingDownloads.delete(link);
         });
 
         if (overlay instanceof HTMLElement) {
@@ -1085,6 +1092,66 @@ const startLoadingIndicators = () => {
         if (url.origin !== window.location.origin
             || !['http:', 'https:'].includes(url.protocol)
             || isSamePageHash) {
+            return;
+        }
+
+        if (link.matches('[data-hims-download]')) {
+            event.preventDefault();
+            if (processingDownloads.has(link)) return;
+
+            processingDownloads.add(link);
+            activeApiRequests += 1;
+            link.setAttribute('aria-busy', 'true');
+            link.setAttribute('aria-disabled', 'true');
+            link.setAttribute('data-hims-download-active', '');
+            showOverlay(link.dataset.loadingText || 'Preparing document...');
+
+            void (async () => {
+                let objectUrl = null;
+
+                try {
+                    const response = await nativeFetch(url.href, {
+                        credentials: 'same-origin',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    });
+                    const disposition = response.headers.get('Content-Disposition') || '';
+
+                    if (!response.ok || !disposition.toLowerCase().startsWith('attachment')) {
+                        throw new Error(`Download request failed with status ${response.status}.`);
+                    }
+
+                    objectUrl = URL.createObjectURL(await response.blob());
+                    const download = document.createElement('a');
+                    const downloadName = (link.dataset.downloadName || 'document')
+                        .split(/[\\/]/)
+                        .pop()
+                        .replace(/[\u0000-\u001F\u007F]/g, '') || 'document';
+                    download.href = objectUrl;
+                    download.download = downloadName;
+                    download.hidden = true;
+                    download.setAttribute('data-no-loading', '');
+                    document.body.append(download);
+                    download.click();
+                    download.remove();
+                } catch {
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: {
+                            type: 'error',
+                            title: 'Download failed',
+                            message: 'The document is missing or temporarily unavailable. Please try again or contact the records custodian.',
+                        },
+                    }));
+                } finally {
+                    if (objectUrl) URL.revokeObjectURL(objectUrl);
+                    activeApiRequests = Math.max(0, activeApiRequests - 1);
+                    processingDownloads.delete(link);
+                    link.removeAttribute('aria-busy');
+                    link.removeAttribute('aria-disabled');
+                    link.removeAttribute('data-hims-download-active');
+                    hideOverlay();
+                }
+            })();
+
             return;
         }
 

@@ -13,18 +13,18 @@
                 <p class="text-sm text-neutral-600">Statutory Inspection and Acceptance Report for {{ $iar->purchaseOrder->po_number ?? 'Inbound Goods' }}</p>
             </div>
             <div class="flex items-center gap-2">
-                <button onclick="window.print()" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
+                <a href="{{ route('inventory.logistics.iar.print', ['iar' => $iar, 'print' => 1]) }}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                     Print GAM App. 50
-                </button>
+                </a>
             </div>
         </div>
     </x-slot>
 
     @include('inventory.logistics.partials.nav')
 
-    <div class="py-6" x-data="{ inspectModalOpen: false, acceptModalOpen: false, coaModalOpen: false }">
-        <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
+    <div class="py-6 print:py-0 print:m-0" x-data="{ inspectModalOpen: false, acceptModalOpen: false, coaModalOpen: false }">
+        <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8 print:max-w-none print:p-0 print:m-0 print:space-y-0">
 
             {{-- Flash Messages --}}
             @if(session('success'))
@@ -83,177 +83,7 @@
             </div>
 
             {{-- FORMAL COA GAM VOLUME II APPENDIX 50 DOCUMENT CANVAS --}}
-            <div class="border border-neutral-300 bg-white p-8 shadow-sm print:border-none print:p-0 print:shadow-none font-serif text-neutral-900">
-                <div class="text-center">
-                    <p class="text-[11px] font-sans font-semibold tracking-wider text-neutral-500 uppercase">Appendix 50</p>
-                    <h1 class="text-xl font-bold tracking-tight uppercase">Inspection and Acceptance Report</h1>
-                    <p class="text-xs italic font-sans text-neutral-600 mt-0.5">Republic of the Philippines</p>
-                </div>
-
-                <div class="mt-6 border-t border-b border-neutral-800 py-2 flex justify-between text-xs font-sans">
-                    <div>
-                        <span class="font-bold">Entity Name:</span>
-                        <span class="underline font-semibold ml-1">{{ $iar->purchaseOrder?->entity_name ?? 'HOSPITAL INFORMATION MANAGEMENT SYSTEM' }}</span>
-                    </div>
-                    <div>
-                        <span class="font-bold">Fund Cluster:</span>
-                        <span class="underline font-semibold ml-1">{{ $iar->purchaseOrder?->fund_cluster ?? '01 - Regular Agency Fund' }}</span>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 border-b border-neutral-800 text-xs font-sans">
-                    <div class="border-r border-neutral-800 p-2 space-y-1">
-                        <div><span class="font-bold">Supplier:</span> {{ $iar->supplier->name ?? 'N/A' }}</div>
-                        <div><span class="font-bold">PO No./Date:</span> {{ $iar->purchaseOrder->po_number ?? 'Direct' }} / {{ $iar->purchaseOrder?->created_at?->format('m/d/Y') ?? 'N/A' }}</div>
-                        <div><span class="font-bold">Requisitioning Office/Dept:</span> Hospital Central Pharmacy & Supply</div>
-                        <div><span class="font-bold">Responsibility Center Code:</span> HIMS-101-02</div>
-                    </div>
-                    <div class="p-2 space-y-1">
-                        <div><span class="font-bold">IAR No.:</span> <span class="font-mono font-bold">{{ $iar->iar_number }}</span></div>
-                        <div><span class="font-bold">Date:</span> {{ $iar->created_at->format('F d, Y') }}</div>
-                        <div><span class="font-bold">Invoice No. (BIR RA 11976):</span> <span class="font-mono">{{ $iar->invoice_number ?? 'Pending' }}</span></div>
-                        <div><span class="font-bold">Delivery Receipt (DR) No.:</span> <span class="font-mono">{{ $iar->goodsReceiptNote->dr_number ?? 'N/A' }}</span></div>
-                    </div>
-                </div>
-
-                {{-- Items Table --}}
-                <div class="overflow-x-auto">
-                    <table class="min-w-full border-b border-neutral-800 text-left text-xs font-sans">
-                        <thead class="bg-neutral-100 font-bold uppercase border-b border-neutral-800 text-[10px]">
-                            <tr>
-                                <th class="border-r border-neutral-800 px-3 py-2 text-center w-12">Item #</th>
-                                <th class="border-r border-neutral-800 px-3 py-2">Stock / Description</th>
-                                <th class="border-r border-neutral-800 px-3 py-2 text-center w-16">Unit</th>
-                                <th class="border-r border-neutral-800 px-3 py-2 text-right w-20">Qty Delivered</th>
-                                <th class="border-r border-neutral-800 px-3 py-2 text-right w-24">Unit Cost (₱)</th>
-                                <th class="px-3 py-2 text-right w-28">Amount (₱)</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-neutral-300">
-                            @php $totalAmount = 0; @endphp
-                            @if($iar->goodsReceiptNote && $iar->goodsReceiptNote->lines)
-                                @foreach($iar->goodsReceiptNote->lines as $idx => $line)
-                                    @php
-                                        $unitCost = $line->unit_cost ?? $line->item?->unit_cost ?? 0;
-                                        $lineTotal = $line->received_quantity * $unitCost;
-                                        $totalAmount += $lineTotal;
-                                    @endphp
-                                    <tr>
-                                        <td class="border-r border-neutral-800 px-3 py-2 text-center font-mono">{{ $idx + 1 }}</td>
-                                        <td class="border-r border-neutral-800 px-3 py-2">
-                                            <div class="font-bold text-neutral-900">{{ $line->item->name ?? 'Medical Supply' }}</div>
-                                            <div class="text-[10px] text-neutral-600 font-mono">SKU: {{ $line->item->sku ?? 'N/A' }} | Batch: {{ $line->batch_number ?? 'N/A' }} | Exp: {{ $line->expiry_date?->format('Y-m-d') ?? 'N/A' }}</div>
-                                        </td>
-                                        <td class="border-r border-neutral-800 px-3 py-2 text-center uppercase">{{ $line->item->unit ?? 'pcs' }}</td>
-                                        <td class="border-r border-neutral-800 px-3 py-2 text-right font-mono font-bold">{{ number_format($line->received_quantity) }}</td>
-                                        <td class="border-r border-neutral-800 px-3 py-2 text-right font-mono">{{ number_format($unitCost, 2) }}</td>
-                                        <td class="px-3 py-2 text-right font-mono font-bold">{{ number_format($lineTotal, 2) }}</td>
-                                    </tr>
-                                @endforeach
-                            @endif
-                        </tbody>
-                        <tfoot class="border-t-2 border-neutral-800 font-bold">
-                            <tr>
-                                <td colspan="5" class="border-r border-neutral-800 px-3 py-2 text-right uppercase">Total Value of Delivery</td>
-                                <td class="px-3 py-2 text-right font-mono text-sm">₱{{ number_format($totalAmount, 2) }}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-
-                {{-- DUAL SECTION STATUTORY SIGNATURE EXECUTION --}}
-                <div class="grid grid-cols-2 border-b border-neutral-800 font-sans text-xs">
-                    {{-- Technical Inspection Section --}}
-                    <div class="border-r border-neutral-800 p-4 flex flex-col justify-between">
-                        <div>
-                            <div class="font-bold uppercase tracking-wider text-center border-b border-neutral-400 pb-1 mb-2">
-                                INSPECTION
-                            </div>
-                            <div class="text-[11px] space-y-1">
-                                <div><span class="font-semibold">Date Inspected:</span> {{ $iar->inspection_date?->format('F d, Y') ?? '___________________' }}</div>
-                                <div class="mt-2 flex items-start gap-2">
-                                    <span class="font-bold text-base">[{{ $iar->inspection_date ? 'X' : ' ' }}]</span>
-                                    <span>Inspected, verified and found in order as to quantity and technical specifications.</span>
-                                </div>
-                                @if($iar->inspection_findings)
-                                    <div class="mt-2 text-[10px] bg-neutral-50 p-2 rounded border border-neutral-200">
-                                        <span class="font-bold">Findings:</span> {{ $iar->inspection_findings }}
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-
-                        <div class="mt-8 text-center">
-                            <div class="border-b border-neutral-800 mx-auto w-48 mb-1">
-                                <span class="font-bold">{{ $iar->inspectedBy->name ?? '____________________________' }}</span>
-                            </div>
-                            <div class="text-[10px] font-semibold uppercase text-neutral-600">Inspection Officer / Committee</div>
-                        </div>
-                    </div>
-
-                    {{-- Custodial Acceptance Section --}}
-                    <div class="p-4 flex flex-col justify-between">
-                        <div>
-                            <div class="font-bold uppercase tracking-wider text-center border-b border-neutral-400 pb-1 mb-2">
-                                ACCEPTANCE
-                            </div>
-                            <div class="text-[11px] space-y-1">
-                                <div><span class="font-semibold">Date Received:</span> {{ $iar->acceptance_date?->format('F d, Y') ?? '___________________' }}</div>
-                                <div class="mt-2 space-y-1">
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-bold text-base">[{{ $iar->delivery_status === 'complete' || $iar->status === 'accepted' ? 'X' : ' ' }}]</span>
-                                        <span>Complete</span>
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-bold text-base">[{{ $iar->delivery_status === 'partial' ? 'X' : ' ' }}]</span>
-                                        <span>Partial (pls. specify quantity)</span>
-                                    </div>
-                                </div>
-
-                                {{-- Liquidated Damages Assessment --}}
-                                @if($iar->days_delayed > 0 || $iar->liquidated_damages_amount > 0)
-                                    <div class="mt-3 rounded border border-red-300 bg-red-50 p-2 text-[10px] text-red-900">
-                                        <div class="font-bold uppercase">COA GAM App. 61 Liquidated Damages Assessed:</div>
-                                        <div>Delay: <span class="font-bold">{{ $iar->days_delayed }} days</span></div>
-                                        <div>Rate: 1/10 of 1% (0.001) per day of delay</div>
-                                        <div class="font-bold text-xs mt-0.5">Assessed Penalty: ₱{{ number_format($iar->liquidated_damages_amount, 2) }}</div>
-                                    </div>
-                                @endif
-
-                                @if($iar->notes)
-                                    <div class="mt-2 text-[10px] bg-neutral-50 p-2 rounded border border-neutral-200">
-                                        <span class="font-bold">Remarks:</span> {{ $iar->notes }}
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-
-                        <div class="mt-8 text-center">
-                            <div class="border-b border-neutral-800 mx-auto w-48 mb-1">
-                                <span class="font-bold">{{ $iar->acceptedBy->name ?? '____________________________' }}</span>
-                            </div>
-                            <div class="text-[10px] font-semibold uppercase text-neutral-600">Property and/or Supply Custodian</div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- COA Transmittal Compliance Footer --}}
-                <div class="p-3 bg-neutral-50 text-xs font-sans flex items-center justify-between">
-                    <div>
-                        <span class="font-bold">COA 5-Day Statutory Transmittal:</span>
-                        @if($iar->coa_transmitted_at)
-                            <span class="inline-flex items-center gap-1.5 text-emerald-800 font-semibold ml-1"><x-ui.icon name="check-circle" class="h-4 w-4 shrink-0" /> Transmitted on {{ $iar->coa_transmitted_at->format('F d, Y') }} (Received by: {{ $iar->coa_received_by }})</span>
-                        @elseif($iar->isAccepted())
-                            <span class="text-amber-800 font-bold ml-1">⏳ Pending Transmittal (Deadline: {{ $iar->coa_transmittal_deadline_at?->format('F d, Y') ?? 'Within 5 days' }})</span>
-                        @else
-                            <span class="text-neutral-500 ml-1">Pending custodial acceptance</span>
-                        @endif
-                    </div>
-                    <div class="text-[10px] text-neutral-400 font-mono">
-                        System Verification ID: {{ $iar->iar_number }}-SHA256
-                    </div>
-                </div>
-            </div>
+            @include('inventory.logistics.partials.iar_document')
 
             {{-- Linked Supporting Documents & Chain of Custody (Screen Only) --}}
             <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm print:hidden space-y-4">
@@ -265,7 +95,7 @@
                             @forelse($iar->documents as $doc)
                                 <li class="flex items-center justify-between py-1">
                                     <span class="truncate font-medium text-neutral-900">{{ $doc->title }} ({{ $doc->tracking_number }})</span>
-                                    <a href="{{ route('inventory.logistics.documents.download', $doc) }}" class="text-primary-600 hover:underline">Download</a>
+                                    <a href="{{ route('inventory.logistics.documents.download', $doc) }}" class="text-primary-600 hover:underline" data-hims-download data-loading-text="Preparing document..." data-download-name="{{ $doc->original_name ?: ($doc->file_name ?: 'document') }}">Download</a>
                                 </li>
                             @empty
                                 <li class="text-neutral-400 text-xs italic">No direct file attachments linked to this IAR.</li>

@@ -24,9 +24,9 @@ class GoodsReceiptController extends Controller implements HasMiddleware
     {
         return [
             'auth:web,admin,super_admin',
-            new Middleware('can:' . Permission::ReceivePurchaseOrder->value, only: ['storeReceipt']),
-            new Middleware('can:' . Permission::InspectStock->value, only: ['qcQueue', 'releaseQc', 'rejectQc']),
-            new Middleware('can:' . Permission::ViewInventory->value, only: ['index', 'show']),
+            new Middleware('can:'.Permission::ReceivePurchaseOrder->value, only: ['storeReceipt']),
+            new Middleware('can:'.Permission::InspectStock->value, only: ['qcQueue', 'releaseQc', 'rejectQc']),
+            new Middleware('can:'.Permission::ViewInventory->value, only: ['index', 'show']),
         ];
     }
 
@@ -43,7 +43,14 @@ class GoodsReceiptController extends Controller implements HasMiddleware
 
         // Open purchase orders available for dock receiving
         $openPurchaseOrders = PurchaseOrder::with(['supplier', 'lines.item'])
-            ->whereNotIn('status', ['received', 'cancelled', 'rejected', PurchaseOrderStatus::Fulfilled->value])
+            ->whereIn('status', [
+                PurchaseOrderStatus::Approved->value,
+                PurchaseOrderStatus::Dispatched->value,
+                PurchaseOrderStatus::Acknowledged->value,
+                PurchaseOrderStatus::PartiallyFulfilled->value,
+                'partially_received',
+                'issued',
+            ])
             ->latest()
             ->get();
 
@@ -149,7 +156,7 @@ class GoodsReceiptController extends Controller implements HasMiddleware
             );
 
             return redirect()->route('inventory.qc.index')
-                ->with('success', "Stock rejected and isolated in blocked inventory.");
+                ->with('success', 'Stock rejected and isolated in blocked inventory.');
         } catch (DomainException $e) {
             return redirect()->back()->withErrors(['qc' => $e->getMessage()]);
         }

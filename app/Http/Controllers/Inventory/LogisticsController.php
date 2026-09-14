@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Enums\AuditAction;
 use App\Enums\DocumentType;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
@@ -41,6 +42,7 @@ class LogisticsController extends Controller implements HasMiddleware
                 'shipments',
                 'iarIndex',
                 'iarShow',
+                'iarPrint',
                 'chainOfCustody',
                 'risShow',
             ]),
@@ -440,9 +442,32 @@ class LogisticsController extends Controller implements HasMiddleware
      */
     public function iarShow(InspectionAcceptanceReport $iar): View
     {
-        $iar->load([
+        $this->loadIarDocumentRelations($iar);
+
+        return view('inventory.logistics.iar_show', compact('iar'));
+    }
+
+    /**
+     * Render the IAR as a standalone, print-ready institutional document.
+     */
+    public function iarPrint(InspectionAcceptanceReport $iar, Request $request): View
+    {
+        $this->loadIarDocumentRelations($iar);
+
+        return view('inventory.logistics.iar_print', [
+            'iar' => $iar,
+            'autoPrint' => $request->boolean('print'),
+        ]);
+    }
+
+    private function loadIarDocumentRelations(InspectionAcceptanceReport $iar): InspectionAcceptanceReport
+    {
+        return $iar->load([
             'goodsReceiptNote.lines.item',
             'purchaseOrder.lines.item',
+            'purchaseOrder.costCenter',
+            'purchaseOrder.purchaseRequest.costCenter',
+            'purchaseOrder.purchaseRequest.requester',
             'supplier',
             'inspectedBy',
             'acceptedBy',
@@ -450,8 +475,6 @@ class LogisticsController extends Controller implements HasMiddleware
             'custodyLogs.releasingUser',
             'custodyLogs.receivingUser',
         ]);
-
-        return view('inventory.logistics.iar_show', compact('iar'));
     }
 
     /**

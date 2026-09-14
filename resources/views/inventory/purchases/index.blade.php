@@ -12,12 +12,7 @@
                     <x-ui.button variant="secondary" :href="route('inventory.suppliers')" icon="truck">Suppliers</x-ui.button>
                 @endcan
                 @can(\App\Enums\Permission::ViewInventory->value)
-                <a href="{{ route('inventory.receiving.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50">
-                    <svg class="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    Receiving
-                </a>
+                    <x-ui.button variant="secondary" :href="route('inventory.receiving.index')" icon="inbox">Receiving</x-ui.button>
                 @endcan
             </div>
             @endcanany
@@ -150,7 +145,7 @@
                             @endcanany
                             <option value="orders_revisions">Purchase Orders &amp; Revisions</option>
                             @canany(['create_requisition', 'manage_sourcing', 'issue_purchase_order'])
-                                <option value="legacy_canvass">Standard Canvassing (Stages 1-5)</option>
+                                <option value="legacy_canvass">Standard Canvassing</option>
                             @endcanany
                         </optgroup>
                         @canany(['view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids', 'award_procurement'])
@@ -228,7 +223,7 @@
                                     class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
                                     :class="activeTab === 'legacy_canvass' ? 'bg-primary-50 text-primary-700 font-bold' : 'text-neutral-700 hover:bg-neutral-50'"
                                 >
-                                    <span>Standard Canvassing (Stages 1-5)</span>
+                                    <span>Standard Canvassing</span>
                                     <span x-show="activeTab === 'legacy_canvass'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
                                 </button>
                             @endcanany
@@ -991,7 +986,7 @@
                                         </span>
                                         <div>
                                             <h3 id="create-po-heading" class="text-sm font-bold text-neutral-900">Prepare Purchase Order</h3>
-                                            <p class="text-[11px] text-neutral-500">Real-time catalog pricing &amp; compliance</p>
+                                            <p class="text-[11px] text-neutral-500">Trusted catalog pricing &amp; compliance</p>
                                         </div>
                                     </div>
                                     <span class="rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-semibold text-primary-700 ring-1 ring-inset ring-primary-200">Catalog PO</span>
@@ -1140,11 +1135,11 @@
                                             Purchase Order Pipeline
                                             <span class="ml-1 text-xs font-normal text-neutral-500">({{ $purchaseOrders->total() }})</span>
                                         </h3>
-                                        <p class="text-[11px] text-neutral-500">Recent Purchase Orders dispatched through ERP and catalog workflow</p>
+                                        <p class="text-[11px] text-neutral-500">Orders across approval, fulfillment, and receiving</p>
                                     </div>
                                 </div>
                                 @can(\App\Enums\Permission::ViewInventory->value)
-                                    <x-ui.button variant="secondary" size="sm" :href="route('inventory.receiving.index')" icon="archive-box">Receiving Dock</x-ui.button>
+                                    <x-ui.button variant="secondary" size="sm" :href="route('inventory.receiving.index')" icon="inbox">Receiving Dock</x-ui.button>
                                 @endcan
                             </div>
 
@@ -1207,7 +1202,7 @@
                                     $statusLabel = $statusEnum?->label() ?? \Illuminate\Support\Str::headline((string) $po->status);
                                     $statusVariant = match(true) {
                                         in_array($po->status, ['approved', 'received', 'fulfilled'], true) => 'success',
-                                        in_array($po->status, ['submitted', 'pending', 'pending_approval', 'acknowledged', 'partially_fulfilled'], true) => 'warning',
+                                        in_array($po->status, ['submitted', 'pending', 'pending_approval', 'acknowledged', 'partially_fulfilled', 'partially_received'], true) => 'warning',
                                         in_array($po->status, ['cancelled', 'rejected'], true) => 'danger',
                                         in_array($po->status, ['dispatched', 'issued'], true) => 'primary',
                                         default => 'neutral',
@@ -1218,7 +1213,8 @@
                                     $receivedQuantity = $poLines->isNotEmpty() ? (int) $poLines->sum('received_quantity') : ($po->received_at ? $orderedQuantity : 0);
                                     $expectedDelivery = $po->shipments->sortByDesc('id')->first()?->estimated_delivery_date ?? $po->delivery_date;
                                     $isOverdue = $expectedDelivery && $expectedDelivery->lt(today()) && !in_array($po->status, ['received', 'fulfilled', 'cancelled', 'rejected'], true);
-                                    $canReceiveThisPo = in_array($po->status, ['approved', 'dispatched', 'acknowledged', 'partially_fulfilled', 'issued', 'pending'], true);
+                                    $canReceiveThisPo = $statusEnum?->canReceiveStock()
+                                        ?? in_array($po->status, ['approved', 'dispatched', 'acknowledged', 'partially_fulfilled', 'partially_received', 'issued'], true);
                                     $poDetail = [
                                         'number' => $po->po_number,
                                         'version' => $po->version,
@@ -1339,7 +1335,7 @@
                                             @if($canReceiveThisPo)
                                                 <form method="POST" action="{{ route('inventory.purchases.receive', $po) }}" data-confirm-title="Receive Purchase Order" data-confirm-message="Confirm that this delivery is physically present at the dock before posting into inventory." data-confirm-label="Receive delivery">
                                                     @csrf
-                                                    <x-ui.button type="submit" size="sm" icon="check-badge">Receive delivery</x-ui.button>
+                                                    <x-ui.button type="submit" size="sm" icon="check-circle">Receive delivery</x-ui.button>
                                                 </form>
                                             @elseif(in_array($po->status, ['received', 'fulfilled'], true))
                                                 <span class="inline-flex items-center gap-1 text-xs font-semibold text-success-700">
@@ -1478,7 +1474,7 @@
                     </x-slot>
                 </x-ui.modal>
             </div>
-            {{-- ======================================================== TAB 6: Standard Canvassing (Stages 1-5 Preserved) --}}
+            {{-- ======================================================== TAB 6: Standard Canvassing --}}
             <div x-show="activeTab === 'legacy_canvass'" class="space-y-6">
                 {{-- Stage 1 --}}
                 <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
@@ -1813,25 +1809,6 @@
                 `;
             @else
                 return '<span class="text-xs text-[var(--muted)]">Pending approval</span>';
-            @endcan
-        }
-
-        function renderReceiveForm(order) {
-            if (order.status === 'received') {
-                return '<span class="text-sm text-[var(--muted)]">Received</span>';
-            }
-
-            @can(\App\Enums\Permission::RecordMovements->value)
-                return `
-                    <form method="POST" action="/inventory/purchases/${order.id}/receive">
-                        <input type="hidden" name="_token" value="${csrfToken()}">
-                        <button type="submit" class="rounded-lg bg-[var(--primary)] px-3 py-1.5 text-xs font-semibold text-white">
-                            Receive
-                        </button>
-                    </form>
-                `;
-            @else
-                return '<span class="text-sm text-[var(--muted)]">Awaiting delivery</span>';
             @endcan
         }
 

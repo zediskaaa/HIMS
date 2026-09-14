@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class PurchaseOrderController extends Controller implements HasMiddleware
 {
@@ -51,6 +52,12 @@ class PurchaseOrderController extends Controller implements HasMiddleware
         } catch (DomainException $exception) {
             throw ValidationException::withMessages([
                 'purchase_order' => $exception->getMessage(),
+            ]);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            throw ValidationException::withMessages([
+                'purchase_order' => 'The purchase order could not be created. No records were saved.',
             ]);
         }
 

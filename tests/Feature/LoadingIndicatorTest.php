@@ -117,7 +117,6 @@ class LoadingIndicatorTest extends TestCase
             [route('inventory.items'), 'inventory-api-status'],
             [route('inventory.storage-locations'), 'locations-api-status'],
             [route('inventory.alerts'), 'alerts-api-status'],
-            [route('inventory.purchases'), 'purchase-orders-api-status'],
         ] as [$url, $statusId]) {
             $this->actingAs($manager, AuthenticationContext::WEB_GUARD)
                 ->get($url)
@@ -125,6 +124,14 @@ class LoadingIndicatorTest extends TestCase
                 ->assertSee('id="'.$statusId.'"', false)
                 ->assertSee('loader loader--sm', false);
         }
+
+        // Purchase orders are server-rendered so status, authorization, and
+        // financial visibility come from one trusted response.
+        $this->actingAs($manager, AuthenticationContext::WEB_GUARD)
+            ->get(route('inventory.purchases'))
+            ->assertOk()
+            ->assertSee('id="purchase-orders"', false)
+            ->assertDontSee('purchase-orders-api-status');
 
         // Supplier Management is now server-rendered because its compliance
         // and authorization state cannot be safely reconstructed by the old

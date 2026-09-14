@@ -24,6 +24,34 @@
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+    <style>
+        @media print {
+            .hims-app-shell > aside,
+            .hims-app-shell header,
+            [data-session-warning],
+            #notification-panel,
+            .print\:hidden {
+                display: none !important;
+            }
+            .hims-app-shell {
+                overflow: visible !important;
+            }
+            .lg\:pl-64 {
+                padding-left: 0 !important;
+            }
+            main.hims-app-content {
+                padding: 0 !important;
+                margin: 0 !important;
+                background: transparent !important;
+                overflow: visible !important;
+            }
+            body {
+                background: #ffffff !important;
+                color: #000000 !important;
+            }
+        }
+    </style>
 </head>
 <body
     class="h-full font-sans antialiased bg-neutral-50 text-neutral-800"

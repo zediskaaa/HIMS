@@ -398,7 +398,7 @@
                                             <span class="text-neutral-400">• {{ number_format($doc->file_size_bytes / 1024, 1) }} KB</span>
                                         </div>
                                     </div>
-                                    <a href="{{ route('inventory.logistics.documents.download', $doc) }}" class="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600" title="Download Document">
+                                    <a href="{{ route('inventory.logistics.documents.download', $doc) }}" class="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600" data-hims-download data-loading-text="Preparing document..." data-download-name="{{ $doc->original_name ?: ($doc->file_name ?: 'document') }}" title="Download Document">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                     </a>
                                 </div>

@@ -8,6 +8,7 @@ use App\Enums\PurchaseOrderStatus;
 use App\Models\GoodsReceiptNote;
 use App\Models\GoodsReceiptNoteLine;
 use App\Models\InventoryItem;
+use App\Models\InventorySerial;
 use App\Models\ItemBatch;
 use App\Models\PurchaseOrder;
 use App\Models\QualityInspection;
@@ -20,9 +21,8 @@ use App\Services\Procurement\BudgetEncumbranceService;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
-use App\Models\InventorySerial;
+use Illuminate\Validation\ValidationException;
 
 class GoodsReceiptService
 {
@@ -43,8 +43,9 @@ class GoodsReceiptService
             // Lock PO to avoid race condition on concurrent receiving
             $po = PurchaseOrder::lockForUpdate()->with(['lines.item', 'supplier'])->findOrFail($purchaseOrder->id);
 
-            if (in_array($po->status, ['cancelled', 'rejected'], true)) {
-                throw new DomainException("Cannot receive delivery against {$po->status} Purchase Order {$po->po_number}.");
+            $status = PurchaseOrderStatus::tryFrom((string) $po->status);
+            if (! ($status?->canReceiveStock() ?? in_array($po->status, ['approved', 'dispatched', 'acknowledged', 'partially_fulfilled', 'partially_received', 'issued'], true))) {
+                throw new DomainException("Purchase Order {$po->po_number} must be approved before receiving.");
             }
 
             if ($po->isFullyReceived()) {
@@ -59,7 +60,7 @@ class GoodsReceiptService
                     'type' => 'zone',
                     'zone' => 'Quarantine',
                     'status' => 'active',
-                    'description' => 'Designated holding zone for inbound receipts awaiting QA/QC inspection.'
+                    'description' => 'Designated holding zone for inbound receipts awaiting QA/QC inspection.',
                 ]
             );
 
@@ -90,9 +91,9 @@ class GoodsReceiptService
 
             foreach ($linesData as $lineInput) {
                 $poLine = $po->lines()->where('id', $lineInput['po_line_id'])->first();
-                if (!$poLine) {
+                if (! $poLine) {
                     throw ValidationException::withMessages([
-                        'lines' => ["Purchase order line #{$lineInput['po_line_id']} does not belong to {$po->po_number}."]
+                        'lines' => ["Purchase order line #{$lineInput['po_line_id']} does not belong to {$po->po_number}."],
                     ]);
                 }
 
@@ -109,7 +110,7 @@ class GoodsReceiptService
 
                 if ($receivedQty > $maxAllowedQty) {
                     throw ValidationException::withMessages([
-                        'lines' => ["Line for {$item->name} exceeds the allowable +5% over-delivery tolerance. Open: {$openQty}, Max Allowed: {$maxAllowedQty}, Received: {$receivedQty}."]
+                        'lines' => ["Line for {$item->name} exceeds the allowable +5% over-delivery tolerance. Open: {$openQty}, Max Allowed: {$maxAllowedQty}, Received: {$receivedQty}."],
                     ]);
                 }
 
@@ -120,25 +121,25 @@ class GoodsReceiptService
 
                 if ($item->is_batch_tracked && empty($batchNumber)) {
                     throw ValidationException::withMessages([
-                        'lines' => ["Item {$item->name} requires a batch/lot number."]
+                        'lines' => ["Item {$item->name} requires a batch/lot number."],
                     ]);
                 }
 
                 if ($item->is_expiry_tracked && ! $expiryDate) {
                     throw ValidationException::withMessages([
-                        'lines' => ["Item {$item->name} requires an expiration date."]
+                        'lines' => ["Item {$item->name} requires an expiration date."],
                     ]);
                 }
 
                 if ($expiryDate && $expiryDate->isPast()) {
                     throw ValidationException::withMessages([
-                        'lines' => ["Expiration date for {$item->name} cannot be in the past."]
+                        'lines' => ["Expiration date for {$item->name} cannot be in the past."],
                     ]);
                 }
 
                 if ($manufacturedDate && $manufacturedDate->isFuture()) {
                     throw ValidationException::withMessages([
-                        'lines' => ["Manufacturing date for {$item->name} cannot be in the future."]
+                        'lines' => ["Manufacturing date for {$item->name} cannot be in the future."],
                     ]);
                 }
 
@@ -249,7 +250,7 @@ class GoodsReceiptService
                 $po->status = PurchaseOrderStatus::Fulfilled->value;
                 $po->received_at = now();
             } else {
-                $po->status = 'partially_received';
+                $po->status = PurchaseOrderStatus::PartiallyFulfilled->value;
             }
             $po->save();
 

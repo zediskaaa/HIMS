@@ -13,16 +13,6 @@ class StorePurchaseOrderRequest extends FormRequest
         return true;
     }
 
-    protected function prepareForValidation(): void
-    {
-        if (! $this->filled('cost_center_id')) {
-            $fallbackId = \App\Models\CostCenter::query()->where('is_active', true)->orderBy('id')->value('id');
-            if ($fallbackId) {
-                $this->merge(['cost_center_id' => $fallbackId]);
-            }
-        }
-    }
-
     /** @return array<string, mixed> */
     public function rules(): array
     {
@@ -34,13 +24,11 @@ class StorePurchaseOrderRequest extends FormRequest
                 Rule::exists('inventory_items', 'id')->where(fn ($query) => $query->where('status', '!=', 'inactive')),
             ],
             'cost_center_id' => [
-                'nullable',
+                'required',
                 'integer',
                 Rule::exists('cost_centers', 'id')->where(fn ($query) => $query->where('is_active', true)),
             ],
             'quantity' => ['required', 'integer', 'min:1', 'max:1000000'],
-            'unit_cost' => ['nullable', 'numeric', 'min:0'],
-            'status' => ['nullable', 'string'],
             'delivery_date' => ['nullable', 'date', 'after_or_equal:today'],
             'payment_terms' => ['nullable', Rule::in(['Net 15', 'Net 30', 'Net 60', 'COD'])],
             'incoterms' => ['nullable', Rule::in(['DDP', 'FOB', 'CIF', 'EXW'])],
