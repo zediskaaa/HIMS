@@ -267,6 +267,57 @@ class UiNavigationAuthorizationTest extends TestCase
             ->assertSee('Purchase Orders &amp; Revisions', false);
     }
 
+    public function test_logistics_and_warehousing_navigation_strictly_enforce_role_permissions(): void
+    {
+        // 1. Viewer only has ViewLogisticsRecords: see Overview, but no Shipments, IAR, Documents, CoC
+        $viewer = User::factory()->role(UserRole::Viewer)->create();
+        $viewerSidebar = $this->mainNavigationFor($viewer);
+        $this->assertStringContainsString('Logistics Overview', $viewerSidebar);
+        $this->assertStringNotContainsString('Shipments &amp; 3PL', $viewerSidebar);
+        $this->assertStringNotContainsString('COA IAR Reports', $viewerSidebar);
+        $this->assertStringNotContainsString('Documents Registry', $viewerSidebar);
+        $this->assertStringNotContainsString('Chain of Custody', $viewerSidebar);
+        $this->assertStringNotContainsString('Smart Warehousing', $viewerSidebar);
+
+        $this->actingAs($viewer)->get('/inventory/logistics')
+            ->assertOk()
+            ->assertSee('Document Tracking & Logistics Records (DTRS)', false)
+            ->assertDontSee('Upload Document')
+            ->assertDontSee('New Shipment')
+            ->assertDontSee('IAR Processing')
+            ->assertSee('Summary access only');
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        // 2. Warehouse Staff has ViewWarehouseTasks, ExecuteWarehouseTasks, ReceivePurchaseOrder, ViewLogisticsSensitiveData
+        $warehouse = User::factory()->role(UserRole::WarehouseStaff)->create();
+        $warehouseSidebar = $this->mainNavigationFor($warehouse);
+        $this->assertStringContainsString('Warehouse Dashboard', $warehouseSidebar);
+        $this->assertStringContainsString('Scan Workstation', $warehouseSidebar);
+        $this->assertStringContainsString('Dock Receiving', $warehouseSidebar);
+        $this->assertStringContainsString('Shipments &amp; 3PL', $warehouseSidebar);
+        $this->assertStringContainsString('COA IAR Reports', $warehouseSidebar);
+
+        $this->actingAs($warehouse)->get('/inventory/warehousing')
+            ->assertOk()
+            ->assertSee('Scan Workstation')
+            ->assertSee('Dock Receiving')
+            ->assertSee('QC Inspection')
+            ->assertSee('Warehouse Tasks');
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        // 3. Auditor has ViewWarehouseTasks and ViewAuditTrail, but NOT ExecuteWarehouseTasks
+        $auditor = User::factory()->role(UserRole::Auditor)->create();
+        $this->actingAs($auditor)->get('/inventory/warehousing')
+            ->assertOk()
+            ->assertDontSee('Scan Workstation')
+            ->assertDontSee('Dock Receiving')
+            ->assertSee('Warehouse Tasks');
+    }
+
     private function mainNavigationFor(User $user): string
     {
         $html = $this->actingAs($user)->get('/dashboard')->assertOk()->getContent();

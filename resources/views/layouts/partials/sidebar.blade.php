@@ -263,13 +263,15 @@
                         </x-ui.nav-item>
                     @endcan
 
-                    <x-ui.nav-item sub :href="route('inventory.logistics.shipments')" :active="request()->routeIs('inventory.logistics.shipments*')">
-                        Shipments &amp; 3PL
-                    </x-ui.nav-item>
+                    @can(\App\Enums\Permission::ViewLogisticsSensitiveData->value)
+                        <x-ui.nav-item sub :href="route('inventory.logistics.shipments')" :active="request()->routeIs('inventory.logistics.shipments*')">
+                            Shipments &amp; 3PL
+                        </x-ui.nav-item>
 
-                    <x-ui.nav-item sub :href="route('inventory.logistics.iar.index')" :active="request()->routeIs('inventory.logistics.iar*')">
-                        COA IAR Reports
-                    </x-ui.nav-item>
+                        <x-ui.nav-item sub :href="route('inventory.logistics.iar.index')" :active="request()->routeIs('inventory.logistics.iar*')">
+                            COA IAR Reports
+                        </x-ui.nav-item>
+                    @endcan
 
                     @can(\App\Enums\Permission::ViewLogisticsSensitiveData->value)
                         <x-ui.nav-item sub :href="route('inventory.logistics.chain-of-custody')" :active="request()->routeIs('inventory.logistics.chain-of-custody*')">

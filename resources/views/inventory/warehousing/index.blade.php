@@ -19,15 +19,19 @@
                 @can(\App\Enums\Permission::InspectStock->value)
                     <x-ui.button variant="secondary" :href="route('inventory.qc.index')" icon="shield-check">QC Inspection</x-ui.button>
                 @endcan
+                @can(\App\Enums\Permission::ViewWarehouseTasks->value)
                 <a href="{{ route('inventory.warehouse-tasks.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
                     Warehouse Tasks
                 </a>
                 <a href="{{ route('inventory.warehousing.locations') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
                     Locations Explorer
                 </a>
+                @endcan
+                @canany([\App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ViewInventory->value])
                 <a href="{{ route('inventory.storage-locations') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
                     Location Registry
                 </a>
+                @endcanany
             </div>
         </div>
     </x-slot>
@@ -101,9 +105,11 @@
                         <h3 class="text-base font-semibold text-neutral-900">Cold Chain & Environmental Telemetry (Haynes MKT)</h3>
                         <p class="text-xs text-neutral-500">Calibrated real-time sensor streams and Mean Kinetic Temperature evaluations.</p>
                     </div>
+                    @canany([\App\Enums\Permission::ManageTelemetryExcursions->value, \App\Enums\Permission::ViewWarehouseTasks->value])
                     <a href="{{ route('inventory.warehousing.telemetry') }}" class="text-xs font-semibold text-primary-600 hover:text-primary-800">
                         View Telemetry Console &rarr;
                     </a>
+                    @endcanany
                 </div>
                 <div class="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
                     @forelse($criticalSensors as $sensor)
@@ -143,18 +149,26 @@
                 <div class="rounded-xl border border-neutral-200 bg-white shadow-sm">
                     <div class="flex items-center justify-between border-b border-neutral-100 px-6 py-4">
                         <h3 class="text-base font-semibold text-neutral-900">Recent Warehouse Tasks</h3>
+                        @can(\App\Enums\Permission::ViewWarehouseTasks->value)
                         <a href="{{ route('inventory.warehouse-tasks.index') }}" class="text-xs font-semibold text-primary-600 hover:text-primary-800">
                             View All ({{ $metrics['open_tasks'] }}) &rarr;
                         </a>
+                        @endcan
                     </div>
                     <div class="divide-y divide-neutral-100 overflow-hidden">
                         @forelse($recentTasks as $task)
                             <div class="flex items-center justify-between px-6 py-3.5 hover:bg-neutral-50">
                                 <div>
                                     <div class="flex items-center gap-2">
+                                        @can(\App\Enums\Permission::ViewWarehouseTasks->value)
                                         <a href="{{ route('inventory.warehouse-tasks.show', $task) }}" class="font-mono text-xs font-bold text-primary-700 hover:underline">
                                             {{ $task->task_number }}
                                         </a>
+                                        @else
+                                        <span class="font-mono text-xs font-bold text-neutral-700">
+                                            {{ $task->task_number }}
+                                        </span>
+                                        @endcan
                                         <span class="rounded bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-neutral-700">
                                             {{ $task->task_type->label() }}
                                         </span>

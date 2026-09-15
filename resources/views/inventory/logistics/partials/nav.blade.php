@@ -14,9 +14,11 @@
                     <option value="{{ route('inventory.logistics') }}" @selected(request()->routeIs('inventory.logistics') && !request()->routeIs('inventory.logistics.*'))>
                         Overview Dashboard
                     </option>
+                    @can(\App\Enums\Permission::ViewLogisticsSensitiveData->value)
                     <option value="{{ route('inventory.logistics.shipments') }}" @selected(request()->routeIs('inventory.logistics.shipments*'))>
                         Shipments &amp; 3PL Logistics
                     </option>
+                    @endcan
                 </optgroup>
                 @can(\App\Enums\Permission::ViewLogisticsSensitiveData->value)
                     <optgroup label="Compliance &amp; Governance">
@@ -77,6 +79,7 @@
                                 <svg class="h-3.5 w-3.5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                             @endif
                         </a>
+                        @can(\App\Enums\Permission::ViewLogisticsSensitiveData->value)
                         <a
                             href="{{ route('inventory.logistics.shipments') }}"
                             class="flex items-center justify-between px-3 py-2 rounded-lg text-xs transition {{ request()->routeIs('inventory.logistics.shipments*') ? 'bg-primary-50 text-primary-700 font-semibold' : 'text-neutral-700 hover:bg-neutral-50 font-medium' }}"
@@ -86,6 +89,7 @@
                                 <svg class="h-3.5 w-3.5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                             @endif
                         </a>
+                        @endcan
                     </div>
                 </div>
 
