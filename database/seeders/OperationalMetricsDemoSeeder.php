@@ -20,7 +20,9 @@ use App\Models\SupplierContract;
 use App\Models\SupplierDocument;
 use App\Models\SupplierScorecard;
 use App\Models\User;
+use App\Support\DemoPdfBuilder;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Storage;
 
 class OperationalMetricsDemoSeeder extends Seeder
 {
@@ -433,6 +435,35 @@ class OperationalMetricsDemoSeeder extends Seeder
             );
 
             // Documents
+            Storage::disk('local')->makeDirectory('documents/suppliers');
+            $fdaPdf = DemoPdfBuilder::create(
+                title: 'FOOD AND DRUG ADMINISTRATION PHILIPPINES - LICENSE TO OPERATE',
+                sections: [
+                    [
+                        'heading' => 'LICENSE & REGISTRATION PARTICULARS',
+                        'lines' => [
+                            'LTO Number: CDRR-NCR-DI/W-104928 | Status: Active & Valid',
+                            'Validity Period: 2024-05-15 to 2027-05-14 (3-Year License Cycle)',
+                            'Establishment Name: MedSupply Premier Hospital Consumables, Inc.',
+                            'Authorized Activity: Wholesaler / Distributor of Medical Devices and Consumables',
+                            'Address: Sta. Rosa Commercial Complex, Santa Rosa, Laguna, Philippines',
+                        ],
+                    ],
+                    [
+                        'heading' => 'REGULATORY COMPLIANCE & ACCREDITATION CONDITIONS',
+                        'lines' => [
+                            'Issuing Authority: Food and Drug Administration (FDA) Philippines - CDRR',
+                            'Supervising Pharmacist: Registered Pharmacist PRC License # 0049182',
+                            'Inspection Result: Compliant with Good Distribution Practices (GDP Standards)',
+                            'HIMS Verification: Verified against official FDA Verification Portal with Zero Deficiencies.',
+                        ],
+                    ],
+                ],
+                subtitle: 'Department of Health | Center for Device Regulation, Radiation Health, and Research'
+            );
+            $fdaDocPath = 'documents/suppliers/medsupply_lto_2024_2027.pdf';
+            Storage::disk('local')->put($fdaDocPath, $fdaPdf);
+
             SupplierDocument::updateOrCreate(
                 [
                     'supplier_id' => $primarySupplier->id,
@@ -444,10 +475,10 @@ class OperationalMetricsDemoSeeder extends Seeder
                     'expires_at' => '2027-05-14',
                     'issuing_authority' => 'Food and Drug Administration (FDA) Philippines',
                     'disk' => 'local',
-                    'path' => 'documents/suppliers/medsupply_lto_2024_2027.pdf',
+                    'path' => $fdaDocPath,
                     'original_name' => 'FDA_LTO_MedSupply_2027.pdf',
                     'mime_type' => 'application/pdf',
-                    'size_bytes' => 245890,
+                    'size_bytes' => strlen($fdaPdf),
                     'verification_status' => SupplierDocumentStatus::Verified,
                     'required_for_accreditation' => true,
                     'blocks_procurement_when_invalid' => true,

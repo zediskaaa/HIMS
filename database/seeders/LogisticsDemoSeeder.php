@@ -17,6 +17,7 @@ use App\Models\Shipment;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Support\DemoPdfBuilder;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
 
@@ -383,14 +384,48 @@ class LogisticsDemoSeeder extends Seeder
             ]
         );
 
-        // 7. Seed Simulated PDF/Record Files in Storage
+        // 7. Seed Authentic PDF Records in Storage
         Storage::disk('local')->makeDirectory('logistics_documents');
-        $dummyPdfContent = "%PDF-1.4\n%DEMO PHILIPPINE HEALTHCARE DOCUMENT\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000050 00000 n\n0000000100 00000 n\n0000000150 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n200\n%%EOF";
+
+        $drPdfContent = DemoPdfBuilder::create(
+            title: 'ZUELLIG PHARMA PHILIPPINES, INC. - DELIVERY RECEIPT',
+            sections: [
+                [
+                    'heading' => 'DELIVERY & CONSIGNMENT PARTICULARS',
+                    'lines' => [
+                        'Supplier / Carrier: Zuellig Pharma Philippines, Inc. (Cold Chain Fleet)',
+                        'Dispatch Facility: KM 14 West Service Road, South Superhighway, Paranaque City',
+                        'Recipient: Hospital Information Management System (Central Receiving Dock Bay 1)',
+                        'Purchase Order Ref: PO-2026-09-0145 | Waybill: WB-MNL-00912 | Plate: NDO-9821',
+                        'Delivery Date: '.now()->toDateString().' | Mode: Cold Chain Direct Fleet Transfer',
+                    ],
+                ],
+                [
+                    'heading' => 'DELIVERED INVENTORY & BATCH SPECIFICATIONS',
+                    'table' => [
+                        'headers' => ['Item / Product Name', 'Batch / Lot No.', 'Expiry Date', 'Quantity', 'Unit Cost (PHP)'],
+                        'rows' => [
+                            ['Verorab Inactivated Rabies Vaccine 0.5mL + Diluent', 'VER-2026-881', now()->addYears(2)->toDateString(), '500 vials', '1,450.00'],
+                        ],
+                    ],
+                ],
+                [
+                    'heading' => 'RECEIVING INSPECTION & COLD CHAIN COMPLIANCE',
+                    'lines' => [
+                        'Storage Requirement: Biological Cold Chain Protocol (2.0 deg C to 8.0 deg C)',
+                        'Sensor Logger SEN-LOG-ZP-9941: Transit Range 3.4 deg C - 5.6 deg C (Temperature Excursion: None)',
+                        'Receiving Officer: Eduardo Reyes (Warehouse Receiving Staff)',
+                        'Physical Inspection: Packaging intact, seal unbroken, tamper-evident indicators valid.',
+                    ],
+                ],
+            ],
+            subtitle: 'Healthcare Logistics & Central Receiving Documentation | DR No: DR-ZP-889922'
+        );
 
         $docPath1 = 'logistics_documents/demo_dr_889922.pdf';
-        Storage::disk('local')->put($docPath1, $dummyPdfContent);
+        Storage::disk('local')->put($docPath1, $drPdfContent);
 
-        $doc1 = LogisticsDocument::firstOrCreate(
+        $doc1 = LogisticsDocument::updateOrCreate(
             ['tracking_number' => 'DOC-DR-202609-00001'],
             [
                 'document_type' => DocumentType::DeliveryReceipt,
@@ -402,10 +437,10 @@ class LogisticsDemoSeeder extends Seeder
                 'file_path' => $docPath1,
                 'file_name' => 'demo_dr_889922.pdf',
                 'original_name' => 'Zuellig_DR_889922.pdf',
-                'file_size_bytes' => strlen($dummyPdfContent),
+                'file_size_bytes' => strlen($drPdfContent),
                 'mime_type' => 'application/pdf',
                 'disk' => 'local',
-                'sha256_checksum' => hash('sha256', $dummyPdfContent),
+                'sha256_checksum' => hash('sha256', $drPdfContent),
                 'version_number' => 1,
                 'status' => 'verified',
                 'uploaded_by_id' => $warehouseStaff->id,
@@ -417,10 +452,44 @@ class LogisticsDemoSeeder extends Seeder
             ]
         );
 
-        $docPath2 = 'logistics_documents/demo_si_088192.pdf';
-        Storage::disk('local')->put($docPath2, $dummyPdfContent);
+        $siPdfContent = DemoPdfBuilder::create(
+            title: 'ZUELLIG PHARMA PHILIPPINES, INC. - ELECTRONIC SALES INVOICE',
+            sections: [
+                [
+                    'heading' => 'TAXPAYER & INVOICE DETAILS',
+                    'lines' => [
+                        'Seller: Zuellig Pharma Philippines, Inc. | VAT Reg TIN: 000-123-456-000',
+                        'Customer: Hospital Information Management System | Fund Cluster: 01 Regular Agency Fund',
+                        'Billing Address: Central Medical Logistics & Supply Division, Manila, Philippines',
+                        'Purchase Order Ref: PO-2026-09-0145 | Invoice Date: '.now()->toDateString().' | Terms: Net 30 Days',
+                    ],
+                ],
+                [
+                    'heading' => 'INVOICED LINE ITEMS & VALUES',
+                    'table' => [
+                        'headers' => ['Item Description', 'Qty / Unit', 'Unit Price', 'Tax Status', 'Total (PHP)'],
+                        'rows' => [
+                            ['Verorab Inactivated Rabies Vaccine 0.5mL Vial', '500 vials', '1,450.00', 'VAT-Exempt', '725,000.00'],
+                        ],
+                    ],
+                ],
+                [
+                    'heading' => 'FINANCIAL SUMMARY & BIR CERTIFICATION',
+                    'lines' => [
+                        'Total Net Amount Due: PHP 725,000.00 (Seven Hundred Twenty-Five Thousand Pesos Only)',
+                        'VAT Status: Zero-Rated / Exempt under Republic Act 10963 (TRAIN Law)',
+                        'Payment Terms: Net 30 Calendar Days via Authorized Government Depository Bank (LBP)',
+                        'BIR Digital Certification: Official electronic invoice archived pursuant to RA 11976 regulations.',
+                    ],
+                ],
+            ],
+            subtitle: 'BIR Electronic Invoice (RA 11976 Ease of Paying Taxes Compliant) | SI No: SI-2026-088192'
+        );
 
-        $doc2 = LogisticsDocument::firstOrCreate(
+        $docPath2 = 'logistics_documents/demo_si_088192.pdf';
+        Storage::disk('local')->put($docPath2, $siPdfContent);
+
+        $doc2 = LogisticsDocument::updateOrCreate(
             ['tracking_number' => 'DOC-INV-202609-00002'],
             [
                 'document_type' => DocumentType::SalesInvoice,
@@ -432,10 +501,10 @@ class LogisticsDemoSeeder extends Seeder
                 'file_path' => $docPath2,
                 'file_name' => 'demo_si_088192.pdf',
                 'original_name' => 'Zuellig_SI_088192_BIR_RA11976.pdf',
-                'file_size_bytes' => strlen($dummyPdfContent),
+                'file_size_bytes' => strlen($siPdfContent),
                 'mime_type' => 'application/pdf',
                 'disk' => 'local',
-                'sha256_checksum' => hash('sha256', $dummyPdfContent),
+                'sha256_checksum' => hash('sha256', $siPdfContent),
                 'version_number' => 1,
                 'status' => 'submitted',
                 'uploaded_by_id' => $warehouseStaff->id,
