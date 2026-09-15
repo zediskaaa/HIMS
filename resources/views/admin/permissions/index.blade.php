@@ -1,7 +1,6 @@
 <x-app-layout>
     <x-ui.page-header
         title="Access Control"
-        subtitle="Which role may reach which module. Generated from the permission definitions the system enforces."
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'User Management' => route('admin.users.index'), 'Access Control' => null]">
         <x-slot:actions>
             <x-ui.button variant="secondary" :href="route('admin.users.index')" icon="arrow-left">Back to User Management</x-ui.button>

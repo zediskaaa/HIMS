@@ -1,7 +1,6 @@
 <x-app-layout>
     <x-ui.page-header
         title="System Recovery Center"
-        subtitle="Multi-Layer Error Recovery, Safe Transaction Rollbacks, Idempotent Retries & System Health Diagnostics."
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Recovery Center' => null]"
     >
         <x-slot:actions>

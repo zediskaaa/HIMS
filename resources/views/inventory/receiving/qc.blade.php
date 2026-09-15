@@ -7,9 +7,6 @@
                     <span class="text-xs text-neutral-500">• Quarantine Assay &amp; Partitioning Protocol</span>
                 </div>
                 <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">QC Inspection &amp; Release Queue</h2>
-                <p class="text-sm text-neutral-600">
-                    Verify physical condition, package integrity, cold-chain temperature logs, and laboratory certificates before releasing stock from quarantine to unrestricted inventory.
-                </p>
             </div>
             <div class="flex items-center gap-3">
                 <x-ui.button variant="secondary" :href="route('inventory.warehousing.dashboard')" icon="arrow-left">Back to Smart Warehousing</x-ui.button>
@@ -17,7 +14,7 @@
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="{
+    <div class="space-y-6" x-data="{
         releaseModalOpen: false,
         rejectModalOpen: false,
         selectedInspection: null,
@@ -30,7 +27,6 @@
             this.rejectModalOpen = true;
         }
     }">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
 
             {{-- SWS Consolidated Workflow Navigation --}}
             @include('inventory.warehousing.partials.workflow_nav')
@@ -325,6 +321,4 @@
             </div>
         </div>
         @endcan
-
-    </div>
 </x-app-layout>

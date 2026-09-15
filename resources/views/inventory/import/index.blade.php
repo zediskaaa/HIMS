@@ -10,9 +10,6 @@
                 <h2 class="text-2xl font-bold tracking-tight text-slate-900">
                     {{ __('Data Ingress & System Import') }}
                 </h2>
-                <p class="mt-1 text-sm text-slate-500">
-                    Bulk-load master catalogues, storage topology, and vendor records using CSV, Excel (.xlsx/.xls), or JSON with strict pre-commit validation.
-                </p>
             </div>
             <div class="flex items-center gap-3">
                 <a href="{{ route('inventory.items') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
@@ -25,17 +22,16 @@
         </div>
     </x-slot>
 
-    <div class="py-8" x-data="dataImporter({
+    <div class="space-y-6" x-data="dataImporter({
         previewUrl: '{{ route('inventory.import.preview') }}',
         commitUrl: '{{ route('inventory.import.commit') }}',
         templateUrl: '{{ route('inventory.import.template') }}',
         csrfToken: '{{ csrf_token() }}',
         initialTarget: '{{ $canItems ? 'items' : ($canLocations ? 'locations' : 'suppliers') }}'
     })">
-        <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
 
-            {{-- Consolidated Inventory Workflow Navigation --}}
-            @include('inventory.partials.workflow_nav')
+        {{-- Consolidated Inventory Workflow Navigation --}}
+        @include('inventory.partials.workflow_nav')
 
             {{-- Flash Messages / Toast Feedback --}}
             <div x-show="errorMessage" x-cloak class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 shadow-sm" role="alert">
@@ -691,7 +687,6 @@
             </div>
 
         </div>
-    </div>
 
     <script>
         function dataImporter(config) {

@@ -4,15 +4,13 @@
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Smart Warehousing</p>
                 <h2 class="text-2xl font-bold text-neutral-900">Warehouse Hierarchy &amp; Locations</h2>
-                <p class="text-sm text-neutral-600">Configure operational storage points, capacity, classifications, and scannable internal codes.</p>
             </div>
             <x-ui.button variant="secondary" :href="route('inventory.warehousing.dashboard')" icon="arrow-left">Back to Smart Warehousing</x-ui.button>
         </div>
     </x-slot>
 
-    <div class="py-6"><div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
-        {{-- SWS Consolidated Workflow Navigation --}}
-        @include('inventory.warehousing.partials.workflow_nav')
+    {{-- SWS Consolidated Workflow Navigation --}}
+    @include('inventory.warehousing.partials.workflow_nav')
 
         @if ($errors->any())<x-ui.alert variant="danger" title="Location could not be saved"><ul class="list-disc pl-5">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></x-ui.alert>@endif
 
@@ -54,5 +52,4 @@
                 </x-ui.table.row>@empty<x-ui.table.empty colspan="7" title="No storage locations" message="Configure the real warehouse hierarchy before creating physical tasks." />@endforelse</tbody>
             </x-ui.table>
         </x-ui.card>
-    </div></div>
 </x-app-layout>

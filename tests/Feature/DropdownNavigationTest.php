@@ -63,7 +63,7 @@ class DropdownNavigationTest extends TestCase
         $response = $this->actingAs($this->superAdmin)->get(route('inventory.items'));
 
         $response->assertOk();
-        $response->assertSee('Inventory Workflows &amp; Operations', false);
+        $response->assertSee('Inventory Workflows:');
         $response->assertSee('Stock &amp; Movements', false);
         $response->assertSee('Requisitions &amp; Transfers', false);
         $response->assertSee('Audits &amp; Data Operations', false);
@@ -74,7 +74,7 @@ class DropdownNavigationTest extends TestCase
         $response = $this->actingAs($this->superAdmin)->get(route('inventory.warehousing.dashboard'));
 
         $response->assertOk();
-        $response->assertSee('Smart Warehousing Workflows &amp; Operations', false);
+        $response->assertSee('Smart Warehousing Workflows:');
         $response->assertSee('Warehouse Operations');
         $response->assertSee('Locations &amp; Storage', false);
         $response->assertSee('Compliance &amp; Special Handling', false);

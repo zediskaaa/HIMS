@@ -45,7 +45,6 @@
 <x-app-layout>
     <x-ui.page-header
         title="Reports & Analytics"
-        :subtitle="($canViewFinancialData ? 'Inventory valuation, stock status, procurement spend and movement history' : 'Stock status and movement history').' for '.$periodContext.'.'"
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Reports' => null]">
         <x-slot name="actions">
             {{-- Dashboard Timeline Filter Dropdown --}}

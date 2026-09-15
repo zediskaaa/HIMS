@@ -12,9 +12,6 @@
                 <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">
                     Stock Transfer: {{ $stockTransfer->transfer_number }}
                 </h2>
-                <p class="text-sm text-neutral-600">
-                    Virtual In-Transit buffer accounting, destination receipt verification, and loss/damage write-off tracking.
-                </p>
             </div>
             <div class="flex items-center gap-3">
                 @if(in_array($stockTransfer->status, ['dispatched', 'in_transit']) && auth()->user()->can(\App\Enums\Permission::TransferStock->value))
@@ -29,8 +26,7 @@
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="{ receiveModalOpen: false }" @open-receive-modal.window="receiveModalOpen = true">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+    <div class="space-y-6" x-data="{ receiveModalOpen: false }" @open-receive-modal.window="receiveModalOpen = true">
 
             {{-- Flash Alerts --}}
             @if(session('success'))
@@ -274,6 +270,4 @@
             </div>
         </div>
         @endcan
-
-    </div>
 </x-app-layout>

@@ -10,8 +10,7 @@
         </div>
     </x-slot>
 
-    <div class="py-6"><div class="mx-auto max-w-6xl space-y-6 sm:px-6 lg:px-8">
-        @if (session('notice'))<x-ui.alert variant="info">{{ session('notice') }}</x-ui.alert>@endif
+    @if (session('notice'))<x-ui.alert variant="info">{{ session('notice') }}</x-ui.alert>@endif
         @if ($errors->any())<x-ui.alert variant="danger" title="Action blocked"><ul class="list-disc pl-5">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></x-ui.alert>@endif
 
         <div class="grid gap-6 lg:grid-cols-3">
@@ -156,5 +155,4 @@
                 <x-ui.card title="Cancel task"><form method="POST" action="{{ route('inventory.warehouse-tasks.cancel', $warehouseTask) }}" data-confirm-title="Cancel warehouse task" data-confirm-message="The task will close without moving stock. Continue?" data-confirm-label="Cancel task" class="flex flex-col gap-3 sm:flex-row">@csrf<input type="text" name="reason" required maxlength="1000" placeholder="Required cancellation reason" class="flex-1 rounded-lg border-neutral-300"><x-ui.button type="submit" variant="danger">Cancel task</x-ui.button></form></x-ui.card>
             @endif
         @endcan
-    </div></div>
 </x-app-layout>

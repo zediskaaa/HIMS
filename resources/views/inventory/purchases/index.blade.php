@@ -3,7 +3,6 @@
         <div>
             <span class="rounded-md bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700 ring-1 ring-inset ring-primary-200">Operational workspace</span>
             <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Procurement &amp; Purchase Orders</h2>
-            <p class="text-sm text-neutral-600">Prepare catalog-backed orders, track fulfillment, and move approved deliveries into receiving.</p>
         </div>
     </x-slot>
 
@@ -50,8 +49,7 @@
         ];
     @endphp
 
-    <div class="py-5" x-data="procurementWorkspace({{ Js::from($procurementWorkspaceConfig) }})">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+    <div x-data="procurementWorkspace({{ Js::from($procurementWorkspaceConfig) }})" class="space-y-6">
 
 
             @if($errors->any())
@@ -1767,7 +1765,6 @@
             </div>
 
         </div>
-    </div>
 
     {{-- Preserved Legacy API Rendering Scripts --}}
     <script>

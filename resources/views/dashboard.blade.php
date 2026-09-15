@@ -6,11 +6,6 @@
         $isAdminPanel => 'Admin Dashboard',
         default => 'Staff Dashboard',
     };
-    $dashboardSubtitle = match (true) {
-        $isSuperAdminPanel => 'Full administrative oversight of HIMS inventory, users, procurement, and records.',
-        $isAdminPanel => 'Manage HIMS operations and user access within the Administrator role.',
-        default => 'Monitor inventory health and complete the operations authorized for your staff role.',
-    };
 @endphp
 
 <x-app-layout full-width>
@@ -18,7 +13,6 @@
 
     <x-ui.page-header
         :title="$dashboardTitle"
-        :subtitle="$dashboardSubtitle"
     >
         <x-slot:actions>
             @canany([\App\Enums\Permission::IssueStock->value, \App\Enums\Permission::RecordMovements->value, \App\Enums\Permission::TransferStock->value])

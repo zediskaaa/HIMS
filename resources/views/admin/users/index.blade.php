@@ -3,7 +3,6 @@
 
     <x-ui.page-header
         title="User Management"
-        subtitle="Staff accounts and what each role is allowed to do."
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'User Management' => null]">
         <x-slot:actions>
             <x-ui.button variant="secondary" :href="route('admin.permissions')" icon="shield-check">Access Control</x-ui.button>

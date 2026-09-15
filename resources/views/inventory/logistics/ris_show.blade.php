@@ -10,7 +10,6 @@
                     </span>
                 </div>
                 <h2 class="mt-1 text-2xl font-bold text-neutral-900">Requisition and Issue Slip (RIS)</h2>
-                <p class="text-sm text-neutral-600">Statutory internal store requisition and issuance slip for {{ $requisition->requisition_number }}</p>
             </div>
             <div>
                 <button onclick="window.print()" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
@@ -23,8 +22,7 @@
 
     @include('inventory.logistics.partials.nav')
 
-    <div class="py-6">
-        <div class="mx-auto max-w-4xl space-y-6 px-4 sm:px-6 lg:px-8">
+    <div class="space-y-6">
 
             {{-- FORMAL COA GAM VOLUME II APPENDIX 63 CANVAS --}}
             <div class="border border-neutral-300 bg-white p-8 shadow-sm print:border-none print:p-0 print:shadow-none font-serif text-neutral-900">
@@ -175,7 +173,5 @@
                     HIMS System Reference: RIS-{{ $requisition->id }}-GAM63
                 </div>
             </div>
-
         </div>
-    </div>
 </x-app-layout>

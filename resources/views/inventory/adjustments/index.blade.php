@@ -7,19 +7,13 @@
                     <span class="text-xs text-neutral-500">• Dual-Tier Authorization &amp; Ledger Reconciliations</span>
                 </div>
                 <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Stock Adjustments</h2>
-                <p class="text-sm text-neutral-600">
-                    Documented quantity and value corrections. Adjustments exceeding ₱25,000 trigger mandatory second-tier Plant Controller authorization.
-                </p>
             </div>
             <x-ui.button variant="secondary" :href="route('inventory.items')" icon="arrow-left">Back to Inventory</x-ui.button>
         </div>
     </x-slot>
 
-    <div class="py-6">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
-
-            {{-- Consolidated Inventory Workflow Navigation --}}
-            @include('inventory.partials.workflow_nav')
+    {{-- Consolidated Inventory Workflow Navigation --}}
+    @include('inventory.partials.workflow_nav')
 
             {{-- Flash Alerts --}}
             @if(session('success'))
@@ -250,7 +244,4 @@
                     </div>
                 @endif
             </div>
-
-        </div>
-    </div>
 </x-app-layout>

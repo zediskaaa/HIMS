@@ -12,9 +12,6 @@
                 <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">
                     Goods Receipt Note: {{ $goodsReceiptNote->grn_number }}
                 </h2>
-                <p class="text-sm text-neutral-600">
-                    Carrier intake documentation and initial quarantine staging for PO #{{ $goodsReceiptNote->purchaseOrder->po_number ?? 'N/A' }}.
-                </p>
             </div>
             <div class="flex items-center gap-3">
                 @can(\App\Enums\Permission::InspectStock->value)
@@ -28,9 +25,6 @@
             </div>
         </div>
     </x-slot>
-
-    <div class="py-6">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
 
             {{-- Status & Summary Card --}}
             <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
@@ -182,7 +176,4 @@
                     </table>
                 </div>
             </div>
-
-        </div>
-    </div>
 </x-app-layout>

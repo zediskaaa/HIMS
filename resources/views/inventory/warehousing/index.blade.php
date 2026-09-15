@@ -3,15 +3,9 @@
         <div>
             <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Hospital Supply Chain Execution</p>
             <h2 class="text-2xl font-bold text-neutral-900">Smart Warehousing System (SWS)</h2>
-            <p class="text-sm text-neutral-600">Physical location topology, IoT cold-chain telemetry, scan verification, and regulatory compliance.</p>
         </div>
     </x-slot>
 
-    <div class="py-6">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
-
-            {{-- SWS Consolidated Workflow Navigation --}}
-            @include('inventory.warehousing.partials.workflow_nav')
 
             {{-- High-Level KPI Matrix --}}
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -71,6 +65,9 @@
                     <p class="mt-1 text-xs text-neutral-500">Operating room serial consumption tracking</p>
                 </div>
             </div>
+
+            {{-- SWS Consolidated Workflow Navigation --}}
+            @include('inventory.warehousing.partials.workflow_nav')
 
             {{-- Live Environmental Telemetry & MKT Status --}}
             <div class="rounded-xl border border-neutral-200 bg-white shadow-sm">
@@ -270,7 +267,4 @@
                 </a>
                 @endcanany
             </div>
-
-        </div>
-    </div>
 </x-app-layout>

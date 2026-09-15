@@ -5,7 +5,6 @@
 
         <x-ui.page-header
             title="Inventory Items"
-            subtitle="Manage your hospital medical supply catalogue, stock tracking, and supplier links."
             :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Inventory Items' => null]" />
 
         @if (session('success'))
@@ -24,6 +23,11 @@
                     <h3 class="text-sm font-bold text-neutral-900">Inventory Items Catalog</h3>
                     <p class="text-xs text-neutral-500">Current stock on hand, reorder thresholds, and active suppliers.</p>
                 </div>
+                @can(\App\Enums\Permission::ManageItems->value)
+                    <x-ui.button variant="primary" size="sm" icon="plus" @click="createItemModal = true" id="btn-open-create-item-modal">
+                        Create Inventory Item
+                    </x-ui.button>
+                @endcan
             </div>
 
             <div class="mt-4 overflow-x-auto">

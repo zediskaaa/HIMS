@@ -1,7 +1,6 @@
 <x-app-layout>
     <x-ui.page-header
         :title="$user->isAdministrator() ? __('Account Settings') : __('Profile')"
-        :subtitle="__('Manage your account credentials, multi-factor authentication, and session preferences.')"
         :breadcrumbs="[
             'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
             ($user->isAdministrator() ? __('Account Settings') : __('Profile')) => null,

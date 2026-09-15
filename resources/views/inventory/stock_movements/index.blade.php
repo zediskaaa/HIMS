@@ -81,7 +81,6 @@
     >
         <x-ui.page-header
             title="Stock Movements & Ledger"
-            subtitle="Record quick stock in, stock out, departmental issuances, and returns, or review the complete movements ledger."
             :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Inventory' => route('inventory.items'), 'Stock Movements & Transfers' => null]">
             <x-slot:actions>
                 @can(\App\Enums\Permission::TransferStock->value)

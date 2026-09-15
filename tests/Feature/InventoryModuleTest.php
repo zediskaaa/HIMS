@@ -26,7 +26,6 @@ class InventoryModuleTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Staff Dashboard');
-        $response->assertSee('Monitor inventory health');
     }
 
     public function test_dashboard_renders_populated_alerts_purchase_orders_and_movements(): void

@@ -3,7 +3,6 @@
 
     <x-ui.page-header
         title="AI-Based Stock Demand Forecasting"
-        subtitle="Review validated demand forecasts, stock risk, and advisory reorder recommendations derived from HIMS inventory activity."
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Procurement' => route('inventory.purchases'), 'Demand Forecast' => null]"
     >
         <x-slot:actions>

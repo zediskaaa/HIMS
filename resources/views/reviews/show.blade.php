@@ -1,5 +1,5 @@
 <x-app-layout>
-    <div class="py-6" x-data="{
+    <div x-data="{
         activeTab: 'velocity',
         openDropdown: null,
         rejectModal: false,
@@ -8,87 +8,85 @@
         implementTitle: '',
         rejectionReason: '',
         implementationNotes: ''
-    }">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
-
-            {{-- Breadcrumbs & Header --}}
-            <div class="border-b border-neutral-200 pb-4">
-                <nav class="flex text-xs text-neutral-500 mb-2" aria-label="Breadcrumb">
-                    <a href="{{ route('reviews.index') }}" class="hover:text-indigo-600 transition">Process Reviews</a>
-                    <span class="mx-2 text-neutral-400">/</span>
-                    <span class="text-neutral-900 font-medium">{{ $review->review_number }}</span>
-                </nav>
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <h2 class="text-2xl font-bold tracking-tight text-neutral-900">{{ $review->review_number }}</h2>
-                            @if($review->status === 'approved')
-                                <span class="rounded-full bg-emerald-100 px-3 py-0.5 text-xs font-semibold text-emerald-800 border border-emerald-200">
-                                    Approved &amp; Signed Off
-                                </span>
-                            @elseif($review->status === 'submitted')
-                                <span class="rounded-full bg-amber-100 px-3 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200 animate-pulse">
-                                    Pending BAC Review
-                                </span>
-                            @elseif($review->status === 'rejected')
-                                <span class="rounded-full bg-rose-100 px-3 py-0.5 text-xs font-semibold text-rose-800 border border-rose-200">
-                                    Returned / Rejected
-                                </span>
-                            @elseif($review->status === 'implemented')
-                                <span class="rounded-full bg-blue-100 px-3 py-0.5 text-xs font-semibold text-blue-800 border border-blue-200">
-                                    Recommendations Implemented
-                                </span>
-                            @else
-                                <span class="rounded-full bg-neutral-100 px-3 py-0.5 text-xs font-semibold text-neutral-800 border border-neutral-200">
-                                    Draft Evaluation
-                                </span>
-                            @endif
-                        </div>
-                        <h3 class="text-base font-semibold text-neutral-700 mt-1">{{ $review->title }}</h3>
-                        <p class="text-xs text-neutral-500 mt-0.5">
-                            Period: <strong class="text-neutral-700">{{ $review->period_start->format('M d, Y') }}</strong> to <strong class="text-neutral-700">{{ $review->period_end->format('M d, Y') }}</strong>
-                            • Evaluator: <span class="text-neutral-700 font-medium">{{ $review->evaluator->name }}</span>
-                            @if($review->approver)
-                                • Approved by: <span class="text-emerald-700 font-semibold">{{ $review->approver->name }}</span> ({{ $review->approved_at->format('M d, Y H:i') }})
-                            @endif
-                        </p>
-                    </div>
-
-                    {{-- Governance Action Bar --}}
+    }" class="space-y-6">
+        {{-- Breadcrumbs & Header --}}
+        <div class="border-b border-neutral-200 pb-4">
+            <nav class="flex text-xs text-neutral-500 mb-2" aria-label="Breadcrumb">
+                <a href="{{ route('reviews.index') }}" class="hover:text-indigo-600 transition">Process Reviews</a>
+                <span class="mx-2 text-neutral-400">/</span>
+                <span class="text-neutral-900 font-medium">{{ $review->review_number }}</span>
+            </nav>
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
                     <div class="flex items-center gap-2">
-                        @if($review->isDraft())
-                            @can(\App\Enums\Permission::CreateProcessReview->value)
-                            <form action="{{ route('reviews.submit', $review) }}" method="POST">
-                                @csrf
-                                <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition">
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-                                    Submit for BAC Approval
-                                </button>
-                            </form>
-                            @endcan
-                        @elseif($review->isSubmitted())
-                            @can(\App\Enums\Permission::ApproveProcessReview->value)
-                            @if($review->canBeApprovedBy(auth()->user()))
-                                <form action="{{ route('reviews.approve', $review) }}" method="POST">
-                                    @csrf
-                                    <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
-                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                        Approve Review (BAC)
-                                    </button>
-                                </form>
-                                <button type="button" @click="rejectModal = true" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3.5 py-2 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50 transition">
-                                    Reject / Return
-                                </button>
-                            @elseif(auth()->id() === $review->evaluator_id)
-                                <div class="rounded-md bg-amber-50 px-3 py-1.5 text-xs text-amber-800 border border-amber-200">
-                                    Maker-Checker: Pending approval from BAC / Administrator.
-                                </div>
-                            @endif
-                            @endcan
+                        <h2 class="text-2xl font-bold tracking-tight text-neutral-900">{{ $review->review_number }}</h2>
+                        @if($review->status === 'approved')
+                            <span class="rounded-full bg-emerald-100 px-3 py-0.5 text-xs font-semibold text-emerald-800 border border-emerald-200">
+                                Approved &amp; Signed Off
+                            </span>
+                        @elseif($review->status === 'submitted')
+                            <span class="rounded-full bg-amber-100 px-3 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200 animate-pulse">
+                                Pending BAC Review
+                            </span>
+                        @elseif($review->status === 'rejected')
+                            <span class="rounded-full bg-rose-100 px-3 py-0.5 text-xs font-semibold text-rose-800 border border-rose-200">
+                                Returned / Rejected
+                            </span>
+                        @elseif($review->status === 'implemented')
+                            <span class="rounded-full bg-blue-100 px-3 py-0.5 text-xs font-semibold text-blue-800 border border-blue-200">
+                                Recommendations Implemented
+                            </span>
+                        @else
+                            <span class="rounded-full bg-neutral-100 px-3 py-0.5 text-xs font-semibold text-neutral-800 border border-neutral-200">
+                                Draft Evaluation
+                            </span>
                         @endif
                     </div>
+                    <h3 class="text-base font-semibold text-neutral-700 mt-1">{{ $review->title }}</h3>
+                    <p class="text-xs text-neutral-500 mt-0.5">
+                        Period: <strong class="text-neutral-700">{{ $review->period_start->format('M d, Y') }}</strong> to <strong class="text-neutral-700">{{ $review->period_end->format('M d, Y') }}</strong>
+                        • Evaluator: <span class="text-neutral-700 font-medium">{{ $review->evaluator->name }}</span>
+                        @if($review->approver)
+                            • Approved by: <span class="text-emerald-700 font-semibold">{{ $review->approver->name }}</span> ({{ $review->approved_at->format('M d, Y H:i') }})
+                        @endif
+                    </p>
+                </div>
+
+                {{-- Governance Action Bar --}}
+                <div class="flex items-center gap-2">
+                    @if($review->isDraft())
+                        @can(\App\Enums\Permission::CreateProcessReview->value)
+                        <form action="{{ route('reviews.submit', $review) }}" method="POST">
+                            @csrf
+                            <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                Submit for BAC Approval
+                            </button>
+                        </form>
+                        @endcan
+                    @elseif($review->isSubmitted())
+                        @can(\App\Enums\Permission::ApproveProcessReview->value)
+                        @if($review->canBeApprovedBy(auth()->user()))
+                            <form action="{{ route('reviews.approve', $review) }}" method="POST">
+                                @csrf
+                                <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                    Approve Review (BAC)
+                                </button>
+                            </form>
+                            <button type="button" @click="rejectModal = true" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3.5 py-2 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50 transition">
+                                Reject / Return
+                            </button>
+                        @elseif(auth()->id() === $review->evaluator_id)
+                            <div class="rounded-md bg-amber-50 px-3 py-1.5 text-xs text-amber-800 border border-amber-200">
+                                Maker-Checker: Pending approval from BAC / Administrator.
+                            </div>
+                        @endif
+                        @endcan
+                    @endif
                 </div>
             </div>
+        </div>
 
             {{-- Flash Notification --}}
             @if(session('status'))
@@ -750,7 +748,5 @@
                 </div>
             </div>
             @endcan
-
-        </div>
     </div>
 </x-app-layout>

@@ -4,7 +4,6 @@
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Scan-Assisted Execution</p>
                 <h2 class="text-2xl font-bold text-neutral-900">Warehouse Scan Workstation</h2>
-                <p class="text-sm text-neutral-600">Barcode and 2D GS1 DataMatrix scan verification for directed put-away, replenishment, and picking.</p>
             </div>
             <div class="flex items-center gap-2">
                 <a href="{{ route('inventory.warehouse-tasks.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
@@ -15,7 +14,7 @@
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="{
+    <div class="space-y-6" x-data="{
         selectedTaskId: '{{ $activeTasks->first()?->id ?? '' }}',
         scanInput: '',
         playBeep(success = true) {
@@ -32,7 +31,9 @@
             } catch (e) {}
         }
     }">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+
+            {{-- SWS Consolidated Workflow Navigation --}}
+            @include('inventory.warehousing.partials.workflow_nav')
 
             @if(session('success'))
                 <x-ui.alert variant="success" :message="session('success')" />
@@ -406,5 +407,4 @@
             </div>
 
         </div>
-    </div>
 </x-app-layout>

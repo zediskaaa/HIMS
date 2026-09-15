@@ -1,7 +1,6 @@
 <x-app-layout>
     <x-ui.page-header
         title="Audit Trail"
-        subtitle="Append-only history of security, administrative, procurement, inventory, warehouse, logistics, and system activity."
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Audit Trail' => null]" />
 
     <x-ui.card

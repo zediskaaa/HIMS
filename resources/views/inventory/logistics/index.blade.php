@@ -10,14 +10,10 @@
                 </span>
             </div>
             <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Document Tracking & Logistics Records (DTRS)</h2>
-            <p class="text-sm text-neutral-600">Centralized procurement records, COA Appendix 50 IAR, GS1 logistics tracking, and immutable chain of custody.</p>
         </div>
     </x-slot>
 
-    <div class="py-6">
-        <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-
-            {{-- Flash Notification Messages --}}
+    {{-- Flash Notification Messages --}}
             @if(session('success'))
                 <div class="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 shadow-sm">
                     <svg class="h-5 w-5 flex-shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -397,7 +393,4 @@
                     Detailed shipment identifiers, logistics documents, inspection reports, and chain-of-custody evidence are restricted to operational and audit roles.
                 </x-ui.alert>
             @endcan
-
-        </div>
-    </div>
 </x-app-layout>

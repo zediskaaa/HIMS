@@ -1,23 +1,19 @@
 <x-app-layout>
-    <div class="py-6" x-data="reviewCreator()">
-        <div class="mx-auto max-w-4xl space-y-6 sm:px-6 lg:px-8">
-
-            {{-- Breadcrumbs & Header --}}
-            <div class="border-b border-neutral-200 pb-4">
-                <nav class="flex text-xs text-neutral-500 mb-2" aria-label="Breadcrumb">
-                    <a href="{{ route('reviews.index') }}" class="hover:text-indigo-600 transition">Process Reviews</a>
-                    <span class="mx-2 text-neutral-400">/</span>
-                    <span class="text-neutral-900 font-medium">New Evidence-Based Review</span>
-                </nav>
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h2 class="text-2xl font-bold tracking-tight text-neutral-900">Initiate Operational Process Review</h2>
-                        <p class="text-sm text-neutral-600">
-                            Synthesizes real transaction logs, purchase orders, IAR quality assay findings, and COA physical audits within the selected date window.
-                        </p>
-                    </div>
-                </div>
+    {{-- Breadcrumbs & Header --}}
+    <div class="border-b border-neutral-200 pb-4">
+        <nav class="flex text-xs text-neutral-500 mb-2" aria-label="Breadcrumb">
+            <a href="{{ route('reviews.index') }}" class="hover:text-indigo-600 transition">Process Reviews</a>
+            <span class="mx-2 text-neutral-400">/</span>
+            <span class="text-neutral-900 font-medium">New Evidence-Based Review</span>
+        </nav>
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold tracking-tight text-neutral-900">Initiate Operational Process Review</h2>
             </div>
+        </div>
+    </div>
+
+    <div x-data="reviewCreator()" class="max-w-4xl space-y-6">
 
             {{-- Error Alerts --}}
             @if($errors->any())
@@ -120,7 +116,6 @@
                     </button>
                 </div>
             </form>
-        </div>
     </div>
 
     <script>

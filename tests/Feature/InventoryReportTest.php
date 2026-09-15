@@ -153,8 +153,7 @@ class InventoryReportTest extends TestCase
         $this->actingAs($this->reader())
             ->get('/inventory/reports?days=90')
             ->assertStatus(200)
-            ->assertSee('Last 90 days')
-            ->assertSee('90-day window');
+            ->assertSee('Last 90 days');
     }
 
     /**

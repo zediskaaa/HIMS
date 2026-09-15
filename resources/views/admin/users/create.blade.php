@@ -1,7 +1,6 @@
 <x-app-layout>
     <x-ui.page-header
         title="Add User"
-        subtitle="New accounts are active immediately and can sign in with the password you set."
         :breadcrumbs="[
             'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
             'User Management' => route('admin.users.index'),

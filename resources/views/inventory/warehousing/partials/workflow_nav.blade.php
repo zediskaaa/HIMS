@@ -20,34 +20,27 @@
 @endphp
 
 <div
+    class="rounded-xl border border-neutral-200 bg-white p-2.5 shadow-sm"
     x-data="{ openDropdown: null }"
     @keydown.escape.window="openDropdown = null"
-    class="rounded-xl border border-neutral-200 bg-white p-3.5 sm:p-4 shadow-sm"
 >
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 pb-3 border-b border-neutral-100">
-        <div>
-            <h3 class="text-xs font-bold uppercase tracking-wider text-neutral-500">Smart Warehousing Workflows &amp; Operations</h3>
-            <p class="text-xs text-neutral-600">Access warehouse execution, spatial topology, cold-chain telemetry, and compliance vaults.</p>
-        </div>
-    </div>
-
     {{-- Mobile Screen Selector (< sm) --}}
-    <div class="mt-3 sm:hidden">
-        <label for="warehousing-workflow-mobile-select" class="sr-only">Choose Warehousing Workflow</label>
-        <select
-            id="warehousing-workflow-mobile-select"
-            onchange="if (this.value) window.location.href = this.value;"
-            class="block w-full rounded-lg border border-neutral-300 py-2.5 pl-3 pr-10 text-xs font-semibold text-neutral-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 shadow-2xs"
-        >
-            <option value="">Jump to warehousing workflow...</option>
+    <div class="sm:hidden space-y-2">
+        <div>
+            <label for="warehousing-workflow-mobile-select" class="block text-[11px] font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
+                Smart Warehousing Workflows:
+            </label>
+            <select
+                id="warehousing-workflow-mobile-select"
+                onchange="if (this.value) window.location.href = this.value;"
+                class="block w-full rounded-lg border border-neutral-300 py-2.5 pl-3 pr-10 text-xs font-semibold text-neutral-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 shadow-2xs"
+            >
+                <option value="">Jump to warehousing workflow...</option>
 
             @canany([\App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ExecuteWarehouseTasks->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::InspectStock->value])
                 <optgroup label="Warehouse Operations">
                     @can(\App\Enums\Permission::ViewWarehouseTasks->value)
                         <option value="{{ route('inventory.warehousing.dashboard') }}" @selected(request()->routeIs('inventory.warehousing.dashboard'))>Warehouse Dashboard</option>
-                    @endcan
-                    @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
-                        <option value="{{ route('inventory.warehousing.scan-station') }}" @selected(request()->routeIs('inventory.warehousing.scan-station'))>Scan Workstation</option>
                     @endcan
                     @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
                         <option value="{{ route('inventory.receiving.index') }}" @selected(request()->routeIs('inventory.receiving*'))>Dock Receiving</option>
@@ -86,10 +79,23 @@
                 </optgroup>
             @endcanany
         </select>
+        </div>
+
+        @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
+            <div class="pt-1">
+                <a
+                    href="{{ route('inventory.warehousing.scan-station') }}"
+                    class="flex items-center justify-center gap-2 w-full rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary-700"
+                >
+                    <x-ui.icon name="qr-code" class="w-4 h-4" />
+                    <span>Launch Scan Workstation</span>
+                </a>
+            </div>
+        @endcan
     </div>
 
     {{-- Desktop & Tablet Major Dropdown Tabs (>= sm) --}}
-    <div class="hidden sm:flex sm:items-center sm:gap-2.5 flex-wrap text-xs mt-3">
+    <div class="hidden sm:flex sm:items-center sm:gap-2.5 flex-wrap text-xs">
         {{-- 1. Warehouse Operations --}}
         @canany([\App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ExecuteWarehouseTasks->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::InspectStock->value])
             <div class="relative" @click.outside="if (openDropdown === 'operations') openDropdown = null">
@@ -124,21 +130,6 @@
                                 <span>Warehouse Dashboard</span>
                             </span>
                             @if (request()->routeIs('inventory.warehousing.dashboard'))
-                                <span class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
-                            @endif
-                        </a>
-                    @endcan
-
-                    @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
-                        <a
-                            href="{{ route('inventory.warehousing.scan-station') }}"
-                            class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition {{ request()->routeIs('inventory.warehousing.scan-station') ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50' }}"
-                        >
-                            <span class="flex items-center gap-2">
-                                <x-ui.icon name="qr-code" class="w-4 h-4 {{ request()->routeIs('inventory.warehousing.scan-station') ? 'text-primary-600' : 'text-neutral-400' }}" />
-                                <span>Scan Workstation</span>
-                            </span>
-                            @if (request()->routeIs('inventory.warehousing.scan-station'))
                                 <span class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
                             @endif
                         </a>
@@ -320,5 +311,18 @@
                 </div>
             </div>
         @endcanany
+
+        {{-- Quick Action: Scan Workstation --}}
+        @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
+            <div class="sm:ml-auto">
+                <a
+                    href="{{ route('inventory.warehousing.scan-station') }}"
+                    class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-3.5 py-2 font-semibold text-white shadow-2xs hover:bg-primary-700 transition focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1"
+                >
+                    <x-ui.icon name="qr-code" class="w-4 h-4" />
+                    <span>Scan Workstation</span>
+                </a>
+            </div>
+        @endcan
     </div>
 </div>

@@ -7,82 +7,68 @@
 @endphp
 
 <div
+    class="rounded-xl border border-neutral-200 bg-white p-2.5 shadow-sm"
     x-data="{ openDropdown: null }"
     @keydown.escape.window="openDropdown = null"
-    class="rounded-xl border border-neutral-200 bg-white p-3.5 sm:p-4 shadow-sm"
 >
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 pb-3 border-b border-neutral-100">
+    {{-- Mobile Screen Selector (< sm) --}}
+    <div class="sm:hidden space-y-2">
         <div>
-            <h3 class="text-xs font-bold uppercase tracking-wider text-neutral-500">Inventory Workflows &amp; Operations</h3>
-            <p class="text-xs text-neutral-600">Select an inventory workflow category to access authorized tools and actions.</p>
+            <label for="inventory-workflow-mobile-select" class="block text-[11px] font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
+                Inventory Workflows:
+            </label>
+            <select
+                id="inventory-workflow-mobile-select"
+                onchange="if (this.value) window.location.href = this.value;"
+                class="block w-full rounded-lg border border-neutral-300 py-2.5 pl-3 pr-10 text-xs font-semibold text-neutral-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 shadow-2xs"
+            >
+                <option value="">Jump to inventory workflow...</option>
+                <optgroup label="Stock &amp; Movements">
+                    @can(\App\Enums\Permission::ViewInventory->value)
+                        <option value="{{ route('inventory.items') }}" @selected(request()->routeIs('inventory.items*'))>Inventory Items</option>
+                        <option value="{{ route('inventory.stock-movements') }}" @selected(request()->routeIs('inventory.stock-movements*'))>Stock Movements</option>
+                    @endcan
+                    @canany([\App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::ApproveAdjustment->value])
+                        <option value="{{ route('inventory.adjustments') }}" @selected(request()->routeIs('inventory.adjustments*'))>Stock Adjustments</option>
+                    @endcanany
+                    @can(\App\Enums\Permission::PerformCycleCount->value)
+                        <option value="{{ route('inventory.cycle-counts.index') }}" @selected(request()->routeIs('inventory.cycle-counts*'))>Cycle Counts</option>
+                    @endcan
+                    @can(\App\Enums\Permission::AcknowledgeAlerts->value)
+                        <option value="{{ route('inventory.alerts') }}" @selected(request()->routeIs('inventory.alerts*'))>Stock Alerts {{ $openAlertCount > 0 ? '('.$openAlertCount.')' : '' }}</option>
+                    @endcan
+                </optgroup>
+
+                @canany([\App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::ApproveRequisition->value, \App\Enums\Permission::IssueStock->value, \App\Enums\Permission::TransferStock->value])
+                    <optgroup label="Requisitions &amp; Transfers">
+                        @canany([\App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::ApproveRequisition->value, \App\Enums\Permission::IssueStock->value])
+                            <option value="{{ route('inventory.requisitions.index') }}" @selected(request()->routeIs('inventory.requisitions*'))>Store Requisitions</option>
+                        @endcanany
+                        @can(\App\Enums\Permission::TransferStock->value)
+                            <option value="{{ route('inventory.transfers.index') }}" @selected(request()->routeIs('inventory.transfers*'))>Stock Transfers</option>
+                        @endcan
+                    </optgroup>
+                @endcanany
+
+                @canany([\App\Enums\Permission::ManageItems->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ManageSuppliers->value, \App\Enums\Permission::ViewReports->value, \App\Enums\Permission::ViewAuditTrail->value])
+                    <optgroup label="Audits &amp; Data Operations">
+                        @canany([\App\Enums\Permission::ManageItems->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ManageSuppliers->value])
+                            <option value="{{ route('inventory.import.index') }}" @selected(request()->routeIs('inventory.import*'))>Import Data</option>
+                        @endcanany
+                        @can(\App\Enums\Permission::ViewReports->value)
+                            <option value="{{ route('inventory.reports') }}" @selected(request()->routeIs('inventory.reports*'))>Inventory Reports</option>
+                        @endcan
+                        @can(\App\Enums\Permission::ViewAuditTrail->value)
+                            <option value="{{ route('admin.audit-logs.index') }}" @selected(request()->routeIs('admin.audit-logs*'))>Audit Trail</option>
+                        @endcan
+                    </optgroup>
+                @endcanany
+            </select>
         </div>
     </div>
 
-    {{-- Mobile Screen Selector (< sm) --}}
-    <div class="mt-3 sm:hidden">
-        <label for="inventory-workflow-mobile-select" class="sr-only">Choose Inventory Workflow</label>
-        <select
-            id="inventory-workflow-mobile-select"
-            onchange="if (this.value) window.location.href = this.value;"
-            class="block w-full rounded-lg border border-neutral-300 py-2.5 pl-3 pr-10 text-xs font-semibold text-neutral-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 shadow-2xs"
-        >
-            <option value="">Jump to inventory workflow...</option>
-            <optgroup label="Stock &amp; Movements">
-                @can(\App\Enums\Permission::ViewInventory->value)
-                    <option value="{{ route('inventory.items') }}" @selected(request()->routeIs('inventory.items*'))>Inventory Items</option>
-                    <option value="{{ route('inventory.stock-movements') }}" @selected(request()->routeIs('inventory.stock-movements*'))>Stock Movements</option>
-                @endcan
-                @canany([\App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::ApproveAdjustment->value])
-                    <option value="{{ route('inventory.adjustments') }}" @selected(request()->routeIs('inventory.adjustments*'))>Stock Adjustments</option>
-                @endcanany
-                @can(\App\Enums\Permission::PerformCycleCount->value)
-                    <option value="{{ route('inventory.cycle-counts.index') }}" @selected(request()->routeIs('inventory.cycle-counts*'))>Cycle Counts</option>
-                @endcan
-                @can(\App\Enums\Permission::AcknowledgeAlerts->value)
-                    <option value="{{ route('inventory.alerts') }}" @selected(request()->routeIs('inventory.alerts*'))>Stock Alerts {{ $openAlertCount > 0 ? '('.$openAlertCount.')' : '' }}</option>
-                @endcan
-            </optgroup>
-
-            @canany([\App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::ApproveRequisition->value, \App\Enums\Permission::IssueStock->value, \App\Enums\Permission::TransferStock->value])
-                <optgroup label="Requisitions &amp; Transfers">
-                    @canany([\App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::ApproveRequisition->value, \App\Enums\Permission::IssueStock->value])
-                        <option value="{{ route('inventory.requisitions.index') }}" @selected(request()->routeIs('inventory.requisitions*'))>Store Requisitions</option>
-                    @endcanany
-                    @can(\App\Enums\Permission::TransferStock->value)
-                        <option value="{{ route('inventory.transfers.index') }}" @selected(request()->routeIs('inventory.transfers*'))>Stock Transfers</option>
-                    @endcan
-                </optgroup>
-            @endcanany
-
-            @canany([\App\Enums\Permission::ManageItems->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ManageSuppliers->value, \App\Enums\Permission::ViewReports->value, \App\Enums\Permission::ViewAuditTrail->value])
-                <optgroup label="Audits &amp; Data Operations">
-                    @canany([\App\Enums\Permission::ManageItems->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ManageSuppliers->value])
-                        <option value="{{ route('inventory.import.index') }}" @selected(request()->routeIs('inventory.import*'))>Import Data</option>
-                    @endcanany
-                    @can(\App\Enums\Permission::ViewReports->value)
-                        <option value="{{ route('inventory.reports') }}" @selected(request()->routeIs('inventory.reports*'))>Inventory Reports</option>
-                    @endcan
-                    @can(\App\Enums\Permission::ViewAuditTrail->value)
-                        <option value="{{ route('admin.audit-logs.index') }}" @selected(request()->routeIs('admin.audit-logs*'))>Audit Trail</option>
-                    @endcan
-                </optgroup>
-            @endcanany
-        </select>
-
-        @can(\App\Enums\Permission::ManageItems->value)
-            @if(request()->routeIs('inventory.items*'))
-                <div class="pt-2">
-                    <x-ui.button variant="primary" size="sm" icon="plus" @click="createItemModal = true" class="w-full">
-                        Create Inventory Item
-                    </x-ui.button>
-                </div>
-            @endif
-        @endcan
-    </div>
-
     {{-- Desktop & Tablet Major Dropdown Tabs (>= sm) --}}
-    <div class="hidden sm:flex sm:items-center sm:justify-between sm:gap-4 flex-wrap text-xs mt-3">
-        <div class="flex items-center gap-2.5 flex-wrap">
+    <div class="hidden sm:flex sm:items-center sm:gap-2.5 flex-wrap text-xs">
             {{-- 1. Stock & Movements --}}
         @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::ApproveAdjustment->value, \App\Enums\Permission::PerformCycleCount->value, \App\Enums\Permission::AcknowledgeAlerts->value])
             <div class="relative" @click.outside="if (openDropdown === 'stock') openDropdown = null">
@@ -314,17 +300,5 @@
                 </div>
             </div>
         @endcanany
-        </div>
-
-        {{-- Action Buttons --}}
-        @can(\App\Enums\Permission::ManageItems->value)
-            @if(request()->routeIs('inventory.items*'))
-                <div class="flex items-center gap-2 flex-wrap">
-                    <x-ui.button variant="primary" size="sm" icon="plus" @click="createItemModal = true" id="btn-open-create-item-modal">
-                        Create Inventory Item
-                    </x-ui.button>
-                </div>
-            @endif
-        @endcan
     </div>
 </div>

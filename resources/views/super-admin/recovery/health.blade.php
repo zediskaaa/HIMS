@@ -1,7 +1,6 @@
 <x-app-layout>
     <x-ui.page-header
         title="System Health Diagnostics"
-        subtitle="Infrastructure health telemetry, subsystem latency metrics, and operational readiness audits."
         :breadcrumbs="[
             'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
             'Recovery Center' => route('admin.recovery.index'),

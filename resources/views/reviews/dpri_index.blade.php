@@ -1,38 +1,34 @@
 <x-app-layout>
     @include('inventory.logistics.partials.nav')
 
-    <div class="py-6" x-data="{ newModal: false }">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+    <div x-data="{ newModal: false }" class="space-y-6">
 
-            {{-- Breadcrumbs & Header --}}
-            <div class="border-b border-neutral-200 pb-4">
-                <nav class="flex text-xs text-neutral-500 mb-2" aria-label="Breadcrumb">
-                    <a href="{{ route('reviews.index') }}" class="hover:text-indigo-600 transition">Process Reviews</a>
-                    <span class="mx-2 text-neutral-400">/</span>
-                    <span class="text-neutral-900 font-medium">DPRI Reference Catalog</span>
-                </nav>
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <span class="rounded-md bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">DOH AO No. 2019-0040</span>
-                            <span class="text-xs text-neutral-500">• Philippine National Drug Formulary (PNDF)</span>
-                        </div>
-                        <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Drug Price Reference Index (DPRI)</h2>
-                        <p class="text-sm text-neutral-600">
-                            Statutory government price ceilings established to ensure transparent, economical, and standardized public hospital procurement.
-                        </p>
+        {{-- Breadcrumbs & Header --}}
+        <div class="border-b border-neutral-200 pb-4">
+            <nav class="flex text-xs text-neutral-500 mb-2" aria-label="Breadcrumb">
+                <a href="{{ route('reviews.index') }}" class="hover:text-indigo-600 transition">Process Reviews</a>
+                <span class="mx-2 text-neutral-400">/</span>
+                <span class="text-neutral-900 font-medium">DPRI Reference Catalog</span>
+            </nav>
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="rounded-md bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">DOH AO No. 2019-0040</span>
+                        <span class="text-xs text-neutral-500">• Philippine National Drug Formulary (PNDF)</span>
                     </div>
-
-                    @can(\App\Enums\Permission::CreateProcessReview->value)
-                        <div>
-                            <button type="button" @click="newModal = true" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
-                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                                Register DPRI Reference Price
-                            </button>
-                        </div>
-                    @endcan
+                    <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Drug Price Reference Index (DPRI)</h2>
                 </div>
+
+                @can(\App\Enums\Permission::CreateProcessReview->value)
+                    <div>
+                        <button type="button" @click="newModal = true" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                            Register DPRI Reference Price
+                        </button>
+                    </div>
+                @endcan
             </div>
+        </div>
 
             {{-- Flash Alerts --}}
             @if(session('status'))
@@ -157,7 +153,5 @@
                 </div>
             </div>
             @endcan
-
-        </div>
     </div>
 </x-app-layout>

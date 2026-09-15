@@ -4,7 +4,6 @@
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Commission on Audit (COA) GAM Volume II App. 50</p>
                 <h2 class="text-2xl font-bold text-neutral-900">Inspection & Acceptance Reports (IAR)</h2>
-                <p class="text-sm text-neutral-600">Dual-stage statutory accountability: Technical Inspection and Property Custodial Acceptance with automated liquidated damages penalty computation.</p>
             </div>
             <div>
                 @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
@@ -19,8 +18,7 @@
 
     @include('inventory.logistics.partials.nav')
 
-    <div class="py-6" x-data="{ genModalOpen: false, selectedGrnId: null, selectedGrnNumber: '', defaultDr: '', defaultSi: '' }">
-        <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
+    <div class="space-y-6" x-data="{ genModalOpen: false, selectedGrnId: null, selectedGrnNumber: '', defaultDr: '', defaultSi: '' }">
 
             {{-- Flash Notifications --}}
             @if(session('success'))
@@ -271,7 +269,5 @@
                 </div>
             </div>
             @endcan
-
         </div>
-    </div>
 </x-app-layout>

@@ -1,5 +1,5 @@
 <x-app-layout>
-    <div class="py-6" x-data="{
+    <div class="space-y-6" x-data="{
         issueModalOpen: false,
         ackModalOpen: false,
         rejectModalOpen: false,
@@ -11,77 +11,72 @@
     @open-cancel-modal.window="cancelModalOpen = true"
     @keydown.escape.window="issueModalOpen = false; ackModalOpen = false; rejectModalOpen = false; cancelModalOpen = false;"
     >
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
-
-            {{-- Header with Action Buttons --}}
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-neutral-200 pb-5">
-                <div>
-                    <div class="flex items-center gap-2">
-                        <a href="{{ route('inventory.requisitions.index') }}" class="text-xs font-semibold text-primary-600 hover:underline">
-                            &larr; Requisitions Registry
-                        </a>
-                        <span class="text-xs text-neutral-400">/</span>
-                        <span class="text-xs text-neutral-500">{{ $requisition->requisition_number }}</span>
-                    </div>
-                    <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">
-                        Store Requisition: {{ $requisition->requisition_number }}
-                    </h2>
-                    <p class="text-sm text-neutral-600">
-                        Department supply request, algorithmic FEFO pick list, and custody handover protocol.
-                    </p>
+        {{-- Header with Action Buttons --}}
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-neutral-200 pb-5">
+            <div>
+                <div class="flex items-center gap-2">
+                    <a href="{{ route('inventory.requisitions.index') }}" class="text-xs font-semibold text-primary-600 hover:underline">
+                        &larr; Requisitions Registry
+                    </a>
+                    <span class="text-xs text-neutral-400">/</span>
+                    <span class="text-xs text-neutral-500">{{ $requisition->requisition_number }}</span>
                 </div>
-                <div class="flex items-center gap-3">
-                    {{-- Approve & Reject Actions --}}
-                    @if(in_array($requisition->status, ['submitted', 'pending_approval'], true) && auth()->user()->can(\App\Enums\Permission::ApproveRequisition->value) && auth()->id() !== $requisition->requesting_user_id)
-                        <form action="{{ route('inventory.requisitions.approve', $requisition) }}" method="POST"
-                              data-confirm-title="Approve Store Requisition"
-                              data-confirm-message="Approve Requisition #{{ $requisition->requisition_number }} and place a hard reservation on available stock?"
-                              data-confirm-label="Approve &amp; Reserve">
-                            @csrf
-                            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
-                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                </svg>
-                                Approve &amp; Reserve Stock
-                            </button>
-                        </form>
-
-                        <button type="button" @click="rejectModalOpen = true" class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-700 transition">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            Reject
-                        </button>
-                    @endif
-
-                    {{-- Cancel Action --}}
-                    @if(in_array($requisition->status, ['submitted', 'pending_approval', 'approved'], true) && ((auth()->id() === $requisition->requesting_user_id && auth()->user()->can(\App\Enums\Permission::CreateRequisition->value)) || auth()->user()->can(\App\Enums\Permission::ApproveRequisition->value)))
-                        <button type="button" @click="cancelModalOpen = true" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 transition">
-                            Cancel Requisition
-                        </button>
-                    @endif
-
-                    {{-- Issue Action Button --}}
-                    @if(in_array($requisition->status, ['approved', 'picking'], true) && auth()->user()->can(\App\Enums\Permission::IssueStock->value))
-                        <button type="button" @click="issueModalOpen = true" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 transition">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                            </svg>
-                            Issue Stock to Department
-                        </button>
-                    @endif
-
-                    {{-- Acknowledge Action Button --}}
-                    @if($requisition->status === 'issued' && auth()->id() === $requisition->requesting_user_id && auth()->user()->can(\App\Enums\Permission::CreateRequisition->value))
-                        <button type="button" @click="ackModalOpen = true" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Acknowledge Custody Handover
-                        </button>
-                    @endif
-                </div>
+                <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">
+                    Store Requisition: {{ $requisition->requisition_number }}
+                </h2>
             </div>
+            <div class="flex items-center gap-3">
+                {{-- Approve & Reject Actions --}}
+                @if(in_array($requisition->status, ['submitted', 'pending_approval'], true) && auth()->user()->can(\App\Enums\Permission::ApproveRequisition->value) && auth()->id() !== $requisition->requesting_user_id)
+                    <form action="{{ route('inventory.requisitions.approve', $requisition) }}" method="POST"
+                          data-confirm-title="Approve Store Requisition"
+                          data-confirm-message="Approve Requisition #{{ $requisition->requisition_number }} and place a hard reservation on available stock?"
+                          data-confirm-label="Approve &amp; Reserve">
+                        @csrf
+                        <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Approve &amp; Reserve Stock
+                        </button>
+                    </form>
+
+                    <button type="button" @click="rejectModalOpen = true" class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-700 transition">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Reject
+                    </button>
+                @endif
+
+                {{-- Cancel Action --}}
+                @if(in_array($requisition->status, ['submitted', 'pending_approval', 'approved'], true) && ((auth()->id() === $requisition->requesting_user_id && auth()->user()->can(\App\Enums\Permission::CreateRequisition->value)) || auth()->user()->can(\App\Enums\Permission::ApproveRequisition->value)))
+                    <button type="button" @click="cancelModalOpen = true" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 transition">
+                        Cancel Requisition
+                    </button>
+                @endif
+
+                {{-- Issue Action Button --}}
+                @if(in_array($requisition->status, ['approved', 'picking'], true) && auth()->user()->can(\App\Enums\Permission::IssueStock->value))
+                    <button type="button" @click="issueModalOpen = true" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 transition">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                        Issue Stock to Department
+                    </button>
+                @endif
+
+                {{-- Acknowledge Action Button --}}
+                @if($requisition->status === 'issued' && auth()->id() === $requisition->requesting_user_id && auth()->user()->can(\App\Enums\Permission::CreateRequisition->value))
+                    <button type="button" @click="ackModalOpen = true" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Acknowledge Custody Handover
+                    </button>
+                @endif
+            </div>
+        </div>
 
             {{-- Flash Alerts --}}
             @if(session('success'))

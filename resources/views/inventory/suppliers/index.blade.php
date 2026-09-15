@@ -7,11 +7,10 @@
 
     <x-ui.page-header
         title="Supplier Vendor Analytics"
-        subtitle="Monitor supplier qualification, compliance, and procurement readiness from one workspace."
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Supplier Management' => null]"
     />
 
-    <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <x-ui.stat compact label="Active suppliers" :value="$counts['active']" icon="users" tone="primary" :hint="$counts['new_this_month'].' added this month · '.$counts['total'].' total'" />
         <x-ui.stat compact label="Procurement eligible" :value="$counts['eligible']" icon="shield-check" tone="success" :hint="$counts['pending'].' awaiting accreditation review'" />
         <x-ui.stat compact label="Compliance attention" :value="$counts['attention']" icon="exclamation-triangle" :tone="$counts['critical_alerts'] > 0 ? 'danger' : 'warning'" :hint="$counts['critical_alerts'].' critical · '.$counts['active_alerts'].' active alerts'" />

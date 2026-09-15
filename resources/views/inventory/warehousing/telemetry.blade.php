@@ -4,7 +4,6 @@
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Good Storage Practice (DOH AO 2014-0034)</p>
                 <h2 class="text-2xl font-bold text-neutral-900">Cold Chain & IoT Telemetry Monitor</h2>
-                <p class="text-sm text-neutral-600">Continuous environmental sensing, automated excursion locking, and rolling Haynes Mean Kinetic Temperature (MKT).</p>
             </div>
             <div class="flex items-center gap-2">
                 @can(\App\Enums\Permission::ManageTelemetryExcursions->value)
@@ -20,10 +19,9 @@
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="{ showIngestModal: false, showReleaseModal: false, releaseLocationId: null, releaseLocationCode: '' }"
+    <div class="space-y-6" x-data="{ showIngestModal: false, showReleaseModal: false, releaseLocationId: null, releaseLocationCode: '' }"
          @open-ingest-modal.window="showIngestModal = true"
          @open-release-modal.window="showReleaseModal = true; releaseLocationId = $event.detail.id; releaseLocationCode = $event.detail.code">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
 
             {{-- SWS Consolidated Workflow Navigation --}}
             @include('inventory.warehousing.partials.workflow_nav')
@@ -238,6 +236,4 @@
             </div>
         </div>
         @endcan
-
-    </div>
 </x-app-layout>

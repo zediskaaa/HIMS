@@ -4,7 +4,6 @@
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">3PL Carrier & Dock Inbound Tracking</p>
                 <h2 class="text-2xl font-bold text-neutral-900">Shipments & Carrier Logistics</h2>
-                <p class="text-sm text-neutral-600">Inbound logistics monitoring, GS1 SSCC validation, WHO GDP cold-chain thermal loggers, and dock arrival handoffs.</p>
             </div>
             <div class="flex items-center gap-2" x-data>
                 @can(\App\Enums\Permission::ManageLogisticsRecords->value)
@@ -19,9 +18,8 @@
 
     @include('inventory.logistics.partials.nav')
 
-    <div class="py-6" x-data="{ shipmentModalOpen: false, dockModalOpen: false, selectedShipment: null, selectedShipmentNumber: '', isColdChain: false }"
+    <div class="space-y-6" x-data="{ shipmentModalOpen: false, dockModalOpen: false, selectedShipment: null, selectedShipmentNumber: '', isColdChain: false }"
          @open-shipment-modal.window="shipmentModalOpen = true">
-        <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
 
             {{-- Flash Notifications --}}
             @if(session('success'))
@@ -413,7 +411,5 @@
                 </div>
             </div>
             @endcan
-
         </div>
-    </div>
 </x-app-layout>

@@ -4,7 +4,6 @@
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wider text-purple-700">Republic Act No. 9165 & DDB Reg. 1 (2014)</p>
                 <h2 class="text-2xl font-bold text-neutral-900">Dangerous Drugs Vault & Electronic DDRB</h2>
-                <p class="text-sm text-neutral-600">Dual-custody access governance, Yellow Prescription tracking, physician S-2 license validation, and 5-year retention.</p>
             </div>
             <div class="flex items-center gap-2">
                 @can(\App\Enums\Permission::AccessNarcoticsVault->value)
@@ -24,8 +23,7 @@
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="{ showVaultModal: false }" @open-vault-modal.window="showVaultModal = true">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+    <div class="space-y-6" x-data="{ showVaultModal: false }" @open-vault-modal.window="showVaultModal = true">
 
             {{-- SWS Consolidated Workflow Navigation --}}
             @include('inventory.warehousing.partials.workflow_nav')
@@ -269,6 +267,4 @@
             </div>
         </div>
         @endcan
-
-    </div>
 </x-app-layout>

@@ -3,7 +3,6 @@
 
     <x-ui.page-header
         :title="$log->action->label()"
-        subtitle="Read-only audit event details."
         :breadcrumbs="[
             'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
             'Audit Trail' => route('admin.audit-logs.index'),

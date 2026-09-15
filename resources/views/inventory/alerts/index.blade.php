@@ -8,21 +8,17 @@
         </div>
     </x-slot>
 
-    <div class="py-6">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
-            {{-- Consolidated Inventory Workflow Navigation --}}
-            @include('inventory.partials.workflow_nav')
-            <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
-                <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h3 class="text-lg font-semibold text-[var(--text)]">Reorder Alerts & Inventory Notices</h3>
-                        <p class="text-sm text-[var(--muted)]">Live warnings for low stock, out of stock, and near-expiry inventory items.</p>
-                    </div>
-                    <x-ui.loader id="alerts-api-status" size="sm" label="Loading alerts from API..." class="text-sm text-[var(--muted)]" />
-                </div>
-                <div id="alerts-list" class="mt-6 grid gap-4 lg:grid-cols-2"></div>
+    {{-- Consolidated Inventory Workflow Navigation --}}
+    @include('inventory.partials.workflow_nav')
+    <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+                <h3 class="text-lg font-semibold text-[var(--text)]">Reorder Alerts & Inventory Notices</h3>
+                <p class="text-sm text-[var(--muted)]">Live warnings for low stock, out of stock, and near-expiry inventory items.</p>
             </div>
+            <x-ui.loader id="alerts-api-status" size="sm" label="Loading alerts from API..." class="text-sm text-[var(--muted)]" />
         </div>
+        <div id="alerts-list" class="mt-6 grid gap-4 lg:grid-cols-2"></div>
     </div>
 
     <script>

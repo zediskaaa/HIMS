@@ -12,9 +12,6 @@
                 <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">
                     Audit Document: {{ $cycleCountDoc->document_number }}
                 </h2>
-                <p class="text-sm text-neutral-600">
-                    Blind physical count verification, variance calculation, and multi-tier discrepancy authorization.
-                </p>
             </div>
             <div class="flex items-center gap-3">
                 @if(in_array($cycleCountDoc->status, ['completed', 'recount_pending']) && auth()->user()->can(\App\Enums\Permission::ApproveAdjustment->value) && auth()->id() !== $cycleCountDoc->assigned_counter_id)
@@ -53,9 +50,6 @@
             </div>
         </div>
     </x-slot>
-
-    <div class="py-6">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
 
             {{-- Flash Alerts --}}
             @if(session('success'))
@@ -413,7 +407,4 @@
                     </div>
                 </div>
             @endif
-
-        </div>
-    </div>
 </x-app-layout>

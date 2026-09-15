@@ -4,7 +4,6 @@
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Spatial Topology</p>
                 <h2 class="text-2xl font-bold text-neutral-900">Warehouse Storage Locations</h2>
-                <p class="text-sm text-neutral-600">Physical coordinate hierarchy: Warehouses &rarr; Zones &rarr; Aisles &rarr; Racks &rarr; Shelves &rarr; Bins.</p>
             </div>
             <div class="flex items-center gap-2">
                 @can(\App\Enums\Permission::ManageWarehouseTopology->value)
@@ -20,8 +19,7 @@
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="{ showCreateModal: false }" @open-create-modal.window="showCreateModal = true">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+    <div class="space-y-6" x-data="{ showCreateModal: false }" @open-create-modal.window="showCreateModal = true">
 
             {{-- SWS Consolidated Workflow Navigation --}}
             @include('inventory.warehousing.partials.workflow_nav')
@@ -318,5 +316,4 @@
             </div>
         </div>
         @endcan
-    </div>
 </x-app-layout>

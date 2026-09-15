@@ -1,7 +1,6 @@
 <x-app-layout>
     <x-ui.page-header
         title="Edit {{ $user->name }}"
-        subtitle="Changes take effect the next time this person loads a page."
         :breadcrumbs="[
             'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
             'User Management' => route('admin.users.index'),

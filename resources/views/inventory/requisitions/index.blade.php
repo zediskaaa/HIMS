@@ -1,5 +1,5 @@
 <x-app-layout>
-    <div class="py-6" x-data="{
+    <div class="space-y-6" x-data="{
         newRequisitionModal: {{ $errors->any() ? 'true' : 'false' }},
         itemsList: {{ Js::from($items) }},
         lines: [
@@ -25,38 +25,33 @@
     @open-new-requisition-modal.window="newRequisitionModal = true"
     @keydown.escape.window="newRequisitionModal = false"
     >
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
-
-            {{-- Header with Action Button --}}
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-neutral-200 pb-5">
-                <div>
-                    <div class="flex items-center gap-2">
-                        <span class="rounded-md bg-primary-100 px-2.5 py-0.5 text-xs font-semibold text-primary-800">Store Requisitions</span>
-                        <span class="text-xs text-neutral-500">• Department Issuance &amp; ATP Reservation Protocol</span>
-                    </div>
-                    <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Department Material Requisitions</h2>
-                    <p class="text-sm text-neutral-600">
-                        Department store requisitions, budget verification, Segregation of Duties approval, hard ATP stock reservation, and FEFO picking.
-                    </p>
+        {{-- Header with Action Button --}}
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-neutral-200 pb-5">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="rounded-md bg-primary-100 px-2.5 py-0.5 text-xs font-semibold text-primary-800">Store Requisitions</span>
+                    <span class="text-xs text-neutral-500">• Department Issuance &amp; ATP Reservation Protocol</span>
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
-                    <x-ui.button variant="secondary" :href="route('inventory.items')" icon="arrow-left">Back to Inventory</x-ui.button>
-                    @can(\App\Enums\Permission::CreateRequisition->value)
-                        <button type="button"
-                                @click="newRequisitionModal = true"
-                                id="btn-new-requisition"
-                                class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 active:bg-primary-800 transition focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                            </svg>
-                            New Store Requisition
-                        </button>
-                    @endcan
-                </div>
+                <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Department Material Requisitions</h2>
             </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <x-ui.button variant="secondary" :href="route('inventory.items')" icon="arrow-left">Back to Inventory</x-ui.button>
+                @can(\App\Enums\Permission::CreateRequisition->value)
+                    <button type="button"
+                            @click="newRequisitionModal = true"
+                            id="btn-new-requisition"
+                            class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 active:bg-primary-800 transition focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        New Store Requisition
+                    </button>
+                @endcan
+            </div>
+        </div>
 
-            {{-- Consolidated Inventory Workflow Navigation --}}
-            @include('inventory.partials.workflow_nav')
+        {{-- Consolidated Inventory Workflow Navigation --}}
+        @include('inventory.partials.workflow_nav')
 
             {{-- Flash Alerts --}}
             @if(session('success'))
@@ -414,6 +409,4 @@
             </div>
         </div>
         @endcan
-
-    </div>
 </x-app-layout>

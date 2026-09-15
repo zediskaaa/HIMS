@@ -4,16 +4,13 @@
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Smart Warehousing</p>
                 <h2 class="text-2xl font-bold text-neutral-900">Warehouse Task Registry</h2>
-                <p class="text-sm text-neutral-600">Assigned, scan-validated physical work. Creating a task does not change stock.</p>
             </div>
             <x-ui.button variant="secondary" :href="route('inventory.warehousing.dashboard')" icon="arrow-left">Back to Smart Warehousing</x-ui.button>
         </div>
     </x-slot>
 
-    <div class="py-6">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
-            {{-- SWS Consolidated Workflow Navigation --}}
-            @include('inventory.warehousing.partials.workflow_nav')
+    {{-- SWS Consolidated Workflow Navigation --}}
+    @include('inventory.warehousing.partials.workflow_nav')
 
             @if ($errors->any())
                 <x-ui.alert variant="danger" title="Warehouse task could not be saved">
@@ -126,6 +123,4 @@
                 </x-ui.table>
                 <div class="mt-4">{{ $tasks->links() }}</div>
             </x-ui.card>
-        </div>
-    </div>
 </x-app-layout>

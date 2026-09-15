@@ -6,11 +6,10 @@
                 <span class="text-xs text-neutral-500">• Three-Way Matching &amp; DOH GSDP Quarantine Protocol</span>
             </div>
             <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Dock Receiving &amp; Goods Receipt Notes</h2>
-            <p class="text-sm text-neutral-600">Physical carrier intake, PO line tolerance verification (+5% max), lot/batch registration, and quarantine placement.</p>
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="{
+    <div class="space-y-6" x-data="{
         showReceiveModal: false,
         selectedPo: null,
         poLines: [],
@@ -20,7 +19,6 @@
             this.poLines = this.selectedPo ? this.selectedPo.lines : [];
         }
     }">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
 
             {{-- SWS Consolidated Workflow Navigation --}}
             @include('inventory.warehousing.partials.workflow_nav')
@@ -357,6 +355,4 @@
             </div>
         </div>
         @endcan
-
-    </div>
 </x-app-layout>

@@ -10,7 +10,6 @@
                     </span>
                 </div>
                 <h2 class="mt-1 text-2xl font-bold text-neutral-900">{{ $iar->iar_number }}</h2>
-                <p class="text-sm text-neutral-600">Statutory Inspection and Acceptance Report for {{ $iar->purchaseOrder->po_number ?? 'Inbound Goods' }}</p>
             </div>
             <div class="flex items-center gap-2">
                 <a href="{{ route('inventory.logistics.iar.print', ['iar' => $iar, 'print' => 1]) }}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
@@ -23,8 +22,7 @@
 
     @include('inventory.logistics.partials.nav')
 
-    <div class="py-6 print:py-0 print:m-0" x-data="{ inspectModalOpen: false, acceptModalOpen: false, coaModalOpen: false }">
-        <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8 print:max-w-none print:p-0 print:m-0 print:space-y-0">
+    <div class="space-y-6 print:p-0 print:m-0 print:space-y-0" x-data="{ inspectModalOpen: false, acceptModalOpen: false, coaModalOpen: false }">
 
             {{-- Flash Messages --}}
             @if(session('success'))
@@ -249,7 +247,5 @@
                 </div>
             </div>
             @endcan
-
         </div>
-    </div>
 </x-app-layout>

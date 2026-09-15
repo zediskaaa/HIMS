@@ -4,7 +4,6 @@
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Forensic Physical & Document Accountability</p>
                 <h2 class="text-2xl font-bold text-neutral-900">Chain of Custody Ledger</h2>
-                <p class="text-sm text-neutral-600">Append-only, immutable transaction log of all cargo handoffs, carrier dispatches, inspection sign-offs, and custodial transfers.</p>
             </div>
             <div class="flex items-center gap-2">
                 <span class="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
@@ -16,9 +15,6 @@
     </x-slot>
 
     @include('inventory.logistics.partials.nav')
-
-    <div class="py-6">
-        <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
 
             {{-- Filter Bar --}}
             <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -155,7 +151,4 @@
                     </div>
                 @endif
             </div>
-
-        </div>
-    </div>
 </x-app-layout>

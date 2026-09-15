@@ -39,7 +39,6 @@
 
     <x-ui.page-header
         :title="$supplier->name"
-        :subtitle="($supplier->trade_name ? $supplier->trade_name.' · ' : '').'Supplier qualification profile'"
         :breadcrumbs="[
             'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
             'Suppliers' => route('inventory.suppliers'),

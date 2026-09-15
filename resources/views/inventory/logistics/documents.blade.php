@@ -7,7 +7,6 @@
                     Digital Archive &amp; Audit Trail
                 </span>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">Document Tracking Registry</h1>
-                <p class="mt-0.5 text-sm text-neutral-600">Secure SHA-256 cryptographic verification, National Archives (NAP) retention compliance, and non-destructive versioning.</p>
             </div>
             <div class="flex items-center gap-2" x-data>
                 @can(\App\Enums\Permission::ManageLogisticsRecords->value)
@@ -22,7 +21,7 @@
 
     @include('inventory.logistics.partials.nav')
 
-    <div class="py-5" x-data="{
+    <div class="space-y-6" x-data="{
         uploadModalOpen: false,
         verifyModalOpen: false,
         verifyDocId: null,
@@ -42,7 +41,6 @@
         }
     }"
     @open-upload-modal.window="uploadModalOpen = true">
-        <div class="mx-auto max-w-7xl space-y-4 px-4 sm:px-6 lg:px-8">
 
             {{-- Flash Notifications --}}
             @if(session('success'))
@@ -638,7 +636,5 @@
                 </div>
             </div>
             @endcan
-
         </div>
-    </div>
 </x-app-layout>

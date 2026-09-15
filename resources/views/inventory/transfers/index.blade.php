@@ -1,5 +1,5 @@
 <x-app-layout>
-    <div class="py-6" x-data="{
+    <div class="space-y-6" x-data="{
         newTransferModal: {{ $errors->any() ? 'true' : 'false' }},
         sourceLocationId: '{{ old('source_location_id', '') }}',
         destinationLocationId: '{{ old('destination_location_id', '') }}',
@@ -79,36 +79,31 @@
     @open-new-transfer-modal.window="newTransferModal = true"
     @keydown.escape.window="newTransferModal = false"
     >
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
-
-            {{-- Header with Action Button --}}
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-neutral-200 pb-5">
-                <div>
-                    <div class="flex items-center gap-2">
-                        <span class="rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">Internal Logistics</span>
-                        <span class="text-xs text-neutral-500">• In-Transit Virtual Buffer &amp; Discrepancy Tracking</span>
-                    </div>
-                    <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Stock Transfers</h2>
-                    <p class="text-sm text-neutral-600">
-                        Inter-facility and inter-department inventory movements with in-transit buffer accounting and transit damage/loss logging.
-                    </p>
+        {{-- Header with Action Button --}}
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-neutral-200 pb-5">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">Internal Logistics</span>
+                    <span class="text-xs text-neutral-500">• In-Transit Virtual Buffer &amp; Discrepancy Tracking</span>
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
-                    <x-ui.button variant="secondary" :href="route('inventory.stock-movements')" icon="arrows-right-left">Movement Ledger</x-ui.button>
-                    <x-ui.button variant="secondary" :href="route('inventory.items')" icon="arrow-left">Back to Inventory</x-ui.button>
-                    @can(\App\Enums\Permission::TransferStock->value)
-                        <button type="button"
-                                @click="newTransferModal = true"
-                                id="btn-initiate-stock-transfer"
-                                class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                            </svg>
-                            Initiate Stock Transfer
-                        </button>
-                    @endcan
-                </div>
+                <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Stock Transfers</h2>
             </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <x-ui.button variant="secondary" :href="route('inventory.stock-movements')" icon="arrows-right-left">Movement Ledger</x-ui.button>
+                <x-ui.button variant="secondary" :href="route('inventory.items')" icon="arrow-left">Back to Inventory</x-ui.button>
+                @can(\App\Enums\Permission::TransferStock->value)
+                    <button type="button"
+                            @click="newTransferModal = true"
+                            id="btn-initiate-stock-transfer"
+                            class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                        Initiate Stock Transfer
+                    </button>
+                @endcan
+            </div>
+        </div>
 
             {{-- Consolidated Inventory Workflow Navigation --}}
             @include('inventory.partials.workflow_nav')
@@ -269,8 +264,6 @@
                     </div>
                 @endif
             </div>
-
-        </div>
 
         @include('inventory.transfers.partials.initiate_modal')
 

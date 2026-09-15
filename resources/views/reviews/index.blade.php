@@ -1,38 +1,32 @@
 <x-app-layout>
     @include('inventory.logistics.partials.nav')
 
-    <div class="py-6">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
-
-            {{-- Header with Action Buttons --}}
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-neutral-200 pb-5">
-                <div>
-                    <div class="flex items-center gap-2">
-                        <span class="rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">Operational Analytics</span>
-                        <span class="text-xs text-neutral-500">• Evidence-Based Supply Chain Governance</span>
-                    </div>
-                    <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Evidence-Based Process Reviews</h2>
-                    <p class="text-sm text-neutral-600">
-                        Multi-criteria supplier scorecards, DOH DPRI price ceiling analytics, lead time variance ($\sigma$), and COA physical inventory shrinkage reviews.
-                    </p>
-                </div>
-                <div class="flex items-center gap-3">
-                    <a href="{{ route('reviews.dpri') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 transition">
-                        <svg class="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                        </svg>
-                        DOH DPRI Reference Prices
-                    </a>
-                    @can(\App\Enums\Permission::CreateProcessReview->value)
-                        <a href="{{ route('reviews.create') }}" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                            </svg>
-                            New Process Review
-                        </a>
-                    @endcan
-                </div>
+    {{-- Header with Action Buttons --}}
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-neutral-200 pb-5">
+        <div>
+            <div class="flex items-center gap-2">
+                <span class="rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">Operational Analytics</span>
+                <span class="text-xs text-neutral-500">• Evidence-Based Supply Chain Governance</span>
             </div>
+            <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Evidence-Based Process Reviews</h2>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="{{ route('reviews.dpri') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 transition">
+                <svg class="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                DOH DPRI Reference Prices
+            </a>
+            @can(\App\Enums\Permission::CreateProcessReview->value)
+                <a href="{{ route('reviews.create') }}" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    New Process Review
+                </a>
+            @endcan
+        </div>
+    </div>
 
             {{-- Flash Notification --}}
             @if(session('status'))
@@ -221,6 +215,4 @@
             <div class="mt-4">
                 {{ $reviews->links() }}
             </div>
-        </div>
-    </div>
 </x-app-layout>

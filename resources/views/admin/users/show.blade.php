@@ -2,7 +2,6 @@
     @php($nameComponents = $user->nameComponents())
     <x-ui.page-header
         :title="$user->name"
-        :subtitle="$user->role->label().' · '.$user->status->label()"
         :breadcrumbs="[
             'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
             'User Management' => route('admin.users.index'),

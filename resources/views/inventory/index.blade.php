@@ -5,14 +5,11 @@
                 <h2 class="text-xl font-semibold leading-tight text-[var(--text)]">
                     Supply Chain & Inventory
                 </h2>
-                <p class="mt-1 text-sm text-[var(--muted)]">Core modules for purchasing, receiving, stock movement, alerts, and reporting.</p>
             </div>
         </div>
     </x-slot>
 
-    <div class="py-6">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
-            <div class="grid gap-4 md:grid-cols-3">
+    <div class="grid gap-4 md:grid-cols-3">
                 <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
                     <p class="text-sm text-[var(--muted)]">Total suppliers</p>
                     <p class="mt-2 text-3xl font-semibold text-[var(--text)]">{{ $totalSuppliers }}</p>
@@ -88,6 +85,4 @@
                 </a>
                 @endcan
             </div>
-        </div>
-    </div>
 </x-app-layout>

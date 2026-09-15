@@ -4,7 +4,6 @@
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wider text-amber-700">Point-of-Care Material Custody</p>
                 <h2 class="text-2xl font-bold text-neutral-900">Surgical Consignment & Bill-Only Implants</h2>
-                <p class="text-sm text-neutral-600">Vendor-owned high-value surgical implants (stents, prostheses, lenses). Automated Bill-Only PR generation upon OR consumption.</p>
             </div>
             <div class="flex items-center gap-2">
                 @can(\App\Enums\Permission::RecordConsignments->value)
@@ -20,8 +19,7 @@
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="{ showConsumeModal: false }" @open-consume-modal.window="showConsumeModal = true">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+    <div class="space-y-6" x-data="{ showConsumeModal: false }" @open-consume-modal.window="showConsumeModal = true">
 
             {{-- SWS Consolidated Workflow Navigation --}}
             @include('inventory.warehousing.partials.workflow_nav')
@@ -261,6 +259,4 @@
             </div>
         </div>
         @endcan
-
-    </div>
 </x-app-layout>
