@@ -82,7 +82,7 @@ class StockTransferController extends Controller implements HasMiddleware
             'lines.*.quantity' => ['required', 'integer', 'min:1'],
             'lines.*.item_batch_id' => ['nullable', 'exists:item_batches,id'],
         ], [
-            'destination_location_id.different' => 'Ang Origin at Destination location ay hindi maaaring magkatulad.',
+            'destination_location_id.different' => 'The origin and destination locations cannot be the same.',
         ]);
 
         $sourceLocation = StorageLocation::find($validated['source_location_id']);
@@ -94,7 +94,7 @@ class StockTransferController extends Controller implements HasMiddleware
                 $item = InventoryItem::find($line['item_id']);
                 $itemName = $item ? $item->name : "Item #{$line['item_id']}";
                 $locName = $sourceLocation ? $sourceLocation->name : 'Origin Location';
-                $insufficientErrors["lines.{$index}.quantity"] = "Kulang ang stock para sa {$itemName} sa {$locName}. Mayroon lamang {$available} units na available, ngunit {$qty} units ang inilagay mo.";
+                $insufficientErrors["lines.{$index}.quantity"] = "Insufficient stock for {$itemName} at {$locName}. Only {$available} units available, but {$qty} units requested.";
             }
         }
 

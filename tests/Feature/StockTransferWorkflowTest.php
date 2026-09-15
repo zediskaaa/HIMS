@@ -260,5 +260,85 @@ class StockTransferWorkflowTest extends TestCase
         // Verify that no transfer was created
         $this->assertEquals(0, StockTransfer::count());
     }
+
+    public function test_initiating_and_receiving_batch_tracked_stock_transfer_decrements_origin_and_increments_destination(): void
+    {
+        extract($this->createSetup());
+
+        $batch = \App\Models\ItemBatch::create([
+            'item_id' => $item->id,
+            'batch_number' => 'BATCH-TEST-001',
+            'expiry_date' => now()->addYear()->toDateString(),
+            'received_at' => now()->toDateString(),
+            'unit_cost' => 12.50,
+            'status' => 'active',
+        ]);
+
+        // Put stock specifically in a batch level at the source location
+        ItemStockLevel::where('item_id', $item->id)->delete();
+        ItemStockLevel::create([
+            'item_id' => $item->id,
+            'storage_location_id' => $source->id,
+            'item_batch_id' => $batch->id,
+            'quantity' => 40,
+        ]);
+        app(InventoryAutomationService::class)->syncItemTotals($item);
+
+        $this->actingAs($staff);
+
+        // 1. Dispatch 15 units of Dobutrex/batch-tracked item
+        $response = $this->post(route('inventory.transfers.store'), [
+            'source_location_id' => $source->id,
+            'destination_location_id' => $destination->id,
+            'notes' => 'Batch-tracked dispatch',
+            'lines' => [
+                ['item_id' => $item->id, 'quantity' => 15],
+            ],
+        ]);
+
+        $response->assertRedirect(route('inventory.transfers.index'));
+
+        // Verify source batch stock was decremented from 40 to 25
+        $sourceLevel = ItemStockLevel::where('item_id', $item->id)
+            ->where('storage_location_id', $source->id)
+            ->where('item_batch_id', $batch->id)
+            ->first();
+        $this->assertEquals(25, $sourceLevel->quantity);
+
+        // Verify available count in stock map is now 25
+        $indexResponse = $this->get(route('inventory.transfers.index'));
+        $locationStockMap = $indexResponse->viewData('locationStockMap');
+        $this->assertEquals(25, $locationStockMap[$source->id][$item->id]);
+
+        // 2. Receive transfer at destination
+        $transfer = StockTransfer::latest('id')->first();
+        $line = $transfer->lines->first();
+        $this->assertEquals($batch->id, $line->item_batch_id);
+        $this->assertEquals(15, $line->dispatched_quantity);
+
+        $receiveResponse = $this->post(route('inventory.transfers.receive', $transfer), [
+            'lines' => [
+                [
+                    'line_id' => $line->id,
+                    'received_quantity' => 15,
+                    'damaged_quantity' => 0,
+                    'lost_quantity' => 0,
+                ],
+            ],
+        ]);
+
+        $receiveResponse->assertRedirect(route('inventory.transfers.show', $transfer));
+
+        // Destination received the 15 units into its batch level
+        $destLevel = ItemStockLevel::where('item_id', $item->id)
+            ->where('storage_location_id', $destination->id)
+            ->where('item_batch_id', $batch->id)
+            ->first();
+        $this->assertNotNull($destLevel);
+        $this->assertEquals(15, $destLevel->quantity);
+
+        // Total item stock equals 25 (source) + 15 (dest) = 40
+        $this->assertEquals(40, $item->fresh()->quantity_on_hand);
+    }
 }
 

@@ -84,39 +84,47 @@ class TransferService
                     ]);
                 }
 
-                // 1. Decrement source location
-                $this->automationService->adjustStockLevel($item->id, $sourceLocation->id, $batchId, -$qty);
+                // Allocate FEFO across batches if batch not explicitly given, or for that specific batch
+                $allocations = $this->automationService->allocateFefo($item->id, $sourceLocation->id, $qty, $batchId);
 
-                // 2. Increment in-transit stock
-                $this->automationService->adjustInTransitStock($item->id, $inTransitLocation->id, $batchId, $qty);
+                foreach ($allocations as $allocation) {
+                    $sliceBatchId = $allocation['batch_id'];
+                    $sliceQty = (int) $allocation['quantity'];
 
-                // 3. Record dispatch movement in ledger
-                StockMovement::create([
-                    'item_id' => $item->id,
-                    'item_batch_id' => $batchId,
-                    'movement_type' => MovementType::TransferDispatch,
-                    'quantity' => $qty,
-                    'unit_cost' => $item->unit_cost,
-                    'from_location_id' => $sourceLocation->id,
-                    'to_location_id' => $inTransitLocation->id,
-                    'reference_type' => StockTransfer::class,
-                    'reference_id' => $transfer->id,
-                    'remarks' => "Transfer Dispatch {$transfer->transfer_number} from {$sourceLocation->name} to In-Transit",
-                    'moved_at' => now(),
-                    'user_id' => $dispatcher->id,
-                ]);
+                    // 1. Decrement source location
+                    $this->automationService->adjustStockLevel($item->id, $sourceLocation->id, $sliceBatchId, -$sliceQty);
 
-                StockTransferLine::create([
-                    'stock_transfer_id' => $transfer->id,
-                    'item_id' => $item->id,
-                    'item_batch_id' => $batchId,
-                    'dispatched_quantity' => $qty,
-                    'received_quantity' => 0,
-                    'damaged_quantity' => 0,
-                    'lost_quantity' => 0,
-                    'line_status' => 'in_transit',
-                    'notes' => $lineData['notes'] ?? null,
-                ]);
+                    // 2. Increment in-transit stock
+                    $this->automationService->adjustInTransitStock($item->id, $inTransitLocation->id, $sliceBatchId, $sliceQty);
+
+                    // 3. Record dispatch movement in ledger
+                    StockMovement::create([
+                        'item_id' => $item->id,
+                        'item_batch_id' => $sliceBatchId,
+                        'movement_type' => MovementType::TransferDispatch,
+                        'quantity' => $sliceQty,
+                        'unit_cost' => $item->unit_cost,
+                        'from_location_id' => $sourceLocation->id,
+                        'to_location_id' => $inTransitLocation->id,
+                        'reference_type' => StockTransfer::class,
+                        'reference_id' => $transfer->id,
+                        'remarks' => "Transfer Dispatch {$transfer->transfer_number} from {$sourceLocation->name} to In-Transit",
+                        'moved_at' => now(),
+                        'user_id' => $dispatcher->id,
+                    ]);
+
+                    StockTransferLine::create([
+                        'stock_transfer_id' => $transfer->id,
+                        'item_id' => $item->id,
+                        'item_batch_id' => $sliceBatchId,
+                        'dispatched_quantity' => $sliceQty,
+                        'received_quantity' => 0,
+                        'damaged_quantity' => 0,
+                        'lost_quantity' => 0,
+                        'line_status' => 'in_transit',
+                        'notes' => $lineData['notes'] ?? null,
+                    ]);
+                }
 
                 $this->automationService->syncItemTotals($item);
             }

@@ -162,7 +162,7 @@
                                         <p class="text-xs text-neutral-500">SKU: {{ $line->item->sku ?? 'N/A' }}</p>
                                     </td>
                                     <td class="px-6 py-4 text-right font-semibold text-neutral-900">
-                                        {{ number_format($line->quantity) }}
+                                        {{ number_format($line->dispatched_quantity) }}
                                     </td>
                                     <td class="px-6 py-4 text-right font-semibold text-emerald-600">
                                         {{ number_format($line->received_quantity) }}
@@ -230,23 +230,23 @@
                                     <div class="rounded-lg bg-neutral-50 p-4 border border-neutral-200 space-y-3">
                                         <div class="flex items-center justify-between">
                                             <p class="text-sm font-semibold text-neutral-900">{{ $line->item->name }}</p>
-                                            <p class="text-xs text-neutral-500 font-mono">Dispatched: {{ $line->quantity }} units</p>
+                                            <p class="text-xs text-neutral-500 font-mono">Dispatched: {{ $line->dispatched_quantity }} units</p>
                                             <input type="hidden" name="lines[{{ $idx }}][line_id]" value="{{ $line->id }}">
                                         </div>
                                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                             <div>
                                                 <label class="block text-xs font-semibold text-emerald-700">Received Qty</label>
-                                                <input type="number" name="lines[{{ $idx }}][received_quantity]" min="0" max="{{ $line->quantity }}" value="{{ $line->quantity }}" required
+                                                <input type="number" name="lines[{{ $idx }}][received_quantity]" min="0" max="{{ $line->dispatched_quantity }}" value="{{ $line->dispatched_quantity }}" required
                                                        class="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-xs text-right">
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-semibold text-rose-700">Damaged Qty</label>
-                                                <input type="number" name="lines[{{ $idx }}][damaged_quantity]" min="0" max="{{ $line->quantity }}" value="0"
+                                                <input type="number" name="lines[{{ $idx }}][damaged_quantity]" min="0" max="{{ $line->dispatched_quantity }}" value="0"
                                                        class="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 text-xs text-right">
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-semibold text-neutral-600">Lost In-Transit</label>
-                                                <input type="number" name="lines[{{ $idx }}][lost_quantity]" min="0" max="{{ $line->quantity }}" value="0"
+                                                <input type="number" name="lines[{{ $idx }}][lost_quantity]" min="0" max="{{ $line->dispatched_quantity }}" value="0"
                                                        class="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-neutral-500 focus:ring-neutral-500 text-xs text-right">
                                             </div>
                                         </div>

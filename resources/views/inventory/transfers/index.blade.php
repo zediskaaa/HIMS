@@ -18,6 +18,18 @@
             if (!locId || !itemId) return 0;
             return (this.stockMap[locId] && this.stockMap[locId][itemId]) ? parseInt(this.stockMap[locId][itemId]) : 0;
         },
+        getAvailableItems() {
+            if (!this.sourceLocationId) return [];
+            return this.itemsList.filter(itm => this.getAvailable(this.sourceLocationId, itm.id) > 0);
+        },
+        onSourceLocationChange() {
+            this.lines.forEach(line => {
+                if (line.item_id && this.getAvailable(this.sourceLocationId, line.item_id) <= 0) {
+                    line.item_id = '';
+                    line.quantity = 1;
+                }
+            });
+        },
         isOverStock(line) {
             if (!this.sourceLocationId || !line.item_id) return false;
             const avail = this.getAvailable(this.sourceLocationId, line.item_id);
@@ -273,7 +285,7 @@
                             <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700">Source Location (Origin)</label>
-                                    <select name="source_location_id" x-model="sourceLocationId" required class="mt-1 block w-full rounded-lg border-neutral-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                                    <select name="source_location_id" x-model="sourceLocationId" @change="onSourceLocationChange()" required class="mt-1 block w-full rounded-lg border-neutral-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                                         <option value="">-- Select Origin Location --</option>
                                         @foreach($locations as $loc)
                                             <option value="{{ $loc->id }}">{{ $loc->name }} ({{ $loc->code }})</option>
@@ -303,7 +315,7 @@
                             <div class="mt-6 border-t border-neutral-200 pt-4">
                                 <div class="flex items-center justify-between mb-2">
                                     <h4 class="text-xs font-bold uppercase tracking-wider text-neutral-800">Transfer Items</h4>
-                                    <button type="button" @click="addLine" class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                                    <button type="button" @click="addLine" :disabled="!sourceLocationId || getAvailableItems().length === 0" class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                                         Add Another Item
                                     </button>
@@ -316,12 +328,20 @@
                                             <div class="flex items-center gap-3">
                                                 <div class="flex-1">
                                                     <label class="block text-[11px] font-semibold text-neutral-600 mb-1">Item to Transfer</label>
-                                                    <select :name="'lines[' + idx + '][item_id]'" x-model="line.item_id" required
-                                                            class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs">
-                                                        <option value="">-- Select Item to Transfer --</option>
-                                                        <template x-for="itm in itemsList" :key="itm.id">
+                                                    <select :name="'lines[' + idx + '][item_id]'" x-model="line.item_id" :disabled="!sourceLocationId" required
+                                                            class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs disabled:bg-neutral-100 disabled:text-neutral-400">
+                                                        <template x-if="!sourceLocationId">
+                                                            <option value="">-- Select an Origin Location first --</option>
+                                                        </template>
+                                                        <template x-if="sourceLocationId && getAvailableItems().length === 0">
+                                                            <option value="">-- No available stock at selected Origin --</option>
+                                                        </template>
+                                                        <template x-if="sourceLocationId && getAvailableItems().length > 0">
+                                                            <option value="">-- Select Item to Transfer --</option>
+                                                        </template>
+                                                        <template x-for="itm in getAvailableItems()" :key="itm.id">
                                                             <option :value="itm.id" 
-                                                                    x-text="itm.name + (sourceLocationId ? ' (Origin Available: ' + getAvailable(sourceLocationId, itm.id) + ')' : ' (Total: ' + itm.quantity_on_hand + ')')">
+                                                                    x-text="itm.name + ' (Available: ' + getAvailable(sourceLocationId, itm.id) + ')'">
                                                             </option>
                                                         </template>
                                                     </select>
@@ -329,10 +349,11 @@
                                                 <div class="w-36">
                                                     <label class="block text-[11px] font-semibold text-neutral-600 mb-1">Quantity</label>
                                                     <input type="number" :name="'lines[' + idx + '][quantity]'" x-model="line.quantity" min="1" 
-                                                           :max="sourceLocationId && line.item_id ? getAvailable(sourceLocationId, line.item_id) : null"
-                                                           required placeholder="Qty"
-                                                           :class="isOverStock(line) ? 'border-rose-500 ring-1 ring-rose-500 bg-rose-50 text-rose-900' : 'border-neutral-300 focus:border-indigo-500 focus:ring-indigo-500'"
-                                                           class="block w-full rounded-md shadow-sm text-xs text-right font-medium">
+                                                            :max="sourceLocationId && line.item_id ? getAvailable(sourceLocationId, line.item_id) : null"
+                                                            :disabled="!line.item_id"
+                                                            required placeholder="Qty"
+                                                            :class="isOverStock(line) ? 'border-rose-500 ring-1 ring-rose-500 bg-rose-50 text-rose-900' : 'border-neutral-300 focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-neutral-100'"
+                                                            class="block w-full rounded-md shadow-sm text-xs text-right font-medium">
                                                 </div>
                                                 <div class="pt-5">
                                                     <button type="button" @click="removeLine(idx)" :disabled="lines.length === 1"
@@ -349,27 +370,27 @@
                                                 <template x-if="!sourceLocationId">
                                                     <span class="text-amber-600 flex items-center gap-1 font-medium">
                                                         <svg class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                                        Pumili muna ng Source Location (Origin) sa itaas para makita ang available stock.
+                                                        Select a Source Location (Origin) above to view available items.
                                                     </span>
+                                                </template>
+                                                <template x-if="sourceLocationId && getAvailableItems().length === 0">
+                                                    <div class="text-rose-600 font-semibold flex items-center gap-1.5">
+                                                        <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                        <span>No stock available for any items at the selected origin location.</span>
+                                                    </div>
                                                 </template>
                                                 <template x-if="sourceLocationId && line.item_id">
                                                     <div>
-                                                        <template x-if="getAvailable(sourceLocationId, line.item_id) <= 0">
-                                                            <div class="text-rose-600 font-semibold flex items-center gap-1.5">
-                                                                <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                                                <span>Walang stock (0 units available) sa piniling origin location. Hindi ito pwedeng i-transfer.</span>
-                                                            </div>
-                                                        </template>
                                                         <template x-if="getAvailable(sourceLocationId, line.item_id) > 0 && parseInt(line.quantity || 0) > getAvailable(sourceLocationId, line.item_id)">
                                                             <div class="text-rose-600 font-semibold flex items-center gap-1.5">
                                                                 <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                                                                <span>Kulang ang stock! Mayroon lamang <strong class="underline" x-text="getAvailable(sourceLocationId, line.item_id)"></strong> units sa origin, ngunit <strong x-text="line.quantity"></strong> units ang inilagay mo.</span>
+                                                                <span>Insufficient stock! Only <strong class="underline" x-text="getAvailable(sourceLocationId, line.item_id)"></strong> units available at origin, but you requested <strong x-text="line.quantity"></strong> units.</span>
                                                             </div>
                                                         </template>
                                                         <template x-if="getAvailable(sourceLocationId, line.item_id) > 0 && parseInt(line.quantity || 0) <= getAvailable(sourceLocationId, line.item_id)">
                                                             <div class="text-emerald-700 font-medium flex items-center gap-1.5">
                                                                 <svg class="h-4 w-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                                                <span>Sapat ang stock: <strong x-text="getAvailable(sourceLocationId, line.item_id)"></strong> units available sa origin.</span>
+                                                                <span>Stock available: <strong x-text="getAvailable(sourceLocationId, line.item_id)"></strong> units at origin.</span>
                                                             </div>
                                                         </template>
                                                     </div>
@@ -386,7 +407,7 @@
                                 <template x-if="hasAnyOverStock()">
                                     <p class="text-xs text-rose-600 font-semibold flex items-center gap-1.5">
                                         <svg class="h-4 w-4 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                                        Iwasto muna ang quantity: May item na lumagpas o walang stock sa Origin.
+                                        Please correct the quantity: An item exceeds available stock or has zero inventory at the Origin.
                                     </p>
                                 </template>
                             </div>
