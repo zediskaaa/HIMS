@@ -16,6 +16,7 @@ use App\Services\AiDemandForecastService;
 use App\Services\DemandForecastService;
 use App\Services\InventoryReportService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -182,9 +183,9 @@ class InventoryController extends Controller implements HasMiddleware
         return view('inventory.purchases.index');
     }
 
-    public function stock(): View
+    public function stock(): RedirectResponse
     {
-        return view('inventory.stock.index');
+        return redirect()->route('inventory.items');
     }
 
     public function alerts(): View

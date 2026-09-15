@@ -44,7 +44,7 @@ class DropdownNavigationTest extends TestCase
 
         // Check submodules inside dropdowns
         $response->assertSee('Inventory Items');
-        $response->assertSee('Stock Levels');
+        $response->assertSee('Stock Movements');
         $response->assertSee('Warehouse Dashboard');
         $response->assertSee('Purchase Orders &amp; S2P', false);
         $response->assertSee('Logistics Overview');

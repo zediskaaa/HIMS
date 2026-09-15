@@ -79,10 +79,12 @@ class StockTransferController extends Controller implements HasMiddleware
             'notes' => ['nullable', 'string', 'max:500'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.item_id' => ['required', 'exists:inventory_items,id'],
-            'lines.*.quantity' => ['required', 'integer', 'min:1'],
+            'lines.*.quantity' => ['required', 'integer', 'min:1', 'max:999999'],
             'lines.*.item_batch_id' => ['nullable', 'exists:item_batches,id'],
         ], [
             'destination_location_id.different' => 'The origin and destination locations cannot be the same.',
+            'lines.*.quantity.min' => 'Quantity must be at least 1 unit.',
+            'lines.*.quantity.max' => 'Quantity cannot exceed 999,999 units per line item.',
         ]);
 
         $sourceLocation = StorageLocation::find($validated['source_location_id']);

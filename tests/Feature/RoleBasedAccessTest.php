@@ -124,7 +124,7 @@ class RoleBasedAccessTest extends TestCase
         $this->stockedItem();
 
         $this->actingAs($pharmacy)->get('/inventory/items')->assertStatus(200);
-        $this->actingAs($pharmacy)->get('/inventory/stock')->assertStatus(200);
+        $this->actingAs($pharmacy)->get('/inventory/stock')->assertRedirect(route('inventory.items'));
         $this->actingAs($pharmacy)->get('/inventory/alerts')->assertStatus(200);
         $this->actingAs($pharmacy)->get('/inventory/reports')->assertStatus(200);
     }
@@ -317,7 +317,6 @@ class RoleBasedAccessTest extends TestCase
             '/inventory/adjustments',
             '/inventory/suppliers',
             '/inventory/purchases',
-            '/inventory/stock',
             '/inventory/alerts',
             '/inventory/reports',
             '/inventory/demand-forecast',
@@ -325,6 +324,8 @@ class RoleBasedAccessTest extends TestCase
             $this->actingAs($manager)->get($path)
                 ->assertStatus(200, "Inventory Manager should reach {$path}");
         }
+
+        $this->actingAs($manager)->get('/inventory/stock')->assertRedirect(route('inventory.items'));
     }
 
     /**

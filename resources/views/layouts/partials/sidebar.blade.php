@@ -87,11 +87,8 @@
                     <x-ui.nav-item sub :href="route('inventory.items')" :active="request()->routeIs('inventory.items*')">
                         Inventory Items
                     </x-ui.nav-item>
-                    <x-ui.nav-item sub :href="route('inventory.stock')" :active="request()->routeIs('inventory.stock')">
-                        Stock Levels
-                    </x-ui.nav-item>
-                    <x-ui.nav-item sub :href="route('inventory.stock-movements')" :active="request()->routeIs('inventory.stock-movements*')">
-                        Stock Movements
+                    <x-ui.nav-item sub :href="route('inventory.stock-movements')" :active="request()->routeIs('inventory.stock-movements*', 'inventory.transfers*')">
+                        Stock Movements &amp; Transfers
                     </x-ui.nav-item>
                 @endcan
 
@@ -100,12 +97,6 @@
                         Store Requisitions
                     </x-ui.nav-item>
                 @endcanany
-
-                @can(\App\Enums\Permission::TransferStock->value)
-                    <x-ui.nav-item sub :href="route('inventory.transfers.index')" :active="request()->routeIs('inventory.transfers*')">
-                        Stock Transfers
-                    </x-ui.nav-item>
-                @endcan
 
                 @can(\App\Enums\Permission::PerformCycleCount->value)
                     <x-ui.nav-item sub :href="route('inventory.cycle-counts.index')" :active="request()->routeIs('inventory.cycle-counts*')">

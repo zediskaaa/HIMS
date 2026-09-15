@@ -33,7 +33,6 @@
                     >
                         <option value="">Choose an action or workflow...</option>
                         <optgroup label="Stock &amp; Movements">
-                            <option value="{{ route('inventory.stock') }}">Stock Levels</option>
                             <option value="{{ route('inventory.stock-movements') }}">Stock Movements</option>
                             @can(\App\Enums\Permission::AcknowledgeAlerts->value)
                                 <option value="{{ route('inventory.alerts') }}">Stock Alerts {{ ($openAlertCount ?? 0) > 0 ? '('.$openAlertCount.')' : '' }}</option>
@@ -93,12 +92,6 @@
                             x-transition:leave-end="opacity-0 -translate-y-1.5 scale-95"
                             class="absolute left-0 z-40 mt-1.5 w-60 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl space-y-1"
                         >
-                            <a href="{{ route('inventory.stock') }}" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-neutral-700 hover:bg-neutral-50">
-                                <span class="flex items-center gap-2">
-                                    <x-ui.icon name="chart-bar" class="w-4 h-4 text-neutral-500" />
-                                    <span>Stock Levels</span>
-                                </span>
-                            </a>
                             <a href="{{ route('inventory.stock-movements') }}" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-neutral-700 hover:bg-neutral-50">
                                 <span class="flex items-center gap-2">
                                     <x-ui.icon name="arrows-right-left" class="w-4 h-4 text-neutral-500" />

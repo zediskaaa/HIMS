@@ -64,20 +64,65 @@ class StockMovementController extends Controller implements HasMiddleware
             ->groupBy('item_id');
 
         // Only the types this user may actually record. Pharmacy staff see
-        // Issuance and Stock Out; the warehouse also sees receiving, transfers
-        // and returns. Offering a type the POST would refuse is a dead end.
+        // Issuance and Stock Out; the warehouse also sees receiving and returns.
+        // Inter-location transfers use the dedicated Initiate Stock Transfer workflow.
         $movementTypes = self::permittedTypes();
 
+        $transferLocations = StorageLocation::where('status', 'active')
+            ->where(function ($query) {
+                $query->whereNull('zone')
+                    ->orWhere('zone', '!=', 'In-Transit');
+            })
+            ->orderBy('name')
+            ->get();
+
+        $transferStockLevels = ItemStockLevel::query()
+            ->where('quantity', '>', 0)
+            ->select('item_id', 'storage_location_id', \Illuminate\Support\Facades\DB::raw('SUM(quantity) as available_qty'))
+            ->groupBy('item_id', 'storage_location_id')
+            ->get();
+
+        $locationStockMap = [];
+        foreach ($transferStockLevels as $sl) {
+            $locationStockMap[$sl->storage_location_id][$sl->item_id] = (int) $sl->available_qty;
+        }
+
+        $itemsData = $items->mapWithKeys(function ($item) use ($availability) {
+            $levels = $availability->get($item->id, collect());
+            $locStocks = [];
+            foreach ($levels as $lvl) {
+                $locStocks[$lvl->storage_location_id] = (int) $lvl->quantity;
+            }
+            return [$item->id => [
+                'id' => $item->id,
+                'name' => $item->name,
+                'sku' => $item->sku,
+                'unit' => $item->unit ?: 'unit',
+                'quantity_on_hand' => (int) $item->quantity_on_hand,
+                'location_stocks' => $locStocks,
+            ]];
+        });
+
+        $availableUnits = $items->pluck('unit')
+            ->filter()
+            ->map(fn ($u) => trim($u))
+            ->filter(fn ($u) => $u !== '')
+            ->unique(fn ($u) => strtolower($u))
+            ->values();
+
+        $availableTransferItems = InventoryItem::where('quantity_on_hand', '>', 0)->orderBy('name')->get();
+
         return view('inventory.stock_movements.index', compact(
-            'movements', 'items', 'locations', 'suppliers', 'availability', 'movementTypes'
+            'movements', 'items', 'locations', 'suppliers', 'availability', 'movementTypes',
+            'transferLocations', 'locationStockMap', 'availableTransferItems', 'itemsData', 'availableUnits'
         ));
     }
 
     /**
      * The movement types this screen records.
      *
-     * Adjustments are excluded on purpose — they carry a signed quantity, need
-     * adjust_stock, and have their own screen in StockAdjustmentController.
+     * Inter-location transfers have their dedicated multi-line workflow.
+     * Adjustments have their own screen in StockAdjustmentController.
      *
      * @return array<int, MovementType>
      */
@@ -86,7 +131,6 @@ class StockMovementController extends Controller implements HasMiddleware
         return [
             MovementType::StockIn,
             MovementType::StockOut,
-            MovementType::Transfer,
             MovementType::Issuance,
             MovementType::ReturnToSupplier,
         ];
@@ -111,11 +155,11 @@ class StockMovementController extends Controller implements HasMiddleware
     {
         $validated = $request->validate([
             'item_id' => ['required', 'exists:inventory_items,id'],
-            'movement_type' => ['required', Rule::in(array_map(
-                fn (MovementType $type) => $type->value,
-                self::recordableTypes()
+            'movement_type' => ['required', Rule::in(array_merge(
+                array_map(fn (MovementType $type) => $type->value, self::recordableTypes()),
+                [MovementType::Transfer->value]
             ))],
-            'quantity' => ['required', 'integer', 'min:1'],
+            'quantity' => ['required', 'integer', 'min:1', 'max:999999'],
             'from_location_id' => ['nullable', 'exists:storage_locations,id'],
             'to_location_id' => ['nullable', 'exists:storage_locations,id'],
             // Issuance and returns record their counterparty through the
@@ -124,6 +168,8 @@ class StockMovementController extends Controller implements HasMiddleware
             'return_supplier_id' => ['required_if:movement_type,return_to_supplier', 'nullable', 'exists:suppliers,id'],
             'remarks' => ['nullable', 'string', 'max:255'],
         ], [
+            'quantity.min' => 'Quantity must be at least 1 unit.',
+            'quantity.max' => 'Quantity cannot exceed 999,999 units per transaction.',
             'issued_to_location_id.required_if' => 'Select the department or ward the stock was issued to.',
             'return_supplier_id.required_if' => 'Select the supplier the stock is being returned to.',
         ]);

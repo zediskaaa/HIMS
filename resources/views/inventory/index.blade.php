@@ -68,9 +68,9 @@
                 @endcan
 
                 @can(\App\Enums\Permission::ViewInventory->value)
-                <a href="{{ route('inventory.stock') }}" class="block rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-                    <h3 class="text-lg font-semibold text-[var(--text)]">Stock Movement & Transfers</h3>
-                    <p class="mt-2 text-sm text-[var(--muted)]">Monitor stock in, stock out, internal transfers, and warehouse movement.</p>
+                <a href="{{ route('inventory.stock-movements') }}" class="block rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+                    <h3 class="text-lg font-semibold text-[var(--text)]">Stock Movements &amp; Ledger</h3>
+                    <p class="mt-2 text-sm text-[var(--muted)]">Monitor stock in, stock out, adjustment history, and the immutable inventory ledger.</p>
                 </a>
                 @endcan
 
