@@ -8,14 +8,8 @@
     <x-ui.page-header
         title="Supplier Vendor Analytics"
         subtitle="Monitor supplier qualification, compliance, and procurement readiness from one workspace."
-        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Procurement' => route('inventory.purchases'), 'Suppliers' => null]">
-        <x-slot:actions>
-            <x-ui.button variant="secondary" :href="route('inventory.purchases')" icon="arrow-left">Procurement</x-ui.button>
-            @can(\App\Enums\Permission::ManageSuppliers->value)
-                <x-ui.button icon="plus" x-data x-on:click="$dispatch('open-modal', 'create-supplier')">Add Supplier</x-ui.button>
-            @endcan
-        </x-slot:actions>
-    </x-ui.page-header>
+        :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Supplier Management' => null]"
+    />
 
     <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <x-ui.stat compact label="Active suppliers" :value="$counts['active']" icon="users" tone="primary" :hint="$counts['new_this_month'].' added this month · '.$counts['total'].' total'" />
@@ -49,6 +43,11 @@
                     <p class="mt-0.5 text-xs text-neutral-500">{{ number_format($suppliers->total()) }} matching {{ str('supplier')->plural($suppliers->total()) }}</p>
                 </div>
             </x-slot:header>
+            <x-slot:actions>
+                @can(\App\Enums\Permission::ManageSuppliers->value)
+                    <x-ui.button icon="plus" x-data x-on:click="$dispatch('open-modal', 'create-supplier')">Add Supplier</x-ui.button>
+                @endcan
+            </x-slot:actions>
 
             <form method="GET" class="border-b border-neutral-200 p-3 sm:p-4" role="search">
                 <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(15rem,1fr)_minmax(10rem,0.55fr)_minmax(9rem,0.45fr)_auto]">

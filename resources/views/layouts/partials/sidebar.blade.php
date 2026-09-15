@@ -89,10 +89,10 @@
         @endcanany
 
         {{-- 4. Procurement & Sourcing --}}
-        @canany([\App\Enums\Permission::ViewProcurement->value, \App\Enums\Permission::ViewSuppliers->value, \App\Enums\Permission::GenerateForecasts->value])
+        @canany([\App\Enums\Permission::ViewProcurement->value, \App\Enums\Permission::GenerateForecasts->value])
             @php
                 $isProcurementActive = request()->routeIs(
-                    'inventory.purchases*', 'inventory.suppliers*', 'inventory.demand-forecast*'
+                    'inventory.purchases*', 'inventory.demand-forecast*'
                 );
             @endphp
             <div class="relative">
@@ -106,7 +106,23 @@
             </div>
         @endcanany
 
-        {{-- 5. Documents & Logistics --}}
+        {{-- 5. Supplier Management --}}
+        @can(\App\Enums\Permission::ViewSuppliers->value)
+            @php
+                $isSuppliersActive = request()->routeIs('inventory.suppliers*');
+            @endphp
+            <div class="relative">
+                <x-ui.nav-item
+                    :href="route('inventory.suppliers')"
+                    icon="truck"
+                    :active="$isSuppliersActive"
+                >
+                    Supplier Management
+                </x-ui.nav-item>
+            </div>
+        @endcan
+
+        {{-- 6. Documents & Logistics --}}
         @canany([\App\Enums\Permission::ViewReports->value, \App\Enums\Permission::ViewLogisticsRecords->value, \App\Enums\Permission::ViewProcessReviews->value])
             @php
                 $isRecordsActive = request()->routeIs(

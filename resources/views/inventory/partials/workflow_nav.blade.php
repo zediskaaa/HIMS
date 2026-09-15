@@ -68,11 +68,22 @@
                 </optgroup>
             @endcanany
         </select>
+
+        @can(\App\Enums\Permission::ManageItems->value)
+            @if(request()->routeIs('inventory.items*'))
+                <div class="pt-2">
+                    <x-ui.button variant="primary" size="sm" icon="plus" @click="createItemModal = true" class="w-full">
+                        Create Inventory Item
+                    </x-ui.button>
+                </div>
+            @endif
+        @endcan
     </div>
 
     {{-- Desktop & Tablet Major Dropdown Tabs (>= sm) --}}
-    <div class="hidden sm:flex sm:items-center sm:gap-2.5 flex-wrap text-xs mt-3">
-        {{-- 1. Stock & Movements --}}
+    <div class="hidden sm:flex sm:items-center sm:justify-between sm:gap-4 flex-wrap text-xs mt-3">
+        <div class="flex items-center gap-2.5 flex-wrap">
+            {{-- 1. Stock & Movements --}}
         @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::ApproveAdjustment->value, \App\Enums\Permission::PerformCycleCount->value, \App\Enums\Permission::AcknowledgeAlerts->value])
             <div class="relative" @click.outside="if (openDropdown === 'stock') openDropdown = null">
                 <button
@@ -303,5 +314,17 @@
                 </div>
             </div>
         @endcanany
+        </div>
+
+        {{-- Action Buttons --}}
+        @can(\App\Enums\Permission::ManageItems->value)
+            @if(request()->routeIs('inventory.items*'))
+                <div class="flex items-center gap-2 flex-wrap">
+                    <x-ui.button variant="primary" size="sm" icon="plus" @click="createItemModal = true" id="btn-open-create-item-modal">
+                        Create Inventory Item
+                    </x-ui.button>
+                </div>
+            @endif
+        @endcan
     </div>
 </div>

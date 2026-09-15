@@ -1,25 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-                <div class="flex items-center gap-2">
-                    <span class="rounded-md bg-primary-100 px-2.5 py-0.5 text-xs font-semibold text-primary-800">Inbound Receiving</span>
-                    <span class="text-xs text-neutral-500">• Three-Way Matching &amp; DOH GSDP Quarantine Protocol</span>
-                </div>
-                <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Dock Receiving &amp; Goods Receipt Notes</h2>
-                <p class="text-sm text-neutral-600">Physical carrier intake, PO line tolerance verification (+5% max), lot/batch registration, and quarantine placement.</p>
+        <div>
+            <div class="flex items-center gap-2">
+                <span class="rounded-md bg-primary-100 px-2.5 py-0.5 text-xs font-semibold text-primary-800">Inbound Receiving</span>
+                <span class="text-xs text-neutral-500">• Three-Way Matching &amp; DOH GSDP Quarantine Protocol</span>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
-                <x-ui.button variant="secondary" :href="route('inventory.warehousing.dashboard')" icon="arrow-left">Back to Smart Warehousing</x-ui.button>
-                @can(\App\Enums\Permission::InspectStock->value)
-                    <a href="{{ route('inventory.qc.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2 text-sm font-medium text-amber-800 shadow-sm hover:bg-amber-100">
-                        <svg class="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                        </svg>
-                        QC Inspection Queue
-                    </a>
-                @endcan
-            </div>
+            <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Dock Receiving &amp; Goods Receipt Notes</h2>
+            <p class="text-sm text-neutral-600">Physical carrier intake, PO line tolerance verification (+5% max), lot/batch registration, and quarantine placement.</p>
         </div>
     </x-slot>
 

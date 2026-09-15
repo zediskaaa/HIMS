@@ -1,18 +1,9 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Hospital Supply Chain Execution</p>
-                <h2 class="text-2xl font-bold text-neutral-900">Smart Warehousing System (SWS)</h2>
-                <p class="text-sm text-neutral-600">Physical location topology, IoT cold-chain telemetry, scan verification, and regulatory compliance.</p>
-            </div>
-            <div class="flex items-center gap-2">
-                @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
-                    <x-ui.button :href="route('inventory.warehousing.scan-station')" icon="qr-code">
-                        Scan Workstation
-                    </x-ui.button>
-                @endcan
-            </div>
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Hospital Supply Chain Execution</p>
+            <h2 class="text-2xl font-bold text-neutral-900">Smart Warehousing System (SWS)</h2>
+            <p class="text-sm text-neutral-600">Physical location topology, IoT cold-chain telemetry, scan verification, and regulatory compliance.</p>
         </div>
     </x-slot>
 

@@ -39,6 +39,7 @@ class DropdownNavigationTest extends TestCase
         $response->assertSee('Inventory');
         $response->assertSee('Smart Warehousing');
         $response->assertSee('Procurement');
+        $response->assertSee('Supplier Management');
         $response->assertSee('Documents &amp; Logistics', false);
         $response->assertSee('Administration');
 

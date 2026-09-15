@@ -1,21 +1,9 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-                <span class="rounded-md bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700 ring-1 ring-inset ring-primary-200">Operational workspace</span>
-                <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Procurement &amp; Purchase Orders</h2>
-                <p class="text-sm text-neutral-600">Prepare catalog-backed orders, track fulfillment, and move approved deliveries into receiving.</p>
-            </div>
-            @canany([\App\Enums\Permission::ViewSuppliers->value, \App\Enums\Permission::ViewInventory->value])
-            <div class="flex flex-wrap items-center gap-2">
-                @can(\App\Enums\Permission::ViewSuppliers->value)
-                    <x-ui.button variant="secondary" :href="route('inventory.suppliers')" icon="truck">Suppliers</x-ui.button>
-                @endcan
-                @can(\App\Enums\Permission::ViewInventory->value)
-                    <x-ui.button variant="secondary" :href="route('inventory.receiving.index')" icon="inbox">Receiving</x-ui.button>
-                @endcan
-            </div>
-            @endcanany
+        <div>
+            <span class="rounded-md bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700 ring-1 ring-inset ring-primary-200">Operational workspace</span>
+            <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Procurement &amp; Purchase Orders</h2>
+            <p class="text-sm text-neutral-600">Prepare catalog-backed orders, track fulfillment, and move approved deliveries into receiving.</p>
         </div>
     </x-slot>
 
@@ -153,11 +141,8 @@
                             @endcanany
                         </optgroup>
 
-                        @canany([\App\Enums\Permission::ViewSuppliers->value, \App\Enums\Permission::GenerateForecasts->value, \App\Enums\Permission::ViewReports->value, 'view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids', 'award_procurement'])
+                        @canany([\App\Enums\Permission::GenerateForecasts->value, \App\Enums\Permission::ViewReports->value, 'view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids', 'award_procurement'])
                             <optgroup label="Strategic Sourcing">
-                                @can(\App\Enums\Permission::ViewSuppliers->value)
-                                    <option value="{{ route('inventory.suppliers') }}">Suppliers Directory</option>
-                                @endcan
                                 @canany(['view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids'])
                                     <option value="sourcing_rfqs" :selected="activeTab === 'sourcing_rfqs'">Sourcing Events &amp; RFQs ({{ $rfqs->count() }})</option>
                                 @endcanany
@@ -258,7 +243,7 @@
                     </div>
 
                     {{-- Major Tab 2: Strategic Sourcing --}}
-                    @canany([\App\Enums\Permission::ViewSuppliers->value, \App\Enums\Permission::GenerateForecasts->value, \App\Enums\Permission::ViewReports->value, 'view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids', 'award_procurement'])
+                    @canany([\App\Enums\Permission::GenerateForecasts->value, \App\Enums\Permission::ViewReports->value, 'view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids', 'award_procurement'])
                         <div class="relative" @click.outside="if (openDropdown === 'sourcing') openDropdown = null">
                             <button
                                 type="button"
@@ -288,19 +273,6 @@
                                 x-transition:leave-end="opacity-0 -translate-y-1 scale-95"
                                 class="absolute left-0 z-40 mt-1.5 w-72 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl space-y-0.5"
                             >
-                                @can(\App\Enums\Permission::ViewSuppliers->value)
-                                    <a
-                                        href="{{ route('inventory.suppliers') }}"
-                                        class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition text-neutral-700 hover:bg-neutral-50"
-                                    >
-                                        <span class="flex items-center gap-2">
-                                            <x-ui.icon name="truck" class="w-4 h-4 text-neutral-400" />
-                                            <span>Suppliers Directory</span>
-                                        </span>
-                                        <x-ui.icon name="arrow-top-right-on-square" class="w-3.5 h-3.5 text-neutral-400" />
-                                    </a>
-                                @endcan
-
                                 @canany(['view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids'])
                                     <button
                                         type="button"
@@ -347,7 +319,7 @@
                         </div>
                     @endcanany
 
-                    {{-- Major Tab 3: Governance & Approvals --}}
+                    {{-- Major Tab 4: Governance & Approvals --}}
                     @canany(['approve_purchase_order', 'view_audit_trail'])
                         <div class="relative" @click.outside="if (openDropdown === 'governance') openDropdown = null">
                             <button

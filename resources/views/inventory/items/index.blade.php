@@ -6,23 +6,7 @@
         <x-ui.page-header
             title="Inventory Items"
             subtitle="Manage your hospital medical supply catalogue, stock tracking, and supplier links."
-            :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Inventory Items' => null]">
-            <x-slot:actions>
-                @can(\App\Enums\Permission::ManageItems->value)
-                    <button
-                        type="button"
-                        @click="createItemModal = true"
-                        id="btn-open-create-item-modal"
-                        class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-700 transition focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-                    >
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        <span>Create Inventory Item</span>
-                    </button>
-                @endcan
-            </x-slot:actions>
-        </x-ui.page-header>
+            :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Inventory Items' => null]" />
 
         @if (session('success'))
             <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
