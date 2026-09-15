@@ -43,19 +43,18 @@ class DropdownNavigationTest extends TestCase
         $response->assertSee('Administration');
 
         // Check submodules inside dropdowns
-        $response->assertSee('Purchase Orders &amp; S2P', false);
         $response->assertSee('Recovery Center');
     }
 
     public function test_sidebar_coordinates_exclusive_accordion_state(): void
     {
-        // When visiting a procurement page, activeDropdown should be initialized to 'procurement'
-        $response = $this->actingAs($this->superAdmin)->get(route('inventory.purchases'));
+        // When visiting an administration page, activeDropdown should be initialized to 'administration'
+        $response = $this->actingAs($this->superAdmin)->get(route('admin.users.index'));
 
         $response->assertOk();
-        $response->assertSee("activeDropdown: 'procurement'", false);
-        $response->assertSee("activeDropdown === 'procurement'", false);
-        $response->assertSee("activeDropdown = (activeDropdown === 'procurement' ? null : 'procurement')", false);
+        $response->assertSee("activeDropdown: 'administration'", false);
+        $response->assertSee("activeDropdown === 'administration'", false);
+        $response->assertSee("activeDropdown = (activeDropdown === 'administration' ? null : 'administration')", false);
     }
 
     public function test_inventory_items_page_renders_grouped_workflow_dropdowns(): void

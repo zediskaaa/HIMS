@@ -26,10 +26,6 @@
     @php
         $initialOpenDropdown = null;
         if (request()->routeIs(
-            'inventory.purchases*', 'inventory.suppliers*', 'inventory.demand-forecast*'
-        )) {
-            $initialOpenDropdown = 'procurement';
-        } elseif (request()->routeIs(
             'admin.users.*', 'admin.permissions', 'admin.audit-logs.*',
             'admin.recovery.*', 'super-admin.recovery.*'
         )) {
@@ -92,37 +88,22 @@
             </div>
         @endcanany
 
-        {{-- 4. Procurement & Sourcing (Major Tab Dropdown) --}}
+        {{-- 4. Procurement & Sourcing --}}
         @canany([\App\Enums\Permission::ViewProcurement->value, \App\Enums\Permission::ViewSuppliers->value, \App\Enums\Permission::GenerateForecasts->value])
             @php
                 $isProcurementActive = request()->routeIs(
                     'inventory.purchases*', 'inventory.suppliers*', 'inventory.demand-forecast*'
                 );
             @endphp
-            <x-ui.nav-dropdown
-                id="procurement"
-                title="Procurement & Sourcing"
-                icon="clipboard-document-list"
-                :active="$isProcurementActive"
-            >
-                @can(\App\Enums\Permission::ViewProcurement->value)
-                    <x-ui.nav-item sub :href="route('inventory.purchases')" :active="request()->routeIs('inventory.purchases*')">
-                        Purchase Orders &amp; S2P
-                    </x-ui.nav-item>
-                @endcan
-
-                @can(\App\Enums\Permission::ViewSuppliers->value)
-                    <x-ui.nav-item sub :href="route('inventory.suppliers')" :active="request()->routeIs('inventory.suppliers*')">
-                        Suppliers Directory
-                    </x-ui.nav-item>
-                @endcan
-
-                @can(\App\Enums\Permission::GenerateForecasts->value)
-                    <x-ui.nav-item sub :href="route('inventory.demand-forecast')" :active="request()->routeIs('inventory.demand-forecast*')">
-                        Demand Forecasts
-                    </x-ui.nav-item>
-                @endcan
-            </x-ui.nav-dropdown>
+            <div class="relative">
+                <x-ui.nav-item
+                    :href="route('inventory.purchases')"
+                    icon="clipboard-document-list"
+                    :active="$isProcurementActive"
+                >
+                    Procurement &amp; Sourcing
+                </x-ui.nav-item>
+            </div>
         @endcanany
 
         {{-- 5. Documents & Logistics --}}

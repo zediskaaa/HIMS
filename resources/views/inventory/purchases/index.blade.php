@@ -128,7 +128,11 @@
             </div>
 
             {{-- Navigation: Major Dropdown Tabs --}}
-            <div class="rounded-xl border border-neutral-200 bg-white p-2.5 shadow-sm" x-data="{ openDropdown: null }">
+            <div
+                class="rounded-xl border border-neutral-200 bg-white p-2.5 shadow-sm"
+                x-data="{ openDropdown: null }"
+                @keydown.escape.window="openDropdown = null"
+            >
                 {{-- Mobile / Small Screen Quick Selector (< sm) --}}
                 <div class="sm:hidden">
                     <label for="procurement-mobile-tab-select" class="block text-[11px] font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
@@ -136,32 +140,46 @@
                     </label>
                     <select
                         id="procurement-mobile-tab-select"
-                        x-model="activeTab"
+                        x-on:change="if ($event.target.value.startsWith('http') || $event.target.value.startsWith('/')) { window.location.href = $event.target.value; } else { activeTab = $event.target.value; }"
                         class="block w-full rounded-lg border border-neutral-300 py-2.5 pl-3 pr-10 text-xs font-semibold text-neutral-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 shadow-2xs"
                     >
                         <optgroup label="Purchasing &amp; Orders">
                             @canany(['view_procurement_sensitive_data', 'create_requisition', 'manage_sourcing', 'issue_purchase_order', 'manage_procurement'])
-                                <option value="enterprise_s2p">Enterprise Source-to-Pay Workspace</option>
+                                <option value="enterprise_s2p" :selected="activeTab === 'enterprise_s2p'">Enterprise Source-to-Pay Workspace</option>
                             @endcanany
-                            <option value="orders_revisions">Purchase Orders &amp; Revisions</option>
+                            <option value="orders_revisions" :selected="activeTab === 'orders_revisions'">Purchase Orders &amp; Revisions</option>
                             @canany(['create_requisition', 'manage_sourcing', 'issue_purchase_order'])
-                                <option value="legacy_canvass">Standard Canvassing</option>
+                                <option value="legacy_canvass" :selected="activeTab === 'legacy_canvass'">Standard Canvassing</option>
                             @endcanany
                         </optgroup>
-                        @canany(['view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids', 'award_procurement'])
-                            <optgroup label="Strategic Sourcing &amp; Bids">
-                                <option value="sourcing_rfqs">Sourcing Events &amp; RFQs ({{ $rfqs->count() }})</option>
-                                <option value="evaluations">Comparative Evaluation &amp; Landed Cost Matrix</option>
+
+                        @canany([\App\Enums\Permission::ViewSuppliers->value, \App\Enums\Permission::GenerateForecasts->value, \App\Enums\Permission::ViewReports->value, 'view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids', 'award_procurement'])
+                            <optgroup label="Strategic Sourcing">
+                                @can(\App\Enums\Permission::ViewSuppliers->value)
+                                    <option value="{{ route('inventory.suppliers') }}">Suppliers Directory</option>
+                                @endcan
+                                @canany(['view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids'])
+                                    <option value="sourcing_rfqs" :selected="activeTab === 'sourcing_rfqs'">Sourcing Events &amp; RFQs ({{ $rfqs->count() }})</option>
+                                @endcanany
+                                @canany(['view_procurement_sensitive_data', 'evaluate_bids', 'award_procurement'])
+                                    <option value="evaluations" :selected="activeTab === 'evaluations'">Comparative Evaluation &amp; Landed Cost Matrix</option>
+                                @endcanany
+                                @canany([\App\Enums\Permission::GenerateForecasts->value, \App\Enums\Permission::ViewReports->value])
+                                    <option value="{{ route('inventory.demand-forecast') }}">Demand Forecasts</option>
+                                @endcanany
                             </optgroup>
                         @endcanany
-                        <optgroup label="Governance &amp; Approvals">
-                            @can('approve_purchase_order')
-                                <option value="doa_approvals">Delegation of Authority (DOA) Hub</option>
-                            @endcan
-                            @can('view_audit_trail')
-                                <option value="audit_trail">Procurement Audit Trail</option>
-                            @endcan
-                        </optgroup>
+
+                        @canany(['approve_purchase_order', 'view_audit_trail'])
+                            <optgroup label="Governance &amp; Approvals">
+                                @can('approve_purchase_order')
+                                    <option value="doa_approvals" :selected="activeTab === 'doa_approvals'">Delegation of Authority (DOA) Hub</option>
+                                @endcan
+                                @can('view_audit_trail')
+                                    <option value="audit_trail" :selected="activeTab === 'audit_trail'">Procurement Audit Trail</option>
+                                @endcan
+                            </optgroup>
+                        @endcanany
                     </select>
                 </div>
 
@@ -172,36 +190,39 @@
                         <button
                             type="button"
                             @click="openDropdown = openDropdown === 'purchasing' ? null : 'purchasing'"
-                            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold transition shadow-2xs"
+                            class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold transition border shadow-2xs"
                             :class="['enterprise_s2p', 'orders_revisions', 'legacy_canvass'].includes(activeTab)
-                                ? 'bg-primary-50 text-primary-700 border border-primary-200'
-                                : 'bg-neutral-50 text-neutral-700 border border-neutral-200 hover:bg-neutral-100'"
+                                ? 'bg-primary-50 text-primary-800 border-primary-200 ring-1 ring-primary-500/20'
+                                : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50 hover:text-neutral-900'"
                         >
-                            <svg class="h-4 w-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                            <x-ui.icon name="shopping-bag" class="h-4 w-4 text-primary-600" />
                             <span>Purchasing &amp; Orders</span>
                             <span class="text-[10px] font-mono text-neutral-400 font-normal" x-text="activeTab === 'enterprise_s2p' ? '(S2P Workspace)' : (activeTab === 'orders_revisions' ? '(Purchase Orders)' : (activeTab === 'legacy_canvass' ? '(Canvassing)' : ''))"></span>
-                            <svg class="h-3.5 w-3.5 text-neutral-400 transition-transform duration-200" :class="openDropdown === 'purchasing' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            <x-ui.icon name="chevron-down" class="h-3.5 w-3.5 text-neutral-400 transition-transform duration-200" ::class="openDropdown === 'purchasing' ? 'rotate-180' : ''" />
                         </button>
 
                         <div
                             x-show="openDropdown === 'purchasing'"
                             x-cloak
-                            x-transition:enter="transition ease-out duration-200"
-                            x-transition:enter-start="opacity-0 -translate-y-1.5 scale-95"
+                            x-transition:enter="transition ease-out duration-150"
+                            x-transition:enter-start="opacity-0 -translate-y-1 scale-95"
                             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                            x-transition:leave="transition ease-in-out duration-200"
+                            x-transition:leave="transition ease-in duration-100"
                             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                            x-transition:leave-end="opacity-0 -translate-y-1.5 scale-95"
-                            class="absolute left-0 z-40 mt-1.5 w-64 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl space-y-1"
+                            x-transition:leave-end="opacity-0 -translate-y-1 scale-95"
+                            class="absolute left-0 z-40 mt-1.5 w-64 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl space-y-0.5"
                         >
                             @canany(['view_procurement_sensitive_data', 'create_requisition', 'manage_sourcing', 'issue_purchase_order', 'manage_procurement'])
                                 <button
                                     type="button"
                                     @click="activeTab = 'enterprise_s2p'; openDropdown = null"
                                     class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
-                                    :class="activeTab === 'enterprise_s2p' ? 'bg-primary-50 text-primary-700 font-bold' : 'text-neutral-700 hover:bg-neutral-50'"
+                                    :class="activeTab === 'enterprise_s2p' ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50'"
                                 >
-                                    <span>Enterprise S2P Workspace</span>
+                                    <span class="flex items-center gap-2">
+                                        <x-ui.icon name="building-office-2" class="w-4 h-4 text-neutral-400" />
+                                        <span>Enterprise S2P Workspace</span>
+                                    </span>
                                     <span x-show="activeTab === 'enterprise_s2p'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
                                 </button>
                             @endcanany
@@ -210,9 +231,12 @@
                                 type="button"
                                 @click="activeTab = 'orders_revisions'; openDropdown = null"
                                 class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
-                                :class="activeTab === 'orders_revisions' ? 'bg-primary-50 text-primary-700 font-bold' : 'text-neutral-700 hover:bg-neutral-50'"
+                                :class="activeTab === 'orders_revisions' ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50'"
                             >
-                                <span>Purchase Orders &amp; Revisions</span>
+                                <span class="flex items-center gap-2">
+                                    <x-ui.icon name="clipboard-document-list" class="w-4 h-4 text-neutral-400" />
+                                    <span>Purchase Orders &amp; Revisions</span>
+                                </span>
                                 <span x-show="activeTab === 'orders_revisions'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
                             </button>
 
@@ -221,52 +245,73 @@
                                     type="button"
                                     @click="activeTab = 'legacy_canvass'; openDropdown = null"
                                     class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
-                                    :class="activeTab === 'legacy_canvass' ? 'bg-primary-50 text-primary-700 font-bold' : 'text-neutral-700 hover:bg-neutral-50'"
+                                    :class="activeTab === 'legacy_canvass' ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50'"
                                 >
-                                    <span>Standard Canvassing</span>
+                                    <span class="flex items-center gap-2">
+                                        <x-ui.icon name="magnifying-glass" class="w-4 h-4 text-neutral-400" />
+                                        <span>Standard Canvassing</span>
+                                    </span>
                                     <span x-show="activeTab === 'legacy_canvass'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
                                 </button>
                             @endcanany
                         </div>
                     </div>
 
-                    {{-- Major Tab 2: Strategic Sourcing & Bids --}}
-                    @canany(['view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids', 'award_procurement'])
+                    {{-- Major Tab 2: Strategic Sourcing --}}
+                    @canany([\App\Enums\Permission::ViewSuppliers->value, \App\Enums\Permission::GenerateForecasts->value, \App\Enums\Permission::ViewReports->value, 'view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids', 'award_procurement'])
                         <div class="relative" @click.outside="if (openDropdown === 'sourcing') openDropdown = null">
                             <button
                                 type="button"
                                 @click="openDropdown = openDropdown === 'sourcing' ? null : 'sourcing'"
-                                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold transition shadow-2xs"
+                                class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold transition border shadow-2xs"
                                 :class="['sourcing_rfqs', 'evaluations'].includes(activeTab)
-                                    ? 'bg-primary-50 text-primary-700 border border-primary-200'
-                                    : 'bg-neutral-50 text-neutral-700 border border-neutral-200 hover:bg-neutral-100'"
+                                    ? 'bg-primary-50 text-primary-800 border-primary-200 ring-1 ring-primary-500/20'
+                                    : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50 hover:text-neutral-900'"
                             >
-                                <svg class="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                <x-ui.icon name="globe-alt" class="h-4 w-4 text-blue-600" />
                                 <span>Strategic Sourcing</span>
-                                <span class="rounded-full bg-blue-100 px-1.5 py-0.2 text-[10px] font-bold text-blue-800">{{ $rfqs->count() }}</span>
+                                @if($rfqs->count() > 0)
+                                    <span class="rounded-full bg-blue-100 px-1.5 py-0.2 text-[10px] font-bold text-blue-800">{{ $rfqs->count() }}</span>
+                                @endif
                                 <span class="text-[10px] font-mono text-neutral-400 font-normal" x-text="activeTab === 'sourcing_rfqs' ? '(RFQs)' : (activeTab === 'evaluations' ? '(Evaluations)' : '')"></span>
-                                <svg class="h-3.5 w-3.5 text-neutral-400 transition-transform duration-200" :class="openDropdown === 'sourcing' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                <x-ui.icon name="chevron-down" class="h-3.5 w-3.5 text-neutral-400 transition-transform duration-200" ::class="openDropdown === 'sourcing' ? 'rotate-180' : ''" />
                             </button>
 
                             <div
                                 x-show="openDropdown === 'sourcing'"
                                 x-cloak
-                                x-transition:enter="transition ease-out duration-200"
-                                x-transition:enter-start="opacity-0 -translate-y-1.5 scale-95"
+                                x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="opacity-0 -translate-y-1 scale-95"
                                 x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                                x-transition:leave="transition ease-in-out duration-200"
+                                x-transition:leave="transition ease-in duration-100"
                                 x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                                x-transition:leave-end="opacity-0 -translate-y-1.5 scale-95"
-                                class="absolute left-0 z-40 mt-1.5 w-72 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl space-y-1"
+                                x-transition:leave-end="opacity-0 -translate-y-1 scale-95"
+                                class="absolute left-0 z-40 mt-1.5 w-72 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl space-y-0.5"
                             >
+                                @can(\App\Enums\Permission::ViewSuppliers->value)
+                                    <a
+                                        href="{{ route('inventory.suppliers') }}"
+                                        class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition text-neutral-700 hover:bg-neutral-50"
+                                    >
+                                        <span class="flex items-center gap-2">
+                                            <x-ui.icon name="truck" class="w-4 h-4 text-neutral-400" />
+                                            <span>Suppliers Directory</span>
+                                        </span>
+                                        <x-ui.icon name="arrow-top-right-on-square" class="w-3.5 h-3.5 text-neutral-400" />
+                                    </a>
+                                @endcan
+
                                 @canany(['view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids'])
                                     <button
                                         type="button"
                                         @click="activeTab = 'sourcing_rfqs'; openDropdown = null"
                                         class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
-                                        :class="activeTab === 'sourcing_rfqs' ? 'bg-primary-50 text-primary-700 font-bold' : 'text-neutral-700 hover:bg-neutral-50'"
+                                        :class="activeTab === 'sourcing_rfqs' ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50'"
                                     >
-                                        <span>Sourcing Events &amp; RFQs ({{ $rfqs->count() }})</span>
+                                        <span class="flex items-center gap-2">
+                                            <x-ui.icon name="document-duplicate" class="w-4 h-4 text-neutral-400" />
+                                            <span>Sourcing Events &amp; RFQs ({{ $rfqs->count() }})</span>
+                                        </span>
                                         <span x-show="activeTab === 'sourcing_rfqs'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
                                     </button>
                                 @endcanany
@@ -276,11 +321,27 @@
                                         type="button"
                                         @click="activeTab = 'evaluations'; openDropdown = null"
                                         class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
-                                        :class="activeTab === 'evaluations' ? 'bg-primary-50 text-primary-700 font-bold' : 'text-neutral-700 hover:bg-neutral-50'"
+                                        :class="activeTab === 'evaluations' ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50'"
                                     >
-                                        <span>Comparative Landed Cost Matrix</span>
+                                        <span class="flex items-center gap-2">
+                                            <x-ui.icon name="scale" class="w-4 h-4 text-neutral-400" />
+                                            <span>Comparative Landed Cost Matrix</span>
+                                        </span>
                                         <span x-show="activeTab === 'evaluations'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
                                     </button>
+                                @endcanany
+
+                                @canany([\App\Enums\Permission::GenerateForecasts->value, \App\Enums\Permission::ViewReports->value])
+                                    <a
+                                        href="{{ route('inventory.demand-forecast') }}"
+                                        class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition text-neutral-700 hover:bg-neutral-50"
+                                    >
+                                        <span class="flex items-center gap-2">
+                                            <x-ui.icon name="chart-bar" class="w-4 h-4 text-neutral-400" />
+                                            <span>Demand Forecasts</span>
+                                        </span>
+                                        <x-ui.icon name="arrow-top-right-on-square" class="w-3.5 h-3.5 text-neutral-400" />
+                                    </a>
                                 @endcanany
                             </div>
                         </div>
@@ -292,36 +353,39 @@
                             <button
                                 type="button"
                                 @click="openDropdown = openDropdown === 'governance' ? null : 'governance'"
-                                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold transition shadow-2xs"
+                                class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold transition border shadow-2xs"
                                 :class="['doa_approvals', 'audit_trail'].includes(activeTab)
-                                    ? 'bg-primary-50 text-primary-700 border border-primary-200'
-                                    : 'bg-neutral-50 text-neutral-700 border border-neutral-200 hover:bg-neutral-100'"
+                                    ? 'bg-primary-50 text-primary-800 border-primary-200 ring-1 ring-primary-500/20'
+                                    : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50 hover:text-neutral-900'"
                             >
-                                <svg class="h-4 w-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                                <x-ui.icon name="shield-check" class="h-4 w-4 text-purple-600" />
                                 <span>Governance &amp; Approvals</span>
                                 <span class="text-[10px] font-mono text-neutral-400 font-normal" x-text="activeTab === 'doa_approvals' ? '(DOA Hub)' : (activeTab === 'audit_trail' ? '(Audit Trail)' : '')"></span>
-                                <svg class="h-3.5 w-3.5 text-neutral-400 transition-transform duration-200" :class="openDropdown === 'governance' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                <x-ui.icon name="chevron-down" class="h-3.5 w-3.5 text-neutral-400 transition-transform duration-200" ::class="openDropdown === 'governance' ? 'rotate-180' : ''" />
                             </button>
 
                             <div
                                 x-show="openDropdown === 'governance'"
                                 x-cloak
-                                x-transition:enter="transition ease-out duration-200"
-                                x-transition:enter-start="opacity-0 -translate-y-1.5 scale-95"
+                                x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="opacity-0 -translate-y-1 scale-95"
                                 x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                                x-transition:leave="transition ease-in-out duration-200"
+                                x-transition:leave="transition ease-in duration-100"
                                 x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                                x-transition:leave-end="opacity-0 -translate-y-1.5 scale-95"
-                                class="absolute left-0 z-40 mt-1.5 w-64 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl space-y-1"
+                                x-transition:leave-end="opacity-0 -translate-y-1 scale-95"
+                                class="absolute left-0 z-40 mt-1.5 w-64 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl space-y-0.5"
                             >
                                 @can('approve_purchase_order')
                                     <button
                                         type="button"
                                         @click="activeTab = 'doa_approvals'; openDropdown = null"
                                         class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
-                                        :class="activeTab === 'doa_approvals' ? 'bg-primary-50 text-primary-700 font-bold' : 'text-neutral-700 hover:bg-neutral-50'"
+                                        :class="activeTab === 'doa_approvals' ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50'"
                                     >
-                                        <span>Delegation of Authority (DOA) Hub</span>
+                                        <span class="flex items-center gap-2">
+                                            <x-ui.icon name="check-badge" class="w-4 h-4 text-neutral-400" />
+                                            <span>Delegation of Authority (DOA) Hub</span>
+                                        </span>
                                         <span x-show="activeTab === 'doa_approvals'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
                                     </button>
                                 @endcan
@@ -331,9 +395,12 @@
                                         type="button"
                                         @click="activeTab = 'audit_trail'; openDropdown = null"
                                         class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
-                                        :class="activeTab === 'audit_trail' ? 'bg-primary-50 text-primary-700 font-bold' : 'text-neutral-700 hover:bg-neutral-50'"
+                                        :class="activeTab === 'audit_trail' ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50'"
                                     >
-                                        <span>Procurement Audit Trail</span>
+                                        <span class="flex items-center gap-2">
+                                            <x-ui.icon name="clock" class="w-4 h-4 text-neutral-400" />
+                                            <span>Procurement Audit Trail</span>
+                                        </span>
                                         <span x-show="activeTab === 'audit_trail'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
                                     </button>
                                 @endcan

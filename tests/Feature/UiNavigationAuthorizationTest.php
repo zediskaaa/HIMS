@@ -179,10 +179,11 @@ class UiNavigationAuthorizationTest extends TestCase
         $auditor = User::factory()->role(UserRole::Auditor)->create();
         $sidebar = $this->mainNavigationFor($auditor);
         $this->assertStringContainsString('Smart Warehousing', $sidebar);
+        $this->assertStringContainsString('Procurement &amp; Sourcing', $sidebar);
         $this->assertStringContainsString('Documents &amp; Logistics', $sidebar);
         $this->assertStringNotContainsString('Process Reviews', $sidebar);
         $this->assertStringContainsString('Audit Trail', $sidebar);
-        $this->assertStringContainsString('Suppliers Directory', $sidebar);
+        $this->assertStringNotContainsString('Suppliers Directory', $sidebar);
         $this->assertStringNotContainsString('User Management', $sidebar);
 
         $this->flushSession();
@@ -191,7 +192,8 @@ class UiNavigationAuthorizationTest extends TestCase
         $viewer = User::factory()->role(UserRole::Viewer)->create();
         $sidebar = $this->mainNavigationFor($viewer);
         $this->assertStringContainsString('Inventory', $sidebar);
-        $this->assertStringContainsString('Suppliers Directory', $sidebar);
+        $this->assertStringContainsString('Procurement &amp; Sourcing', $sidebar);
+        $this->assertStringNotContainsString('Suppliers Directory', $sidebar);
         $this->assertStringNotContainsString('User Management', $sidebar);
         $this->assertStringNotContainsString('Audit Trail', $sidebar);
         $this->assertStringNotContainsString('Store Requisitions', $sidebar);

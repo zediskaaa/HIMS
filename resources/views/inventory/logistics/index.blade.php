@@ -1,40 +1,18 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-                <div class="flex items-center gap-2">
-                    <span class="inline-flex items-center rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
-                        COA GAM & BIR RA 11976 Compliant
-                    </span>
-                    <span class="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
-                        WHO GDP Cold Chain
-                    </span>
-                </div>
-                <h2 class="mt-1 text-2xl font-bold text-neutral-900">Document Tracking & Logistics Records (DTRS)</h2>
-                <p class="text-sm text-neutral-600">Centralized procurement records, COA Appendix 50 IAR, GS1 logistics tracking, and immutable chain of custody.</p>
+        <div>
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
+                    COA GAM & BIR RA 11976 Compliant
+                </span>
+                <span class="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                    WHO GDP Cold Chain
+                </span>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
-                @can(\App\Enums\Permission::ManageLogisticsRecords->value)
-                <a href="{{ route('inventory.logistics.documents') }}" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                    Upload Document
-                </a>
-                <a href="{{ route('inventory.logistics.shipments') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    New Shipment
-                </a>
-                @endcan
-                @can(\App\Enums\Permission::ViewLogisticsSensitiveData->value)
-                <a href="{{ route('inventory.logistics.iar.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                    IAR Processing
-                </a>
-                @endcan
-            </div>
+            <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Document Tracking & Logistics Records (DTRS)</h2>
+            <p class="text-sm text-neutral-600">Centralized procurement records, COA Appendix 50 IAR, GS1 logistics tracking, and immutable chain of custody.</p>
         </div>
     </x-slot>
-
-    @include('inventory.logistics.partials.nav')
 
     <div class="py-6">
         <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
@@ -153,6 +131,9 @@
                     <p class="mt-1 text-xs text-neutral-500">WHO GDP thermal logger monitoring</p>
                 </div>
             </div>
+
+            {{-- Navigation: Major Dropdown Tabs --}}
+            @include('inventory.logistics.partials.nav')
 
             {{-- Main Two-Column Layout --}}
             @can(\App\Enums\Permission::ViewLogisticsSensitiveData->value)
