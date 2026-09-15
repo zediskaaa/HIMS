@@ -170,69 +170,103 @@ class DocumentTrackingService
      */
     public function reviseDocument(LogisticsDocument $document, array $data, UploadedFile $newFile, User $uploader): LogisticsDocument
     {
-        return DB::transaction(function () use ($document, $data, $newFile, $uploader): LogisticsDocument {
-            $locked = LogisticsDocument::lockForUpdate()->findOrFail($document->id);
+        $this->validateFile($newFile);
 
-            if ($locked->superseded_by_id !== null) {
-                throw new DomainException("Document #{$locked->tracking_number} has already been superseded by #{$locked->supersededBy?->tracking_number}.");
-            }
+        $path = $newFile->store('logistics_documents', 'local');
+        if (! $path) {
+            throw new DomainException('Failed to store document file to disk.');
+        }
 
-            $this->validateFile($newFile);
-            $path = $newFile->store('logistics_documents', 'local');
+        try {
             $checksum = hash_file('sha256', $newFile->getRealPath());
 
-            $newVersionNumber = (int) $locked->version_number + 1;
-            $trackingNumber = "DOC-{$locked->document_type->numberPrefix()}-".now()->format('Ym').'-'.Str::upper(Str::random(5));
+            return DB::transaction(function () use ($document, $data, $newFile, $path, $checksum, $uploader): LogisticsDocument {
+                $locked = LogisticsDocument::lockForUpdate()->findOrFail($document->id);
 
-            $newDoc = LogisticsDocument::create([
-                'tracking_number' => $trackingNumber,
-                'document_type' => $locked->document_type,
-                'title' => $data['title'] ?? $locked->title,
-                'reference_number' => $data['reference_number'] ?? $locked->reference_number,
-                'supplier_id' => $locked->supplier_id,
-                'purchase_order_id' => $locked->purchase_order_id,
-                'goods_receipt_note_id' => $locked->goods_receipt_note_id,
-                'inspection_acceptance_report_id' => $locked->inspection_acceptance_report_id,
-                'material_requisition_id' => $locked->material_requisition_id,
-                'status' => 'submitted',
-                'file_path' => $path,
-                'file_name' => basename($path),
-                'original_name' => $newFile->getClientOriginalName(),
-                'mime_type' => $newFile->getMimeType() ?? 'application/octet-stream',
-                'file_size_bytes' => $newFile->getSize(),
-                'disk' => 'local',
-                'sha256_checksum' => $checksum,
-                'issued_at' => $data['issued_at'] ?? $locked->issued_at,
-                'received_at' => now(),
-                'retention_class' => $locked->retention_class,
-                'retention_until' => $locked->retention_until,
-                'uploaded_by_id' => $uploader->id,
-                'version_number' => $newVersionNumber,
-                'replaces_document_id' => $locked->id,
-                'revision_reason' => $data['revision_reason'] ?? 'Superseding correction.',
-                'notes' => $data['notes'] ?? $locked->notes,
-            ]);
+                if ($locked->superseded_by_id !== null) {
+                    throw new DomainException("Document #{$locked->tracking_number} has already been superseded by #{$locked->supersededBy?->tracking_number}.");
+                }
 
-            // Mark old document as superseded
-            $locked->superseded_by_id = $newDoc->id;
-            $locked->status = 'archived';
-            $locked->save();
+                $newVersionNumber = (int) $locked->version_number + 1;
+                $trackingNumber = "DOC-{$locked->document_type->numberPrefix()}-".now()->format('Ym').'-'.Str::upper(Str::random(5));
 
-            $this->auditLogger->record(
-                AuditAction::RevisedLogisticsDocument,
-                actor: $uploader,
-                target: $newDoc,
-                description: "Created revision v{$newVersionNumber} ({$trackingNumber}) superseding #{$locked->tracking_number}.",
-                newValues: [
+                $newDoc = LogisticsDocument::create([
                     'tracking_number' => $trackingNumber,
+                    'document_type' => $locked->document_type,
+                    'title' => $data['title'] ?? $locked->title,
+                    'reference_number' => $data['reference_number'] ?? $locked->reference_number,
+                    'supplier_id' => $locked->supplier_id,
+                    'purchase_order_id' => $locked->purchase_order_id,
+                    'goods_receipt_note_id' => $locked->goods_receipt_note_id,
+                    'inspection_acceptance_report_id' => $locked->inspection_acceptance_report_id,
+                    'material_requisition_id' => $locked->material_requisition_id,
+                    'status' => 'submitted',
+                    'file_path' => $path,
+                    'file_name' => basename($path),
+                    'original_name' => $newFile->getClientOriginalName(),
+                    'mime_type' => $newFile->getMimeType() ?? 'application/octet-stream',
+                    'file_size_bytes' => $newFile->getSize(),
+                    'disk' => 'local',
+                    'sha256_checksum' => $checksum,
+                    'issued_at' => $data['issued_at'] ?? $locked->issued_at,
+                    'received_at' => now(),
+                    'retention_class' => $locked->retention_class,
+                    'retention_until' => $locked->retention_until,
+                    'uploaded_by_id' => $uploader->id,
                     'version_number' => $newVersionNumber,
                     'replaces_document_id' => $locked->id,
-                    'revision_reason' => $newDoc->revision_reason,
-                ],
-            );
+                    'revision_reason' => $data['revision_reason'] ?? 'Superseding correction.',
+                    'notes' => $data['notes'] ?? $locked->notes,
+                ]);
 
-            return $newDoc;
-        });
+                // Mark old document as superseded
+                $locked->superseded_by_id = $newDoc->id;
+                $locked->status = 'archived';
+                $locked->save();
+
+                $this->auditLogger->record(
+                    AuditAction::RevisedLogisticsDocument,
+                    actor: $uploader,
+                    target: $newDoc,
+                    description: "Created revision v{$newVersionNumber} ({$trackingNumber}) superseding #{$locked->tracking_number}.",
+                    newValues: [
+                        'tracking_number' => $trackingNumber,
+                        'version_number' => $newVersionNumber,
+                        'replaces_document_id' => $locked->id,
+                        'revision_reason' => $newDoc->revision_reason,
+                    ],
+                );
+
+                return $newDoc;
+            });
+        } catch (\Throwable $e) {
+            Storage::disk('local')->delete($path);
+            throw $e;
+        }
+    }
+
+    /**
+     * Supersede an existing document with a new revision.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function supersedeDocument(
+        LogisticsDocument $original,
+        array $data,
+        UploadedFile $newFile,
+        User $actor,
+        ?string $reason = null
+    ): LogisticsDocument {
+        if ($reason !== null && empty($data['revision_reason'])) {
+            $data['revision_reason'] = $reason;
+        }
+
+        return $this->reviseDocument(
+            document: $original,
+            data: $data,
+            newFile: $newFile,
+            uploader: $actor
+        );
     }
 
     /**

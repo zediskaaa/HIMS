@@ -248,7 +248,7 @@ class LogisticsController extends Controller implements HasMiddleware
 
             return redirect()->route('inventory.logistics.documents')
                 ->with('success', "Document [{$document->tracking_number}] superseded by new version [{$newDoc->tracking_number}].");
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             return redirect()->back()->with('error', 'Failed to supersede document: '.$e->getMessage());
         }
     }

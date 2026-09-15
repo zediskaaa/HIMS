@@ -105,6 +105,7 @@ class DocumentTrackingAndLogisticsTest extends TestCase
             'disk' => 'local',
             'sha256_checksum' => hash('sha256', $contents),
             'uploaded_by_id' => $uploader->id,
+            'version_number' => 1,
         ]);
     }
 
@@ -746,5 +747,61 @@ class DocumentTrackingAndLogisticsTest extends TestCase
         $this->get(route('inventory.logistics.chain-of-custody'))
             ->assertStatus(200)
             ->assertSee('Chain of Custody Ledger');
+    }
+
+    public function test_logistics_document_supersede_creates_new_revision_and_archives_original(): void
+    {
+        Storage::fake('local');
+        extract($this->createSetup());
+
+        $originalDoc = $this->createDownloadableDocument($buyer);
+
+        $this->assertEquals(1, $originalDoc->version_number);
+        $this->assertNull($originalDoc->superseded_by_id);
+        $this->assertEquals('verified', $originalDoc->status);
+
+        $newFile = UploadedFile::fake()->create('revised_invoice_88192.pdf', 150, 'application/pdf');
+
+        $response = $this->actingAs($buyer)->post(
+            route('inventory.logistics.documents.supersede', $originalDoc),
+            [
+                'file' => $newFile,
+                'reason' => 'Supplier revised VAT invoice breakdown.',
+            ]
+        );
+
+        $response->assertRedirect(route('inventory.logistics.documents'));
+        $response->assertSessionHas('success');
+
+        $originalDoc->refresh();
+        $this->assertEquals('archived', $originalDoc->status);
+        $this->assertNotNull($originalDoc->superseded_by_id);
+
+        $newDoc = LogisticsDocument::findOrFail($originalDoc->superseded_by_id);
+        $this->assertEquals(2, $newDoc->version_number);
+        $this->assertEquals($originalDoc->id, $newDoc->replaces_document_id);
+        $this->assertEquals('Supplier revised VAT invoice breakdown.', $newDoc->revision_reason);
+        $this->assertEquals('submitted', $newDoc->status);
+        $this->assertNotEmpty($newDoc->sha256_checksum);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => AuditAction::RevisedLogisticsDocument->value,
+            'target_type' => $newDoc->getMorphClass(),
+            'target_id' => (string) $newDoc->id,
+            'user_id' => $buyer->id,
+        ]);
+
+        // Attempting to supersede again on the already-superseded document should fail
+        $anotherFile = UploadedFile::fake()->create('attempt_third_revision.pdf', 100, 'application/pdf');
+        $duplicateAttemptResponse = $this->actingAs($buyer)->from(route('inventory.logistics.documents'))->post(
+            route('inventory.logistics.documents.supersede', $originalDoc),
+            [
+                'file' => $anotherFile,
+                'reason' => 'Another revision attempt.',
+            ]
+        );
+
+        $duplicateAttemptResponse->assertRedirect(route('inventory.logistics.documents'));
+        $duplicateAttemptResponse->assertSessionHas('error');
     }
 }
