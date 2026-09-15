@@ -99,7 +99,9 @@ class DecisionConfirmationTest extends TestCase
         $this->get(route('inventory.purchases'))
             ->assertOk()
             ->assertSee('Are you sure you want to approve this procurement request?')
-            ->assertSee('This will add the ordered stock to inventory.');
+            // The redesign moved the stock-posting consequence onto the receive
+            // confirmation it belongs to.
+            ->assertSee('Confirm that this delivery is physically present before posting it into stock.');
     }
 
     public function test_confirmation_gate_runs_before_session_and_loading_submission_handlers(): void

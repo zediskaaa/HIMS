@@ -275,7 +275,7 @@ class InspectionAcceptanceService
                     $po->received_at = now();
                     $po->save();
                 } else {
-                    $po->status = 'partially_received';
+                    $po->status = PurchaseOrderStatus::PartiallyFulfilled->value;
                     $po->save();
                 }
             }

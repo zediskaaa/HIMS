@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\PurchaseOrderStatus;
 use App\Models\InventoryItem;
 use App\Models\ItemStockLevel;
 use App\Models\PurchaseOrder;
@@ -205,7 +206,7 @@ class InventoryModuleTest extends TestCase
             'quantity' => 5,
             'unit_cost' => 2.5,
             'total_amount' => 12.5,
-            'status' => 'pending',
+            'status' => PurchaseOrderStatus::Approved->value,
         ]);
 
         $response = $this->actingAs($user)->post('/inventory/purchases/'.$purchaseOrder->id.'/receive');
@@ -256,13 +257,17 @@ class InventoryModuleTest extends TestCase
             'quantity' => 5,
             'unit_cost' => 2.5,
             'total_amount' => 12.5,
-            'status' => 'pending',
+            'status' => PurchaseOrderStatus::Approved->value,
         ]);
 
         $response = $this->actingAs($user)->post('/inventory/purchases/'.$purchaseOrder->id.'/receive');
 
-        $response->assertSessionHasErrors('receive');
-        $this->assertSame('pending', $purchaseOrder->fresh()->status);
+        // Receivable, so the request reaches the storage-location guard rather
+        // than being turned away by the approval guard.
+        $response->assertSessionHasErrors([
+            'receive' => 'No storage location exists to receive this order into.',
+        ]);
+        $this->assertSame(PurchaseOrderStatus::Approved->value, $purchaseOrder->fresh()->status);
         $this->assertDatabaseCount('stock_movements', 0);
     }
 

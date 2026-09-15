@@ -775,6 +775,10 @@ class AiDemandForecastTest extends TestCase
             ]),
         ]);
 
+        // Another visitor already claimed the warm-up, so this request serves
+        // the placeholder and leaves the model call to the pass that holds it.
+        $this->holdForecastWarmup();
+
         $this->actingAs($manager)->get(route('dashboard'))
             ->assertOk()
             ->assertSee('Statistical Forecast')
@@ -791,6 +795,10 @@ class AiDemandForecastTest extends TestCase
         $manager = User::factory()->inventoryManager()->create();
         $item = $this->item();
         $this->consume($item, 30, 12);
+
+        // The warm-up is claimed elsewhere, so the page view leaves the
+        // unfinished placeholder behind rather than a landed forecast.
+        $this->holdForecastWarmup();
 
         $this->actingAs($manager)->get(route('dashboard'))->assertOk();
 
@@ -832,6 +840,18 @@ class AiDemandForecastTest extends TestCase
         $this->assertDatabaseMissing('audit_logs', [
             'action' => AuditAction::RefreshedDemandForecast->value,
         ]);
+    }
+
+    /**
+     * Claim the lock the deferred Gemini warm-up runs under.
+     *
+     * The harness terminates the request, so a deferred callback would run
+     * before the assertions and the test would observe the cache after the
+     * warm-up instead of the placeholder a visitor is served.
+     */
+    private function holdForecastWarmup(int $analysisDays = 90, int $forecastDays = 30): void
+    {
+        Cache::lock("demand-forecast:v3:warmup:{$analysisDays}:{$forecastDays}", 300)->get();
     }
 
     private function item(): InventoryItem

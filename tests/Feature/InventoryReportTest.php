@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\MovementType;
 use App\Enums\Permission;
+use App\Enums\PurchaseOrderStatus;
 use App\Enums\UserRole;
 use App\Models\InventoryItem;
 use App\Models\ItemBatch;
@@ -522,7 +523,7 @@ class InventoryReportTest extends TestCase
             'quantity' => 500,
             'unit_cost' => 41.50,
             'total_amount' => 20750,
-            'status' => 'pending',
+            'status' => PurchaseOrderStatus::Approved->value,
             'requested_at' => now(),
         ]);
 

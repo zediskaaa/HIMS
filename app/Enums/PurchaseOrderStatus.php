@@ -12,6 +12,8 @@ enum PurchaseOrderStatus: string
     case Acknowledged = 'acknowledged';
     case PartiallyFulfilled = 'partially_fulfilled';
     case Fulfilled = 'fulfilled';
+    /** Written by the receive action once the ordered stock is posted. */
+    case Received = 'received';
     case Amended = 'amended';
     case Cancelled = 'cancelled';
 
@@ -26,6 +28,7 @@ enum PurchaseOrderStatus: string
             self::Acknowledged => 'Acknowledged by Vendor',
             self::PartiallyFulfilled => 'Partially Fulfilled',
             self::Fulfilled => 'Fulfilled / Closed',
+            self::Received => 'Received',
             self::Amended => 'Amended (Revised)',
             self::Cancelled => 'Cancelled',
         };
@@ -46,7 +49,7 @@ enum PurchaseOrderStatus: string
             self::Dispatched => [self::Acknowledged, self::PartiallyFulfilled, self::Fulfilled, self::Amended, self::Cancelled],
             self::Acknowledged => [self::PartiallyFulfilled, self::Fulfilled, self::Amended, self::Cancelled],
             self::PartiallyFulfilled => [self::PartiallyFulfilled, self::Fulfilled, self::Amended, self::Cancelled],
-            self::Fulfilled, self::Amended, self::Cancelled => [],
+            self::Fulfilled, self::Received, self::Amended, self::Cancelled => [],
         };
     }
 
@@ -65,6 +68,6 @@ enum PurchaseOrderStatus: string
 
     public function isOpen(): bool
     {
-        return ! in_array($this, [self::Fulfilled, self::Amended, self::Cancelled], true);
+        return ! in_array($this, [self::Fulfilled, self::Received, self::Amended, self::Cancelled], true);
     }
 }

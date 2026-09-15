@@ -146,7 +146,7 @@ class PurchaseOrderController extends Controller implements HasMiddleware
                 ], auth()->id(), $purchaseOrder);
             }
 
-            $purchaseOrder->status = 'received';
+            $purchaseOrder->status = PurchaseOrderStatus::Received->value;
             $purchaseOrder->received_at = now();
             $purchaseOrder->save();
 

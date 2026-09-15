@@ -201,7 +201,9 @@ class SupplierManagementTest extends TestCase
         $this->actingAs($viewer)->get('/inventory/purchases?supplier_id='.$selected->id)
             ->assertOk()
             ->assertViewHas('supplierFilter', fn (?Supplier $supplier) => $supplier?->is($selected) === true)
-            ->assertSee('Showing purchase orders for')
+            // The workspace redesign replaced the "Showing purchase orders for …"
+            // banner with the supplier badge in the collapsed filter summary.
+            ->assertSeeInOrder(['More filters', $selected->name])
             ->assertSee('PO-LEDGER-SELECTED')
             ->assertDontSee('PO-LEDGER-OTHER');
     }

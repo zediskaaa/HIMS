@@ -32,7 +32,7 @@ return [
     |
     */
 
-    'lifetime' => (int) env('SESSION_LIFETIME', 4),
+    'lifetime' => (int) env('SESSION_LIFETIME', 5),
 
     /*
     |--------------------------------------------------------------------------

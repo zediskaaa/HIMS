@@ -238,11 +238,11 @@ class SuperAdminAuthenticationTest extends TestCase
             ->assertDontSee('Your session has expired due to inactivity. Please log in again.');
     }
 
-    public function test_super_admin_inactivity_uses_the_existing_four_minute_policy(): void
+    public function test_super_admin_inactivity_follows_the_configured_session_lifetime(): void
     {
         $superAdmin = $this->superAdmin();
         $this->login($superAdmin);
-        $this->travel(4)->minutes();
+        $this->travel(config('session.lifetime'))->minutes();
 
         $this->get(route('super-admin.dashboard'))
             ->assertRedirect(route('super-admin.login'))
