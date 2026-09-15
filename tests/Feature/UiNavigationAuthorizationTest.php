@@ -318,6 +318,20 @@ class UiNavigationAuthorizationTest extends TestCase
             ->assertSee('Warehouse Tasks');
     }
 
+    public function test_topbar_renders_user_full_name_and_role_label(): void
+    {
+        $superAdmin = User::factory()->superAdministrator()->create([
+            'name' => 'Dr. Maria Santos Dela Cruz',
+        ]);
+
+        $response = $this->actingAs($superAdmin, \App\Support\AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get(route('super-admin.dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('Dr. Maria Santos Dela Cruz');
+        $response->assertSee('Super Administrator');
+    }
+
     private function mainNavigationFor(User $user): string
     {
         $html = $this->actingAs($user)->get('/dashboard')->assertOk()->getContent();

@@ -170,16 +170,21 @@
         <button
             type="button"
             x-on:click="open = !open"
-            class="flex items-center gap-2 p-1 pr-2 rounded-md hover:bg-neutral-100
+            class="flex items-center gap-2.5 p-1.5 pr-2 rounded-lg hover:bg-neutral-100 transition
                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             :aria-expanded="open ? 'true' : 'false'"
             aria-haspopup="menu"
         >
             <x-ui.avatar :user="Auth::user()" size="sm" />
-            <span class="hidden sm:block text-sm font-medium text-neutral-700 max-w-32 truncate">
-                {{ Auth::user()?->name }}
-            </span>
-            <x-ui.icon name="chevron-down" class="w-4 h-4 text-neutral-400" />
+            <div class="hidden sm:flex flex-col text-left leading-tight">
+                <span class="text-xs font-semibold text-neutral-900 whitespace-nowrap">
+                    {{ Auth::user()?->name }}
+                </span>
+                <span class="text-[11px] font-medium text-neutral-500 whitespace-nowrap">
+                    {{ Auth::user()?->role?->label() ?? 'Staff' }}
+                </span>
+            </div>
+            <x-ui.icon name="chevron-down" class="w-4 h-4 text-neutral-400 shrink-0" />
         </button>
 
         <div
@@ -187,16 +192,19 @@
             x-cloak
             x-on:click.outside="open = false"
             x-transition.origin.top.right
-            class="absolute right-0 mt-1 w-56 bg-white border border-neutral-200 rounded-md shadow-lg py-1"
+            class="absolute right-0 mt-1.5 w-60 bg-white border border-neutral-200 rounded-xl shadow-lg py-1.5 z-50"
             role="menu"
         >
-            <div class="px-3 py-2 border-b border-neutral-100">
-                <p class="text-sm font-medium text-neutral-900 truncate">{{ Auth::user()?->name }}</p>
-                <p class="text-xs text-neutral-500 truncate">{{ Auth::user()?->email }}</p>
+            <div class="px-3.5 py-2.5 border-b border-neutral-100">
+                <p class="text-xs font-bold text-neutral-900">{{ Auth::user()?->name }}</p>
+                <span class="inline-block mt-0.5 text-[10px] font-semibold text-primary-700 bg-primary-50 px-1.5 py-0.5 rounded">
+                    {{ Auth::user()?->role?->label() ?? 'Staff' }}
+                </span>
+                <p class="text-[11px] text-neutral-500 truncate mt-1">{{ Auth::user()?->email }}</p>
             </div>
 
             <a href="{{ route('profile.edit') }}" role="menuitem"
-               class="flex items-center gap-2 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
+               class="flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50">
                 <x-ui.icon name="user-circle" class="w-4 h-4 text-neutral-400" />
                 {{ Auth::user()?->isAdministrator() ? 'Account settings' : 'Profile settings' }}
             </a>
@@ -208,8 +216,8 @@
                   data-confirm-label="Log Out">
                 @csrf
                 <button type="submit" role="menuitem"
-                        class="flex items-center gap-2 w-full px-3 py-2 text-sm text-left text-neutral-700 hover:bg-neutral-50">
-                    <x-ui.icon name="arrow-right-on-rectangle" class="w-4 h-4 text-neutral-400" />
+                        class="flex items-center gap-2 w-full px-3.5 py-2 text-xs font-medium text-left text-rose-700 hover:bg-rose-50">
+                    <x-ui.icon name="arrow-right-on-rectangle" class="w-4 h-4 text-rose-500" />
                     Log out
                 </button>
             </form>
