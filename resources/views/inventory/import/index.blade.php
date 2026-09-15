@@ -34,6 +34,9 @@
     })">
         <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
 
+            {{-- Consolidated Inventory Workflow Navigation --}}
+            @include('inventory.partials.workflow_nav')
+
             {{-- Flash Messages / Toast Feedback --}}
             <div x-show="errorMessage" x-cloak class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 shadow-sm" role="alert">
                 <div class="flex items-start gap-3">

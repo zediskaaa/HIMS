@@ -13,7 +13,7 @@
 
         <x-auth.wrong-panel-alert />
 
-        <form method="POST" action="{{ route($panel->passwordStoreRoute()) }}" class="space-y-5" x-data="{ password: '', passwordConfirmation: '' }">
+        <form method="POST" action="{{ route($panel->passwordStoreRoute()) }}" class="space-y-5" autocomplete="off" x-data="{ password: '', passwordConfirmation: '' }">
             @csrf
 
             <input type="hidden" name="token" value="{{ $request->route('token') }}">
@@ -28,7 +28,7 @@
                     :value="old('email', $request->email)"
                     required
                     autofocus
-                    autocomplete="username"
+                    autocomplete="off"
                 />
                 <x-input-error :messages="$errors->get('email')" class="mt-2 text-danger-600" />
             </div>

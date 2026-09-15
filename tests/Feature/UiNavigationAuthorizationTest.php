@@ -44,8 +44,7 @@ class UiNavigationAuthorizationTest extends TestCase
 
         $warehouse = User::factory()->role(UserRole::WarehouseStaff)->create();
         $warehouseSidebar = $this->mainNavigationFor($warehouse);
-        $this->assertStringContainsString('Store Requisitions', $warehouseSidebar);
-        $this->assertStringContainsString('Cycle Counts', $warehouseSidebar);
+        $this->assertStringContainsString('Inventory', $warehouseSidebar);
         $this->assertStringNotContainsString('Suppliers Directory', $warehouseSidebar);
         $this->assertStringNotContainsString('User Management', $warehouseSidebar);
 

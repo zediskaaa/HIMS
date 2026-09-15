@@ -19,7 +19,7 @@
     @endif
 
     <x-ui.card title="Account Details" subtitle="Fields marked with an asterisk are required.">
-        <form method="POST" action="{{ route('admin.users.store') }}" class="space-y-5">
+        <form method="POST" action="{{ route('admin.users.store') }}" class="space-y-5" autocomplete="off">
             @csrf
 
             @include('admin.users.partials.form', ['user' => null, 'roles' => $roles])

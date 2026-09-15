@@ -99,6 +99,9 @@
             </x-slot:actions>
         </x-ui.page-header>
 
+        {{-- Consolidated Inventory Workflow Navigation --}}
+        @include('inventory.partials.workflow_nav')
+
         {{-- Server Error Alert (Only rendered after failed server submission) --}}
         @if ($errors->any())
             <x-ui.alert variant="danger" title="This movement was not recorded" class="mb-4">

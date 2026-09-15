@@ -247,11 +247,11 @@
                         <div class="grid gap-3 sm:grid-cols-2">
                             <div>
                                 <label for="witness_email" class="text-[11px] font-semibold text-neutral-600">Witness Email *</label>
-                                <input type="email" id="witness_email" name="witness_email" required placeholder="pharmacist@hospital.ph" class="mt-1 w-full rounded-lg border-neutral-300 text-xs">
+                                <input type="email" id="witness_email" name="witness_email" required placeholder="pharmacist@hospital.ph" autocomplete="off" class="mt-1 w-full rounded-lg border-neutral-300 text-xs">
                             </div>
                             <div>
                                 <label for="witness_password" class="text-[11px] font-semibold text-neutral-600">Witness Password / PIN *</label>
-                                <input type="password" id="witness_password" name="witness_password" required placeholder="Enter password to sign" class="mt-1 w-full rounded-lg border-neutral-300 text-xs">
+                                <input type="password" id="witness_password" name="witness_password" required placeholder="Enter password to sign" autocomplete="new-password" class="mt-1 w-full rounded-lg border-neutral-300 text-xs">
                             </div>
                         </div>
                     </div>

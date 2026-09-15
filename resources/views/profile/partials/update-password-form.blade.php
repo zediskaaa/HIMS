@@ -18,6 +18,7 @@
     @endif
 
     <form method="post" action="{{ route('password.update') }}" class="mt-6 space-y-6"
+          autocomplete="off"
           x-data="{ password: '', passwordConfirmation: '' }"
           data-confirm-title="Confirm security change"
           data-confirm-message="Are you sure you want to change your password?"
@@ -27,7 +28,16 @@
 
         <div>
             <x-input-label for="update_password_current_password" :value="__('Current Password')" />
-            <x-text-input id="update_password_current_password" name="current_password" type="password" class="mt-1 block w-full {{ $errors->updatePassword->has('current_password') ? '!border-danger-500 focus:!border-danger-500 focus:!ring-danger-500' : '' }}" autocomplete="current-password" />
+            <x-text-input
+                id="update_password_current_password"
+                name="current_password"
+                type="password"
+                class="mt-1 block w-full {{ $errors->updatePassword->has('current_password') ? '!border-danger-500 focus:!border-danger-500 focus:!ring-danger-500' : '' }}"
+                autocomplete="new-password"
+                x-data
+                x-init="$nextTick(() => { $el.value = '' })"
+                value=""
+            />
             <x-input-error :messages="$errors->updatePassword->get('current_password')" class="mt-2" />
         </div>
 

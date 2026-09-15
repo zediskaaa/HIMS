@@ -67,7 +67,7 @@
             </x-ui.nav-item>
         </div>
 
-        {{-- 2. Inventory (Major Tab Dropdown) --}}
+        {{-- 2. Inventory --}}
         @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::ApproveRequisition->value, \App\Enums\Permission::IssueStock->value, \App\Enums\Permission::TransferStock->value, \App\Enums\Permission::PerformCycleCount->value, \App\Enums\Permission::ManageItems->value])
             @php
                 $isInventoryActive = request()->routeIs(
@@ -76,52 +76,16 @@
                     'inventory.adjustments*', 'inventory.alerts*', 'inventory.import*'
                 );
             @endphp
-            <x-ui.nav-dropdown
-                id="inventory"
-                title="Inventory"
-                icon="cube"
-                :active="$isInventoryActive"
-                :badge="$openAlertCount ?? null"
-            >
-                @can(\App\Enums\Permission::ViewInventory->value)
-                    <x-ui.nav-item sub :href="route('inventory.items')" :active="request()->routeIs('inventory.items*')">
-                        Inventory Items
-                    </x-ui.nav-item>
-                    <x-ui.nav-item sub :href="route('inventory.stock-movements')" :active="request()->routeIs('inventory.stock-movements*', 'inventory.transfers*')">
-                        Stock Movements &amp; Transfers
-                    </x-ui.nav-item>
-                @endcan
-
-                @canany([\App\Enums\Permission::CreateRequisition->value, \App\Enums\Permission::ApproveRequisition->value, \App\Enums\Permission::IssueStock->value])
-                    <x-ui.nav-item sub :href="route('inventory.requisitions.index')" :active="request()->routeIs('inventory.requisitions*')">
-                        Store Requisitions
-                    </x-ui.nav-item>
-                @endcanany
-
-                @can(\App\Enums\Permission::PerformCycleCount->value)
-                    <x-ui.nav-item sub :href="route('inventory.cycle-counts.index')" :active="request()->routeIs('inventory.cycle-counts*')">
-                        Cycle Counts
-                    </x-ui.nav-item>
-                @endcan
-
-                @canany([\App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::ApproveAdjustment->value])
-                    <x-ui.nav-item sub :href="route('inventory.adjustments')" :active="request()->routeIs('inventory.adjustments*')">
-                        Stock Adjustments
-                    </x-ui.nav-item>
-                @endcanany
-
-                @can(\App\Enums\Permission::AcknowledgeAlerts->value)
-                    <x-ui.nav-item sub :href="route('inventory.alerts')" :active="request()->routeIs('inventory.alerts*')" :badge="$openAlertCount ?? null">
-                        Stock Alerts
-                    </x-ui.nav-item>
-                @endcan
-
-                @canany([\App\Enums\Permission::ManageItems->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ManageSuppliers->value])
-                    <x-ui.nav-item sub :href="route('inventory.import.index')" :active="request()->routeIs('inventory.import*')">
-                        Import Data
-                    </x-ui.nav-item>
-                @endcanany
-            </x-ui.nav-dropdown>
+            <div class="space-y-0.5">
+                <x-ui.nav-item
+                    :href="route('inventory.items')"
+                    icon="cube"
+                    :active="$isInventoryActive"
+                    :badge="$openAlertCount ?? null"
+                >
+                    Inventory
+                </x-ui.nav-item>
+            </div>
         @endcanany
 
         {{-- 3. Smart Warehousing (Major Tab Dropdown) --}}

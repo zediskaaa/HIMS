@@ -66,6 +66,7 @@
     </form>
 
     <form method="post" action="{{ route('profile.update') }}" class="mt-6 space-y-6"
+          autocomplete="off"
           data-confirm-email-change
           data-original-email="{{ $user->email }}">
         @csrf
@@ -84,7 +85,7 @@
                     maxlength="80"
                     required
                     autofocus
-                    autocomplete="family-name"
+                    autocomplete="off"
                 />
                 <x-input-error class="mt-2" :messages="$errors->get('surname')" />
             </div>
@@ -100,7 +101,7 @@
                     placeholder="e.g. Juan"
                     maxlength="80"
                     required
-                    autocomplete="given-name"
+                    autocomplete="off"
                 />
                 <x-input-error class="mt-2" :messages="$errors->get('first_name')" />
             </div>
@@ -115,7 +116,7 @@
                     :value="old('middle_name', $nameComponents['middle_name'])"
                     placeholder="e.g. Santos (optional)"
                     maxlength="80"
-                    autocomplete="additional-name"
+                    autocomplete="off"
                 />
                 <x-input-error class="mt-2" :messages="$errors->get('middle_name')" />
             </div>
@@ -125,7 +126,7 @@
             <x-input-label for="email" :value="__('Email')" />
             <x-text-input id="email" name="email" type="email" class="mt-1 block w-full"
                           :value="old('email', $user->email)"
-                          required autocomplete="username" />
+                          required autocomplete="off" />
             <x-input-error class="mt-2" :messages="$errors->get('email')" />
 
             @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
@@ -154,7 +155,10 @@
                 name="current_password"
                 type="password"
                 class="mt-1 block w-full {{ $errors->has('current_password') ? '!border-danger-500 focus:!border-danger-500 focus:!ring-danger-500' : '' }}"
-                autocomplete="current-password"
+                autocomplete="new-password"
+                x-data
+                x-init="$nextTick(() => { $el.value = '' })"
+                value=""
             />
             <p class="mt-2 text-sm text-gray-600">
                 {{ __('Required only when changing your email address.') }}

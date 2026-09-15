@@ -117,7 +117,7 @@
         </x-ui.alert>
     @endif
 
-    <form method="POST" action="{{ $action }}" class="animate-fade-up space-y-5 [animation-delay:440ms]" x-data="{ showPassword: false }" data-login-form>
+    <form method="POST" action="{{ $action }}" class="animate-fade-up space-y-5 [animation-delay:440ms]" x-data="{ showPassword: false }" autocomplete="off" data-login-form>
         @csrf
         <input type="hidden" name="latitude" data-login-latitude>
         <input type="hidden" name="longitude" data-login-longitude>
@@ -134,7 +134,7 @@
                 placeholder="name@hospital.org"
                 required
                 autofocus
-                autocomplete="username"
+                autocomplete="off"
             />
             <x-input-error :messages="$errors->get('email')" class="mt-2 text-danger-600" />
         </div>
@@ -158,7 +158,7 @@
                     x-bind:type="showPassword ? 'text' : 'password'"
                     name="password"
                     required
-                    autocomplete="current-password"
+                    autocomplete="new-password"
                 />
 
                 <button

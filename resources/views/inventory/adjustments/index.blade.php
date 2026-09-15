@@ -18,6 +18,9 @@
     <div class="py-6">
         <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
 
+            {{-- Consolidated Inventory Workflow Navigation --}}
+            @include('inventory.partials.workflow_nav')
+
             {{-- Flash Alerts --}}
             @if(session('success'))
                 <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 flex items-center justify-between shadow-sm">

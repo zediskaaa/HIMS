@@ -37,7 +37,7 @@
                 label="Surname"
                 :value="$nameComponents['surname']"
                 required
-                autocomplete="family-name"
+                autocomplete="off"
                 placeholder="e.g. Dela Cruz" />
 
             <x-ui.field
@@ -45,14 +45,14 @@
                 label="First Name"
                 :value="$nameComponents['first_name']"
                 required
-                autocomplete="given-name"
+                autocomplete="off"
                 placeholder="e.g. Juan" />
 
             <x-ui.field
                 name="middle_name"
                 label="Middle Name"
                 :value="$nameComponents['middle_name']"
-                autocomplete="additional-name"
+                autocomplete="off"
                 placeholder="e.g. Santos"
                 hint="Optional." />
         </div>
@@ -63,6 +63,7 @@
             type="email"
             :value="$user?->email"
             required
+            autocomplete="off"
             placeholder="e.g. maria.cruz@djnrmhs.gov.ph"
             hint="Used to sign in. Must be unique." />
 
@@ -89,7 +90,7 @@
             :value="$user?->phone"
             required
             inputmode="numeric"
-            autocomplete="tel"
+            autocomplete="off"
             minlength="11"
             maxlength="11"
             pattern="09[0-9]{9}"

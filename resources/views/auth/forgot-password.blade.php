@@ -18,7 +18,7 @@
             :status="session('status')"
         />
 
-        <form method="POST" action="{{ route($panel->passwordEmailRoute()) }}" class="space-y-5">
+        <form method="POST" action="{{ route($panel->passwordEmailRoute()) }}" class="space-y-5" autocomplete="off">
             @csrf
 
             <div>
@@ -31,7 +31,7 @@
                     :value="old('email')"
                     required
                     autofocus
-                    autocomplete="username"
+                    autocomplete="off"
                 />
                 <x-input-error :messages="$errors->get('email')" class="mt-2 text-danger-600" />
             </div>

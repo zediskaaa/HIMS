@@ -15,6 +15,7 @@
             method="POST"
             action="{{ route($panel->expiredPasswordUpdateRoute()) }}"
             class="space-y-5"
+            autocomplete="off"
             x-data="{ password: '', passwordConfirmation: '' }"
             data-confirm-title="Confirm security change"
             data-confirm-message="Are you sure you want to change your password?"

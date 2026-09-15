@@ -207,6 +207,7 @@
                 action="{{ route('profile.authenticator.disable') }}"
                 class="mt-6 space-y-5"
                 data-confirm-title="Disable authenticator app?"
+                autocomplete="off"
                 data-confirm-message="This removes authenticator verification from future sign-ins. Your password and current authenticator code will be verified first."
                 data-confirm-label="Disable authenticator"
             >
@@ -215,7 +216,7 @@
 
                 <div>
                     <x-input-label for="authenticator-disable-password" :value="__('Current password')" />
-                    <x-text-input id="authenticator-disable-password" name="current_password" type="password" class="mt-1 block w-full" autocomplete="current-password" required />
+                    <x-text-input id="authenticator-disable-password" name="current_password" type="password" class="mt-1 block w-full" autocomplete="new-password" required />
                     <x-input-error :messages="$errors->authenticatorDisable->get('current_password')" class="mt-2" />
                 </div>
 
@@ -305,14 +306,14 @@
                 </button>
             </header>
 
-            <form @submit.prevent="submitPassword" class="p-5 space-y-4">
+            <form @submit.prevent="submitPassword" autocomplete="off" class="p-5 space-y-4">
                 <div>
                     <x-input-label for="authenticator-modal-password" :value="__('Current password')" />
                     <x-text-input
                         id="authenticator-modal-password"
                         type="password"
                         class="mt-1 block w-full"
-                        autocomplete="current-password"
+                        autocomplete="new-password"
                         required
                         x-model="password"
                         ::class="passwordError ? '!border-danger-500 focus:!border-danger-500 focus:!ring-danger-500' : ''"

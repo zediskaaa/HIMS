@@ -19,7 +19,7 @@
             :status="session('status')"
         />
 
-        <form method="POST" action="{{ route($panel->passwordOtpVerifyRoute()) }}" class="space-y-5">
+        <form method="POST" action="{{ route($panel->passwordOtpVerifyRoute()) }}" class="space-y-5" autocomplete="off">
             @csrf
             <input type="hidden" name="email" value="{{ $email }}">
 

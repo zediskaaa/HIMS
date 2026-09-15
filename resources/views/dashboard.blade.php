@@ -341,17 +341,7 @@
                         </div>
                         </div>
 
-                        <div
-                            x-show="loading"
-                            x-cloak
-                            role="status"
-                            aria-live="polite"
-                            class="flex items-center gap-2 text-xs text-primary-700 sm:col-span-2 lg:col-span-5"
-                        >
-                            <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600 motion-reduce:animate-none" aria-hidden="true"></span>
-                            <span x-text="loadingPeriodLabel()"></span>
-                            <span class="text-neutral-500">Current chart remains available while new data loads.</span>
-                        </div>
+
                     </div>
 
                     <div x-show="!forecast" class="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-4 py-7 text-center">

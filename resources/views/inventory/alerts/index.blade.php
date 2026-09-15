@@ -9,7 +9,9 @@
     </x-slot>
 
     <div class="py-6">
-        <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+            {{-- Consolidated Inventory Workflow Navigation --}}
+            @include('inventory.partials.workflow_nav')
             <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
                 <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
