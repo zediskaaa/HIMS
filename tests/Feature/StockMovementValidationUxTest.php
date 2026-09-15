@@ -240,4 +240,31 @@ class StockMovementValidationUxTest extends TestCase
         $response->assertSee('md:grid-cols-12', false);
         $response->assertSee('max="999999"', false);
     }
+
+    public function test_movement_history_renders_filter_toolbar_and_scrollable_container(): void
+    {
+        [$item, $location] = $this->createStockedItem(15, 'vial');
+        $user = User::factory()->warehouseStaff()->create();
+
+        StockMovement::create([
+            'item_id' => $item->id,
+            'movement_type' => MovementType::StockIn,
+            'quantity' => 15,
+            'to_location_id' => $location->id,
+            'user_id' => $user->id,
+            'moved_at' => now(),
+            'remarks' => 'Initial delivery intake',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('inventory.stock-movements'));
+
+        $response->assertOk();
+        $response->assertSee('Movement History');
+        $response->assertSee('placeholder="Search movements..."', false);
+        $response->assertSee('All Movement Types');
+        $response->assertSee('All Locations');
+        $response->assertSee('overflow-y-auto max-h-[460px]', false);
+        $response->assertSee('sticky top-0', false);
+        $response->assertSee('Initial delivery intake');
+    }
 }

@@ -811,8 +811,95 @@
         </x-ui.card>
         @endif
 
-        {{-- MOVEMENT HISTORY (FULLY RESPONSIVE - ZERO HORIZONTAL SCROLL) --}}
-        <x-ui.card title="Movement History" :subtitle="$movements->count().' recorded'" :padding="false">
+        {{-- MOVEMENT HISTORY (WITH DYNAMIC FILTERS & VERTICAL SCROLLBAR) --}}
+        <x-ui.card :padding="false"
+                   x-data="{
+                       historySearch: '',
+                       historyType: '',
+                       historyLocation: '',
+                       totalRows: {{ $movements->count() }},
+                       get isFiltered() {
+                           return !!(this.historySearch.trim() || this.historyType || this.historyLocation);
+                       },
+                       matches(type, fromLoc, toLoc, itemText, remarks, userText) {
+                           if (this.historyType && type !== this.historyType) return false;
+                           if (this.historyLocation && fromLoc !== this.historyLocation && toLoc !== this.historyLocation) return false;
+                           if (this.historySearch.trim()) {
+                               const q = this.historySearch.toLowerCase().trim();
+                               const haystack = `${itemText} ${remarks} ${fromLoc} ${toLoc} ${userText}`.toLowerCase();
+                               if (!haystack.includes(q)) return false;
+                           }
+                           return true;
+                       },
+                       clearFilters() {
+                           this.historySearch = '';
+                           this.historyType = '';
+                           this.historyLocation = '';
+                       }
+                   }">
+            <x-slot:header>
+                <div>
+                    <h2 class="text-sm font-semibold text-neutral-900 truncate">Movement History</h2>
+                    <p class="mt-0.5 text-xs text-neutral-500">
+                        {{ $movements->count() }} recorded
+                    </p>
+                </div>
+            </x-slot:header>
+
+            <x-slot:actions>
+                {{-- Quick Filter Toolbar --}}
+                <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    {{-- Search Filter --}}
+                    <div class="relative flex-1 sm:w-48 min-w-[150px]">
+                        <input type="text"
+                               x-model="historySearch"
+                               placeholder="Search movements..."
+                               class="w-full rounded-lg border border-neutral-300 py-1.5 pl-8 pr-7 text-xs text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 shadow-2xs" />
+                        <svg class="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-neutral-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <button x-show="historySearch"
+                                @click="historySearch = ''"
+                                type="button"
+                                class="absolute right-2 top-2 text-neutral-400 hover:text-neutral-600">
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    {{-- Movement Type Filter --}}
+                    <div class="w-full sm:w-40">
+                        <select x-model="historyType"
+                                class="w-full rounded-lg border border-neutral-300 py-1.5 px-2 text-xs text-neutral-700 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 shadow-2xs">
+                            <option value="">All Movement Types</option>
+                            @foreach (\App\Enums\MovementType::cases() as $type)
+                                <option value="{{ $type->value }}">{{ $type->label() }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- Location Filter --}}
+                    <div class="w-full sm:w-36">
+                        <select x-model="historyLocation"
+                                class="w-full rounded-lg border border-neutral-300 py-1.5 px-2 text-xs text-neutral-700 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 shadow-2xs">
+                            <option value="">All Locations</option>
+                            @foreach ($locations as $loc)
+                                <option value="{{ $loc->name }}">{{ $loc->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- Reset Button --}}
+                    <button x-show="isFiltered"
+                            @click="clearFilters()"
+                            type="button"
+                            title="Reset filters"
+                            class="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 px-2.5 py-1.5 text-xs font-semibold transition shadow-2xs">
+                        <svg class="h-3.5 w-3.5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        <span>Reset</span>
+                    </button>
+                </div>
+            </x-slot:actions>
+
             @if ($movements->isEmpty())
                 <div class="p-8 text-center text-neutral-500">
                     <svg class="mx-auto h-8 w-8 text-neutral-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -822,10 +909,10 @@
                     <p class="text-xs text-neutral-400 mt-0.5">Recorded stock in, stock out and transfers will appear here.</p>
                 </div>
             @else
-                {{-- Desktop & Tablet View (Proportional Columns, No Horizontal Scrollbar) --}}
-                <div class="hidden md:block w-full overflow-hidden">
+                {{-- Desktop & Tablet View (Proportional Columns with Vertical Scrollbar & Sticky Header) --}}
+                <div class="hidden md:block w-full overflow-y-auto max-h-[460px] divide-y divide-neutral-200">
                     <table class="w-full table-fixed divide-y divide-neutral-200 text-xs">
-                        <thead class="bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200">
+                        <thead class="sticky top-0 z-10 bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200 shadow-2xs">
                             <tr>
                                 <th scope="col" class="w-[30%] px-4 py-3 text-left">Item &amp; Type</th>
                                 <th scope="col" class="w-[12%] px-3 py-3 text-right">Quantity</th>
@@ -843,7 +930,8 @@
                                         $destinationName = $movement->reference->name ?? class_basename($movement->reference);
                                     }
                                 @endphp
-                                <tr class="hover:bg-neutral-50/70 transition-colors">
+                                <tr x-show="matches('{{ $movement->movement_type->value }}', '{{ addslashes($movement->fromLocation?->name ?? '') }}', '{{ addslashes($destinationName ?? '') }}', '{{ addslashes(($movement->item?->name ?? '').' '.($movement->item?->sku ?? '')) }}', '{{ addslashes($movement->remarks ?? '') }}', '{{ addslashes($movement->user?->name ?? '') }}')"
+                                    class="hover:bg-neutral-50/70 transition-colors">
                                     {{-- Item & Movement Type --}}
                                     <td class="px-4 py-3 align-top">
                                         <div class="min-w-0">
@@ -925,8 +1013,8 @@
                     </table>
                 </div>
 
-                {{-- Mobile Feed View (Fluid Cards - Zero Horizontal Scroll) --}}
-                <div class="block md:hidden divide-y divide-neutral-100">
+                {{-- Mobile Feed View (Fluid Cards with Vertical Scrollbar) --}}
+                <div class="block md:hidden overflow-y-auto max-h-[460px] divide-y divide-neutral-100">
                     @foreach ($movements as $movement)
                         @php
                             $destinationName = null;
@@ -936,7 +1024,8 @@
                                 $destinationName = $movement->reference->name ?? class_basename($movement->reference);
                             }
                         @endphp
-                        <div class="p-4 space-y-2 hover:bg-neutral-50/70 transition-colors">
+                        <div x-show="matches('{{ $movement->movement_type->value }}', '{{ addslashes($movement->fromLocation?->name ?? '') }}', '{{ addslashes($destinationName ?? '') }}', '{{ addslashes(($movement->item?->name ?? '').' '.($movement->item?->sku ?? '')) }}', '{{ addslashes($movement->remarks ?? '') }}', '{{ addslashes($movement->user?->name ?? '') }}')"
+                             class="p-4 space-y-2 hover:bg-neutral-50/70 transition-colors">
                             <div class="flex items-start justify-between gap-2">
                                 <div class="min-w-0">
                                     <h4 class="font-semibold text-neutral-900 text-xs truncate" title="{{ $movement->item?->name }}">
