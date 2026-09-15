@@ -204,6 +204,33 @@ class PurchaseOrderStatusTest extends TestCase
         $this->assertSame(PurchaseOrderStatus::PartiallyFulfilled, $second->fresh()->statusEnum());
     }
 
+    public function test_the_dock_receiving_list_flags_a_partially_fulfilled_order(): void
+    {
+        // The page compared the raw column against 'partially_received'. The
+        // backfill removed that spelling and the IA path no longer writes it,
+        // so the attention tone became unreachable and a half-delivered order
+        // looked exactly like an untouched one.
+        $this->purchaseOrder(PurchaseOrderStatus::PartiallyFulfilled);
+
+        $this->actingAs(User::factory()->role(UserRole::InventoryManager)->create())
+            ->get(route('inventory.receiving.index'))
+            ->assertOk()
+            ->assertSee('PO-STATUS-001')
+            ->assertSee('bg-amber-100 text-amber-800')
+            ->assertDontSee('bg-blue-100 text-blue-800');
+    }
+
+    public function test_the_dock_receiving_list_keeps_the_plain_tone_for_an_unstarted_delivery(): void
+    {
+        $this->purchaseOrder(PurchaseOrderStatus::Approved);
+
+        $this->actingAs(User::factory()->role(UserRole::InventoryManager)->create())
+            ->get(route('inventory.receiving.index'))
+            ->assertOk()
+            ->assertSee('bg-blue-100 text-blue-800')
+            ->assertDontSee('bg-amber-100 text-amber-800');
+    }
+
     private function purchaseOrder(PurchaseOrderStatus $status): PurchaseOrder
     {
         $supplier = Supplier::create([

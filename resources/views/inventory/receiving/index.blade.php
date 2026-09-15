@@ -121,7 +121,7 @@
                                         ₱{{ number_format((float) $po->total_amount, 2) }}
                                     </td>
                                     <td class="px-6 py-4">
-                                        <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium {{ $po->status === 'partially_received' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800' }}">
+                                        <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium {{ $po->statusEnum() === \App\Enums\PurchaseOrderStatus::PartiallyFulfilled ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800' }}">
                                             {{ ucfirst(str_replace('_', ' ', $po->status)) }}
                                         </span>
                                     </td>
