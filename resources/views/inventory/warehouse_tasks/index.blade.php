@@ -12,6 +12,9 @@
 
     <div class="py-6">
         <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+            {{-- SWS Consolidated Workflow Navigation --}}
+            @include('inventory.warehousing.partials.workflow_nav')
+
             @if ($errors->any())
                 <x-ui.alert variant="danger" title="Warehouse task could not be saved">
                     <ul class="list-disc pl-5">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>

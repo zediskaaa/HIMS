@@ -43,9 +43,6 @@ class DropdownNavigationTest extends TestCase
         $response->assertSee('Administration');
 
         // Check submodules inside dropdowns
-        $response->assertSee('Inventory Items');
-        $response->assertSee('Stock Movements');
-        $response->assertSee('Warehouse Dashboard');
         $response->assertSee('Purchase Orders &amp; S2P', false);
         $response->assertSee('Logistics Overview');
         $response->assertSee('Recovery Center');
@@ -53,15 +50,13 @@ class DropdownNavigationTest extends TestCase
 
     public function test_sidebar_coordinates_exclusive_accordion_state(): void
     {
-        // When visiting an inventory page, activeDropdown should be initialized to 'inventory'
-        $response = $this->actingAs($this->superAdmin)->get(route('inventory.items'));
+        // When visiting a procurement page, activeDropdown should be initialized to 'procurement'
+        $response = $this->actingAs($this->superAdmin)->get(route('inventory.purchases'));
 
         $response->assertOk();
-        $response->assertSee("activeDropdown: 'inventory'", false);
-        $response->assertSee("activeDropdown === 'inventory'", false);
-        $response->assertSee("activeDropdown === 'warehousing'", false);
+        $response->assertSee("activeDropdown: 'procurement'", false);
         $response->assertSee("activeDropdown === 'procurement'", false);
-        $response->assertSee("activeDropdown = (activeDropdown === 'warehousing' ? null : 'warehousing')", false);
+        $response->assertSee("activeDropdown = (activeDropdown === 'procurement' ? null : 'procurement')", false);
     }
 
     public function test_inventory_items_page_renders_grouped_workflow_dropdowns(): void
@@ -69,10 +64,21 @@ class DropdownNavigationTest extends TestCase
         $response = $this->actingAs($this->superAdmin)->get(route('inventory.items'));
 
         $response->assertOk();
-        $response->assertSee('Inventory Workflows &amp; Tools', false);
+        $response->assertSee('Inventory Workflows &amp; Operations', false);
         $response->assertSee('Stock &amp; Movements', false);
         $response->assertSee('Requisitions &amp; Transfers', false);
         $response->assertSee('Audits &amp; Data Operations', false);
+    }
+
+    public function test_smart_warehousing_page_renders_grouped_workflow_dropdowns(): void
+    {
+        $response = $this->actingAs($this->superAdmin)->get(route('inventory.warehousing.dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('Smart Warehousing Workflows &amp; Operations', false);
+        $response->assertSee('Warehouse Operations');
+        $response->assertSee('Locations &amp; Storage', false);
+        $response->assertSee('Compliance &amp; Special Handling', false);
     }
 
     public function test_procurement_page_renders_major_dropdown_tabs(): void

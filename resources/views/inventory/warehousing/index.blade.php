@@ -6,38 +6,21 @@
                 <h2 class="text-2xl font-bold text-neutral-900">Smart Warehousing System (SWS)</h2>
                 <p class="text-sm text-neutral-600">Physical location topology, IoT cold-chain telemetry, scan verification, and regulatory compliance.</p>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex items-center gap-2">
                 @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
-                <a href="{{ route('inventory.warehousing.scan-station') }}" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
-                    Scan Workstation
-                </a>
+                    <x-ui.button :href="route('inventory.warehousing.scan-station')" icon="qr-code">
+                        Scan Workstation
+                    </x-ui.button>
                 @endcan
-                @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
-                    <x-ui.button variant="secondary" :href="route('inventory.receiving.index')" icon="arrow-down-tray">Dock Receiving</x-ui.button>
-                @endcan
-                @can(\App\Enums\Permission::InspectStock->value)
-                    <x-ui.button variant="secondary" :href="route('inventory.qc.index')" icon="shield-check">QC Inspection</x-ui.button>
-                @endcan
-                @can(\App\Enums\Permission::ViewWarehouseTasks->value)
-                <a href="{{ route('inventory.warehouse-tasks.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
-                    Warehouse Tasks
-                </a>
-                <a href="{{ route('inventory.warehousing.locations') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
-                    Locations Explorer
-                </a>
-                @endcan
-                @canany([\App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ViewInventory->value])
-                <a href="{{ route('inventory.storage-locations') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
-                    Location Registry
-                </a>
-                @endcanany
             </div>
         </div>
     </x-slot>
 
     <div class="py-6">
         <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+
+            {{-- SWS Consolidated Workflow Navigation --}}
+            @include('inventory.warehousing.partials.workflow_nav')
 
             {{-- High-Level KPI Matrix --}}
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

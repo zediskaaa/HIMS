@@ -25,6 +25,9 @@
          @open-release-modal.window="showReleaseModal = true; releaseLocationId = $event.detail.id; releaseLocationCode = $event.detail.code">
         <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
 
+            {{-- SWS Consolidated Workflow Navigation --}}
+            @include('inventory.warehousing.partials.workflow_nav')
+
             @if(session('success'))
                 <x-ui.alert variant="success" :message="session('success')" />
             @endif

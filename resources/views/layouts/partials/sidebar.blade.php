@@ -26,17 +26,6 @@
     @php
         $initialOpenDropdown = null;
         if (request()->routeIs(
-            'inventory.items*', 'inventory.stock', 'inventory.stock-movements*',
-            'inventory.requisitions*', 'inventory.transfers*', 'inventory.cycle-counts*',
-            'inventory.adjustments*', 'inventory.alerts*', 'inventory.import*'
-        )) {
-            $initialOpenDropdown = 'inventory';
-        } elseif (request()->routeIs(
-            'inventory.warehousing*', 'inventory.receiving*', 'inventory.qc*',
-            'inventory.warehouse-tasks*', 'inventory.storage-locations*'
-        )) {
-            $initialOpenDropdown = 'warehousing';
-        } elseif (request()->routeIs(
             'inventory.purchases*', 'inventory.suppliers*', 'inventory.demand-forecast*'
         )) {
             $initialOpenDropdown = 'procurement';
@@ -88,7 +77,7 @@
             </div>
         @endcanany
 
-        {{-- 3. Smart Warehousing (Major Tab Dropdown) --}}
+        {{-- 3. Smart Warehousing --}}
         @canany([\App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ExecuteWarehouseTasks->value, \App\Enums\Permission::ManageTelemetryExcursions->value])
             @php
                 $isWarehousingActive = request()->routeIs(
@@ -96,69 +85,15 @@
                     'inventory.warehouse-tasks*', 'inventory.storage-locations*'
                 );
             @endphp
-            <x-ui.nav-dropdown
-                id="warehousing"
-                title="Smart Warehousing"
-                icon="building-storefront"
-                :active="$isWarehousingActive"
-            >
-                @can(\App\Enums\Permission::ViewWarehouseTasks->value)
-                    <x-ui.nav-item sub :href="route('inventory.warehousing.dashboard')" :active="request()->routeIs('inventory.warehousing.dashboard')">
-                        Warehouse Dashboard
-                    </x-ui.nav-item>
-                @endcan
-
-                @can(\App\Enums\Permission::ManageLocations->value)
-                    <x-ui.nav-item sub :href="route('inventory.warehousing.locations')" :active="request()->routeIs('inventory.warehousing.locations')">
-                        Locations Explorer
-                    </x-ui.nav-item>
-                    <x-ui.nav-item sub :href="route('inventory.storage-locations')" :active="request()->routeIs('inventory.storage-locations*')">
-                        Location Registry
-                    </x-ui.nav-item>
-                @endcan
-
-                @can(\App\Enums\Permission::ViewWarehouseTasks->value)
-                    <x-ui.nav-item sub :href="route('inventory.warehouse-tasks.index')" :active="request()->routeIs('inventory.warehouse-tasks*')">
-                        Warehouse Tasks
-                    </x-ui.nav-item>
-                @endcan
-
-                @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
-                    <x-ui.nav-item sub :href="route('inventory.receiving.index')" :active="request()->routeIs('inventory.receiving*')">
-                        Dock Receiving
-                    </x-ui.nav-item>
-                @endcan
-
-                @can(\App\Enums\Permission::InspectStock->value)
-                    <x-ui.nav-item sub :href="route('inventory.qc.index')" :active="request()->routeIs('inventory.qc*')">
-                        QC Inspection
-                    </x-ui.nav-item>
-                @endcan
-
-                @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
-                    <x-ui.nav-item sub :href="route('inventory.warehousing.scan-station')" :active="request()->routeIs('inventory.warehousing.scan-station')">
-                        Scan Workstation
-                    </x-ui.nav-item>
-                @endcan
-
-                @can(\App\Enums\Permission::ManageTelemetryExcursions->value)
-                    <x-ui.nav-item sub :href="route('inventory.warehousing.telemetry')" :active="request()->routeIs('inventory.warehousing.telemetry')">
-                        IoT Telemetry
-                    </x-ui.nav-item>
-                @endcan
-
-                @can(\App\Enums\Permission::AccessNarcoticsVault->value)
-                    <x-ui.nav-item sub :href="route('inventory.warehousing.narcotics')" :active="request()->routeIs('inventory.warehousing.narcotics')">
-                        PDEA Narcotics Vault
-                    </x-ui.nav-item>
-                @endcan
-
-                @can(\App\Enums\Permission::RecordConsignments->value)
-                    <x-ui.nav-item sub :href="route('inventory.warehousing.consignment')" :active="request()->routeIs('inventory.warehousing.consignment')">
-                        Consignments
-                    </x-ui.nav-item>
-                @endcan
-            </x-ui.nav-dropdown>
+            <div class="relative">
+                <x-ui.nav-item
+                    :href="route('inventory.warehousing.dashboard')"
+                    icon="building-storefront"
+                    :active="$isWarehousingActive"
+                >
+                    Smart Warehousing
+                </x-ui.nav-item>
+            </div>
         @endcanany
 
         {{-- 4. Procurement & Sourcing (Major Tab Dropdown) --}}

@@ -292,9 +292,9 @@ class UiNavigationAuthorizationTest extends TestCase
         // 2. Warehouse Staff has ViewWarehouseTasks, ExecuteWarehouseTasks, ReceivePurchaseOrder, ViewLogisticsSensitiveData
         $warehouse = User::factory()->role(UserRole::WarehouseStaff)->create();
         $warehouseSidebar = $this->mainNavigationFor($warehouse);
-        $this->assertStringContainsString('Warehouse Dashboard', $warehouseSidebar);
-        $this->assertStringContainsString('Scan Workstation', $warehouseSidebar);
-        $this->assertStringContainsString('Dock Receiving', $warehouseSidebar);
+        $this->assertStringContainsString('Smart Warehousing', $warehouseSidebar);
+        $this->assertStringNotContainsString('Warehouse Dashboard', $warehouseSidebar);
+        $this->assertStringNotContainsString('Scan Workstation', $warehouseSidebar);
         $this->assertStringContainsString('Shipments &amp; 3PL', $warehouseSidebar);
         $this->assertStringContainsString('COA IAR Reports', $warehouseSidebar);
 

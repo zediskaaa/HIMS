@@ -23,6 +23,9 @@
     <div class="py-6" x-data="{ showConsumeModal: false }" @open-consume-modal.window="showConsumeModal = true">
         <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
 
+            {{-- SWS Consolidated Workflow Navigation --}}
+            @include('inventory.warehousing.partials.workflow_nav')
+
             @if(session('success'))
                 <x-ui.alert variant="success" :message="session('success')" />
             @endif
