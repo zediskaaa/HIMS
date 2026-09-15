@@ -30,10 +30,6 @@
         )) {
             $initialOpenDropdown = 'procurement';
         } elseif (request()->routeIs(
-            'inventory.logistics*', 'inventory.reports*', 'reviews.*'
-        )) {
-            $initialOpenDropdown = 'records';
-        } elseif (request()->routeIs(
             'admin.users.*', 'admin.permissions', 'admin.audit-logs.*',
             'admin.recovery.*', 'super-admin.recovery.*'
         )) {
@@ -129,62 +125,22 @@
             </x-ui.nav-dropdown>
         @endcanany
 
-        {{-- 5. Records & Logistics (Major Tab Dropdown) --}}
+        {{-- 5. Documents & Logistics --}}
         @canany([\App\Enums\Permission::ViewReports->value, \App\Enums\Permission::ViewLogisticsRecords->value, \App\Enums\Permission::ViewProcessReviews->value])
             @php
                 $isRecordsActive = request()->routeIs(
                     'inventory.logistics*', 'inventory.reports*', 'reviews.*'
                 );
             @endphp
-            <x-ui.nav-dropdown
-                id="records"
-                title="Documents & Logistics"
-                icon="document-text"
-                :active="$isRecordsActive"
-            >
-                @can(\App\Enums\Permission::ViewLogisticsRecords->value)
-                    <x-ui.nav-item sub :href="route('inventory.logistics')" :active="request()->routeIs('inventory.logistics') && !request()->routeIs('inventory.logistics.*')">
-                        Logistics Overview
-                    </x-ui.nav-item>
-
-                    @can(\App\Enums\Permission::ViewLogisticsSensitiveData->value)
-                        <x-ui.nav-item sub :href="route('inventory.logistics.documents')" :active="request()->routeIs('inventory.logistics.documents*')">
-                            Documents Registry
-                        </x-ui.nav-item>
-                    @endcan
-
-                    @can(\App\Enums\Permission::ViewLogisticsSensitiveData->value)
-                        <x-ui.nav-item sub :href="route('inventory.logistics.shipments')" :active="request()->routeIs('inventory.logistics.shipments*')">
-                            Shipments &amp; 3PL
-                        </x-ui.nav-item>
-
-                        <x-ui.nav-item sub :href="route('inventory.logistics.iar.index')" :active="request()->routeIs('inventory.logistics.iar*')">
-                            COA IAR Reports
-                        </x-ui.nav-item>
-                    @endcan
-
-                    @can(\App\Enums\Permission::ViewLogisticsSensitiveData->value)
-                        <x-ui.nav-item sub :href="route('inventory.logistics.chain-of-custody')" :active="request()->routeIs('inventory.logistics.chain-of-custody*')">
-                            Chain of Custody
-                        </x-ui.nav-item>
-                    @endcan
-                @endcan
-
-                @can(\App\Enums\Permission::ViewReports->value)
-                    <x-ui.nav-item sub :href="route('inventory.reports')" :active="request()->routeIs('inventory.reports*')">
-                        Reports &amp; Analytics
-                    </x-ui.nav-item>
-                @endcan
-
-                @can(\App\Enums\Permission::ViewProcessReviews->value)
-                    <x-ui.nav-item sub :href="route('reviews.index')" :active="request()->routeIs('reviews.index', 'reviews.show', 'reviews.create')">
-                        Process Reviews
-                    </x-ui.nav-item>
-                    <x-ui.nav-item sub :href="route('reviews.dpri')" :active="request()->routeIs('reviews.dpri*')">
-                        DOH DPRI Benchmarks
-                    </x-ui.nav-item>
-                @endcan
-            </x-ui.nav-dropdown>
+            <div class="relative">
+                <x-ui.nav-item
+                    :href="route('inventory.logistics')"
+                    icon="document-text"
+                    :active="$isRecordsActive"
+                >
+                    Documents &amp; Logistics
+                </x-ui.nav-item>
+            </div>
         @endcanany
 
         {{-- 6. Administration & Governance (Major Tab Dropdown) --}}

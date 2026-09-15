@@ -163,7 +163,8 @@ class UiNavigationAuthorizationTest extends TestCase
         $sidebar = $this->mainNavigationFor($manager);
         $this->assertStringContainsString('Smart Warehousing', $sidebar);
         $this->assertStringContainsString('Procurement &amp; Sourcing', $sidebar);
-        $this->assertStringContainsString('Process Reviews', $sidebar);
+        $this->assertStringContainsString('Documents &amp; Logistics', $sidebar);
+        $this->assertStringNotContainsString('Process Reviews', $sidebar);
         $this->assertStringNotContainsString('User Management', $sidebar);
         $this->assertStringNotContainsString('Access Control', $sidebar);
 
@@ -178,7 +179,8 @@ class UiNavigationAuthorizationTest extends TestCase
         $auditor = User::factory()->role(UserRole::Auditor)->create();
         $sidebar = $this->mainNavigationFor($auditor);
         $this->assertStringContainsString('Smart Warehousing', $sidebar);
-        $this->assertStringContainsString('Process Reviews', $sidebar);
+        $this->assertStringContainsString('Documents &amp; Logistics', $sidebar);
+        $this->assertStringNotContainsString('Process Reviews', $sidebar);
         $this->assertStringContainsString('Audit Trail', $sidebar);
         $this->assertStringContainsString('Suppliers Directory', $sidebar);
         $this->assertStringNotContainsString('User Management', $sidebar);
@@ -271,7 +273,8 @@ class UiNavigationAuthorizationTest extends TestCase
         // 1. Viewer only has ViewLogisticsRecords: see Overview, but no Shipments, IAR, Documents, CoC
         $viewer = User::factory()->role(UserRole::Viewer)->create();
         $viewerSidebar = $this->mainNavigationFor($viewer);
-        $this->assertStringContainsString('Logistics Overview', $viewerSidebar);
+        $this->assertStringContainsString('Documents &amp; Logistics', $viewerSidebar);
+        $this->assertStringNotContainsString('Logistics Overview', $viewerSidebar);
         $this->assertStringNotContainsString('Shipments &amp; 3PL', $viewerSidebar);
         $this->assertStringNotContainsString('COA IAR Reports', $viewerSidebar);
         $this->assertStringNotContainsString('Documents Registry', $viewerSidebar);
@@ -295,8 +298,9 @@ class UiNavigationAuthorizationTest extends TestCase
         $this->assertStringContainsString('Smart Warehousing', $warehouseSidebar);
         $this->assertStringNotContainsString('Warehouse Dashboard', $warehouseSidebar);
         $this->assertStringNotContainsString('Scan Workstation', $warehouseSidebar);
-        $this->assertStringContainsString('Shipments &amp; 3PL', $warehouseSidebar);
-        $this->assertStringContainsString('COA IAR Reports', $warehouseSidebar);
+        $this->assertStringContainsString('Documents &amp; Logistics', $warehouseSidebar);
+        $this->assertStringNotContainsString('Shipments &amp; 3PL', $warehouseSidebar);
+        $this->assertStringNotContainsString('COA IAR Reports', $warehouseSidebar);
 
         $this->actingAs($warehouse)->get('/inventory/warehousing')
             ->assertOk()
@@ -304,6 +308,11 @@ class UiNavigationAuthorizationTest extends TestCase
             ->assertSee('Dock Receiving')
             ->assertSee('QC Inspection')
             ->assertSee('Warehouse Tasks');
+
+        $this->actingAs($warehouse)->get('/inventory/logistics')
+            ->assertOk()
+            ->assertSee('Shipments &amp; 3PL Logistics', false)
+            ->assertSee('Chain of Custody Ledger', false);
 
         $this->flushSession();
         $this->app['auth']->forgetGuards();

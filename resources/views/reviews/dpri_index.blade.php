@@ -1,4 +1,6 @@
 <x-app-layout>
+    @include('inventory.logistics.partials.nav')
+
     <div class="py-6" x-data="{ newModal: false }">
         <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
 

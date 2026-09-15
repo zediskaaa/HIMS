@@ -44,7 +44,6 @@ class DropdownNavigationTest extends TestCase
 
         // Check submodules inside dropdowns
         $response->assertSee('Purchase Orders &amp; S2P', false);
-        $response->assertSee('Logistics Overview');
         $response->assertSee('Recovery Center');
     }
 
@@ -98,6 +97,11 @@ class DropdownNavigationTest extends TestCase
         $response->assertOk();
         $response->assertSee('Operations &amp; Freight', false);
         $response->assertSee('Compliance &amp; Governance', false);
+        $response->assertSee('Documents Registry');
+        $response->assertSee('Shipments &amp; 3PL Logistics', false);
+        $response->assertSee('COA IAR Reports');
+        $response->assertSee('Process Reviews');
+        $response->assertSee('DOH DPRI Reference Prices');
     }
 
     public function test_recovery_center_diagnostics_modal_handles_null_source_location_safely(): void
