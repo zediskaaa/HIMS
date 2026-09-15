@@ -257,21 +257,15 @@ class SupplierLogoTest extends TestCase
 
     public function test_images_wider_than_the_dimension_cap_are_rejected(): void
     {
-        if (! function_exists('imagecreatetruecolor')) {
-            $this->markTestSkipped('The GD extension is unavailable, so an oversized image fixture cannot be generated.');
-        }
-
         Storage::fake('local');
 
         $manager = $this->manager();
         $supplier = $this->supplier();
 
-        // 4100px wide clears the 4096px cap; a short canvas keeps the fixture cheap.
-        $image = imagecreatetruecolor(4100, 10);
-        ob_start();
-        imagepng($image);
-        $binary = ob_get_clean();
-        imagedestroy($image);
+        // 4100px wide clears the 4096px cap; synthesized PNG header avoids GD extension dependency.
+        $ihdr = 'IHDR'.pack('NN', 4100, 10).chr(8).chr(0).chr(0).chr(0).chr(0);
+        $crc = pack('N', crc32($ihdr));
+        $binary = chr(137)."PNG\r\n\x1a\n".pack('N', 13).$ihdr.$crc.pack('N', 0).'IEND'.pack('N', crc32('IEND'));
 
         $this->actingAs($manager)
             ->from(route('inventory.suppliers.show', $supplier))
