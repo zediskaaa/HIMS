@@ -284,7 +284,7 @@
     <div
         x-show="showPasswordModal"
         x-cloak
-        class="fixed inset-0 z-50 flex items-start justify-center px-4 py-8 sm:py-16 overflow-y-auto"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
         role="dialog"
         aria-modal="true"
         aria-label="Confirm Password"
@@ -303,7 +303,7 @@
         <div
             x-show="showPasswordModal"
             x-transition
-            class="relative w-full sm:max-w-md bg-white rounded-lg shadow-lg border border-neutral-200"
+            class="relative w-full sm:max-w-md bg-white rounded-lg shadow-lg border border-neutral-200 my-auto"
         >
             <header class="flex items-start justify-between gap-4 px-5 py-4 border-b border-neutral-200">
                 <div>
@@ -368,7 +368,7 @@
     <div
         x-show="showSetup"
         x-cloak
-        class="fixed inset-0 z-50 flex items-start justify-center px-4 py-8 sm:py-16 overflow-y-auto"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
         role="dialog"
         aria-modal="true"
         aria-label="Authenticator App Setup"
