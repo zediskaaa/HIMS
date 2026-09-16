@@ -155,7 +155,7 @@ class SupplierManagementTest extends TestCase
             ->assertSee('PO-SELECTED-001')
             ->assertSee('92%')
             ->assertSee('create-supplier')
-            ->assertSee('View purchase orders')
+            ->assertSee('View Supplier')
             ->assertSee('Other Vendor');
     }
 

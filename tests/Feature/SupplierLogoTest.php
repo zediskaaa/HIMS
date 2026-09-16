@@ -419,7 +419,7 @@ class SupplierLogoTest extends TestCase
         $this->actingAs($this->manager())
             ->get(route('inventory.suppliers.show', $supplier))
             ->assertOk()
-            ->assertSee('Company logo')
+            ->assertSee('Display picture / Logo')
             ->assertSee('accept="image/jpeg,image/png,image/jpg"', false)
             ->assertSee('name="logo"', false)
             ->assertSee('Choose Image');
@@ -489,5 +489,77 @@ class SupplierLogoTest extends TestCase
             ->latest('id')
             ->first()
             ->description);
+    }
+
+    public function test_manager_can_optionally_upload_a_logo_during_supplier_creation(): void
+    {
+        Storage::fake('local');
+
+        $manager = $this->manager();
+
+        $response = $this->actingAs($manager)->post(route('inventory.suppliers.store'), [
+            'name' => 'Metro Health Logistics',
+            'trade_name' => 'Metro Logistics',
+            'business_structure' => 'corporation',
+            'address' => '77 Pioneer Way, Pasig City',
+            'logo' => $this->createFakePng('company-logo.png'),
+        ]);
+
+        $supplier = Supplier::where('name', 'Metro Health Logistics')->first();
+        $this->assertNotNull($supplier);
+
+        $response->assertRedirect(route('inventory.suppliers.show', $supplier));
+        $this->assertNotNull($supplier->logo_path);
+        $this->assertTrue($supplier->hasLogo());
+        Storage::disk('local')->assertExists($supplier->logo_path);
+    }
+
+    public function test_supplier_creation_without_logo_succeeds_as_optional(): void
+    {
+        Storage::fake('local');
+
+        $manager = $this->manager();
+
+        $response = $this->actingAs($manager)->post(route('inventory.suppliers.store'), [
+            'name' => 'Apex Pharma Solutions',
+            'business_structure' => 'corporation',
+            'address' => '12 Ayala Avenue, Makati',
+        ]);
+
+        $supplier = Supplier::where('name', 'Apex Pharma Solutions')->first();
+        $this->assertNotNull($supplier);
+
+        $response->assertRedirect(route('inventory.suppliers.show', $supplier));
+        $this->assertNull($supplier->logo_path);
+        $this->assertFalse($supplier->hasLogo());
+    }
+
+    public function test_invalid_logo_during_supplier_creation_is_rejected(): void
+    {
+        Storage::fake('local');
+
+        $manager = $this->manager();
+
+        $response = $this->actingAs($manager)->post(route('inventory.suppliers.store'), [
+            'name' => 'Invalid Logo Supplier',
+            'business_structure' => 'corporation',
+            'address' => '123 Fake Street',
+            'logo' => UploadedFile::fake()->create('contract.pdf', 10, 'application/pdf'),
+        ]);
+
+        $response->assertSessionHasErrors('logo');
+        $this->assertNull(Supplier::where('name', 'Invalid Logo Supplier')->first());
+    }
+
+    public function test_create_supplier_modal_contains_optional_dp_input(): void
+    {
+        $manager = $this->manager();
+
+        $response = $this->actingAs($manager)->get(route('inventory.suppliers'));
+
+        $response->assertOk()
+            ->assertSee('Display picture / Logo')
+            ->assertSee('Optional')
+            ->assertSee('name="logo"', false);
     }
 }

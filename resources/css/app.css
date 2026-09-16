@@ -165,6 +165,10 @@
         padding-left: 0.75rem;
     }
 
+    .hims-table-scroll:has(.supplier-directory-table) {
+        overflow-x: hidden;
+    }
+
     .loader {
         --color-1: currentColor;
         --size: 1.25px;

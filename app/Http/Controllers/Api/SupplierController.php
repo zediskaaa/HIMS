@@ -40,7 +40,24 @@ class SupplierController extends Controller implements HasMiddleware
 
     public function store(StoreSupplierRequest $request)
     {
-        $supplier = $this->suppliers->create($request->validated(), $request->user());
+        $validated = $request->validated();
+        $logoFile = $request->file('logo');
+        unset($validated['logo']);
+
+        $supplier = $this->suppliers->create($validated, $request->user());
+
+        if ($logoFile) {
+            $path = $logoFile->store('supplier-logos/'.$supplier->id, 'local');
+            if ($path !== false) {
+                try {
+                    $this->suppliers->updateLogo($supplier, $path, $request->user());
+                } catch (\Throwable $exception) {
+                    \Illuminate\Support\Facades\Storage::disk('local')->delete($path);
+
+                    throw $exception;
+                }
+            }
+        }
 
         return (new SupplierResource($supplier))->response()->setStatusCode(201);
     }

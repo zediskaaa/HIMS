@@ -140,42 +140,37 @@ class SupplierController extends Controller implements HasMiddleware
             ->paginate(15)
             ->withQueryString();
 
-        $suppliers->getCollection()->each(fn (Supplier $supplier) => $supplier->setAttribute('computed_compliance_state', $supplier->complianceState()));
-
         $selectedId = $request->integer('supplier') ?: $suppliers->first()?->id;
-        $selectedSupplier = $selectedId ? Supplier::query()
-            ->with([
-                'supplierProducts' => fn ($query) => $query->where('is_active', true)->with('item.category'),
-                'latestApprovedScorecard.processReview',
-                'complianceAlerts' => fn ($query) => $query->active()->orderBy('due_date')->limit(3),
-            ])
-            ->withCount([
-                'documents',
-                'supplierProducts as active_products_count' => fn ($query) => $query->where('is_active', true),
-                'complianceAlerts as active_compliance_alerts_count' => fn ($query) => $query->active(),
-            ])
-            ->find($selectedId) : null;
+        $selectedSupplier = null;
 
-        if (! $selectedSupplier && $suppliers->isNotEmpty()) {
-            $selectedSupplier = Supplier::query()
-                ->with([
-                    'supplierProducts' => fn ($query) => $query->where('is_active', true)->with('item.category'),
-                    'latestApprovedScorecard.processReview',
+        if ($selectedId) {
+            $existing = $suppliers->firstWhere('id', $selectedId);
+            if ($existing) {
+                $selectedSupplier = $existing;
+                $selectedSupplier->loadMissing([
                     'complianceAlerts' => fn ($query) => $query->active()->orderBy('due_date')->limit(3),
-                ])
-                ->withCount([
-                    'documents',
-                    'supplierProducts as active_products_count' => fn ($query) => $query->where('is_active', true),
-                    'complianceAlerts as active_compliance_alerts_count' => fn ($query) => $query->active(),
-                ])
-                ->find($suppliers->first()->id);
+                ]);
+            } else {
+                $selectedSupplier = Supplier::query()
+                    ->with([
+                        'supplierProducts' => fn ($query) => $query->where('is_active', true)->with('item.category'),
+                        'latestApprovedScorecard.processReview',
+                        'complianceAlerts' => fn ($query) => $query->active()->orderBy('due_date')->limit(3),
+                    ])
+                    ->withCount([
+                        'documents',
+                        'supplierProducts as active_products_count' => fn ($query) => $query->where('is_active', true),
+                        'complianceAlerts as active_compliance_alerts_count' => fn ($query) => $query->active(),
+                    ])
+                    ->find($selectedId);
+            }
         }
 
         if ($selectedSupplier) {
             $selectedSupplier->setAttribute('computed_compliance_state', $selectedSupplier->complianceState());
 
             if ($canViewSensitiveData) {
-                $selectedSupplier->load(['contacts' => fn ($query) => $query
+                $selectedSupplier->loadMissing(['contacts' => fn ($query) => $query
                     ->where('is_active', true)
                     ->orderByDesc('is_primary')
                     ->orderBy('name')
@@ -189,39 +184,54 @@ class SupplierController extends Controller implements HasMiddleware
                     'purchaseOrders as open_purchase_orders_count' => fn ($orders) => $orders
                         ->whereNull('received_at')
                         ->where('status', '!=', 'cancelled'),
-                ])->load(['purchaseOrders' => fn ($orders) => $orders
+                ])->loadMissing(['purchaseOrders' => fn ($orders) => $orders
                     ->latest('requested_at')
                     ->latest('id')
                     ->limit(3)]);
             }
         }
 
+        $supplierCounts = DB::table('suppliers')
+            ->selectRaw("
+                COUNT(*) as total,
+                COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
+                COUNT(CASE WHEN created_at >= ? THEN 1 END) as new_this_month,
+                COUNT(CASE WHEN accreditation_status = 'pending_review' THEN 1 END) as pending
+            ", [now()->startOfMonth()])
+            ->first();
+
+        $alertCounts = DB::table('supplier_compliance_alerts')
+            ->selectRaw("
+                COUNT(CASE WHEN status IN ('open', 'acknowledged') THEN 1 END) as active_alerts,
+                COUNT(CASE WHEN status IN ('open', 'acknowledged') AND severity = 'critical' THEN 1 END) as critical_alerts
+            ")
+            ->first();
+
         $supplierAttentionCount = Supplier::query()
             ->whereHas('complianceAlerts', fn ($alerts) => $alerts->active())
             ->count();
-        $activeComplianceAlerts = SupplierComplianceAlert::query()->active()->count();
-        $criticalComplianceAlerts = SupplierComplianceAlert::query()
-            ->active()
-            ->where('severity', AlertSeverity::Critical->value)
-            ->count();
 
         $counts = [
-            'total' => Supplier::count(),
-            'active' => Supplier::where('status', SupplierStatus::Active)->count(),
-            'new_this_month' => Supplier::where('created_at', '>=', now()->startOfMonth())->count(),
+            'total' => (int) ($supplierCounts->total ?? 0),
+            'active' => (int) ($supplierCounts->active ?? 0),
+            'new_this_month' => (int) ($supplierCounts->new_this_month ?? 0),
             'eligible' => Supplier::procurementEligible()->count(),
-            'pending' => Supplier::where('accreditation_status', SupplierAccreditationStatus::PendingReview)->count(),
+            'pending' => (int) ($supplierCounts->pending ?? 0),
             'attention' => $supplierAttentionCount,
-            'active_alerts' => $activeComplianceAlerts,
-            'critical_alerts' => $criticalComplianceAlerts,
+            'active_alerts' => (int) ($alertCounts->active_alerts ?? 0),
+            'critical_alerts' => (int) ($alertCounts->critical_alerts ?? 0),
         ];
 
         if ($canViewProcurement) {
-            $counts['purchase_orders'] = PurchaseOrder::count();
-            $counts['open_purchase_orders'] = PurchaseOrder::query()
-                ->whereNull('received_at')
-                ->where('status', '!=', 'cancelled')
-                ->count();
+            $poCounts = DB::table('purchase_orders')
+                ->selectRaw("
+                    COUNT(*) as total_orders,
+                    COUNT(CASE WHEN received_at IS NULL AND status != 'cancelled' THEN 1 END) as open_orders
+                ")
+                ->first();
+
+            $counts['purchase_orders'] = (int) ($poCounts->total_orders ?? 0);
+            $counts['open_purchase_orders'] = (int) ($poCounts->open_orders ?? 0);
         }
 
         return view('inventory.suppliers.index', [
@@ -240,7 +250,24 @@ class SupplierController extends Controller implements HasMiddleware
 
     public function store(StoreSupplierRequest $request): RedirectResponse
     {
-        $supplier = $this->suppliers->create($request->validated(), $request->user());
+        $validated = $request->validated();
+        $logoFile = $request->file('logo');
+        unset($validated['logo']);
+
+        $supplier = $this->suppliers->create($validated, $request->user());
+
+        if ($logoFile) {
+            $path = $logoFile->store('supplier-logos/'.$supplier->id, 'local');
+            if ($path !== false) {
+                try {
+                    $this->suppliers->updateLogo($supplier, $path, $request->user());
+                } catch (Throwable $exception) {
+                    Storage::disk('local')->delete($path);
+
+                    throw $exception;
+                }
+            }
+        }
 
         return redirect()->route('inventory.suppliers.show', $supplier)->with('success', 'Supplier record created as an accreditation draft.');
     }

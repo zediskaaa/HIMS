@@ -340,45 +340,20 @@
             @if ($errors->any() && old('_supplier_form') === 'edit')
                 <x-ui.alert variant="danger" title="Supplier could not be updated" class="mb-4">Review the highlighted fields and try again.</x-ui.alert>
             @endif
-            <form method="POST" action="{{ route('inventory.suppliers.update', $supplier) }}" class="space-y-4">
-                @csrf
-                @method('PATCH')
-                <input type="hidden" name="_supplier_form" value="edit">
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <x-ui.field name="name" label="Legal / registered name" :value="$supplier->name" required />
-                    <x-ui.field name="trade_name" label="Trade name" :value="$supplier->trade_name" />
-                    <x-ui.field name="business_structure" label="Business structure" type="select" :value="$supplier->business_structure" :options="$businessStructures" placeholder="Select if known" />
-                    <x-ui.field name="tax_number" label="Tax identifier" :value="$supplier->tax_number" />
-                    <x-ui.field name="email" label="General business email" type="email" :value="$supplier->email" />
-                    <x-ui.field name="phone" label="General business phone" :value="$supplier->phone" />
-                    <div class="sm:col-span-2"><x-ui.field name="address" label="Registered / business address" type="textarea" rows="2" :value="$supplier->address" /></div>
-                    <x-ui.field name="billing_address" label="Billing address" type="textarea" rows="2" :value="$supplier->billing_address" />
-                    <x-ui.field name="delivery_address" label="Delivery / dispatch address" type="textarea" rows="2" :value="$supplier->delivery_address" />
-                    <x-ui.field name="standard_lead_time_days" label="Standard lead time (days)" type="number" min="0" :value="$supplier->standard_lead_time_days" />
-                    <div class="flex items-center">
-                        <input type="hidden" name="provides_regulated_health_products" value="0">
-                        <label class="flex items-start gap-2 text-sm text-neutral-700">
-                            <input type="checkbox" name="provides_regulated_health_products" value="1" @checked(old('provides_regulated_health_products', $supplier->provides_regulated_health_products)) class="mt-0.5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500">
-                            <span>Supplies FDA-regulated health products</span>
-                        </label>
-                    </div>
-                    <x-ui.field name="payment_terms" label="Default payment terms" type="textarea" rows="2" :value="$supplier->payment_terms" />
-                    <x-ui.field name="notes" label="Internal notes" type="textarea" rows="2" :value="$supplier->notes" />
-                </div>
-                <div class="flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4">
-                    <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'edit-supplier')">Cancel</x-ui.button>
-                    <x-ui.button type="submit" data-loading-text="Saving supplier...">Save Supplier Information</x-ui.button>
-                </div>
-            </form>
 
-            {{--
-                The logo is branding, not compliance evidence. It saves through its
-                own form because HTML forbids nested forms, and it sits below the
-                supplier fields so this Save button and the one above are never
-                adjacent and ambiguous about which record they write.
-            --}}
+            @if ($errors->any() && old('_supplier_form') === 'edit-logo')
+                <x-ui.alert variant="danger" title="Logo could not be updated" class="mb-4">
+                    <ul class="list-inside list-disc space-y-1">
+                        @foreach ($errors->get('logo') as $message)
+                            <li>{{ $message }}</li>
+                        @endforeach
+                    </ul>
+                </x-ui.alert>
+            @endif
+
+            {{-- Optional Display Picture / Logo --}}
             <div
-                class="mt-5 border-t border-neutral-200 pt-4"
+                class="mb-4 flex items-center gap-4 rounded-lg border border-neutral-200 bg-neutral-50/70 p-3"
                 x-data="{
                     previewUrl: null,
                     fileName: '',
@@ -410,39 +385,47 @@
                         this.previewUrl = null;
                         this.fileName = '';
                         this.fileSize = '';
+                        this.fileError = '';
                         if (this.$refs.logoInput) {
                             this.$refs.logoInput.value = '';
                         }
                     }
-                }">
-                <h3 class="text-sm font-semibold text-neutral-900">Company logo</h3>
-                <p class="mt-0.5 text-xs text-neutral-500">Shown beside the supplier name in the directory and on this profile. JPG, JPEG, or PNG up to 3 MB.</p>
-
-                @if ($errors->any() && old('_supplier_form') === 'edit-logo')
-                    <x-ui.alert variant="danger" title="Logo could not be updated" class="mt-3">
-                        <ul class="list-inside list-disc space-y-1">
-                            @foreach ($errors->get('logo') as $message)
-                                <li>{{ $message }}</li>
-                            @endforeach
-                        </ul>
-                    </x-ui.alert>
-                @endif
-
-                <div x-show="fileError" x-cloak class="mt-3">
-                    <x-ui.alert variant="danger" title="Invalid file"><span x-text="fileError"></span></x-ui.alert>
-                </div>
-
-                <div class="mt-3 flex flex-wrap items-center gap-4">
-                    <div class="shrink-0">
-                        <template x-if="previewUrl">
-                            <img :src="previewUrl" alt="" class="h-14 w-14 rounded-md border border-neutral-200 bg-white object-contain" />
-                        </template>
-                        <div x-show="!previewUrl">
-                            <x-ui.supplier-logo :supplier="$supplier" size="xl" />
-                        </div>
+                }"
+                @close-modal.window="if ($event.detail === 'edit-supplier') clearPreview()"
+            >
+                <div class="shrink-0">
+                    <template x-if="previewUrl">
+                        <img :src="previewUrl" alt="Display picture preview" class="h-14 w-14 rounded-lg border border-neutral-200 bg-white object-contain shadow-sm" />
+                    </template>
+                    <div x-show="!previewUrl">
+                        <x-ui.supplier-logo :supplier="$supplier" size="xl" class="rounded-lg shadow-sm" />
                     </div>
-
-                    <form method="POST" action="{{ route('inventory.suppliers.logo.update', $supplier) }}" enctype="multipart/form-data" class="min-w-0 flex-1 space-y-3">
+                </div>
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-semibold text-neutral-800">Display picture / Logo</span>
+                            <span class="rounded bg-neutral-200/70 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600">Optional</span>
+                        </div>
+                        @if ($supplier->hasLogo())
+                            <form
+                                method="POST"
+                                action="{{ route('inventory.suppliers.logo.destroy', $supplier) }}"
+                                data-confirm-title="Remove supplier logo?"
+                                data-confirm-message="Are you sure you want to remove this supplier's logo and show its initials instead?"
+                                data-confirm-label="Remove Logo"
+                            >
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-danger-600 transition-colors hover:bg-danger-50 hover:text-danger-700">
+                                    <x-ui.icon name="x-mark" class="h-3.5 w-3.5" />
+                                    Remove Logo
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+                    <p class="mt-0.5 text-xs text-neutral-500">Upload a company logo or avatar. JPG, JPEG, or PNG up to 3 MB.</p>
+                    <form method="POST" action="{{ route('inventory.suppliers.logo.update', $supplier) }}" enctype="multipart/form-data" class="mt-2 min-w-0">
                         @csrf
                         <input type="hidden" name="_supplier_form" value="edit-logo">
                         <input
@@ -450,39 +433,68 @@
                             type="file"
                             name="logo"
                             accept="image/jpeg,image/png,image/jpg"
-                            aria-label="Company logo image file"
+                            aria-label="Supplier display picture or logo"
                             class="sr-only"
                             @change="handleFileSelect($event)"
                         />
-                        <div class="flex flex-wrap items-center gap-3">
-                            <x-ui.button type="button" size="sm" variant="secondary" icon="arrow-up-tray" x-on:click="$refs.logoInput.click()">Choose Image</x-ui.button>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <x-ui.button type="button" size="sm" variant="secondary" icon="arrow-up-tray" x-on:click="$refs.logoInput.click()">
+                                <span x-text="previewUrl ? 'Change Image' : 'Choose Image'"></span>
+                            </x-ui.button>
+                            <x-ui.button type="submit" size="sm" icon="check" x-show="previewUrl" x-cloak data-loading-text="Saving logo...">Save Logo</x-ui.button>
+                            <button
+                                type="button"
+                                x-show="previewUrl"
+                                x-cloak
+                                x-on:click="clearPreview()"
+                                class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-danger-600 hover:bg-danger-50 hover:text-danger-700 transition-colors"
+                            >
+                                <x-ui.icon name="x-mark" class="h-3.5 w-3.5" />
+                                Remove
+                            </button>
                             <span x-show="fileName" x-cloak class="min-w-0 truncate text-xs text-neutral-500">
                                 <span x-text="fileName"></span>
-                                <span class="font-mono text-primary-600" x-text="'(' + fileSize + ')'"></span>
+                                <span class="font-mono text-neutral-400" x-text="'(' + fileSize + ')'"></span>
                             </span>
-                            <x-ui.button type="submit" size="sm" icon="check" x-show="previewUrl" x-cloak data-loading-text="Saving logo...">Save Logo</x-ui.button>
                         </div>
                     </form>
+                    <div x-show="fileError" x-cloak class="mt-1.5 text-xs text-danger-600" x-text="fileError"></div>
+                    @error('logo')
+                        <p class="mt-1.5 text-xs text-danger-600">{{ $message }}</p>
+                    @enderror
                 </div>
-
-                @if ($supplier->hasLogo())
-                    <form
-                        method="POST"
-                        action="{{ route('inventory.suppliers.logo.destroy', $supplier) }}"
-                        class="mt-3"
-                        data-confirm-title="Remove supplier logo?"
-                        data-confirm-message="Are you sure you want to remove this supplier's logo and show its initials instead?"
-                        data-confirm-label="Remove Logo"
-                    >
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="inline-flex items-center gap-1.5 p-1 text-xs font-medium text-danger-600 transition-colors hover:text-danger-700 hover:underline">
-                            <x-ui.icon name="x-mark" class="h-3.5 w-3.5" />
-                            Remove Logo
-                        </button>
-                    </form>
-                @endif
             </div>
+
+            <form method="POST" action="{{ route('inventory.suppliers.update', $supplier) }}" class="space-y-4">
+                @csrf
+                @method('PATCH')
+                <input type="hidden" name="_supplier_form" value="edit">
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <x-ui.field name="name" label="Legal / registered name" :value="$supplier->name" required />
+                    <x-ui.field name="trade_name" label="Trade name" :value="$supplier->trade_name" />
+                    <x-ui.field name="business_structure" label="Business structure" type="select" :value="$supplier->business_structure" :options="$businessStructures" placeholder="Select if known" />
+                    <x-ui.field name="tax_number" label="Tax identifier" :value="$supplier->tax_number" />
+                    <x-ui.field name="email" label="General business email" type="email" :value="$supplier->email" />
+                    <x-ui.field name="phone" label="General business phone" :value="$supplier->phone" />
+                    <div class="sm:col-span-2"><x-ui.field name="address" label="Registered / business address" type="textarea" rows="2" :value="$supplier->address" /></div>
+                    <x-ui.field name="billing_address" label="Billing address" type="textarea" rows="2" :value="$supplier->billing_address" />
+                    <x-ui.field name="delivery_address" label="Delivery / dispatch address" type="textarea" rows="2" :value="$supplier->delivery_address" />
+                    <x-ui.field name="standard_lead_time_days" label="Standard lead time (days)" type="number" min="0" :value="$supplier->standard_lead_time_days" />
+                    <div class="flex items-center">
+                        <input type="hidden" name="provides_regulated_health_products" value="0">
+                        <label class="flex items-start gap-2 text-sm text-neutral-700">
+                            <input type="checkbox" name="provides_regulated_health_products" value="1" @checked(old('provides_regulated_health_products', $supplier->provides_regulated_health_products)) class="mt-0.5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500">
+                            <span>Supplies FDA-regulated health products</span>
+                        </label>
+                    </div>
+                    <x-ui.field name="payment_terms" label="Default payment terms" type="textarea" rows="2" :value="$supplier->payment_terms" />
+                    <x-ui.field name="notes" label="Internal notes" type="textarea" rows="2" :value="$supplier->notes" />
+                </div>
+                <div class="flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4">
+                    <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'edit-supplier')">Cancel</x-ui.button>
+                    <x-ui.button type="submit" data-loading-text="Saving supplier...">Save Supplier Information</x-ui.button>
+                </div>
+            </form>
         </x-ui.modal>
 
         @if ($errors->any() && old('_supplier_form') === 'edit')
