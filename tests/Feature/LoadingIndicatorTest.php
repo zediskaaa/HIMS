@@ -113,17 +113,32 @@ class LoadingIndicatorTest extends TestCase
     {
         $manager = User::factory()->inventoryManager()->create();
 
-        foreach ([
-            [route('inventory.items'), 'inventory-api-status'],
-            [route('inventory.storage-locations'), 'locations-api-status'],
-            [route('inventory.alerts'), 'alerts-api-status'],
-        ] as [$url, $statusId]) {
-            $this->actingAs($manager, AuthenticationContext::WEB_GUARD)
-                ->get($url)
-                ->assertOk()
-                ->assertSee('id="'.$statusId.'"', false)
-                ->assertSee('loader loader--sm', false);
-        }
+        // Alerts renders nothing server-side, so its loader is the only
+        // progress signal until the fetch resolves.
+        $this->actingAs($manager, AuthenticationContext::WEB_GUARD)
+            ->get(route('inventory.alerts'))
+            ->assertOk()
+            ->assertSee('id="alerts-api-status"', false)
+            ->assertSee('loader loader--sm', false);
+
+        // Inventory items are server-rendered so the catalog, its reorder
+        // status, and supplier visibility come from one authorized response.
+        // The foreground fetch replaced the full catalog with a single
+        // paginated page of itself, so items vanished once loading finished.
+        $this->actingAs($manager, AuthenticationContext::WEB_GUARD)
+            ->get(route('inventory.items'))
+            ->assertOk()
+            ->assertSee('Inventory Items Catalog')
+            ->assertDontSee('inventory-api-status');
+
+        // Storage locations are server-rendered as well. The loader that used
+        // to sit above the registry was left behind by that migration and had
+        // no fetch behind it, so it spun forever.
+        $this->actingAs($manager, AuthenticationContext::WEB_GUARD)
+            ->get(route('inventory.storage-locations'))
+            ->assertOk()
+            ->assertSee('Location registry')
+            ->assertDontSee('locations-api-status');
 
         // Purchase orders are server-rendered so status, authorization, and
         // financial visibility come from one trusted response.

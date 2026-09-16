@@ -290,7 +290,7 @@ class SpecificMovementTypeTest extends TestCase
 
         $item->refresh();
         $this->assertSame(40, $item->quantity_on_hand);
-        $this->assertSame('low_stock', $item->status);
+        $this->assertSame('low_stock', $item->stockStatus());
 
         $alert = StockAlert::where('item_id', $item->id)->firstOrFail();
         $this->assertSame(AlertType::LowStock, $alert->type);
@@ -323,7 +323,7 @@ class SpecificMovementTypeTest extends TestCase
 
         $item->refresh();
         $this->assertSame(40, $item->quantity_on_hand);
-        $this->assertSame('low_stock', $item->status);
+        $this->assertSame('low_stock', $item->stockStatus());
 
         $this->assertSame(40, (int) StockAlert::where('item_id', $item->id)->value('current_value'));
     }

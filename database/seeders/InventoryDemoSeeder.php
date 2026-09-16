@@ -187,11 +187,6 @@ class InventoryDemoSeeder extends Seeder
                 'quantity_on_hand' => $total,
                 'unit_cost' => $total > 0 ? ($totalCost / $total) : 0,
                 'total_value' => $totalCost ?? 0,
-                'status' => match (true) {
-                    $total <= 0 => 'out_of_stock',
-                    $total <= $item->reorder_level => 'low_stock',
-                    default => 'in_stock',
-                },
             ]);
         }
 

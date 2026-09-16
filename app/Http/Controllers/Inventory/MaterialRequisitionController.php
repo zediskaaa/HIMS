@@ -37,7 +37,7 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
             ->latest()
             ->paginate(15);
 
-        $items = InventoryItem::where('status', '!=', 'discontinued')->orderBy('name')->get();
+        $items = InventoryItem::active()->orderBy('name')->get();
         $costCenters = CostCenter::where('is_active', true)->orderBy('name')->get();
         $departments = CostCenter::where('is_active', true)
             ->whereNotNull('department')

@@ -259,7 +259,7 @@ class SupplierController extends Controller implements HasMiddleware
         return view('inventory.suppliers.show', [
             'supplier' => $supplier,
             'items' => InventoryItem::query()
-                ->where('status', '!=', 'inactive')
+                ->active()
                 ->whereNotIn('id', $supplier->supplierProducts->pluck('item_id'))
                 ->orderBy('name')
                 ->get(['id', 'name', 'sku', 'unit']),

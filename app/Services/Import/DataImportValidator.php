@@ -360,10 +360,11 @@ class DataImportValidator
             $requiresColdChain = $this->parseBoolean($row['requires_cold_chain'] ?? false);
             $isDangerousDrug = $this->parseBoolean($row['is_dangerous_drug'] ?? false);
 
-            $status = strtolower(trim((string) ($row['status'] ?? 'in_stock')));
-            if (! in_array($status, ['in_stock', 'low_stock', 'out_of_stock'], true)) {
-                $status = 'in_stock';
-            }
+            // `status` is the item's lifecycle, matching the create and update
+            // forms. A stock condition supplied by the import is not stored:
+            // it is derived from the quantities, so a value from the file
+            // would only be a stale copy of what the item already reports.
+            $status = strtolower(trim((string) ($row['status'] ?? 'active'))) === 'inactive' ? 'inactive' : 'active';
 
             $skuNormalized = strtolower($rawSku);
             $isExisting = $rawSku !== '' && isset($existingItems[$skuNormalized]);

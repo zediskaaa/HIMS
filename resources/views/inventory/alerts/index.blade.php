@@ -22,13 +22,29 @@
     </div>
 
     <script>
-        async function loadAlertsFromApi() {
-            const status = document.getElementById('alerts-api-status');
-            const container = document.getElementById('alerts-list');
+        function escapeHtml(value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
 
-            try {
-                await fetch('/sanctum/csrf-cookie', { credentials: 'same-origin' });
-                const response = await fetch('/api/v1/inventory-items?per_page=100', {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // The endpoint is paginated, so one request only ever sees the first
+        // page. Walking every page keeps the reorder and expiry alerts complete
+        // once the catalogue grows past a single page.
+        async function fetchAllInventoryItems() {
+            const items = [];
+            let page = 1;
+            let lastPage = 1;
+
+            do {
+                const response = await fetch(`/api/v1/inventory-items?per_page=100&page=${page}`, {
                     credentials: 'same-origin',
                     headers: {
                         'Accept': 'application/json',
@@ -41,8 +57,23 @@
                 }
 
                 const payload = await response.json();
-                const items = payload.data || [];
-                const lowStock = items.filter(item => ['low_stock', 'out_of_stock'].includes(item.status));
+                items.push(...(payload.data || []));
+                lastPage = payload.meta?.last_page ?? 1;
+                page += 1;
+            } while (page <= lastPage);
+
+            return items;
+        }
+
+        async function loadAlertsFromApi() {
+            const status = document.getElementById('alerts-api-status');
+            const container = document.getElementById('alerts-list');
+
+            try {
+                await fetch('/sanctum/csrf-cookie', { credentials: 'same-origin' });
+                const items = await fetchAllInventoryItems();
+
+                const lowStock = items.filter(item => ['low_stock', 'out_of_stock'].includes(item.stock_status));
                 const expiringSoon = items.filter(item => {
                     if (!item.expiry_date) return false;
                     const expiry = new Date(item.expiry_date);
@@ -65,10 +96,10 @@
                                     ${lowStock.slice(0, 5).map(item => `
                                         <div class="rounded-xl bg-white p-3 shadow-sm">
                                             <div class="flex items-center justify-between gap-2 text-sm">
-                                                <span class="font-semibold text-[var(--text)]">${item.name}</span>
-                                                <span class="text-rose-600 uppercase">${item.status.replace('_', ' ')}</span>
+                                                <span class="font-semibold text-[var(--text)]">${escapeHtml(item.name)}</span>
+                                                <span class="text-rose-600 uppercase">${escapeHtml((item.stock_status || 'unknown').replace(/_/g, ' '))}</span>
                                             </div>
-                                            <p class="mt-1 text-[var(--muted)]">Qty: ${item.quantity_on_hand} • Reorder: ${item.reorder_level}</p>
+                                            <p class="mt-1 text-[var(--muted)]">Qty: ${escapeHtml(item.quantity_on_hand)} • Reorder: ${escapeHtml(item.reorder_level)}</p>
                                         </div>
                                     `).join('')}
                                 </div>
@@ -85,10 +116,10 @@
                                     ${expiringSoon.slice(0, 5).map(item => `
                                         <div class="rounded-xl bg-white p-3 shadow-sm">
                                             <div class="flex items-center justify-between gap-2 text-sm">
-                                                <span class="font-semibold text-[var(--text)]">${item.name}</span>
-                                                <span class="text-amber-700">${item.expiry_date}</span>
+                                                <span class="font-semibold text-[var(--text)]">${escapeHtml(item.name)}</span>
+                                                <span class="text-amber-700">${escapeHtml(item.expiry_date)}</span>
                                             </div>
-                                            <p class="mt-1 text-[var(--muted)]">Qty: ${item.quantity_on_hand} • Status: ${item.status || 'normal'}</p>
+                                            <p class="mt-1 text-[var(--muted)]">Qty: ${escapeHtml(item.quantity_on_hand)} • Status: ${escapeHtml(item.stock_status || 'normal')}</p>
                                         </div>
                                     `).join('')}
                                 </div>

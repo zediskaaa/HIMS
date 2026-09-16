@@ -47,11 +47,22 @@ class InventoryItemController extends Controller implements HasMiddleware
         ];
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
-        $user = request()->user();
+        $user = $request->user();
         $canManageItems = $user->can(Permission::ManageItems->value);
         $canViewSuppliers = $user->can(Permission::ViewSuppliers->value);
+
+        // The stock condition is derived from the quantities, not read off
+        // `status`, which carries the item's lifecycle. Keeping the accepted
+        // states next to the query lets the filter take only a state the
+        // catalogue can render; anything else is ignored rather than silently
+        // emptying the table or erroring on a crafted query string.
+        $stockStatuses = [
+            'in_stock' => 'In Stock',
+            'low_stock' => 'Low Stock',
+            'out_of_stock' => 'Out Of Stock',
+        ];
 
         $items = InventoryItem::query()
             ->with(array_filter([
@@ -59,6 +70,21 @@ class InventoryItemController extends Controller implements HasMiddleware
                 'category',
                 'defaultLocation',
             ]))
+            ->when($request->filled('search'), function ($query) use ($request): void {
+                $term = '%'.$request->string('search')->trim().'%';
+
+                $query->where(fn ($search) => $search
+                    ->where('name', 'like', $term)
+                    ->orWhere('sku', 'like', $term)
+                    ->orWhere('barcode_value', 'like', $term));
+            })
+            // Matches the derived condition the table badges render from, so a
+            // filtered row always carries the state the filter promised.
+            ->when(
+                in_array($request->query('status'), array_keys($stockStatuses), true),
+                fn ($query) => $query->stockStatus($request->query('status')),
+            )
+            ->when($request->filled('category_id'), fn ($query) => $query->where('category_id', $request->integer('category_id')))
             ->latest()
             ->get();
 
@@ -78,13 +104,13 @@ class InventoryItemController extends Controller implements HasMiddleware
                     });
                 })
             : collect();
-        $categories = $canManageItems
-            ? ItemCategory::active()
-                ->with('parent')
-                ->orderBy('name')
-                ->get()
-                ->mapWithKeys(fn (ItemCategory $category) => [$category->id => $category->fullPath()])
-            : collect();
+        // Categories double as the catalogue's filter options, so every viewer
+        // needs them; the create form they also feed stays behind ManageItems.
+        $categories = ItemCategory::active()
+            ->with('parent')
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (ItemCategory $category) => [$category->id => $category->fullPath()]);
         $locations = $canManageItems
             ? StorageLocation::active()
                 ->with('parent')
@@ -101,14 +127,16 @@ class InventoryItemController extends Controller implements HasMiddleware
                 ->pluck('unit')
             : collect();
 
-        return view('inventory.items.index', compact(
-            'categories',
-            'eligibleSuppliers',
-            'items',
-            'locations',
-            'unavailableSuppliers',
-            'unitOptions',
-        ));
+        return view('inventory.items.index', [
+            'categories' => $categories,
+            'eligibleSuppliers' => $eligibleSuppliers,
+            'filters' => $request->only(['search', 'status', 'category_id']),
+            'items' => $items,
+            'locations' => $locations,
+            'stockStatuses' => $stockStatuses,
+            'unavailableSuppliers' => $unavailableSuppliers,
+            'unitOptions' => $unitOptions,
+        ]);
     }
 
     public function store(Request $request): RedirectResponse

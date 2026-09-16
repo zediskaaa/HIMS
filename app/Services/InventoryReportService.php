@@ -212,21 +212,17 @@ class InventoryReportService
 
     private function stockStatusKey(int $quantity, int $reorderLevel): string
     {
-        return match (true) {
-            $quantity <= 0 => 'out_of_stock',
-            $reorderLevel > 0 && $quantity <= $reorderLevel => 'low_stock',
-            default => 'in_stock',
-        };
+        return InventoryItem::stockStatusFor($quantity, $reorderLevel);
     }
 
     /**
      * Items bucketed into in stock / low stock / out of stock.
      *
-     * Worked out from the quantities through the item's own predicates rather
-     * than read off `inventory_items.status`. That column is a cache written
-     * when stock moves through InventoryAutomationService, so an item created
-     * by hand and never moved still reads whatever it was created with — the
-     * report would then disagree with the item screen sitting next to it.
+     * Worked out from the quantities through the item's own rule rather than
+     * read off `inventory_items.status`. That column is the item's lifecycle
+     * (`active` / `inactive`), not a stock condition, and older rows may still
+     * carry a stock value written before that was true — the report would then
+     * disagree with the item screen sitting next to it.
      *
      * @return array<string, array{items: int, units: int, reserved: int, value: float}>
      */

@@ -227,15 +227,78 @@ class InventoryItem extends Model
         return (int) $this->quantity_on_hand <= 0;
     }
 
+    /**
+     * The one rule for the stock condition of an item at a given quantity.
+     *
+     * Stock condition is derived, never read back from
+     * `inventory_items.status`. That column carries the item's lifecycle
+     * (`active` / `inactive`) and is set by hand; the stock condition changes
+     * with every movement, so having a movement write it meant a receipt could
+     * overwrite the lifecycle, and the catalogue and the stock report could
+     * describe the same row differently.
+     */
+    public static function stockStatusFor(int $quantity, int $reorderLevel): string
+    {
+        return match (true) {
+            $quantity <= 0 => 'out_of_stock',
+            $reorderLevel > 0 && $quantity <= $reorderLevel => 'low_stock',
+            default => 'in_stock',
+        };
+    }
+
+    public function stockStatus(): string
+    {
+        return static::stockStatusFor((int) $this->quantity_on_hand, (int) $this->reorder_level);
+    }
+
+    /**
+     * The item is in use — the opposite of the `inactive` the API accepts for
+     * lifecycle. Master-data pickers read through here so a deactivated item is
+     * not offered, and so the column keeps one vocabulary.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active');
+    }
+
     public function scopeLowStock($query)
     {
         return $query->whereColumn('quantity_on_hand', '<=', 'reorder_level')
             ->where('reorder_level', '>', 0);
     }
 
+    /**
+     * Narrow the query to one derived stock state.
+     *
+     * Expressed in SQL from the same quantities `stockStatusFor()` reads, so a
+     * filtered page cannot show a row whose badge contradicts the filter. An
+     * unrecognised value matches nothing rather than quietly widening back to
+     * the unfiltered list.
+     */
+    public function scopeStockStatus($query, string $status)
+    {
+        return match ($status) {
+            'out_of_stock' => $query->where('quantity_on_hand', '<=', 0),
+            'low_stock' => $query->where('quantity_on_hand', '>', 0)
+                ->where('reorder_level', '>', 0)
+                ->whereColumn('quantity_on_hand', '<=', 'reorder_level'),
+            'in_stock' => $query->where('quantity_on_hand', '>', 0)
+                ->where(fn ($group) => $group
+                    ->where('reorder_level', '<=', 0)
+                    ->orWhereColumn('quantity_on_hand', '>', 'reorder_level')),
+            default => $query->whereRaw('1 = 0'),
+        };
+    }
+
     public function scopeNeedsAttention($query)
     {
-        return $query->whereIn('status', ['low_stock', 'out_of_stock']);
+        // Derived from the quantities, and grouped, so the OR cannot escape
+        // into a caller's other constraints.
+        return $query->where(fn ($group) => $group
+            ->where('quantity_on_hand', '<=', 0)
+            ->orWhere(fn ($inner) => $inner
+                ->where('reorder_level', '>', 0)
+                ->whereColumn('quantity_on_hand', '<=', 'reorder_level')));
     }
 
     public function dpriReferencePrices(): HasMany

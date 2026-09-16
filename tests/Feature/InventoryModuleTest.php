@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AlertStatus;
+use App\Enums\AlertType;
 use App\Enums\PurchaseOrderStatus;
 use App\Models\InventoryItem;
 use App\Models\ItemStockLevel;
@@ -109,7 +111,7 @@ class InventoryModuleTest extends TestCase
         $response->assertRedirect('/inventory/stock-movements');
         $item->refresh();
         $this->assertSame(10, $item->quantity_on_hand);
-        $this->assertSame('low_stock', $item->status);
+        $this->assertSame('low_stock', $item->stockStatus());
         $this->assertSame(50.0, (float) $item->total_value);
     }
 
@@ -312,7 +314,25 @@ class InventoryModuleTest extends TestCase
         $exitCode = Artisan::call('inventory:check-alerts');
 
         $this->assertSame(0, $exitCode);
-        $this->assertDatabaseHas('inventory_items', ['sku' => 'MASK-001', 'status' => 'low_stock']);
-        $this->assertDatabaseHas('inventory_items', ['sku' => 'NEEDLE-001', 'status' => 'out_of_stock']);
+
+        // The sweep marks the items by raising the alert for each condition.
+        $this->assertDatabaseHas('stock_alerts', [
+            'item_id' => $mask->id,
+            'type' => AlertType::LowStock->value,
+            'status' => AlertStatus::Open->value,
+        ]);
+        $this->assertDatabaseHas('stock_alerts', [
+            'item_id' => $needle->id,
+            'type' => AlertType::OutOfStock->value,
+            'status' => AlertStatus::Open->value,
+        ]);
+
+        // Re-deriving the rollups must leave the lifecycle alone: the stock
+        // condition is derived from the quantities, and a sweep that stamped it
+        // over `status` used to be how an item's `active`/`inactive` was lost.
+        $this->assertDatabaseHas('inventory_items', ['sku' => 'MASK-001', 'status' => 'active']);
+        $this->assertDatabaseHas('inventory_items', ['sku' => 'NEEDLE-001', 'status' => 'active']);
+        $this->assertSame('low_stock', $mask->refresh()->stockStatus());
+        $this->assertSame('out_of_stock', $needle->refresh()->stockStatus());
     }
 }

@@ -18,9 +18,11 @@ use Illuminate\Validation\ValidationException;
  * Owns every change to stock quantities.
  *
  * Balances live in `item_stock_levels`, keyed by item + location + batch.
- * `inventory_items.quantity_on_hand` / `total_value` / `status` are caches
- * recomputed from those rows after each movement, so nothing else in the
- * app should write to them directly.
+ * `inventory_items.quantity_on_hand` / `total_value` are caches recomputed from
+ * those rows after each movement, so nothing else in the app should write to
+ * them directly. `status` is not one of them: it is the item's lifecycle,
+ * written by the item form and the importer, and the stock condition is derived
+ * from the quantities through InventoryItem::stockStatusFor().
  */
 class InventoryAutomationService
 {
@@ -103,7 +105,6 @@ class InventoryAutomationService
         $item->quantity_on_hand = (int) ($totals->qty ?? 0);
         $item->reserved_quantity = (int) ($totals->reserved ?? 0);
         $item->total_value = round($item->quantity_on_hand * (float) ($item->unit_cost ?? 0), 2);
-        $item->status = $this->resolveStatus($item);
         $item->save();
 
         $this->alerts->syncForItem($item);
@@ -304,19 +305,6 @@ class InventoryAutomationService
         $this->syncItemTotals($item);
 
         return $level;
-    }
-
-    private function resolveStatus(InventoryItem $item): string
-    {
-        if ((int) $item->quantity_on_hand <= 0) {
-            return 'out_of_stock';
-        }
-
-        if ((int) $item->reorder_level > 0 && (int) $item->quantity_on_hand <= (int) $item->reorder_level) {
-            return 'low_stock';
-        }
-
-        return 'in_stock';
     }
 
     private function assertLocationsPresent(MovementType $type, ?int $from, ?int $to): void

@@ -41,7 +41,11 @@ class InventoryItemResource extends JsonResource
             'warehouse_name' => $this->warehouse_name,
             'batch_number' => $this->batch_number,
             'expiry_date' => optional($this->expiry_date)->toDateString(),
+            // `status` is the item's lifecycle; the stock condition is derived
+            // from the quantities so an API consumer sees the same state the
+            // catalogue and the reports render.
             'status' => $this->status,
+            'stock_status' => $this->stockStatus(),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

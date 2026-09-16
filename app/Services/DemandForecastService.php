@@ -99,7 +99,7 @@ class DemandForecastService
         $since = now()->subDays($analysisDays);
 
         return InventoryItem::query()
-            ->where('status', '!=', 'inactive')
+            ->active()
             ->with([
                 'supplier',
                 'category',

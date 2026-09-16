@@ -94,7 +94,7 @@ class StockAdjustmentTest extends TestCase
 
         $item->refresh();
         $this->assertSame(45, $item->quantity_on_hand);
-        $this->assertSame('low_stock', $item->status);
+        $this->assertSame('low_stock', $item->stockStatus());
 
         $this->assertSame(45, (int) StockAlert::where('item_id', $item->id)->value('current_value'));
     }

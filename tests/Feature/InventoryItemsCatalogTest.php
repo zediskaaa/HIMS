@@ -1,0 +1,228 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\InventoryItem;
+use App\Models\ItemCategory;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class InventoryItemsCatalogTest extends TestCase
+{
+    use RefreshDatabase;
+
+    /**
+     * The catalogue used to render server-side and then be replaced by a single
+     * paginated API page, so the row count collapsed once loading finished.
+     */
+    public function test_catalog_renders_every_item_without_a_paginated_refetch(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+
+        // More rows than the API's default page size so a truncated refetch
+        // would be visible.
+        foreach (range(1, 20) as $index) {
+            InventoryItem::create([
+                'name' => "Catalog Item {$index}",
+                'sku' => "CAT-{$index}",
+                'quantity_on_hand' => 50,
+                'reorder_level' => 10,
+                'unit_cost' => 1,
+                'total_value' => 50,
+            ]);
+        }
+
+        $response = $this->actingAs($manager)->get(route('inventory.items'));
+
+        $response->assertOk();
+
+        foreach (range(1, 20) as $index) {
+            $response->assertSee("Catalog Item {$index}");
+        }
+
+        // The catalog must come from the one authorized response rather than a
+        // foreground fetch that replaces it with a page of itself.
+        $response->assertDontSee('/api/v1/inventory-items');
+    }
+
+    public function test_catalog_labels_low_stock_and_out_of_stock_separately(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+
+        // The stock state each row shows is derived from its quantity against
+        // its reorder level, so these quantities are what put the three rows in
+        // the three states.
+        foreach ([
+            ['name' => 'Healthy Item', 'sku' => 'CAT-HEALTHY', 'quantity_on_hand' => 500],
+            ['name' => 'Reorder Soon Item', 'sku' => 'CAT-LOW', 'quantity_on_hand' => 10],
+            ['name' => 'Depleted Item', 'sku' => 'CAT-OUT', 'quantity_on_hand' => 0],
+        ] as $definition) {
+            InventoryItem::create($definition + [
+                'reorder_level' => 50,
+                'unit_cost' => 1,
+                'total_value' => 500,
+            ]);
+        }
+
+        $response = $this->actingAs($manager)->get(route('inventory.items'));
+
+        $response->assertOk();
+
+        // The stock filter's own option labels also read "Low Stock" and
+        // "Out Of Stock", so scope the assertion to the rendered rows: the
+        // catalogue has to distinguish the two states itself rather than
+        // inherit the wording from a control above it. The boundary is
+        // asserted first, because splitting on a marker that has gone missing
+        // would silently widen the scope back to the whole page.
+        $this->assertStringContainsString('id="inventory-items-table-body"', $response->getContent());
+
+        $rows = str($response->getContent())
+            ->after('id="inventory-items-table-body"')
+            ->before('</tbody>')
+            ->toString();
+
+        // Falling to the reorder level and being fully depleted are different
+        // operational states, and neither may be conveyed by colour alone.
+        $this->assertStringContainsString('Low Stock', $rows);
+        $this->assertStringContainsString('Out Of Stock', $rows);
+    }
+
+    public function test_catalog_shows_the_packaging_unit_with_the_quantity(): void
+    {
+        // The create form is hidden from a stock viewer, so a unit string can
+        // only reach this response through the catalogue table itself.
+        $viewer = User::factory()->pharmacyStaff()->create();
+
+        InventoryItem::create([
+            'name' => 'Isopropyl Alcohol 70% 500 mL',
+            'sku' => 'CAT-ALCOHOL',
+            'unit' => 'bottle',
+            'quantity_on_hand' => 8,
+            'reorder_level' => 42,
+            'unit_cost' => 74,
+            'total_value' => 592,
+        ]);
+
+        $response = $this->actingAs($viewer)->get(route('inventory.items'));
+
+        $response->assertOk();
+        $response->assertSee('bottle');
+    }
+
+    /**
+     * The catalog is the lookup surface for every department, so a term that
+     * matches nothing has to say so rather than look like an empty inventory.
+     */
+    public function test_catalog_search_narrows_on_name_sku_and_barcode(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+
+        InventoryItem::create([
+            'name' => 'Losartan 50 mg',
+            'sku' => 'CAT-LOSA',
+            'barcode_value' => '4801234567890',
+            'quantity_on_hand' => 40,
+            'reorder_level' => 10,
+            'unit_cost' => 1,
+            'total_value' => 40,
+        ]);
+        InventoryItem::create([
+            'name' => 'Cetirizine 10 mg',
+            'sku' => 'CAT-CETI',
+            'barcode_value' => '4809876543210',
+            'quantity_on_hand' => 40,
+            'reorder_level' => 10,
+            'unit_cost' => 1,
+            'total_value' => 40,
+        ]);
+
+        // Each case asserts on the identity the search box does not echo back:
+        // the term itself is rendered into the input's value, so a looser
+        // assertion would pass even if no row matched.
+        $cases = [
+            ['Losartan', 'CAT-LOSA', 'CAT-CETI'],
+            ['CAT-CETI', 'Cetirizine 10 mg', 'Losartan 50 mg'],
+            ['4801234567890', 'CAT-LOSA', 'CAT-CETI'],
+        ];
+
+        foreach ($cases as [$term, $expected, $absent]) {
+            $response = $this->actingAs($manager)->get(route('inventory.items', ['search' => $term]));
+
+            $response->assertOk();
+            $response->assertSee($expected);
+            $response->assertDontSee($absent);
+        }
+
+        $this->actingAs($manager)
+            ->get(route('inventory.items', ['search' => 'Nothing Matches This']))
+            ->assertOk()
+            ->assertSee('No items match these filters.')
+            ->assertDontSee('No inventory items yet.');
+    }
+
+    public function test_catalog_filters_rows_by_stock_state(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+
+        // The stock state each row shows is derived from its quantity against
+        // its reorder level, so these quantities are what put the three rows in
+        // the three states.
+        foreach ([
+            ['name' => 'Healthy Item', 'sku' => 'CAT-HEALTHY', 'quantity_on_hand' => 500],
+            ['name' => 'Reorder Soon Item', 'sku' => 'CAT-LOW', 'quantity_on_hand' => 10],
+            ['name' => 'Depleted Item', 'sku' => 'CAT-OUT', 'quantity_on_hand' => 0],
+        ] as $definition) {
+            InventoryItem::create($definition + [
+                'reorder_level' => 50,
+                'unit_cost' => 1,
+                'total_value' => 500,
+            ]);
+        }
+
+        $response = $this->actingAs($manager)->get(route('inventory.items', ['status' => 'low_stock']));
+
+        $response->assertOk();
+        $response->assertSee('CAT-LOW');
+        $response->assertDontSee('CAT-HEALTHY');
+        $response->assertDontSee('CAT-OUT');
+    }
+
+    /**
+     * Category options used to be built only for a viewer who may create
+     * items, which left everyone else with a filter that had nothing in it.
+     */
+    public function test_catalog_offers_category_filtering_to_a_viewer_who_cannot_manage_items(): void
+    {
+        $viewer = User::factory()->pharmacyStaff()->create();
+
+        $medicines = ItemCategory::create(['name' => 'Medicines', 'code' => 'MED']);
+        $consumables = ItemCategory::create(['name' => 'Consumables', 'code' => 'CONS']);
+
+        InventoryItem::create([
+            'name' => 'Paracetamol 500 mg',
+            'sku' => 'CAT-PARA',
+            'category_id' => $medicines->id,
+            'quantity_on_hand' => 40,
+            'reorder_level' => 10,
+            'unit_cost' => 1,
+            'total_value' => 40,
+        ]);
+        InventoryItem::create([
+            'name' => 'Cotton Balls',
+            'sku' => 'CAT-COTTON',
+            'category_id' => $consumables->id,
+            'quantity_on_hand' => 40,
+            'reorder_level' => 10,
+            'unit_cost' => 1,
+            'total_value' => 40,
+        ]);
+
+        $response = $this->actingAs($viewer)->get(route('inventory.items', ['category_id' => $medicines->id]));
+
+        $response->assertOk();
+        $response->assertSee('Consumables');
+        $response->assertSee('CAT-PARA');
+        $response->assertDontSee('CAT-COTTON');
+    }
+}

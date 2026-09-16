@@ -57,7 +57,6 @@ class DemandForecastDemoSeeder extends Seeder
                     'unit_cost' => $unitCost,
                     'total_value' => $stock * $unitCost,
                     'default_location_id' => $warehouse->id,
-                    'status' => $stock <= $reorderLevel ? 'low_stock' : 'in_stock',
                 ]);
 
                 ItemStockLevel::create([

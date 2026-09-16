@@ -71,7 +71,7 @@ class StockAlertReactivityTest extends TestCase
 
         $item->refresh();
         $this->assertSame(40, $item->quantity_on_hand);
-        $this->assertSame('low_stock', $item->status);
+        $this->assertSame('low_stock', $item->stockStatus());
 
         // No scheduled command was run — the alert exists because the
         // movement raised it.
@@ -109,7 +109,7 @@ class StockAlertReactivityTest extends TestCase
 
         $item->refresh();
         $this->assertSame(124, $item->quantity_on_hand);
-        $this->assertSame('in_stock', $item->status);
+        $this->assertSame('in_stock', $item->stockStatus());
 
         $this->assertSame(
             AlertStatus::Resolved,
@@ -168,7 +168,7 @@ class StockAlertReactivityTest extends TestCase
 
         $item->refresh();
         $this->assertSame(0, $item->quantity_on_hand);
-        $this->assertSame('out_of_stock', $item->status);
+        $this->assertSame('out_of_stock', $item->stockStatus());
 
         $this->assertSame(AlertStatus::Resolved, StockAlert::where('item_id', $item->id)
             ->where('type', AlertType::LowStock->value)->firstOrFail()->status);

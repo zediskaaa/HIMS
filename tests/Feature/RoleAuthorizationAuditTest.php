@@ -200,7 +200,6 @@ class RoleAuthorizationAuditTest extends TestCase
             'quantity_on_hand' => 7,
             'unit_cost' => 4321.09,
             'total_value' => 30247.63,
-            'status' => 'in_stock',
         ]);
         $viewer = User::factory()->role(UserRole::Viewer)->create();
 

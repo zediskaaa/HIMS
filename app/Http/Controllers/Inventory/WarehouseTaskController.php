@@ -55,7 +55,7 @@ class WarehouseTaskController extends Controller implements HasMiddleware
             ->withQueryString();
 
         $locations = StorageLocation::active()->orderBy('code')->get();
-        $items = InventoryItem::query()->where('status', '!=', 'discontinued')->orderBy('name')->get();
+        $items = InventoryItem::query()->active()->orderBy('name')->get();
         $operators = User::active()->get()->filter(fn (User $user) => $user->hasPermission(Permission::ExecuteWarehouseTasks))->sortBy('name')->values();
         $metrics = [
             'open' => WarehouseTask::whereNotIn('status', ['completed', 'cancelled'])->count(),

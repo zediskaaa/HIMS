@@ -187,10 +187,10 @@ class InventoryReportTest extends TestCase
 
     /**
      * The buckets are worked out from the quantities, not read off
-     * `inventory_items.status`. That column is a cache written when stock moves
-     * through the service, so an item created by hand and never moved keeps
-     * whatever status it was created with — and the report would then disagree
-     * with the item screen sitting next to it.
+     * `inventory_items.status`. That column is the item's lifecycle, so a row
+     * carrying anything else there — as these fixtures deliberately do — must
+     * not move the item between buckets, or the report would disagree with the
+     * item screen sitting next to it.
      */
     public function test_stock_status_is_derived_from_quantities_not_the_cached_column(): void
     {
@@ -843,7 +843,7 @@ class InventoryReportTest extends TestCase
             'category_id' => $category->id,
             'quantity_on_hand' => 40,
             'reorder_level' => 10,
-            'status' => 'in_stock',
+            'status' => 'active',
         ]);
 
         $batch = ItemBatch::create([
@@ -939,7 +939,7 @@ class InventoryReportTest extends TestCase
             'category_id' => $category->id,
             'quantity_on_hand' => 150,
             'reorder_level' => 30,
-            'status' => 'in_stock',
+            'status' => 'active',
         ]);
 
         $batch = ItemBatch::create([
@@ -1141,7 +1141,7 @@ class InventoryReportTest extends TestCase
             'reserved_quantity' => 1,
             'reorder_level' => 0,
             'unit_cost' => 3,
-            'status' => 'in_stock',
+            'status' => 'active',
             'created_at' => $now,
             'updated_at' => $now,
         ])->all();
@@ -1206,7 +1206,7 @@ class InventoryReportTest extends TestCase
             'reorder_level' => 10,
             'unit_cost' => 12.50,
             'total_value' => 999999,
-            'status' => 'in_stock',
+            'status' => 'active',
         ]);
 
         $this->actingAs($this->reader())
