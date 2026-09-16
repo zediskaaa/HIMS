@@ -39,21 +39,21 @@
 
     $key = $variant ?? ($map[strtolower((string) $status)] ?? 'neutral');
 
-    // Contrast checked against white: all text tones are 700-level on a 50-level fill.
+    // Contrast checked against white and dark backgrounds:
     $styles = [
-        'success' => 'bg-success-50 text-success-700 ring-success-600/20',
-        'warning' => 'bg-warning-50 text-warning-700 ring-warning-600/20',
-        'danger' => 'bg-danger-50 text-danger-700 ring-danger-600/20',
-        'primary' => 'bg-primary-50 text-primary-700 ring-primary-600/20',
-        'neutral' => 'bg-neutral-100 text-neutral-700 ring-neutral-500/20',
+        'success' => 'bg-success-50 dark:bg-emerald-950/60 text-success-700 dark:text-emerald-300 ring-success-600/20 dark:ring-emerald-500/30',
+        'warning' => 'bg-warning-50 dark:bg-amber-950/60 text-warning-700 dark:text-amber-300 ring-warning-600/20 dark:ring-amber-500/30',
+        'danger' => 'bg-danger-50 dark:bg-rose-950/60 text-danger-700 dark:text-rose-300 ring-danger-600/20 dark:ring-rose-500/30',
+        'primary' => 'bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 ring-primary-600/20 dark:ring-primary-500/30',
+        'neutral' => 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 ring-neutral-500/20 dark:ring-neutral-700',
     ];
 
     $dots = [
-        'success' => 'bg-success-500',
-        'warning' => 'bg-warning-500',
-        'danger' => 'bg-danger-500',
-        'primary' => 'bg-primary-500',
-        'neutral' => 'bg-neutral-400',
+        'success' => 'bg-success-500 dark:bg-emerald-400',
+        'warning' => 'bg-warning-500 dark:bg-amber-400',
+        'danger' => 'bg-danger-500 dark:bg-rose-400',
+        'primary' => 'bg-primary-500 dark:bg-primary-400',
+        'neutral' => 'bg-neutral-400 dark:bg-neutral-500',
     ];
 
     $label = trim($slot) !== '' ? $slot : \Illuminate\Support\Str::headline((string) $status);

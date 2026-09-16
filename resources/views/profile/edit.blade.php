@@ -18,32 +18,34 @@
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 items-start">
         {{-- Column 1: Personal Details & Password --}}
         <div class="space-y-6">
-            <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
+            <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
                 @include('profile.partials.update-profile-information-form')
             </div>
 
-            <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
+            <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
                 @include('profile.partials.update-password-form')
             </div>
+
+            @include('profile.partials.update-theme-form')
         </div>
 
         {{-- Column 2: Security & Session Preferences --}}
         <div class="space-y-6">
-            <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
+            <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
                 @include('profile.partials.update-authenticator-form')
             </div>
 
             @if ($user->isAdministrator())
-                <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
+                <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
                     @include('profile.partials.update-mfa-form')
                 </div>
             @endif
 
-            <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
+            <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
                 @include('profile.partials.update-session-timeout-reminder-form')
             </div>
 
-            <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
+            <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
                 @include('profile.partials.account-retention-notice')
             </div>
         </div>

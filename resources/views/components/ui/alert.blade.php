@@ -7,10 +7,10 @@
 
 @php
     $styles = [
-        'info' => ['bg-primary-50 border-primary-200 text-primary-900', 'text-primary-600', 'exclamation-triangle'],
-        'success' => ['bg-success-50 border-success-200 text-success-700', 'text-success-600', 'clipboard-document-list'],
-        'warning' => ['bg-warning-50 border-warning-200 text-warning-700', 'text-warning-600', 'exclamation-triangle'],
-        'danger' => ['bg-danger-50 border-danger-200 text-danger-700', 'text-danger-600', 'exclamation-triangle'],
+        'info' => ['bg-primary-50 dark:bg-primary-950/50 border-primary-200 dark:border-primary-900/60 text-primary-900 dark:text-primary-200', 'text-primary-600 dark:text-primary-400', 'exclamation-triangle'],
+        'success' => ['bg-success-50 dark:bg-emerald-950/50 border-success-200 dark:border-emerald-900/60 text-success-700 dark:text-emerald-200', 'text-success-600 dark:text-emerald-400', 'clipboard-document-list'],
+        'warning' => ['bg-warning-50 dark:bg-amber-950/50 border-warning-200 dark:border-amber-900/60 text-warning-700 dark:text-amber-200', 'text-warning-600 dark:text-amber-400', 'exclamation-triangle'],
+        'danger' => ['bg-danger-50 dark:bg-rose-950/50 border-danger-200 dark:border-rose-900/60 text-danger-700 dark:text-rose-200', 'text-danger-600 dark:text-rose-400', 'exclamation-triangle'],
     ];
     [$box, $iconTone, $icon] = $styles[$variant] ?? $styles['info'];
 @endphp

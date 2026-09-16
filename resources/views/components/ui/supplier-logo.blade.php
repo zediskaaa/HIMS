@@ -24,12 +24,12 @@
     <img
         src="{{ $logoUrl }}"
         alt=""
-        {{ $attributes->merge(['class' => "shrink-0 rounded-md border border-neutral-200 bg-white object-contain {$dimension}"]) }}
+        {{ $attributes->merge(['class' => "shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 object-contain {$dimension}"]) }}
         loading="lazy"
     />
 @else
     <span
         aria-hidden="true"
-        {{ $attributes->merge(['class' => "flex shrink-0 items-center justify-center rounded-md bg-primary-100 font-bold text-primary-700 {$dimension}"]) }}
+        {{ $attributes->merge(['class' => "flex shrink-0 items-center justify-center rounded-md bg-primary-100 dark:bg-primary-900/60 font-bold text-primary-700 dark:text-primary-300 {$dimension}"]) }}
     >{{ $initials }}</span>
 @endif

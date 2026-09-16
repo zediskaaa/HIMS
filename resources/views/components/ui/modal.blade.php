@@ -41,25 +41,25 @@
         x-show="open"
         x-transition.opacity
         x-on:click="open = false"
-        class="fixed inset-0 bg-neutral-900/50"
+        class="fixed inset-0 bg-neutral-900/60 dark:bg-black/70 backdrop-blur-xs"
         aria-hidden="true"
     ></div>
 
     <div
         x-show="open"
         x-transition
-        class="relative flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden {{ $widths[$maxWidth] ?? $widths['lg'] }} bg-white rounded-lg shadow-lg border border-neutral-200"
+        class="relative flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden {{ $widths[$maxWidth] ?? $widths['lg'] }} bg-white dark:bg-neutral-900 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-800"
     >
         @if ($title || isset($header))
-            <header class="flex items-start justify-between gap-4 px-5 py-4 border-b border-neutral-200">
+            <header class="flex items-start justify-between gap-4 px-5 py-4 border-b border-neutral-200 dark:border-neutral-800">
                 @isset($header)
                     {{ $header }}
                 @else
-                    <h2 class="text-sm font-semibold text-neutral-900">{{ $title }}</h2>
+                    <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ $title }}</h2>
                 @endisset
 
                 <button type="button" x-on:click="open = false"
-                        class="p-1 -m-1 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100
+                        class="p-1 -m-1 rounded text-neutral-400 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800
                                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
                     <span class="sr-only">Close</span>
                     <x-ui.icon name="x-mark" class="w-5 h-5" />
@@ -72,7 +72,7 @@
         </div>
 
         @isset($footer)
-            <footer class="flex flex-wrap items-center justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-4 py-4 sm:px-5">
+            <footer class="flex flex-wrap items-center justify-end gap-2 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/60 px-4 py-4 sm:px-5">
                 {{ $footer }}
             </footer>
         @endisset

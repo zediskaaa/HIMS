@@ -20,12 +20,14 @@
     ])->filter()->implode(' ');
 
     $control = 'block min-h-10 min-w-0 max-w-full w-full rounded-md border text-sm shadow-sm transition-colors '
-        .'placeholder:text-neutral-400 '
+        .'bg-white dark:bg-neutral-800 '
+        .'placeholder:text-neutral-400 dark:placeholder:text-neutral-500 '
         .'focus:ring-2 focus:ring-offset-0 '
         .'disabled:bg-neutral-100 disabled:text-neutral-500 disabled:cursor-not-allowed '
+        .'dark:disabled:bg-neutral-800 dark:disabled:text-neutral-500 '
         .($hasError
-            ? 'border-danger-500 text-danger-900 focus:border-danger-500 focus:ring-danger-500/30'
-            : 'border-neutral-300 text-neutral-900 focus:border-primary-500 focus:ring-primary-500/30');
+            ? 'border-danger-500 text-danger-900 dark:text-danger-200 focus:border-danger-500 focus:ring-danger-500/30'
+            : 'border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 focus:border-primary-500 focus:ring-primary-500/30');
 
     $shared = $attributes->except(['class'])->merge([
         'id' => $id,
@@ -38,10 +40,10 @@
 
 <div class="min-w-0 max-w-full space-y-1.5">
     @if ($label)
-        <label for="{{ $id }}" class="block text-sm font-medium text-neutral-700">
+        <label for="{{ $id }}" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
             {{ $label }}
             @if ($required)
-                <span class="text-danger-600" aria-hidden="true">*</span>
+                <span class="text-danger-600 dark:text-danger-400" aria-hidden="true">*</span>
                 <span class="sr-only">(required)</span>
             @endif
         </label>
@@ -71,11 +73,11 @@
     @endif
 
     @if ($hint && ! $hasError)
-        <p id="{{ $id }}-hint" class="text-xs text-neutral-500">{{ $hint }}</p>
+        <p id="{{ $id }}-hint" class="text-xs text-neutral-500 dark:text-neutral-400">{{ $hint }}</p>
     @endif
 
     @if ($hasError)
-        <p id="{{ $id }}-error" class="flex items-start gap-1 text-xs font-medium text-danger-600">
+        <p id="{{ $id }}-error" class="flex items-start gap-1 text-xs font-medium text-danger-600 dark:text-danger-400">
             <x-ui.icon name="exclamation-triangle" class="w-3.5 h-3.5 mt-px shrink-0" />
             {{ $errors->first($name) }}
         </p>

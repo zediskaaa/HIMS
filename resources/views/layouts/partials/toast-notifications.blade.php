@@ -67,22 +67,22 @@
                 {{-- Status Icon Badge --}}
                 <div class="shrink-0 mt-0.5">
                     <template x-if="toast.type === 'success'">
-                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200/80">
+                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-200/80 dark:ring-emerald-800/60">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                         </span>
                     </template>
                     <template x-if="toast.type === 'error' || toast.type === 'danger'">
-                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-rose-50 text-rose-600 ring-1 ring-rose-200/80">
+                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200/80 dark:ring-rose-800/60">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                         </span>
                     </template>
                     <template x-if="toast.type === 'warning'">
-                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-50 text-amber-600 ring-1 ring-amber-200/80">
+                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 ring-1 ring-amber-200/80 dark:ring-amber-800/60">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                         </span>
                     </template>
                     <template x-if="toast.type === 'info' || !['success', 'error', 'danger', 'warning'].includes(toast.type)">
-                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary-50 text-primary-600 ring-1 ring-primary-200/80">
+                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400 ring-1 ring-primary-200/80 dark:ring-primary-800/60">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </span>
                     </template>

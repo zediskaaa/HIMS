@@ -21,11 +21,11 @@
     <img
         src="{{ $avatarUrl }}"
         alt="{{ $user?->name ?? 'User avatar' }}"
-        {{ $attributes->merge(['class' => "rounded-full object-cover shrink-0 ring-1 ring-neutral-200/80 {$dimension}"]) }}
+        {{ $attributes->merge(['class' => "rounded-full object-cover shrink-0 ring-1 ring-neutral-200/80 dark:ring-neutral-700 {$dimension}"]) }}
         loading="lazy"
     />
 @else
-    <span {{ $attributes->merge(['class' => "flex items-center justify-center rounded-full shrink-0 font-semibold bg-primary-100 text-primary-800 {$dimension}"]) }}>
+    <span {{ $attributes->merge(['class' => "flex items-center justify-center rounded-full shrink-0 font-semibold bg-primary-100 dark:bg-primary-900/70 text-primary-800 dark:text-primary-200 {$dimension}"]) }}>
         {{ $initials }}
     </span>
 @endif

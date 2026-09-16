@@ -51,7 +51,7 @@
                     </p>
                 </div>
 
-                <div class="flex justify-center rounded-lg border border-neutral-200 bg-white p-3">
+                <div class="flex justify-center rounded-lg border border-neutral-200 bg-white p-3 hims-keep-light">
                     <img
                         src="{{ $authenticatorSetup['qr_code'] }}"
                         alt="Replacement authenticator app setup QR code"

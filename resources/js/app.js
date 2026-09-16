@@ -2,9 +2,14 @@ import './bootstrap';
 
 import Alpine from 'alpinejs';
 import { himsCameraScanner, playScanAudio } from './scanner';
+import { himsTheme, registerThemeWithAlpine } from './theme';
 
 window.Alpine = Alpine;
 window.playScanAudio = playScanAudio;
+window.himsTheme = himsTheme;
+
+himsTheme.init();
+registerThemeWithAlpine(Alpine);
 
 const loadingButtons = new WeakMap();
 

@@ -585,11 +585,11 @@
                                             </defs>
 
                                             {{-- Static SVG lines render reliably; their positions match chartTicks(). --}}
-                                            <line data-chart-grid-line x1="50" y1="40" x2="725" y2="40" stroke="#f1f5f9" stroke-width="1" vector-effect="non-scaling-stroke"></line>
-                                            <line data-chart-grid-line x1="50" y1="81.25" x2="725" y2="81.25" stroke="#f1f5f9" stroke-width="1" vector-effect="non-scaling-stroke"></line>
-                                            <line data-chart-grid-line x1="50" y1="122.5" x2="725" y2="122.5" stroke="#f1f5f9" stroke-width="1" vector-effect="non-scaling-stroke"></line>
-                                            <line data-chart-grid-line x1="50" y1="163.75" x2="725" y2="163.75" stroke="#f1f5f9" stroke-width="1" vector-effect="non-scaling-stroke"></line>
-                                            <line data-chart-grid-line x1="50" y1="205" x2="725" y2="205" stroke="#e2e8f0" stroke-width="1" vector-effect="non-scaling-stroke"></line>
+                                            <line data-chart-grid-line x1="50" y1="40" x2="725" y2="40" class="stroke-slate-100 dark:stroke-neutral-800" stroke-width="1" vector-effect="non-scaling-stroke"></line>
+                                            <line data-chart-grid-line x1="50" y1="81.25" x2="725" y2="81.25" class="stroke-slate-100 dark:stroke-neutral-800" stroke-width="1" vector-effect="non-scaling-stroke"></line>
+                                            <line data-chart-grid-line x1="50" y1="122.5" x2="725" y2="122.5" class="stroke-slate-100 dark:stroke-neutral-800" stroke-width="1" vector-effect="non-scaling-stroke"></line>
+                                            <line data-chart-grid-line x1="50" y1="163.75" x2="725" y2="163.75" class="stroke-slate-100 dark:stroke-neutral-800" stroke-width="1" vector-effect="non-scaling-stroke"></line>
+                                            <line data-chart-grid-line x1="50" y1="205" x2="725" y2="205" class="stroke-slate-200 dark:stroke-neutral-700" stroke-width="1" vector-effect="non-scaling-stroke"></line>
 
                                             {{-- Forecast horizon wash keeps the two time regions legible without relying on line color. --}}
                                             <rect
@@ -603,7 +603,7 @@
                                             ></rect>
 
                                             {{-- Subtle Forecast Boundary Line --}}
-                                            <line x-bind:x1="displayTransitionX()" y1="20" x-bind:x2="displayTransitionX()" y2="205" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"></line>
+                                            <line x-bind:x1="displayTransitionX()" y1="20" x-bind:x2="displayTransitionX()" y2="205" class="stroke-slate-300 dark:stroke-neutral-600" stroke-width="1.5" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"></line>
 
                                             {{-- Gradient Fills --}}
                                             <path x-show="showActual" x-bind:d="displayHistoricalAreaPath()" fill="url(#dashboard-historical-area)"></path>
@@ -622,7 +622,7 @@
 
                                             {{-- Forecast Point Markers --}}
                                             <template x-for="(point, index) in displayForecastPoints()" x-bind:key="`fore-${index}`">
-                                                <circle x-show="showForecast" x-bind:cx="point.x" x-bind:cy="point.y" r="3.5" fill="#ffffff" stroke="#8b5cf6" stroke-width="2" vector-effect="non-scaling-stroke"></circle>
+                                                <circle x-show="showForecast" x-bind:cx="point.x" x-bind:cy="point.y" r="3.5" class="fill-white dark:fill-neutral-900" stroke="#8b5cf6" stroke-width="2" vector-effect="non-scaling-stroke"></circle>
                                             </template>
 
                                             {{-- Interactive Timeline Scrubber Line & Handles (Moves dynamically with hover, drag, and click) --}}
@@ -634,7 +634,7 @@
                                                         y1="20"
                                                         x-bind:x2="activePoint.x"
                                                         y2="205"
-                                                        stroke="#334155"
+                                                        class="stroke-slate-700 dark:stroke-neutral-300"
                                                         stroke-width="1.5"
                                                         stroke-dasharray="3 3"
                                                         vector-effect="non-scaling-stroke"
@@ -658,11 +658,10 @@
                                                                         x-bind:cx="activePoint.x"
                                                                         x-bind:cy="activePoint.forecastPoint.y"
                                                                         r="5"
-                                                                        fill="#ffffff"
                                                                         stroke="#8b5cf6"
                                                                         stroke-width="2.5"
                                                                         vector-effect="non-scaling-stroke"
-                                                                        class="cursor-grab active:cursor-grabbing"
+                                                                        class="cursor-grab active:cursor-grabbing fill-white dark:fill-neutral-900"
                                                                     ></circle>
                                                                     <circle
                                                                         x-bind:cx="activePoint.x"
@@ -692,11 +691,10 @@
                                                                 x-bind:cx="activePoint.x"
                                                                 x-bind:cy="activePoint.y"
                                                                 r="5"
-                                                                fill="#ffffff"
                                                                 stroke="#1c75f5"
                                                                 stroke-width="2.5"
                                                                 vector-effect="non-scaling-stroke"
-                                                                class="cursor-grab active:cursor-grabbing"
+                                                                class="cursor-grab active:cursor-grabbing fill-white dark:fill-neutral-900"
                                                             ></circle>
                                                             <circle
                                                                 x-bind:cx="activePoint.x"

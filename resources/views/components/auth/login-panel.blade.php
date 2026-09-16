@@ -48,35 +48,35 @@
     @elseif ($isAdmin)
         <header class="animate-fade-up [animation-delay:320ms]">
             <div class="flex items-start gap-4">
-                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-primary-100 bg-primary-50 text-primary-700 shadow-sm">
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-primary-100 bg-primary-50 text-primary-700 shadow-sm dark:border-primary-900/60 dark:bg-primary-950/60 dark:text-primary-300">
                     <x-ui.icon name="users" class="h-6 w-6" />
                 </div>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-700">{{ $badge }}</p>
-                    <h1 class="mt-2 text-3xl font-semibold tracking-tight text-neutral-900">{{ $heading }}</h1>
-                    <p class="mt-3 max-w-sm text-sm leading-6 text-neutral-500">{{ $description }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-700 dark:text-primary-300">{{ $badge }}</p>
+                    <h1 class="mt-2 text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ $heading }}</h1>
+                    <p class="mt-3 max-w-sm text-sm leading-6 text-neutral-500 dark:text-neutral-400">{{ $description }}</p>
                 </div>
             </div>
             @unless ($hasSessionTimeout)
-                <div class="mt-5 rounded-lg border border-primary-100 bg-primary-50/70 px-3.5 py-3 text-xs leading-5 text-primary-900">
+                <div class="mt-5 rounded-lg border border-primary-100 bg-primary-50/70 px-3.5 py-3 text-xs leading-5 text-primary-900 dark:border-primary-900/60 dark:bg-primary-950/50 dark:text-primary-200">
                     Access is limited to the administration modules assigned to your account.
                 </div>
             @endunless
         </header>
     @else
         <header class="animate-fade-up [animation-delay:320ms]">
-            <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
+            <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 dark:border-primary-900/60 dark:bg-primary-950/60 dark:text-primary-300">
                 <span class="h-1.5 w-1.5 rounded-full bg-primary-500"></span>
                 {{ $badge }}
             </div>
 
-            <h1 class="text-3xl font-semibold tracking-tight text-neutral-900">{{ $heading }}</h1>
-            <p class="mt-3 max-w-sm text-sm leading-6 text-neutral-500">{{ $description }}</p>
+            <h1 class="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ $heading }}</h1>
+            <p class="mt-3 max-w-sm text-sm leading-6 text-neutral-500 dark:text-neutral-400">{{ $description }}</p>
         </header>
     @endif
 
     <x-auth-session-status
-        class="animate-fade-up rounded-lg border border-success-100 bg-success-50 px-4 py-3 text-success-700 [animation-delay:380ms]"
+        class="animate-fade-up rounded-lg border border-success-100 bg-success-50 px-4 py-3 text-success-700 dark:border-success-900/60 dark:bg-success-950/40 dark:text-success-300 [animation-delay:380ms]"
         :status="session('status')"
     />
 
@@ -124,10 +124,10 @@
         <input type="hidden" name="accuracy" data-login-accuracy>
 
         <div>
-            <x-input-label for="email" :value="__('Email address')" class="text-neutral-700" />
+            <x-input-label for="email" :value="__('Email address')" class="text-neutral-700 dark:text-neutral-300" />
             <x-text-input
                 id="email"
-                class="mt-2 block h-11 w-full rounded-lg bg-white px-3.5 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:ring-primary-500 {{ $errors->has('email') ? '!border-danger-500 focus:!border-danger-500' : 'border-neutral-300 focus:border-primary-500' }}"
+                class="mt-2 block h-11 w-full rounded-lg bg-white px-3.5 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 {{ $errors->has('email') ? '!border-danger-500 focus:!border-danger-500' : 'border-neutral-300 focus:border-primary-500' }}"
                 type="email"
                 name="email"
                 :value="$loginEmail"
@@ -141,10 +141,10 @@
 
         <div>
             <div class="flex items-center justify-between gap-4">
-                <x-input-label for="password" :value="__('Password')" class="text-neutral-700" />
+                <x-input-label for="password" :value="__('Password')" class="text-neutral-700 dark:text-neutral-300" />
 
                 <a
-                    class="rounded text-xs font-medium text-primary-600 transition-colors hover:text-primary-700"
+                    class="rounded text-xs font-medium text-primary-600 transition-colors hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
                     href="{{ $forgotPasswordUrl }}"
                 >
                     {{ __('Forgot password?') }}
@@ -160,7 +160,7 @@
                 </style>
                 <x-text-input
                     id="password"
-                    class="block h-11 w-full rounded-lg bg-white px-3.5 pr-11 text-sm text-neutral-900 shadow-sm {{ $errors->has('email') || $errors->has('password') ? '!border-danger-500 focus:!border-danger-500' : 'border-neutral-300 focus:border-primary-500' }} focus:ring-primary-500"
+                    class="block h-11 w-full rounded-lg bg-white px-3.5 pr-11 text-sm text-neutral-900 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 {{ $errors->has('email') || $errors->has('password') ? '!border-danger-500 focus:!border-danger-500' : 'border-neutral-300 focus:border-primary-500' }} focus:ring-primary-500"
                     x-bind:type="showPassword ? 'text' : 'password'"
                     name="password"
                     required
@@ -169,7 +169,7 @@
 
                 <button
                     type="button"
-                    class="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-neutral-400 transition-colors hover:text-neutral-700 focus-visible:ring-inset"
+                    class="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-neutral-400 transition-colors hover:text-neutral-700 focus-visible:ring-inset dark:text-neutral-500 dark:hover:text-neutral-200"
                     x-on:click="showPassword = !showPassword"
                     x-bind:aria-label="showPassword ? 'Hide password' : 'Show password'"
                     x-bind:aria-pressed="showPassword"
@@ -182,11 +182,11 @@
             <x-input-error :messages="$errors->get('password')" class="mt-2 text-danger-600" />
         </div>
 
-        <label for="remember_me" class="flex w-fit cursor-pointer items-center gap-2.5 text-sm text-neutral-600">
+        <label for="remember_me" class="flex w-fit cursor-pointer items-center gap-2.5 text-sm text-neutral-600 dark:text-neutral-400">
             <input
                 id="remember_me"
                 type="checkbox"
-                class="rounded border-neutral-300 text-primary-600 shadow-sm focus:ring-primary-500"
+                class="rounded border-neutral-300 text-primary-600 shadow-sm focus:ring-primary-500 dark:border-neutral-600"
                 name="remember"
             >
             <span>{{ __('Keep me signed in') }}</span>
@@ -197,14 +197,14 @@
             size="lg"
             icon="arrow-right-on-rectangle"
             data-loading-text="Signing in..."
-            class="w-full {{ $isSuperAdmin ? '!border-neutral-900 !bg-neutral-900 hover:!border-primary-950 hover:!bg-primary-950 focus-visible:!ring-warning-500' : '' }}"
+            class="w-full {{ $isSuperAdmin ? '!border-neutral-900 !bg-neutral-900 hover:!border-primary-950 hover:!bg-primary-950 focus-visible:!ring-warning-500 dark:!border-neutral-100 dark:!bg-neutral-100 dark:!text-neutral-900 dark:hover:!border-white dark:hover:!bg-white' : '' }}"
         >
             {{ $submitLabel }}
         </x-ui.button>
     </form>
 
-    <div class="flex items-center gap-2.5 border-t border-neutral-200 pt-6 text-xs leading-5 text-neutral-500">
-        <x-ui.icon name="shield-check" class="h-4 w-4 shrink-0 {{ $isSuperAdmin ? 'text-warning-600' : 'text-primary-600' }}" />
+    <div class="flex items-center gap-2.5 border-t border-neutral-200 pt-6 text-xs leading-5 text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+        <x-ui.icon name="shield-check" class="h-4 w-4 shrink-0 {{ $isSuperAdmin ? 'text-warning-600 dark:text-warning-400' : 'text-primary-600 dark:text-primary-400' }}" />
         <p>
             @if ($isSuperAdmin)
                 Privileged access is monitored, time-limited, and recorded.

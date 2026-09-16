@@ -20,6 +20,9 @@
 
     <title>{{ isset($title) ? $title.' · ' : '' }}{{ config('app.name', 'HIMS') }}</title>
 
+    {{-- Early zero-flicker theme script --}}
+    @include('layouts.partials.theme-script')
+
     {{-- Inter is loaded once, from resources/css/app.css --}}
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
 
@@ -54,7 +57,7 @@
     </style>
 </head>
 <body
-    class="h-full font-sans antialiased bg-neutral-50 text-neutral-800"
+    class="h-full font-sans antialiased bg-neutral-50 dark:bg-neutral-950 text-neutral-800 dark:text-neutral-100"
     data-session-timeout-seconds="{{ (int) config('session.lifetime') * 60 }}"
     data-session-warning-seconds="{{ (int) config('session.warning_seconds') }}"
     data-session-warning-enabled="{{ auth()->user()?->session_timeout_reminder_enabled === false ? 'false' : 'true' }}"
@@ -104,7 +107,7 @@
 
     <dialog
         data-session-warning
-        class="m-auto w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-lg border border-warning-200 bg-white p-0 text-neutral-800 shadow-xl backdrop:bg-neutral-900/50"
+        class="m-auto w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-lg border border-warning-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-0 text-neutral-800 dark:text-neutral-100 shadow-xl backdrop:bg-neutral-900/50"
         role="dialog"
         aria-modal="true"
         aria-labelledby="session-warning-title"
@@ -119,23 +122,23 @@
 
         <div class="p-5 sm:p-6">
             <div class="flex items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning-50 text-warning-600" aria-hidden="true">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning-50 dark:bg-warning-950/40 text-warning-600 dark:text-warning-400" aria-hidden="true">
                     <x-ui.icon name="exclamation-triangle" class="h-5 w-5" />
                 </span>
 
                 <div class="min-w-0 flex-1">
-                    <h2 id="session-warning-title" class="text-base font-semibold text-neutral-900">
+                    <h2 id="session-warning-title" class="text-base font-semibold text-neutral-900 dark:text-neutral-100">
                         {{ __('Your session is about to expire') }}
                     </h2>
-                    <p id="session-warning-description" class="mt-1 text-sm text-neutral-600">
+                    <p id="session-warning-description" class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
                         {{ __('For your security, HIMS will sign you out when the inactivity timer reaches zero.') }}
                     </p>
                 </div>
             </div>
 
-            <p class="mt-5 text-center text-sm text-neutral-600">
+            <p class="mt-5 text-center text-sm text-neutral-600 dark:text-neutral-400">
                 {{ __('Time remaining') }}
-                <span data-session-countdown class="mt-1 block font-mono text-3xl font-semibold tabular-nums text-warning-700" aria-hidden="true">--:--</span>
+                <span data-session-countdown class="mt-1 block font-mono text-3xl font-semibold tabular-nums text-warning-700 dark:text-warning-400" aria-hidden="true">--:--</span>
             </p>
             <p data-session-warning-live class="sr-only" aria-live="polite" aria-atomic="true"></p>
             <p data-session-warning-error class="mt-3 hidden text-sm text-danger-700" role="alert"></p>
