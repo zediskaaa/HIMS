@@ -3,165 +3,205 @@
         title="Audit Trail"
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Audit Trail' => null]" />
 
-    <x-ui.card
-        title="Find Activity"
-        subtitle="Use controlled filters for known values and search for descriptive activity."
-        class="relative z-20 !overflow-visible">
-        <form id="audit-log-filters" method="GET" action="{{ route('admin.audit-logs.index') }}"
-              class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:items-end">
-            <div
-                class="relative space-y-1.5"
-                x-data="auditSearchAutocomplete({
-                    endpoint: @js(route('admin.audit-logs.suggestions')),
-                    formId: 'audit-log-filters',
-                    initialQuery: @js($filters['search'] ?? ''),
-                })"
-                x-on:click.outside="close()"
-            >
-                <label for="audit-search" class="block text-sm font-medium text-neutral-700">Search</label>
-                <input
-                    id="audit-search"
-                    name="search"
-                    type="search"
-                    placeholder="e.g. Juan, EMP-0144, action or target"
-                    autocomplete="off"
-                    class="block w-full rounded-md border border-neutral-300 text-sm text-neutral-900 shadow-sm transition-colors placeholder:text-neutral-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 focus:ring-offset-0"
-                    x-model="query"
-                    x-on:input="queue($event.target.value)"
-                    x-on:focus="if (query.trim() && loaded) open = true"
-                    x-on:keydown.down.prevent="move(1)"
-                    x-on:keydown.up.prevent="move(-1)"
-                    x-on:keydown.enter="selectActive($event)"
-                    x-on:keydown.escape.stop="close()"
-                    role="combobox"
-                    aria-autocomplete="list"
-                    aria-controls="audit-search-suggestions"
+    @php
+        $activeFilterCount = count(array_filter($filters ?? []));
+        $hasActiveFilters = $activeFilterCount > 0;
+    @endphp
+
+    <div x-data="{ open: @js($hasActiveFilters) }" class="relative z-20">
+        <x-ui.card
+            title="Find Activity"
+            subtitle="Use controlled filters for known values and search for descriptive activity."
+            :padding="false"
+            class="relative z-20 !overflow-visible">
+            <x-slot:actions>
+                <button
+                    type="button"
+                    x-on:click="open = !open"
+                    class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-neutral-700 shadow-2xs hover:bg-neutral-50 hover:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-all cursor-pointer"
+                    aria-controls="audit-filter-panel"
                     x-bind:aria-expanded="open"
-                    x-bind:aria-activedescendant="activeIndex >= 0 ? `audit-suggestion-${activeIndex}` : null"
-                />
-
-                <div
-                    id="audit-search-suggestions"
-                    x-show="open"
-                    x-cloak
-                    x-transition.opacity
-                    class="absolute left-0 right-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg"
-                    role="listbox"
                 >
-                    <p x-show="loading" class="px-3 py-2 text-sm text-neutral-500">
-                        <x-ui.loader size="sm" label="Finding suggestions..." />
-                    </p>
-                    <p x-show="!loading && failed" class="px-3 py-2 text-sm text-danger-600">
-                        Suggestions could not be loaded. You can still submit the search normally.
-                    </p>
-                    <p
-                        x-show="!loading && !failed && loaded && suggestions.length === 0"
-                        class="px-3 py-2 text-sm text-neutral-500"
+                    <x-ui.icon name="adjustments-horizontal" class="h-4 w-4 text-neutral-500" />
+                    <span>Filters</span>
+                    @if ($hasActiveFilters)
+                        <span class="inline-flex items-center justify-center rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-bold text-primary-800">
+                            {{ $activeFilterCount }}
+                        </span>
+                    @endif
+                    <x-ui.icon name="chevron-down" class="h-3.5 w-3.5 text-neutral-400 transition-transform duration-200" x-bind:class="open ? 'rotate-180' : ''" />
+                </button>
+            </x-slot:actions>
+
+            <div
+                id="audit-filter-panel"
+                x-show="open"
+                x-cloak
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 -translate-y-1"
+                x-transition:enter-end="opacity-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 translate-y-0"
+                x-transition:leave-end="opacity-0 -translate-y-1"
+                class="p-4 sm:p-5"
+            >
+                <form id="audit-log-filters" method="GET" action="{{ route('admin.audit-logs.index') }}"
+                      class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:items-end">
+                    <div
+                        class="relative space-y-1.5"
+                        x-data="auditSearchAutocomplete({
+                            endpoint: @js(route('admin.audit-logs.suggestions')),
+                            formId: 'audit-log-filters',
+                            initialQuery: @js($filters['search'] ?? ''),
+                        })"
+                        x-on:click.outside="close()"
                     >
-                        No matching audit data.
-                    </p>
+                        <label for="audit-search" class="block text-sm font-medium text-neutral-700">Search</label>
+                        <input
+                            id="audit-search"
+                            name="search"
+                            type="search"
+                            placeholder="e.g. Juan, EMP-0144, action or target"
+                            autocomplete="off"
+                            class="block w-full rounded-md border border-neutral-300 text-sm text-neutral-900 shadow-sm transition-colors placeholder:text-neutral-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 focus:ring-offset-0"
+                            x-model="query"
+                            x-on:input="queue($event.target.value)"
+                            x-on:focus="if (query.trim() && loaded) open = true"
+                            x-on:keydown.down.prevent="move(1)"
+                            x-on:keydown.up.prevent="move(-1)"
+                            x-on:keydown.enter="selectActive($event)"
+                            x-on:keydown.escape.stop="close()"
+                            role="combobox"
+                            aria-autocomplete="list"
+                            aria-controls="audit-search-suggestions"
+                            x-bind:aria-expanded="open"
+                            x-bind:aria-activedescendant="activeIndex >= 0 ? `audit-suggestion-${activeIndex}` : null"
+                        />
 
-                    <template x-for="(suggestion, index) in suggestions" :key="`${suggestion.category}:${suggestion.value}`">
-                        <button
-                            type="button"
-                            class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-neutral-700 hover:bg-primary-50 hover:text-primary-900"
-                            x-bind:id="`audit-suggestion-${index}`"
-                            x-bind:class="activeIndex === index ? 'bg-primary-50 text-primary-900' : ''"
-                            x-bind:aria-selected="activeIndex === index"
-                            x-on:mouseenter="activeIndex = index"
-                            x-on:click="select(suggestion)"
-                            role="option"
+                        <div
+                            id="audit-search-suggestions"
+                            x-show="open"
+                            x-cloak
+                            x-transition.opacity
+                            class="absolute left-0 right-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg"
+                            role="listbox"
                         >
-                            <span class="min-w-0 truncate" x-text="suggestion.value"></span>
-                            <span class="shrink-0 text-xs text-neutral-400" x-text="suggestion.category"></span>
-                        </button>
-                    </template>
-                </div>
+                            <p x-show="loading" class="px-3 py-2 text-sm text-neutral-500">
+                                <x-ui.loader size="sm" label="Finding suggestions..." />
+                            </p>
+                            <p x-show="!loading && failed" class="px-3 py-2 text-sm text-danger-600">
+                                Suggestions could not be loaded. You can still submit the search normally.
+                            </p>
+                            <p
+                                x-show="!loading && !failed && loaded && suggestions.length === 0"
+                                class="px-3 py-2 text-sm text-neutral-500"
+                            >
+                                No matching audit data.
+                            </p>
+
+                            <template x-for="(suggestion, index) in suggestions" :key="`${suggestion.category}:${suggestion.value}`">
+                                <button
+                                    type="button"
+                                    class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-neutral-700 hover:bg-primary-50 hover:text-primary-900"
+                                    x-bind:id="`audit-suggestion-${index}`"
+                                    x-bind:class="activeIndex === index ? 'bg-primary-50 text-primary-900' : ''"
+                                    x-bind:aria-selected="activeIndex === index"
+                                    x-on:mouseenter="activeIndex = index"
+                                    x-on:click="select(suggestion)"
+                                    role="option"
+                                >
+                                    <span class="min-w-0 truncate" x-text="suggestion.value"></span>
+                                    <span class="shrink-0 text-xs text-neutral-400" x-text="suggestion.category"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+
+                    <x-ui.field
+                        name="target"
+                        label="Target or reference"
+                        type="search"
+                        :value="$filters['target'] ?? null"
+                        placeholder="Reference, record name, or ID" />
+
+                    <x-ui.field
+                        name="actor_id"
+                        label="User"
+                        type="select"
+                        :value="$filters['actor_id'] ?? null"
+                        placeholder="All users"
+                        :options="$actors" />
+
+                    <x-ui.field
+                        name="actor_role"
+                        label="Role snapshot"
+                        type="select"
+                        :value="$filters['actor_role'] ?? null"
+                        placeholder="All roles"
+                        :options="$roles" />
+
+                    <x-ui.field
+                        name="category"
+                        label="Category"
+                        type="select"
+                        :value="$filters['category'] ?? null"
+                        placeholder="All categories"
+                        :options="$categories" />
+
+                    <x-ui.field
+                        name="module"
+                        label="Module"
+                        type="select"
+                        :value="$filters['module'] ?? null"
+                        placeholder="All modules"
+                        :options="$modules" />
+
+                    <x-ui.field
+                        name="action"
+                        label="Action"
+                        type="select"
+                        :value="$filters['action'] ?? null"
+                        placeholder="All actions"
+                        :options="$actions" />
+
+                    <x-ui.field
+                        name="date_from"
+                        label="From"
+                        type="date"
+                        :value="$filters['date_from'] ?? null" />
+
+                    <x-ui.field
+                        name="date_to"
+                        label="To"
+                        type="date"
+                        :value="$filters['date_to'] ?? null" />
+
+                    <x-ui.field
+                        name="outcome"
+                        label="Outcome"
+                        type="select"
+                        :value="$filters['outcome'] ?? null"
+                        placeholder="All outcomes"
+                        :options="$outcomes" />
+
+                    <x-ui.field
+                        name="source"
+                        label="Source"
+                        type="select"
+                        :value="$filters['source'] ?? null"
+                        placeholder="All sources"
+                        :options="$sources" />
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <x-ui.button type="submit" icon="magnifying-glass" data-loading-text="Loading activity...">Filter</x-ui.button>
+                        @if (array_filter($filters))
+                            <x-ui.button variant="secondary" :href="route('admin.audit-logs.index')">Clear</x-ui.button>
+                        @endif
+                    </div>
+                </form>
             </div>
-
-            <x-ui.field
-                name="target"
-                label="Target or reference"
-                type="search"
-                :value="$filters['target'] ?? null"
-                placeholder="Reference, record name, or ID" />
-
-            <x-ui.field
-                name="actor_id"
-                label="User"
-                type="select"
-                :value="$filters['actor_id'] ?? null"
-                placeholder="All users"
-                :options="$actors" />
-
-            <x-ui.field
-                name="actor_role"
-                label="Role snapshot"
-                type="select"
-                :value="$filters['actor_role'] ?? null"
-                placeholder="All roles"
-                :options="$roles" />
-
-            <x-ui.field
-                name="category"
-                label="Category"
-                type="select"
-                :value="$filters['category'] ?? null"
-                placeholder="All categories"
-                :options="$categories" />
-
-            <x-ui.field
-                name="module"
-                label="Module"
-                type="select"
-                :value="$filters['module'] ?? null"
-                placeholder="All modules"
-                :options="$modules" />
-
-            <x-ui.field
-                name="action"
-                label="Action"
-                type="select"
-                :value="$filters['action'] ?? null"
-                placeholder="All actions"
-                :options="$actions" />
-
-            <x-ui.field
-                name="date_from"
-                label="From"
-                type="date"
-                :value="$filters['date_from'] ?? null" />
-
-            <x-ui.field
-                name="date_to"
-                label="To"
-                type="date"
-                :value="$filters['date_to'] ?? null" />
-
-            <x-ui.field
-                name="outcome"
-                label="Outcome"
-                type="select"
-                :value="$filters['outcome'] ?? null"
-                placeholder="All outcomes"
-                :options="$outcomes" />
-
-            <x-ui.field
-                name="source"
-                label="Source"
-                type="select"
-                :value="$filters['source'] ?? null"
-                placeholder="All sources"
-                :options="$sources" />
-
-            <div class="flex flex-wrap items-center gap-2">
-                <x-ui.button type="submit" icon="magnifying-glass" data-loading-text="Loading activity...">Filter</x-ui.button>
-                @if (array_filter($filters))
-                    <x-ui.button variant="secondary" :href="route('admin.audit-logs.index')">Clear</x-ui.button>
-                @endif
-            </div>
-        </form>
-    </x-ui.card>
+        </x-ui.card>
+    </div>
 
     <x-ui.card
         title="Activity"
