@@ -41,12 +41,7 @@ class DarkModeFeatureTest extends TestCase
         // Check quick toggle in topbar
         $response->assertSee('data-theme-toggle', false);
         $response->assertSee('$store.theme.toggle()', false);
-
-        // Check dropdown switch theme item. It reads the resolved theme from
-        // `effective`; the store exposes no `resolved` property, so an earlier
-        // assertion on that name was pinning a reference that rendered blank.
-        $response->assertSee('Switch theme', false);
-        $response->assertSee('$store.theme.effective', false);
+        $response->assertDontSee('Switch theme', false);
     }
 
     public function test_profile_page_includes_appearance_and_theme_settings_card(): void

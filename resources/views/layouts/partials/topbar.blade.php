@@ -218,17 +218,6 @@
                 {{ Auth::user()?->isAdministrator() ? 'Account settings' : 'Profile settings' }}
             </a>
 
-            <button type="button" role="menuitem"
-                    x-on:click="$store.theme.toggle()"
-                    class="flex items-center justify-between w-full px-3.5 py-2 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800">
-                <span class="flex items-center gap-2">
-                    <x-ui.icon name="moon" class="w-4 h-4 text-neutral-400 hidden dark:block" />
-                    <x-ui.icon name="sun" class="w-4 h-4 text-neutral-400 block dark:hidden" />
-                    <span>Switch theme</span>
-                </span>
-                <span class="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 capitalize" x-text="$store.theme.effective"></span>
-            </button>
-
             <form method="POST" action="{{ route(\App\Support\AuthenticationContext::logoutRoute()) }}"
                   data-manual-logout
                   data-confirm-title="Confirm logout"

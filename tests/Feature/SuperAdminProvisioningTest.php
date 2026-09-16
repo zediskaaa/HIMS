@@ -277,4 +277,38 @@ class SuperAdminProvisioningTest extends TestCase
         ]);
         $this->assertSame(1, User::query()->where('is_protected', true)->count());
     }
+
+    public function test_artisan_command_can_provision_additional_super_admin(): void
+    {
+        $this->artisan('hims:create-super-admin', [
+            '--name' => 'Jayson A. Pinggoy',
+            '--email' => 'jaysonpinggoy11@gmail.com',
+            '--phone' => '09111094213',
+            '--password' => 'Jaysonpinggoy#123',
+        ])->assertSuccessful();
+
+        $user = User::query()->where('email', 'jaysonpinggoy11@gmail.com')->firstOrFail();
+
+        $this->assertSame('Jayson A. Pinggoy', $user->name);
+        $this->assertSame('Jayson', $user->first_name);
+        $this->assertSame('A.', $user->middle_name);
+        $this->assertSame('Pinggoy', $user->surname);
+        $this->assertSame('09111094213', $user->phone);
+        $this->assertSame(UserRole::SuperAdministrator, $user->role);
+        $this->assertSame(UserStatus::Active, $user->status);
+        $this->assertFalse($user->is_protected);
+        $this->assertStringStartsWith('SA-', $user->employee_id);
+        $this->assertTrue(Hash::check('Jaysonpinggoy#123', $user->password));
+    }
+
+    public function test_artisan_command_validates_weak_password(): void
+    {
+        $this->artisan('hims:create-super-admin', [
+            '--name' => 'Invalid Super Admin',
+            '--email' => 'invalid@example.com',
+            '--password' => 'weak',
+        ])->assertFailed();
+
+        $this->assertDatabaseMissing('users', ['email' => 'invalid@example.com']);
+    }
 }
