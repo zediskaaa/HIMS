@@ -72,6 +72,12 @@
                     Record Movement
                 </x-ui.button>
             </div>
+        @elseif(request()->routeIs('inventory.adjustments*') && auth()->user()?->can('adjust_stock'))
+            <div class="pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                <x-ui.button size="sm" class="w-full" icon="plus" x-data x-on:click="$dispatch('open-modal', 'request-stock-adjustment')">
+                    Request Adjustment
+                </x-ui.button>
+            </div>
         @endif
     </div>
 
@@ -319,6 +325,12 @@
             <div class="flex items-center gap-2">
                 <x-ui.button size="sm" icon="plus" x-data x-on:click="$dispatch('open-modal', 'record-quick-movement')">
                     Record Movement
+                </x-ui.button>
+            </div>
+        @elseif(request()->routeIs('inventory.adjustments*') && auth()->user()?->can('adjust_stock'))
+            <div class="flex items-center gap-2">
+                <x-ui.button size="sm" icon="plus" x-data x-on:click="$dispatch('open-modal', 'request-stock-adjustment')">
+                    Request Adjustment
                 </x-ui.button>
             </div>
         @endif
