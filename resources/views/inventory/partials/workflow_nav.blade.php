@@ -78,6 +78,21 @@
                     Request Adjustment
                 </x-ui.button>
             </div>
+        @elseif(request()->routeIs('inventory.cycle-counts*') && auth()->user()?->can(\App\Enums\Permission::PerformCycleCount->value))
+            <div class="pt-2 border-t border-neutral-100 dark:border-neutral-800 space-y-2">
+                <form action="{{ route('inventory.cycle-counts.abc') }}" method="POST" class="w-full"
+                      data-confirm-title="Recalculate ABC classification"
+                      data-confirm-message="Are you sure you want to recalculate ABC classifications for all inventory items based on consumption history?"
+                      data-confirm-label="Recalculate ABC">
+                    @csrf
+                    <x-ui.button type="submit" variant="secondary" size="sm" class="w-full" icon="arrow-path">
+                        Recalculate ABC
+                    </x-ui.button>
+                </form>
+                <x-ui.button size="sm" class="w-full" icon="plus" x-data x-on:click="$dispatch('open-modal', 'schedule-cycle-count')">
+                    Schedule Cycle Count
+                </x-ui.button>
+            </div>
         @endif
     </div>
 
@@ -331,6 +346,21 @@
             <div class="flex items-center gap-2">
                 <x-ui.button size="sm" icon="plus" x-data x-on:click="$dispatch('open-modal', 'request-stock-adjustment')">
                     Request Adjustment
+                </x-ui.button>
+            </div>
+        @elseif(request()->routeIs('inventory.cycle-counts*') && auth()->user()?->can(\App\Enums\Permission::PerformCycleCount->value))
+            <div class="flex items-center gap-2">
+                <form action="{{ route('inventory.cycle-counts.abc') }}" method="POST" class="inline"
+                      data-confirm-title="Recalculate ABC classification"
+                      data-confirm-message="Are you sure you want to recalculate ABC classifications for all inventory items based on consumption history?"
+                      data-confirm-label="Recalculate ABC">
+                    @csrf
+                    <x-ui.button type="submit" variant="secondary" size="sm" icon="arrow-path">
+                        Recalculate ABC Classes
+                    </x-ui.button>
+                </form>
+                <x-ui.button size="sm" icon="plus" x-data x-on:click="$dispatch('open-modal', 'schedule-cycle-count')">
+                    Schedule Cycle Count
                 </x-ui.button>
             </div>
         @endif

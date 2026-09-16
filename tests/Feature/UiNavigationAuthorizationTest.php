@@ -81,7 +81,7 @@ class UiNavigationAuthorizationTest extends TestCase
 
         $this->actingAs($warehouse)->get('/inventory/cycle-counts')
             ->assertOk()
-            ->assertSee('Back to Inventory');
+            ->assertSee('Cycle Counts & Physical Audits');
     }
 
     public function test_viewer_cannot_mutate_inventory_through_the_api(): void
