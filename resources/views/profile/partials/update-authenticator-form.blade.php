@@ -216,7 +216,21 @@
 
                 <div>
                     <x-input-label for="authenticator-disable-password" :value="__('Current password')" />
-                    <x-text-input id="authenticator-disable-password" name="current_password" type="password" class="mt-1 block w-full" autocomplete="new-password" required />
+                    <x-text-input
+                        id="authenticator-disable-password"
+                        name="current_password"
+                        type="text"
+                        class="mt-1 block w-full"
+                        autocomplete="off"
+                        autocorrect="off"
+                        autocapitalize="off"
+                        spellcheck="false"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-form-type="other"
+                        style="-webkit-text-security: disc; text-security: disc;"
+                        required
+                    />
                     <x-input-error :messages="$errors->authenticatorDisable->get('current_password')" class="mt-2" />
                 </div>
 
@@ -311,9 +325,16 @@
                     <x-input-label for="authenticator-modal-password" :value="__('Current password')" />
                     <x-text-input
                         id="authenticator-modal-password"
-                        type="password"
+                        type="text"
                         class="mt-1 block w-full"
-                        autocomplete="new-password"
+                        autocomplete="off"
+                        autocorrect="off"
+                        autocapitalize="off"
+                        spellcheck="false"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-form-type="other"
+                        style="-webkit-text-security: disc; text-security: disc;"
                         required
                         x-model="password"
                         ::class="passwordError ? '!border-danger-500 focus:!border-danger-500 focus:!ring-danger-500' : ''"

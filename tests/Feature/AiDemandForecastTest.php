@@ -516,6 +516,51 @@ class AiDemandForecastTest extends TestCase
             ->assertSee('Statistical fallback active');
     }
 
+    /**
+     * A failed model pass has to expire with the warm-up window, not the AI
+     * result's lifetime. Pinning the statistical fallback for the longer
+     * window means the retry cadence the fallback window exists to provide
+     * never happens: one transient failure would hold the screen for hours.
+     */
+    public function test_a_failed_gemini_pass_expires_with_the_fallback_window(): void
+    {
+        config()->set('services.gemini.forecast_fallback_minutes', 3);
+        config()->set('services.gemini.forecast_cache_minutes', 60);
+
+        $manager = User::factory()->inventoryManager()->create();
+        $item = $this->item();
+        $this->consume($item, 60, 5);
+
+        // No usable credential, so the pass fails before any HTTP call and the
+        // test stays deterministic and offline.
+        config()->set('services.gemini.key', null);
+        Http::fake();
+
+        $this->actingAs($manager)
+            ->post(route('inventory.demand-forecast.refresh'))
+            ->assertRedirect()
+            ->assertSessionHas('info');
+
+        Http::assertNothingSent();
+        $this->assertSame('statistical', Cache::get('demand-forecast:v3:90:30')['source']);
+
+        // Past the warm-up window while still well inside the AI result's
+        // lifetime, the failed result must be gone rather than pinned.
+        $this->travel(4)->minutes();
+        $this->assertNull(Cache::get('demand-forecast:v3:90:30'));
+
+        // So the next view asks the model again instead of serving the stale
+        // failure for the rest of the hour.
+        $this->actingAs($manager)->get(route('inventory.demand-forecast'))->assertOk();
+
+        $this->assertSame(2, AuditLog::where('action', AuditAction::FailedDemandForecast->value)->count());
+        $this->assertDatabaseHas('audit_logs', [
+            'user_id' => $manager->id,
+            'action' => AuditAction::FailedDemandForecast->value,
+            'outcome' => 'failure',
+        ]);
+    }
+
     public function test_a_second_successful_generation_is_audited_as_a_refresh(): void
     {
         $manager = User::factory()->inventoryManager()->create();

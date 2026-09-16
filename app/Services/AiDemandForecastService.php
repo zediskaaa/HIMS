@@ -189,7 +189,10 @@ class AiDemandForecastService
                 $forecastDays,
                 $this->fallbackNotice($failureType),
             );
-            $this->store($fallback, $analysisDays, $forecastDays);
+            // Deliberately shorter than an AI result: the failure has to expire
+            // with the warm-up window so the next view retries the model rather
+            // than pinning the statistical fallback until the AI cache lapses.
+            $this->store($fallback, $analysisDays, $forecastDays, $this->fallbackMinutes());
 
             return $fallback;
         }
@@ -788,10 +791,15 @@ class AiDemandForecastService
             ->all();
     }
 
-    /** @param array<string, mixed> $result */
-    private function store(array $result, int $analysisDays, int $forecastDays): void
+    /**
+     * @param  array<string, mixed>  $result
+     * @param  int|null  $minutes  Overrides the AI result's lifetime. The
+     *                             statistical fallback passes the warm-up
+     *                             window so a failed pass can be retried.
+     */
+    private function store(array $result, int $analysisDays, int $forecastDays, ?int $minutes = null): void
     {
-        $minutes = max(5, (int) config('services.gemini.forecast_cache_minutes', 360));
+        $minutes ??= max(5, (int) config('services.gemini.forecast_cache_minutes', 360));
         Cache::put($this->cacheKey($analysisDays, $forecastDays), $result, now()->addMinutes($minutes));
     }
 

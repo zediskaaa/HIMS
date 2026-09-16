@@ -19,7 +19,7 @@
 
     <form method="post" action="{{ route('password.update') }}" class="mt-6 space-y-6"
           autocomplete="off"
-          x-data="{ password: '', passwordConfirmation: '' }"
+          x-data="{ currentPassword: '', password: '', passwordConfirmation: '' }"
           data-confirm-title="Confirm security change"
           data-confirm-message="Are you sure you want to change your password?"
           data-confirm-label="Change Password">
@@ -31,25 +31,66 @@
             <x-text-input
                 id="update_password_current_password"
                 name="current_password"
-                type="password"
+                type="text"
                 class="mt-1 block w-full {{ $errors->updatePassword->has('current_password') ? '!border-danger-500 focus:!border-danger-500 focus:!ring-danger-500' : '' }}"
-                autocomplete="new-password"
-                x-data
-                x-init="$nextTick(() => { $el.value = '' })"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-form-type="other"
+                style="-webkit-text-security: disc; text-security: disc;"
+                x-model="currentPassword"
+                x-init="$el.value = ''; setTimeout(() => { $el.value = ''; currentPassword = ''; }, 50); setTimeout(() => { $el.value = ''; currentPassword = ''; }, 200)"
                 value=""
+                required
             />
             <x-input-error :messages="$errors->updatePassword->get('current_password')" class="mt-2" />
         </div>
 
         <div>
             <x-input-label for="update_password_password" :value="__('New Password')" />
-            <x-text-input id="update_password_password" name="password" type="password" class="mt-1 block w-full" required minlength="8" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,}" title="{{ \App\Rules\PasswordStandard::REQUIREMENTS }}" autocomplete="new-password" x-model="password" />
+            <x-text-input
+                id="update_password_password"
+                name="password"
+                type="text"
+                class="mt-1 block w-full"
+                required
+                minlength="8"
+                pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,}"
+                title="{{ \App\Rules\PasswordStandard::REQUIREMENTS }}"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-form-type="other"
+                style="-webkit-text-security: disc; text-security: disc;"
+                x-model="password"
+            />
             <x-input-error :messages="$errors->updatePassword->get('password')" class="mt-2" />
         </div>
 
         <div>
             <x-input-label for="update_password_password_confirmation" :value="__('Confirm Password')" />
-            <x-text-input id="update_password_password_confirmation" name="password_confirmation" type="password" class="mt-1 block w-full" required autocomplete="new-password" x-model="passwordConfirmation" />
+            <x-text-input
+                id="update_password_password_confirmation"
+                name="password_confirmation"
+                type="text"
+                class="mt-1 block w-full"
+                required
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-form-type="other"
+                style="-webkit-text-security: disc; text-security: disc;"
+                x-model="passwordConfirmation"
+            />
             <x-input-error :messages="$errors->updatePassword->get('password_confirmation')" class="mt-2" />
         </div>
 

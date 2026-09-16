@@ -148,16 +148,23 @@
             @endif
         </div>
 
-        <div>
+        <div x-data="{ currentPassword: '' }">
             <x-input-label for="profile_current_password" :value="__('Current Password')" />
             <x-text-input
                 id="profile_current_password"
                 name="current_password"
-                type="password"
+                type="text"
                 class="mt-1 block w-full {{ $errors->has('current_password') ? '!border-danger-500 focus:!border-danger-500 focus:!ring-danger-500' : '' }}"
-                autocomplete="new-password"
-                x-data
-                x-init="$nextTick(() => { $el.value = '' })"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-form-type="other"
+                style="-webkit-text-security: disc; text-security: disc;"
+                x-model="currentPassword"
+                x-init="$el.value = ''; setTimeout(() => { $el.value = ''; currentPassword = ''; }, 50); setTimeout(() => { $el.value = ''; currentPassword = ''; }, 200)"
                 value=""
             />
             <p class="mt-2 text-sm text-gray-600">

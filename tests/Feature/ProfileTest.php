@@ -610,6 +610,26 @@ class ProfileTest extends TestCase
         $this->assertDatabaseHas('users', ['id' => $user->id]);
     }
 
+    public function test_profile_password_inputs_resist_browser_autofill_and_password_manager_shortcuts(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->get('/profile');
+
+        $response
+            ->assertOk()
+            ->assertSee('id="profile_current_password"', false)
+            ->assertSee('id="update_password_current_password"', false)
+            ->assertSee('id="update_password_password"', false)
+            ->assertSee('id="update_password_password_confirmation"', false)
+            ->assertSee('style="-webkit-text-security: disc; text-security: disc;"', false)
+            ->assertSee('data-lpignore="true"', false)
+            ->assertSee('data-1p-ignore="true"', false)
+            ->assertDontSee('autocomplete="current-password"', false);
+    }
+
     /**
      * @return array<string, array{string, UserRole, string, string}>
      */
