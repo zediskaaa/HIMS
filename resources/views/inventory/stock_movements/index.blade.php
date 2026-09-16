@@ -78,25 +78,12 @@
     }"
     @open-new-transfer-modal.window="newTransferModal = true"
     @keydown.escape.window="newTransferModal = false"
+    class="space-y-3.5"
     >
         <x-ui.page-header
             title="Stock Movements & Ledger"
-            :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Inventory' => route('inventory.items'), 'Stock Movements & Transfers' => null]">
-            <x-slot:actions>
-                @can(\App\Enums\Permission::TransferStock->value)
-                    <button type="button"
-                            @click="newTransferModal = true"
-                            id="btn-initiate-transfer-modal"
-                            class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                        </svg>
-                        Initiate Stock Transfer
-                    </button>
-                @endcan
-                <x-ui.button variant="secondary" :href="route('inventory.items')" icon="arrow-left">Back to Inventory</x-ui.button>
-            </x-slot:actions>
-        </x-ui.page-header>
+            :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Inventory' => route('inventory.items'), 'Stock Movements & Transfers' => null]"
+        />
 
         {{-- Consolidated Inventory Workflow Navigation --}}
         @include('inventory.partials.workflow_nav')
@@ -124,12 +111,17 @@
             </div>
         @endif
 
-        {{-- RECORD QUICK MOVEMENT CARD --}}
+        {{-- RECORD QUICK MOVEMENT MODAL --}}
         @if (! empty($movementTypes))
-        <x-ui.card
-            title="Record Quick Movement"
-            subtitle="Record individual stock adjustments (Stock In, Stock Out, Departmental Issuances, and Returns). Balances update immediately."
-            x-data="{
+        <x-ui.modal name="record-quick-movement" maxWidth="3xl">
+            <x-slot:header>
+                <div>
+                    <h2 class="text-base font-bold text-neutral-900 dark:text-neutral-100">Record Quick Movement</h2>
+                    <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Record individual stock adjustments (Stock In, Stock Out, Departmental Issuances, and Returns). Balances update immediately.</p>
+                </div>
+            </x-slot:header>
+
+            <div x-data="{
                 type: '{{ old('movement_type', $movementTypes[0]->value ?? 'stock_out') }}',
                 itemId: '{{ old('item_id', $items->first()?->id ?? '') }}',
                 unitFilter: 'all',
@@ -416,7 +408,11 @@
                             id="from_location_id"
                             x-model="fromLocationId"
                             x-bind:required="needsSource"
-                            class="block w-full rounded-lg border-neutral-300 shadow-2xs text-xs font-medium text-neutral-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 truncate {{ $errors->has('from_location_id') ? 'border-rose-500 ring-1 ring-rose-500' : '' }}"
+                            :class="{
+                                'border-rose-500 ring-1 ring-rose-500 bg-rose-50/30 text-rose-900': (needsSource && fromLocationId && isZeroStockAtSource) || {{ $errors->has('from_location_id') ? 'true' : 'false' }},
+                                'border-neutral-300 focus:border-primary-500 focus:ring-primary-500': !(needsSource && fromLocationId && isZeroStockAtSource) && !{{ $errors->has('from_location_id') ? 'true' : 'false' }}
+                            }"
+                            class="block w-full rounded-lg shadow-2xs text-xs font-medium text-neutral-800 truncate transition {{ $errors->has('from_location_id') ? 'border-rose-500 ring-1 ring-rose-500' : '' }}"
                         >
                             <option value="">-- Select Source Location --</option>
                             @foreach ($locations as $location)
@@ -427,6 +423,15 @@
                                 </option>
                             @endforeach
                         </select>
+
+                        {{-- Zero Stock Feedback under Source Location --}}
+                        <template x-if="needsSource && fromLocationId && isZeroStockAtSource">
+                            <div class="mt-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] text-rose-800 flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                <span><strong>No available stock</strong> at origin location. Input disabled.</span>
+                            </div>
+                        </template>
+
                         @error('from_location_id')
                             <p class="mt-1 text-xs text-rose-600 font-medium">{{ $message }}</p>
                         @enderror
@@ -566,16 +571,9 @@
                         @enderror
 
                         {{-- Real-Time Client-Side Stock Availability Feedback for Outbound --}}
-                        <template x-if="needsSource && fromLocationId">
+                        <template x-if="needsSource && fromLocationId && !isZeroStockAtSource">
                             <div class="mt-1.5">
-                                <template x-if="isZeroStockAtSource">
-                                    <div class="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] text-rose-800 flex items-center gap-1.5">
-                                        <svg class="w-3.5 h-3.5 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                        <span><strong>No available stock</strong> at origin location. Input disabled.</span>
-                                    </div>
-                                </template>
-
-                                <template x-if="!isZeroStockAtSource && !isOverStock && parsedQty <= 0">
+                                <template x-if="!isOverStock && parsedQty <= 0">
                                     <div class="flex items-center justify-between text-[11px] text-neutral-600 bg-neutral-50 rounded-md px-2 py-1 border border-neutral-200">
                                         <div class="flex items-center gap-1">
                                             <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -585,7 +583,7 @@
                                     </div>
                                 </template>
 
-                                <template x-if="!isZeroStockAtSource && !isOverStock && parsedQty > 0">
+                                <template x-if="!isOverStock && parsedQty > 0">
                                     <div class="flex items-center justify-between text-[11px] bg-emerald-50/90 text-emerald-800 rounded-md px-2 py-1 border border-emerald-200">
                                         <div class="flex items-center gap-1">
                                             <svg class="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
@@ -597,7 +595,7 @@
                                     </div>
                                 </template>
 
-                                <template x-if="!isZeroStockAtSource && isOverStock">
+                                <template x-if="isOverStock">
                                     <div class="rounded-md border border-rose-300 bg-rose-50 p-2 text-[11px] text-rose-800 space-y-0.5">
                                         <div class="flex items-center gap-1 font-bold text-rose-900">
                                             <svg class="w-3.5 h-3.5 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
@@ -650,8 +648,8 @@
                     </div>
                 </div>
 
-                {{-- Submit Action Row --}}
-                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-neutral-100">
+                {{-- Submit Action Row / Modal Footer --}}
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
                     <div>
                         <template x-if="!isValid && validationError && !isZeroStockAtSource">
                             <p class="text-xs text-rose-600 font-medium flex items-center gap-1.5">
@@ -661,12 +659,15 @@
                         </template>
                     </div>
 
-                    <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+                    <div class="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                        <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'record-quick-movement')">
+                            Cancel
+                        </x-ui.button>
                         <button
                             type="button"
                             @click="openConfirmation()"
                             :disabled="!isValid"
-                            :class="!isValid ? 'opacity-50 cursor-not-allowed bg-neutral-400' : 'bg-primary-600 hover:bg-primary-700 shadow-xs'"
+                            :class="!isValid ? 'opacity-50 cursor-not-allowed bg-neutral-400 dark:bg-neutral-600' : 'bg-primary-600 hover:bg-primary-700 shadow-xs'"
                             id="btn-save-movement"
                             class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold text-white transition focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
                         >
@@ -680,7 +681,7 @@
             </form>
 
             {{-- COMPACT CONFIRMATION MODAL --}}
-            <div x-show="confirmModalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;"
+            <div x-show="confirmModalOpen" class="fixed inset-0 z-[60] overflow-y-auto" style="display: none;"
                  x-transition:enter="transition ease-out duration-200"
                  x-transition:enter-start="opacity-0"
                  x-transition:enter-end="opacity-100"
@@ -690,110 +691,110 @@
                 <div class="flex min-h-screen items-center justify-center p-4 text-center">
                     <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity" @click="if (!isSubmitting) confirmModalOpen = false"></div>
 
-                    <div class="relative w-full max-w-lg transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all my-auto z-10 border border-neutral-200">
-                        <div class="bg-white px-6 pt-6 pb-4">
-                            <div class="flex items-center gap-3 pb-3 border-b border-neutral-100">
-                                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-100 text-primary-600">
+                    <div class="relative w-full max-w-lg transform overflow-hidden rounded-2xl bg-white dark:bg-neutral-900 text-left shadow-2xl transition-all my-auto z-10 border border-neutral-200 dark:border-neutral-800">
+                        <div class="bg-white dark:bg-neutral-900 px-6 pt-6 pb-4">
+                            <div class="flex items-center gap-3 pb-3 border-b border-neutral-100 dark:border-neutral-800">
+                                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
                                 </div>
                                 <div>
-                                    <h3 class="text-base font-bold text-neutral-900">Confirm Stock Movement</h3>
-                                    <p class="text-xs text-neutral-500">Are you sure you want to record this stock movement? Please review the details below.</p>
+                                    <h3 class="text-base font-bold text-neutral-900 dark:text-neutral-100">Confirm Stock Movement</h3>
+                                    <p class="text-xs text-neutral-500 dark:text-neutral-400">Are you sure you want to record this stock movement? Please review the details below.</p>
                                 </div>
                             </div>
 
                             {{-- Structured Transaction Summary --}}
                             <div class="mt-4 space-y-2.5 text-xs">
-                                <div class="flex justify-between items-start py-1.5 border-b border-neutral-100">
-                                    <span class="text-neutral-500 font-medium">Item:</span>
+                                <div class="flex justify-between items-start py-1.5 border-b border-neutral-100 dark:border-neutral-800">
+                                    <span class="text-neutral-500 dark:text-neutral-400 font-medium">Item:</span>
                                     <div class="text-right">
-                                        <span class="font-bold text-neutral-900" x-text="currentItem ? currentItem.name : '—'"></span>
+                                        <span class="font-bold text-neutral-900 dark:text-neutral-100" x-text="currentItem ? currentItem.name : '—'"></span>
                                         <span class="block text-[11px] text-neutral-400" x-text="currentItem ? currentItem.sku : ''"></span>
                                     </div>
                                 </div>
 
-                                <div class="flex justify-between items-center py-1.5 border-b border-neutral-100">
-                                    <span class="text-neutral-500 font-medium">Movement Type:</span>
+                                <div class="flex justify-between items-center py-1.5 border-b border-neutral-100 dark:border-neutral-800">
+                                    <span class="text-neutral-500 dark:text-neutral-400 font-medium">Movement Type:</span>
                                     <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold uppercase tracking-wider"
                                           :class="{
-                                              'bg-emerald-100 text-emerald-800': type === 'stock_in',
-                                              'bg-amber-100 text-amber-800': type === 'stock_out',
-                                              'bg-blue-100 text-blue-800': type === 'issuance',
-                                              'bg-rose-100 text-rose-800': type === 'return_to_supplier'
+                                              'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300': type === 'stock_in',
+                                              'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300': type === 'stock_out',
+                                              'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300': type === 'issuance',
+                                              'bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-300': type === 'return_to_supplier'
                                           }"
                                           x-text="type.replace(/_/g, ' ')">
                                     </span>
                                 </div>
 
                                 <template x-if="needsSource && fromLocationId">
-                                    <div class="flex justify-between items-center py-1.5 border-b border-neutral-100">
-                                        <span class="text-neutral-500 font-medium">From Location:</span>
-                                        <span class="font-semibold text-neutral-900" x-text="locationsMap[fromLocationId] ? locationsMap[fromLocationId].name + ' (' + locationsMap[fromLocationId].code + ')' : '—'"></span>
+                                    <div class="flex justify-between items-center py-1.5 border-b border-neutral-100 dark:border-neutral-800">
+                                        <span class="text-neutral-500 dark:text-neutral-400 font-medium">From Location:</span>
+                                        <span class="font-semibold text-neutral-900 dark:text-neutral-100" x-text="locationsMap[fromLocationId] ? locationsMap[fromLocationId].name + ' (' + locationsMap[fromLocationId].code + ')' : '—'"></span>
                                     </div>
                                 </template>
 
                                 <template x-if="needsDestination && toLocationId">
-                                    <div class="flex justify-between items-center py-1.5 border-b border-neutral-100">
-                                        <span class="text-neutral-500 font-medium">To Location:</span>
-                                        <span class="font-semibold text-neutral-900" x-text="locationsMap[toLocationId] ? locationsMap[toLocationId].name + ' (' + locationsMap[toLocationId].code + ')' : '—'"></span>
+                                    <div class="flex justify-between items-center py-1.5 border-b border-neutral-100 dark:border-neutral-800">
+                                        <span class="text-neutral-500 dark:text-neutral-400 font-medium">To Location:</span>
+                                        <span class="font-semibold text-neutral-900 dark:text-neutral-100" x-text="locationsMap[toLocationId] ? locationsMap[toLocationId].name + ' (' + locationsMap[toLocationId].code + ')' : '—'"></span>
                                     </div>
                                 </template>
 
                                 <template x-if="needsRecipient && issuedToLocationId">
-                                    <div class="flex justify-between items-center py-1.5 border-b border-neutral-100">
-                                        <span class="text-neutral-500 font-medium">Issued To (Ward/Dept):</span>
-                                        <span class="font-semibold text-neutral-900" x-text="locationsMap[issuedToLocationId] ? locationsMap[issuedToLocationId].name : '—'"></span>
+                                    <div class="flex justify-between items-center py-1.5 border-b border-neutral-100 dark:border-neutral-800">
+                                        <span class="text-neutral-500 dark:text-neutral-400 font-medium">Issued To (Ward/Dept):</span>
+                                        <span class="font-semibold text-neutral-900 dark:text-neutral-100" x-text="locationsMap[issuedToLocationId] ? locationsMap[issuedToLocationId].name : '—'"></span>
                                     </div>
                                 </template>
 
                                 <template x-if="needsSupplier && returnSupplierId">
-                                    <div class="flex justify-between items-center py-1.5 border-b border-neutral-100">
-                                        <span class="text-neutral-500 font-medium">Return Supplier:</span>
-                                        <span class="font-semibold text-neutral-900" x-text="suppliersMap[returnSupplierId] ? suppliersMap[returnSupplierId].name : '—'"></span>
+                                    <div class="flex justify-between items-center py-1.5 border-b border-neutral-100 dark:border-neutral-800">
+                                        <span class="text-neutral-500 dark:text-neutral-400 font-medium">Return Supplier:</span>
+                                        <span class="font-semibold text-neutral-900 dark:text-neutral-100" x-text="suppliersMap[returnSupplierId] ? suppliersMap[returnSupplierId].name : '—'"></span>
                                     </div>
                                 </template>
 
-                                <div class="flex justify-between items-center py-1.5 border-b border-neutral-100">
-                                    <span class="text-neutral-500 font-medium">Quantity to Move:</span>
-                                    <span class="font-bold text-sm text-neutral-900" x-text="formatUnit(parsedQty)"></span>
+                                <div class="flex justify-between items-center py-1.5 border-b border-neutral-100 dark:border-neutral-800">
+                                    <span class="text-neutral-500 dark:text-neutral-400 font-medium">Quantity to Move:</span>
+                                    <span class="font-bold text-sm text-neutral-900 dark:text-neutral-100" x-text="formatUnit(parsedQty)"></span>
                                 </div>
 
                                 <template x-if="needsSource && fromLocationId">
-                                    <div class="rounded-lg bg-neutral-50 p-2.5 border border-neutral-200 flex justify-between items-center text-xs">
-                                        <span class="text-neutral-600">Stock Impact:</span>
-                                        <span class="font-medium text-neutral-800">
+                                    <div class="rounded-lg bg-neutral-50 dark:bg-neutral-800/60 p-2.5 border border-neutral-200 dark:border-neutral-700 flex justify-between items-center text-xs">
+                                        <span class="text-neutral-600 dark:text-neutral-400">Stock Impact:</span>
+                                        <span class="font-medium text-neutral-800 dark:text-neutral-200">
                                             <span x-text="formatUnit(availableStockAtSource)"></span>
                                             &rarr;
-                                            <strong class="text-emerald-700 font-bold" x-text="formatUnit(remainingStockAfterMovement)"></strong> remaining
+                                            <strong class="text-emerald-700 dark:text-emerald-400 font-bold" x-text="formatUnit(remainingStockAfterMovement)"></strong> remaining
                                         </span>
                                     </div>
                                 </template>
 
                                 <template x-if="needsDestination && toLocationId">
-                                    <div class="rounded-lg bg-neutral-50 p-2.5 border border-neutral-200 flex justify-between items-center text-xs">
-                                        <span class="text-neutral-600">Stock Impact:</span>
-                                        <span class="font-medium text-neutral-800">
+                                    <div class="rounded-lg bg-neutral-50 dark:bg-neutral-800/60 p-2.5 border border-neutral-200 dark:border-neutral-700 flex justify-between items-center text-xs">
+                                        <span class="text-neutral-600 dark:text-neutral-400">Stock Impact:</span>
+                                        <span class="font-medium text-neutral-800 dark:text-neutral-200">
                                             <span x-text="formatUnit(currentStockAtDest)"></span>
                                             &rarr;
-                                            <strong class="text-indigo-700 font-bold" x-text="formatUnit(projectedDestStock)"></strong> new balance
+                                            <strong class="text-indigo-700 dark:text-indigo-400 font-bold" x-text="formatUnit(projectedDestStock)"></strong> new balance
                                         </span>
                                     </div>
                                 </template>
 
                                 <template x-if="remarks && remarks.trim().length > 0">
                                     <div class="flex justify-between items-start py-1.5">
-                                        <span class="text-neutral-500 font-medium">Remarks:</span>
-                                        <span class="text-neutral-700 italic max-w-xs text-right" x-text="remarks"></span>
+                                        <span class="text-neutral-500 dark:text-neutral-400 font-medium">Remarks:</span>
+                                        <span class="text-neutral-700 dark:text-neutral-300 italic max-w-xs text-right" x-text="remarks"></span>
                                     </div>
                                 </template>
                             </div>
                         </div>
 
-                        <div class="bg-neutral-50 px-6 py-3 flex items-center justify-end gap-3 border-t border-neutral-200">
+                        <div class="bg-neutral-50 dark:bg-neutral-800/60 px-6 py-3 flex items-center justify-end gap-3 border-t border-neutral-200 dark:border-neutral-800">
                             <button type="button" 
                                     @click="confirmModalOpen = false" 
                                     :disabled="isSubmitting"
-                                    class="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 transition disabled:opacity-50">
+                                    class="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition disabled:opacity-50">
                                 Cancel
                             </button>
                             <button type="button" 
@@ -810,7 +811,12 @@
                     </div>
                 </div>
             </div>
-        </x-ui.card>
+            </div>
+        </x-ui.modal>
+
+        @if ($errors->any())
+            <div x-data x-init="$nextTick(() => $dispatch('open-modal', 'record-quick-movement'))"></div>
+        @endif
         @endif
 
         {{-- MOVEMENT HISTORY (WITH DYNAMIC FILTERS & VERTICAL SCROLLBAR) --}}
@@ -889,16 +895,6 @@
                             @endforeach
                         </select>
                     </div>
-
-                    {{-- Reset Button --}}
-                    <button x-show="isFiltered"
-                            @click="clearFilters()"
-                            type="button"
-                            title="Reset filters"
-                            class="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 px-2.5 py-1.5 text-xs font-semibold transition shadow-2xs">
-                        <svg class="h-3.5 w-3.5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        <span>Reset</span>
-                    </button>
                 </div>
             </x-slot:actions>
 
@@ -911,15 +907,15 @@
                     <p class="text-xs text-neutral-400 mt-0.5">Recorded stock in, stock out and transfers will appear here.</p>
                 </div>
             @else
-                {{-- Desktop & Tablet View (Proportional Columns with Vertical Scrollbar & Sticky Header) --}}
-                <div class="hidden md:block w-full overflow-y-auto max-h-[460px] divide-y divide-neutral-200">
+                {{-- Desktop & Tablet View (Proportional Columns with Sticky Header & Viewport-Fitting Scroll) --}}
+                <div class="hidden md:block w-full overflow-y-auto max-h-[calc(100vh-23.5rem)] min-h-[220px] divide-y divide-neutral-200">
                     <table class="w-full table-fixed divide-y divide-neutral-200 text-xs">
                         <thead class="sticky top-0 z-10 bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200 shadow-2xs">
                             <tr>
-                                <th scope="col" class="w-[30%] px-4 py-3 text-left">Item &amp; Type</th>
-                                <th scope="col" class="w-[12%] px-3 py-3 text-right">Quantity</th>
-                                <th scope="col" class="w-[38%] px-4 py-3 text-left">Logistics Route &amp; Remarks</th>
-                                <th scope="col" class="w-[20%] px-4 py-3 text-right">Recorded</th>
+                                <th scope="col" class="w-[30%] px-4 py-2.5 text-left">Item &amp; Type</th>
+                                <th scope="col" class="w-[12%] px-3 py-2.5 text-right">Quantity</th>
+                                <th scope="col" class="w-[38%] px-4 py-2.5 text-left">Logistics Route &amp; Remarks</th>
+                                <th scope="col" class="w-[20%] px-4 py-2.5 text-right">Recorded</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-neutral-100 bg-white">
@@ -935,7 +931,7 @@
                                 <tr x-show="matches('{{ $movement->movement_type->value }}', '{{ addslashes($movement->fromLocation?->name ?? '') }}', '{{ addslashes($destinationName ?? '') }}', '{{ addslashes(($movement->item?->name ?? '').' '.($movement->item?->sku ?? '')) }}', '{{ addslashes($movement->remarks ?? '') }}', '{{ addslashes($movement->user?->name ?? '') }}')"
                                     class="hover:bg-neutral-50/70 transition-colors">
                                     {{-- Item & Movement Type --}}
-                                    <td class="px-4 py-3 align-top">
+                                    <td class="px-4 py-2.5 align-top">
                                         <div class="min-w-0">
                                             <span class="font-semibold text-neutral-900 truncate block" title="{{ $movement->item?->name ?? '—' }}">
                                                 {{ $movement->item?->name ?? '—' }}
@@ -952,7 +948,7 @@
                                     </td>
 
                                     {{-- Quantity --}}
-                                    <td class="px-3 py-3 text-right align-top">
+                                    <td class="px-3 py-2.5 text-right align-top">
                                         <div class="font-bold tabular-nums text-neutral-900 text-sm">
                                             {{ number_format($movement->quantity) }}
                                         </div>
@@ -962,7 +958,7 @@
                                     </td>
 
                                     {{-- Logistics Route (From -> To) & Remarks --}}
-                                    <td class="px-4 py-3 align-top">
+                                    <td class="px-4 py-2.5 align-top">
                                         <div class="min-w-0 space-y-1">
                                             {{-- Route Indicator --}}
                                             @if ($movement->fromLocation && $destinationName)
@@ -999,7 +995,7 @@
                                     </td>
 
                                     {{-- Recorded Timestamp & User --}}
-                                    <td class="px-4 py-3 text-right align-top">
+                                    <td class="px-4 py-2.5 text-right align-top">
                                         <span class="text-xs font-medium text-neutral-800 block whitespace-nowrap">
                                             {{ $movement->moved_at?->format('M d, Y g:i A') ?? '—' }}
                                         </span>
@@ -1015,8 +1011,8 @@
                     </table>
                 </div>
 
-                {{-- Mobile Feed View (Fluid Cards with Vertical Scrollbar) --}}
-                <div class="block md:hidden overflow-y-auto max-h-[460px] divide-y divide-neutral-100">
+                {{-- Mobile Feed View (Fluid Cards with Viewport-Fitting Scroll) --}}
+                <div class="block md:hidden overflow-y-auto max-h-[calc(100vh-25rem)] min-h-[220px] divide-y divide-neutral-100">
                     @foreach ($movements as $movement)
                         @php
                             $destinationName = null;

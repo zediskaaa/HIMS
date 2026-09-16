@@ -232,7 +232,7 @@ class UiNavigationAuthorizationTest extends TestCase
 
         $this->actingAs($manager)->get('/inventory/stock-movements')
             ->assertOk()
-            ->assertSee('Back to Inventory');
+            ->assertSee('Stock Movements &amp; Ledger', false);
 
         $this->actingAs($manager)->get('/inventory/suppliers')
             ->assertOk()

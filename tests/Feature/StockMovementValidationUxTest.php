@@ -65,6 +65,8 @@ class StockMovementValidationUxTest extends TestCase
         $response->assertSee('No available stock');
         $response->assertSee('Confirm Stock Movement');
         $response->assertSee('btn-save-movement');
+        $response->assertSee('Record Movement');
+        $response->assertSee('record-quick-movement');
     }
 
     public function test_outbound_movement_with_sufficient_stock_succeeds_and_updates_ledger(): void
@@ -263,7 +265,7 @@ class StockMovementValidationUxTest extends TestCase
         $response->assertSee('placeholder="Search movements..."', false);
         $response->assertSee('All Movement Types');
         $response->assertSee('All Locations');
-        $response->assertSee('overflow-y-auto max-h-[460px]', false);
+        $response->assertSee('table-fixed', false);
         $response->assertSee('sticky top-0', false);
         $response->assertSee('Initial delivery intake');
     }

@@ -65,10 +65,19 @@
                 @endcanany
             </select>
         </div>
+
+        @if(request()->routeIs('inventory.stock-movements*') && ! empty($movementTypes))
+            <div class="pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                <x-ui.button size="sm" class="w-full" icon="plus" x-data x-on:click="$dispatch('open-modal', 'record-quick-movement')">
+                    Record Movement
+                </x-ui.button>
+            </div>
+        @endif
     </div>
 
     {{-- Desktop & Tablet Major Dropdown Tabs (>= sm) --}}
-    <div class="hidden sm:flex sm:items-center sm:gap-2.5 flex-wrap text-xs">
+    <div class="hidden sm:flex sm:items-center sm:justify-between sm:gap-2.5 flex-wrap text-xs">
+        <div class="flex items-center gap-2.5 flex-wrap">
             {{-- 1. Stock & Movements --}}
         @canany([\App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::AdjustStock->value, \App\Enums\Permission::ApproveAdjustment->value, \App\Enums\Permission::PerformCycleCount->value, \App\Enums\Permission::AcknowledgeAlerts->value])
             <div class="relative" @click.outside="if (openDropdown === 'stock') openDropdown = null">
@@ -300,5 +309,18 @@
                 </div>
             </div>
         @endcanany
+        </div>
+
+        @if(isset($actions))
+            <div class="flex items-center gap-2">
+                {!! $actions !!}
+            </div>
+        @elseif(request()->routeIs('inventory.stock-movements*') && ! empty($movementTypes))
+            <div class="flex items-center gap-2">
+                <x-ui.button size="sm" icon="plus" x-data x-on:click="$dispatch('open-modal', 'record-quick-movement')">
+                    Record Movement
+                </x-ui.button>
+            </div>
+        @endif
     </div>
 </div>
