@@ -26,6 +26,32 @@ class UiNavigationAuthorizationTest extends TestCase
         }
     }
 
+    public function test_all_workflow_and_reporting_icons_render_from_the_shared_icon_system(): void
+    {
+        $icons = [
+            'document-chart-bar',
+            'shopping-bag',
+            'building-office-2',
+            'globe-alt',
+            'scale',
+            'arrow-top-right-on-square',
+            'check-badge',
+            'exclamation-circle',
+            'table',
+            'table-cells',
+            'code-bracket',
+            'squares-2x2',
+            'printer',
+        ];
+
+        foreach ($icons as $icon) {
+            $html = Blade::render('<x-ui.icon name="'.$icon.'" />');
+
+            $this->assertStringContainsString('<svg', $html, "Icon {$icon} did not render an SVG element");
+            $this->assertStringContainsString('<path', $html, "Icon {$icon} did not render an SVG path");
+        }
+    }
+
     public function test_inventory_workflows_are_contextual_buttons_instead_of_sidebar_links(): void
     {
         $viewer = User::factory()->role(UserRole::Viewer)->create();
