@@ -363,8 +363,8 @@ class AiDemandForecastService
             throw new RuntimeException('missing_api_key');
         }
 
-        $primaryModel = trim((string) config('services.gemini.model', 'gemini-flash-lite-latest'));
-        $fallbackConfig = (string) config('services.gemini.fallback_models', 'gemini-3.1-flash-lite');
+        $primaryModel = trim((string) config('services.gemini.model', 'gemini-3.6-flash'));
+        $fallbackConfig = (string) config('services.gemini.fallback_models', 'gemini-flash-lite-latest,gemini-3.1-flash-lite');
         $fallbackCandidates = array_values(array_unique(array_filter(
             array_map('trim', explode(',', $fallbackConfig)),
             fn ($m) => $m !== '' && $m !== $primaryModel
@@ -404,10 +404,10 @@ class AiDemandForecastService
                     ->asJson()
                     ->withHeaders(['X-goog-api-key' => $apiKey])
                     ->connectTimeout(5)
-                    ->timeout(max(5, (int) config('services.gemini.timeout', 30)))
+                    ->timeout(min(15, max(5, (int) config('services.gemini.timeout', 12))))
                     ->retry(
-                        3,
-                        fn (int $attempt) => $attempt * 250,
+                        2,
+                        fn (int $attempt) => $attempt * 200,
                         fn (Throwable $exception) => $this->isRetryable($exception),
                         throw: false,
                     )

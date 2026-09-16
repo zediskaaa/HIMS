@@ -37,10 +37,10 @@ return [
 
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-flash-lite-latest'),
-        'fallback_models' => env('GEMINI_FALLBACK_MODELS', 'gemini-3.1-flash-lite'),
+        'model' => env('GEMINI_MODEL', 'gemini-3.6-flash'),
+        'fallback_models' => env('GEMINI_FALLBACK_MODELS', 'gemini-flash-lite-latest,gemini-3.1-flash-lite'),
         'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com'),
-        'timeout' => (int) env('GEMINI_TIMEOUT', 30),
+        'timeout' => (int) env('GEMINI_TIMEOUT', 12),
         'forecast_cache_minutes' => (int) env('GEMINI_FORECAST_CACHE_MINUTES', 360),
         'forecast_max_items' => (int) env('GEMINI_FORECAST_MAX_ITEMS', 100),
         // How long the statistical placeholder stays on the screens before the
