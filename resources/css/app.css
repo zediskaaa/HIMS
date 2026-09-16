@@ -49,6 +49,12 @@
         min-width: 0;
     }
 
+    /* Suppress duplicate browser-native password reveal (e.g. Edge ::-ms-reveal) so only the custom toggle is shown */
+    input::-ms-reveal,
+    input::-ms-clear {
+        display: none;
+    }
+
     /* Visible focus ring on every focusable element, not just form controls. */
     :focus-visible {
         @apply outline-none ring-2 ring-primary-500 ring-offset-2 ring-offset-white;

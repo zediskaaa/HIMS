@@ -152,6 +152,12 @@
             </div>
 
             <div class="relative mt-2">
+                <style>
+                    #password::-ms-reveal,
+                    #password::-ms-clear {
+                        display: none;
+                    }
+                </style>
                 <x-text-input
                     id="password"
                     class="block h-11 w-full rounded-lg bg-white px-3.5 pr-11 text-sm text-neutral-900 shadow-sm {{ $errors->has('email') || $errors->has('password') ? '!border-danger-500 focus:!border-danger-500' : 'border-neutral-300 focus:border-primary-500' }} focus:ring-primary-500"
