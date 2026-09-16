@@ -9,6 +9,7 @@ use App\Http\Requests\UpdatePurchaseOrderRequest;
 use App\Http\Resources\PurchaseOrderResource;
 use App\Models\PurchaseOrder;
 use App\Services\Procurement\POConversionService;
+use App\Services\Procurement\ProcurementAuditService;
 use DomainException;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -18,7 +19,10 @@ use Throwable;
 
 class PurchaseOrderController extends Controller implements HasMiddleware
 {
-    public function __construct(private readonly POConversionService $poConversionService) {}
+    public function __construct(
+        private readonly POConversionService $poConversionService,
+        private readonly ProcurementAuditService $auditService
+    ) {}
 
     public static function middleware(): array
     {
@@ -66,7 +70,18 @@ class PurchaseOrderController extends Controller implements HasMiddleware
 
     public function update(UpdatePurchaseOrderRequest $request, PurchaseOrder $purchase_order)
     {
+        $old = $purchase_order->only(array_keys($request->validated()));
         $purchase_order->update($request->validated());
+        $new = $purchase_order->only(array_keys($request->validated()));
+
+        $this->auditService->record(
+            $request->user(),
+            'PurchaseOrder',
+            $purchase_order->id,
+            'amended_purchase_order',
+            $old,
+            $new,
+        );
 
         return new PurchaseOrderResource($purchase_order);
     }

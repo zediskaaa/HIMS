@@ -225,6 +225,18 @@ class DocumentTrackingService
                 $locked->save();
 
                 $this->auditLogger->record(
+                    AuditAction::ArchivedLogisticsDocument,
+                    actor: $uploader,
+                    target: $locked,
+                    description: "Archived logistics document #{$locked->tracking_number} superseded by revision #{$trackingNumber}.",
+                    newValues: [
+                        'tracking_number' => $locked->tracking_number,
+                        'superseded_by_id' => $newDoc->id,
+                        'status' => 'archived',
+                    ],
+                );
+
+                $this->auditLogger->record(
                     AuditAction::RevisedLogisticsDocument,
                     actor: $uploader,
                     target: $newDoc,

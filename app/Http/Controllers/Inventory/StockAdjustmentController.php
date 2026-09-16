@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Enums\AuditAction;
 use App\Enums\MovementType;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryAdjustment;
 use App\Models\InventoryItem;
 use App\Models\StorageLocation;
+use App\Services\AuditLogger;
 use App\Services\Inventory\AdjustmentApprovalService;
 use App\Services\InventoryAutomationService;
 use DomainException;
@@ -30,7 +32,8 @@ class StockAdjustmentController extends Controller implements HasMiddleware
 
     public function __construct(
         private readonly InventoryAutomationService $automationService,
-        private readonly AdjustmentApprovalService $adjustmentService
+        private readonly AdjustmentApprovalService $adjustmentService,
+        private readonly AuditLogger $auditLogger,
     ) {}
 
     public function index(): View
@@ -108,7 +111,7 @@ class StockAdjustmentController extends Controller implements HasMiddleware
             $adjNumber = 'ADJ-' . now()->format('Ymd') . '-' . str_pad((string) (InventoryAdjustment::count() + 1), 4, '0', STR_PAD_LEFT);
             $currentQty = $this->automationService->availableAt((int) $validated['item_id'], $locationId);
 
-            InventoryAdjustment::create([
+            $adj = InventoryAdjustment::create([
                 'adjustment_number' => $adjNumber,
                 'item_id' => $validated['item_id'],
                 'storage_location_id' => $locationId,
@@ -125,6 +128,19 @@ class StockAdjustmentController extends Controller implements HasMiddleware
                 'approved_by_id' => $request->user()->id,
                 'posted_at' => now(),
             ]);
+
+            $this->auditLogger->record(
+                AuditAction::PostedInventoryAdjustment,
+                actor: $request->user(),
+                target: $adj,
+                description: "Posted inventory adjustment {$adj->adjustment_number} for {$item->name} (Delta: {$adj->adjustment_quantity})",
+                targetName: $adj->adjustment_number,
+                newValues: [
+                    'adjustment_number' => $adj->adjustment_number,
+                    'delta' => $adj->adjustment_quantity,
+                    'resulting_quantity' => $adj->resulting_quantity,
+                ]
+            );
 
             return redirect()->route('inventory.adjustments')->with('success', 'Stock adjustment applied successfully.');
         } catch (DomainException $e) {

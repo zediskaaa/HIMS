@@ -822,4 +822,148 @@ class AuditTrailTest extends TestCase
         $this->assertSame('2026-09-30 15:59:59.000000', $inside->occurred_at_utc);
         $this->assertSame('2026-09-30 16:00:01.000000', $outside->occurred_at_utc);
     }
+
+    public function test_smart_warehousing_and_stock_movements_record_audit_events(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)
+            ->post(route('inventory.warehousing.locations.store'), [
+                'code' => 'BIN-99A',
+                'name' => 'Automated Storage Cell 99A',
+                'type' => 'bin',
+                'zone' => 'Zone A',
+                'storage_classification' => 'general',
+                'temperature_classification' => 'ambient',
+                'is_receiving_staging' => 0,
+                'is_quarantine' => 0,
+                'is_pick_face' => 1,
+                'is_reserve' => 0,
+                'is_dispatch_staging' => 0,
+                'is_narcotics_vault' => 0,
+                'is_hazardous_containment' => 0,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $locLog = AuditLog::where('action', AuditAction::CreatedStorageLocation->value)
+            ->where('target_name', 'BIN-99A')
+            ->firstOrFail();
+
+        $this->assertSame($admin->id, $locLog->user_id);
+        $this->assertSame('BIN-99A', $locLog->new_values['code']);
+    }
+
+    public function test_direct_stock_movement_issuance_records_audit_event(): void
+    {
+        $user = User::factory()->pharmacyStaff()->create();
+        $source = \App\Models\StorageLocation::create(['name' => 'Main Warehouse', 'code' => 'MWH-01', 'type' => 'warehouse', 'status' => 'active']);
+        $ward = \App\Models\StorageLocation::create(['name' => 'Emergency Ward', 'code' => 'ER-01', 'type' => 'department', 'status' => 'active']);
+        $item = \App\Models\InventoryItem::create([
+            'name' => 'Surgical Gloves',
+            'sku' => 'TEST-GLV-01',
+            'quantity_on_hand' => 50,
+            'reorder_level' => 10,
+            'unit_cost' => 15.00,
+            'status' => 'active',
+        ]);
+
+        // Put initial stock in source
+        app(\App\Services\InventoryAutomationService::class)->recordMovement([
+            'item_id' => $item->id,
+            'movement_type' => \App\Enums\MovementType::StockIn,
+            'quantity' => 50,
+            'to_location_id' => $source->id,
+            'remarks' => 'Initial stock for audit test.',
+        ], $user->id);
+
+        AuditLog::query()->delete();
+
+        $this->actingAs($user)
+            ->post(route('inventory.stock-movements.store'), [
+                'item_id' => $item->id,
+                'movement_type' => \App\Enums\MovementType::Issuance->value,
+                'quantity' => 10,
+                'from_location_id' => $source->id,
+                'issued_to_location_id' => $ward->id,
+                'remarks' => 'Direct issuance to ward.',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $movementLog = AuditLog::where('action', AuditAction::RecordedStockMovement->value)->firstOrFail();
+        $this->assertSame($user->id, $movementLog->user_id);
+        $this->assertSame(\App\Enums\MovementType::Issuance->value, $movementLog->new_values['movement_type']);
+        $this->assertSame(10, $movementLog->new_values['quantity']);
+    }
+
+    public function test_routine_direct_stock_adjustment_records_posted_inventory_adjustment(): void
+    {
+        $user = User::factory()->inventoryManager()->create();
+        $location = \App\Models\StorageLocation::create(['name' => 'Storage Bay', 'code' => 'BAY-01', 'type' => 'shelf', 'status' => 'active']);
+        $item = \App\Models\InventoryItem::create([
+            'name' => 'Alcohol Swabs',
+            'sku' => 'TEST-SWB-01',
+            'quantity_on_hand' => 20,
+            'reorder_level' => 10,
+            'unit_cost' => 100.00,
+            'status' => 'active',
+        ]);
+
+        // Put stock in location
+        app(\App\Services\InventoryAutomationService::class)->recordMovement([
+            'item_id' => $item->id,
+            'movement_type' => \App\Enums\MovementType::StockIn,
+            'quantity' => 20,
+            'to_location_id' => $location->id,
+            'remarks' => 'Initial stock for adjustment test.',
+        ], $user->id);
+
+        AuditLog::query()->delete();
+
+        $this->actingAs($user)
+            ->post(route('inventory.adjustments.store'), [
+                'item_id' => $item->id,
+                'location_id' => $location->id,
+                'adjustment_type' => 'increase',
+                'quantity' => 20,
+                'reason' => 'Cycle count correction found 20 extra units.',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $adjustmentLog = AuditLog::where('action', AuditAction::PostedInventoryAdjustment->value)->firstOrFail();
+        $this->assertSame($user->id, $adjustmentLog->user_id);
+        $this->assertSame(20, $adjustmentLog->new_values['delta']);
+    }
+
+    public function test_place_name_resolves_human_readable_location_from_coordinates_or_stored_values(): void
+    {
+        $superAdmin = User::factory()->superAdministrator()->create();
+
+        // 1. Coordinates only (e.g. Quezon City 14.6646, 121.0500)
+        $coordLog = $this->auditLog([
+            'actor_name' => 'Dr. Reyes',
+            'location_source' => 'browser',
+            'location_latitude' => '14.6646',
+            'location_longitude' => '121.0500',
+            'location_accuracy_meters' => 148,
+        ]);
+
+        $this->assertSame('Quezon City, Metro Manila, Philippines', $coordLog->placeName());
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get(route('admin.audit-logs.show', $coordLog))
+            ->assertOk()
+            ->assertSee('Quezon City, Metro Manila, Philippines')
+            ->assertSee('Coordinates: 14.6646, 121.0500')
+            ->assertSee('View on Google Maps', false);
+
+        // 2. City and country already stored
+        $storedLog = $this->auditLog([
+            'actor_name' => 'Dr. Santos',
+            'location_city' => 'Cebu City',
+            'location_region' => 'Central Visayas',
+            'location_country' => 'Philippines',
+        ]);
+
+        $this->assertSame('Cebu City, Central Visayas, Philippines', $storedLog->placeName());
+    }
 }

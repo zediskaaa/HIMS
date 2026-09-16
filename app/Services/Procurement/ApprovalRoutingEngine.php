@@ -186,6 +186,17 @@ class ApprovalRoutingEngine
                 );
             }
 
+            if ($chain->status === 'approved' && $chain->chain_type === ApprovalChainType::PurchaseRequest) {
+                $this->auditService->record(
+                    $approver,
+                    'PurchaseRequest',
+                    $chain->target_id,
+                    'approved_purchase_request',
+                    ['status' => 'pending_approval'],
+                    ['status' => 'approved'],
+                );
+            }
+
             return $step;
         });
 

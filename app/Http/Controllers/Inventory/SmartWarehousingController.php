@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Enums\AuditAction;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
@@ -14,6 +15,7 @@ use App\Models\User;
 use App\Models\WarehouseException;
 use App\Models\WarehouseScanEvent;
 use App\Models\WarehouseTask;
+use App\Services\AuditLogger;
 use App\Services\Warehouse\BarcodeService;
 use App\Services\Warehouse\TelemetryService;
 use App\Services\Warehouse\WarehouseTaskService;
@@ -30,6 +32,7 @@ class SmartWarehousingController extends Controller implements HasMiddleware
         private readonly WarehouseTaskService $tasks,
         private readonly BarcodeService $barcodeService,
         private readonly TelemetryService $telemetry,
+        private readonly AuditLogger $auditLogger,
     ) {}
 
     public static function middleware(): array
@@ -142,7 +145,16 @@ class SmartWarehousingController extends Controller implements HasMiddleware
         $validated['barcode_value'] = $validated['barcode_value'] ?? $validated['code'];
         $validated['status'] = 'active';
 
-        StorageLocation::create($validated);
+        $location = StorageLocation::create($validated);
+
+        $this->auditLogger->record(
+            AuditAction::CreatedStorageLocation,
+            actor: $request->user(),
+            target: $location,
+            description: "Created storage location {$location->code}",
+            targetName: $location->code,
+            newValues: ['code' => $location->code, 'type' => $location->type, 'status' => $location->status],
+        );
 
         return back()->with('success', "Location {$validated['code']} created successfully.");
     }

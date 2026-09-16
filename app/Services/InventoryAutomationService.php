@@ -8,6 +8,8 @@ use App\Models\InventoryItem;
 use App\Models\ItemBatch;
 use App\Models\ItemStockLevel;
 use App\Models\StockMovement;
+use App\Models\StorageLocation;
+use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -66,7 +68,7 @@ class InventoryAutomationService
 
             $this->syncItemTotals($item);
 
-            if ($reference === null) {
+            if ($reference === null || $reference instanceof StorageLocation || $reference instanceof Supplier) {
                 $this->audit->log(
                     AuditAction::RecordedStockMovement,
                     $userId === null ? null : User::find($userId),

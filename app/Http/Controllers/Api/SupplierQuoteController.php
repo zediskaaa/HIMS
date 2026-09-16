@@ -8,6 +8,7 @@ use App\Http\Requests\StoreSupplierQuoteRequest;
 use App\Http\Requests\UpdateSupplierQuoteRequest;
 use App\Http\Resources\SupplierQuoteResource;
 use App\Models\SupplierQuote;
+use App\Services\Procurement\ProcurementAuditService;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -21,6 +22,8 @@ class SupplierQuoteController extends Controller implements HasMiddleware
             new Middleware('can:'.Permission::ManageSourcing->value, only: ['store', 'update']),
         ];
     }
+
+    public function __construct(private readonly ProcurementAuditService $auditService) {}
 
     public function index(Request $request)
     {
@@ -39,6 +42,15 @@ class SupplierQuoteController extends Controller implements HasMiddleware
     {
         $data = $request->validated();
         $sq = SupplierQuote::create($data);
+
+        $this->auditService->record(
+            $request->user(),
+            'SupplierQuote',
+            $sq->id,
+            'submitted_supplier_quote',
+            null,
+            ['supplier_id' => $sq->supplier_id, 'quoted_price' => $sq->quoted_price]
+        );
 
         return (new SupplierQuoteResource($sq))->response()->setStatusCode(201);
     }

@@ -177,7 +177,7 @@
                 <x-ui.table.th>Date &amp; Time</x-ui.table.th>
                 <x-ui.table.th>IP Address</x-ui.table.th>
             </x-ui.table.head>
-            <tbody x-data="{ expanded: {} }">
+            <tbody>
                 @forelse ($logs as $log)
                     @php
                         $variant = match ($log->action) {
@@ -191,11 +191,8 @@
                             default => 'neutral',
                         };
                         $hasDetails = !empty($log->old_values) || !empty($log->new_values);
-                        $hasBoth = !empty($log->old_values) && !empty($log->new_values);
-                        $singleValues = !empty($log->new_values) ? $log->new_values : ($log->old_values ?? []);
-                        $isSingleAfter = !empty($log->new_values);
                     @endphp
-                    <x-ui.table.row x-bind:class="expanded['{{ $log->id }}'] ? 'bg-primary-50/40' : ''">
+                    <x-ui.table.row>
                         <x-ui.table.td class="whitespace-nowrap">
                             <div class="font-medium text-neutral-900">{{ $log->displayActorName() }}</div>
                             @if ($log->actor_employee_id)
@@ -232,19 +229,21 @@
                         <x-ui.table.td>
                             <p class="text-neutral-700 leading-relaxed">{{ $log->description }}</p>
                             @if ($hasDetails)
-                                <button
-                                    type="button"
-                                    x-on:click="expanded['{{ $log->id }}'] = !expanded['{{ $log->id }}']"
-                                    class="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-primary-700 hover:text-primary-800 hover:underline focus:outline-none"
-                                >
-                                    <x-ui.icon name="chevron-down" class="h-3.5 w-3.5 transition-transform duration-200" x-bind:class="expanded['{{ $log->id }}'] ? 'rotate-180 text-primary-800' : 'text-primary-600'" />
-                                    <span x-text="expanded['{{ $log->id }}'] ? 'Hide recorded details' : 'View recorded details'">View recorded details</span>
-                                </button>
+                                <div class="mt-2">
+                                    <button
+                                        type="button"
+                                        x-on:click="$dispatch('open-modal', 'audit-log-details-{{ $log->id }}')"
+                                        class="group inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 shadow-2xs transition-all duration-150 hover:border-primary-300 hover:bg-primary-50/70 hover:text-primary-700 hover:shadow-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    >
+                                        <x-ui.icon name="document-text" class="h-3.5 w-3.5 text-neutral-400 group-hover:text-primary-600 transition-colors" />
+                                        <span>View recorded details</span>
+                                    </button>
+                                </div>
                             @endif
                         </x-ui.table.td>
 
                         <x-ui.table.td muted class="whitespace-nowrap">
-                            @php($displayTime = $log->displayTimestamp())
+                            @php $displayTime = $log->displayTimestamp(); @endphp
                             <time datetime="{{ $log->authoritativeTimestamp()->toIso8601String() }}" class="block font-medium text-neutral-900" title="{{ $displayTime->format('F j, Y, g:i:s A').' '.$log->displayTimezoneLabel() }}">
                                 {{ $displayTime->format('M d, Y, g:i:s A') }}
                                 <span class="block text-xs font-normal text-neutral-400">{{ $log->displayTimezoneLabel() }}</span>
@@ -255,108 +254,16 @@
                         </x-ui.table.td>
 
                         <x-ui.table.td muted class="whitespace-nowrap">
-                            <div class="flex items-center gap-1.5">
-                                <span class="font-mono text-xs text-neutral-600">{{ $log->ip_address ?? '—' }}</span>
-                                @if ($log->location_source === 'browser')
-                                    <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200" title="{{ $log->locationSummary() }} (Browser GPS)">
-                                        <x-ui.icon name="map-pin" class="h-3 w-3 text-emerald-600" />
-                                        GPS
-                                    </span>
-                                @elseif ($log->location_source === 'ip')
-                                    <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-neutral-100 text-neutral-600" title="{{ $log->locationSummary() }}">
-                                        IP
-                                    </span>
-                                @endif
-                            </div>
+                            <span class="font-mono text-xs text-neutral-600">{{ $log->ip_address ?? '—' }}</span>
                             <div class="mt-1.5">
-                                <a href="{{ route('admin.audit-logs.show', $log) }}" class="inline-flex items-center text-xs font-semibold text-primary-700 hover:text-primary-800 hover:underline">
-                                    Details &rarr;
+                                <a href="{{ route('admin.audit-logs.show', $log) }}"
+                                   class="inline-flex items-center justify-center rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 shadow-2xs transition-all duration-150 hover:border-primary-300 hover:bg-primary-50/70 hover:text-primary-700 hover:shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                   title="View full audit log details">
+                                    Details
                                 </a>
                             </div>
                         </x-ui.table.td>
                     </x-ui.table.row>
-
-                    @if ($hasDetails)
-                        <tr x-show="expanded['{{ $log->id }}']" x-cloak class="border-b border-neutral-200 bg-neutral-50/80">
-                            <td colspan="7" class="px-6 py-3.5">
-                                <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-2xs space-y-3">
-                                    <div class="flex items-center justify-between border-b border-neutral-100 pb-2">
-                                        <div class="flex items-center gap-2">
-                                            <span class="inline-flex h-6 w-6 items-center justify-center rounded bg-primary-50 text-primary-700">
-                                                <x-ui.icon name="clipboard-document-list" class="h-3.5 w-3.5" />
-                                            </span>
-                                            <h4 class="text-xs font-semibold text-neutral-900">Recorded Audit Details</h4>
-                                        </div>
-                                        <div class="flex items-center gap-3">
-                                            <span class="text-[11px] font-mono text-neutral-400">Log ID: #{{ $log->id }}</span>
-                                            <button
-                                                type="button"
-                                                x-on:click="expanded['{{ $log->id }}'] = false"
-                                                class="text-xs font-medium text-neutral-500 hover:text-neutral-800 focus:outline-none"
-                                            >
-                                                Close
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    @if ($hasBoth)
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div class="rounded-lg border border-neutral-200 bg-neutral-50/50 p-3">
-                                                <p class="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2.5">Before (Previous Values)</p>
-                                                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                                                    @foreach ($log->old_values as $field => $value)
-                                                        <div class="rounded-md bg-white p-2 border border-neutral-100">
-                                                            <dt class="font-medium text-neutral-500">{{ \Illuminate\Support\Str::headline($field) }}</dt>
-                                                            <dd class="mt-1 font-mono text-neutral-800 break-words">
-                                                                {{ is_array($value) ? json_encode($value, JSON_UNESCAPED_SLASHES) : (filled($value) ? $value : '—') }}
-                                                            </dd>
-                                                        </div>
-                                                    @endforeach
-                                                </dl>
-                                            </div>
-
-                                            <div class="rounded-lg border border-primary-200 bg-primary-50/20 p-3">
-                                                <p class="text-xs font-semibold uppercase tracking-wider text-primary-700 mb-2.5">After (New Values)</p>
-                                                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                                                    @foreach ($log->new_values as $field => $value)
-                                                        <div class="rounded-md bg-white p-2 border border-primary-100">
-                                                            <dt class="font-medium text-neutral-500">{{ \Illuminate\Support\Str::headline($field) }}</dt>
-                                                            <dd class="mt-1 font-mono text-neutral-800 break-words">
-                                                                {{ is_array($value) ? json_encode($value, JSON_UNESCAPED_SLASHES) : (filled($value) ? $value : '—') }}
-                                                            </dd>
-                                                        </div>
-                                                    @endforeach
-                                                </dl>
-                                            </div>
-                                        </div>
-                                    @else
-                                        <div>
-                                            <div class="mb-2 flex items-center justify-between">
-                                                <span class="text-xs font-medium text-neutral-500">
-                                                    {{ $isSingleAfter ? 'Recorded attributes (After):' : 'Prior attributes snapshot (Before):' }}
-                                                </span>
-                                                <span class="text-[11px] text-neutral-400">{{ count($singleValues) }} fields</span>
-                                            </div>
-                                            <dl class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 text-xs">
-                                                @foreach ($singleValues as $field => $value)
-                                                    <div class="rounded-lg border border-neutral-100 bg-neutral-50/80 p-2.5">
-                                                        <dt class="text-[11px] font-medium text-neutral-500">{{ \Illuminate\Support\Str::headline($field) }}</dt>
-                                                        <dd class="mt-1 font-semibold text-neutral-900 break-words">
-                                                            @if ($field === 'filesize' && is_numeric($value))
-                                                                {{ number_format($value) }} bytes <span class="text-neutral-500 font-normal">({{ round($value / 1024, 1) }} KB)</span>
-                                                            @else
-                                                                {{ is_array($value) ? json_encode($value, JSON_UNESCAPED_SLASHES) : (filled($value) ? $value : '—') }}
-                                                            @endif
-                                                        </dd>
-                                                    </div>
-                                                @endforeach
-                                            </dl>
-                                        </div>
-                                    @endif
-                                </div>
-                            </td>
-                        </tr>
-                    @endif
                 @empty
                     <x-ui.table.empty
                         :colspan="7"
@@ -373,4 +280,129 @@
             </x-slot:footer>
         @endif
     </x-ui.card>
+
+    @foreach ($logs as $log)
+        @if (!empty($log->old_values) || !empty($log->new_values))
+            @php
+                $hasBoth = !empty($log->old_values) && !empty($log->new_values);
+                $singleValues = !empty($log->new_values) ? $log->new_values : ($log->old_values ?? []);
+                $isSingleAfter = !empty($log->new_values);
+                $variant = match ($log->action) {
+                    \App\Enums\AuditAction::CreatedUser => 'success',
+                    \App\Enums\AuditAction::DeletedUser => 'danger',
+                    \App\Enums\AuditAction::LoggedIn => 'primary',
+                    \App\Enums\AuditAction::LoggedOut => 'neutral',
+                    \App\Enums\AuditAction::ChangedPassword => 'warning',
+                    \App\Enums\AuditAction::TemporarilyLockedUser => 'danger',
+                    \App\Enums\AuditAction::UnlockedUser => 'success',
+                    default => 'neutral',
+                };
+            @endphp
+
+            <x-ui.modal name="audit-log-details-{{ $log->id }}" title="Recorded Audit Details #{{ $log->id }}" maxWidth="3xl">
+                <div class="space-y-4">
+                    {{-- Event Context Summary --}}
+                    <div class="rounded-lg border border-neutral-200 bg-neutral-50/80 p-3.5">
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                            <div>
+                                <span class="block text-[11px] font-medium text-neutral-500">Action</span>
+                                <span class="mt-0.5 inline-block"><x-ui.badge :variant="$variant">{{ $log->action->label() }}</x-ui.badge></span>
+                            </div>
+                            <div>
+                                <span class="block text-[11px] font-medium text-neutral-500">Module</span>
+                                <span class="mt-1 block font-semibold text-neutral-800">{{ $log->module ?? $log->action->module() }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[11px] font-medium text-neutral-500">Performed By</span>
+                                <span class="mt-1 block font-semibold text-neutral-800">{{ $log->displayActorName() }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[11px] font-medium text-neutral-500">Timestamp</span>
+                                <span class="mt-1 block font-medium text-neutral-700">{{ $log->displayTimestamp()->format('M d, Y, g:i:s A') }}</span>
+                            </div>
+                        </div>
+                        @if ($log->description)
+                            <div class="mt-3 pt-2.5 border-t border-neutral-200/70 text-xs">
+                                <span class="text-[11px] font-medium text-neutral-500">Description:</span>
+                                <p class="mt-0.5 text-neutral-800 leading-relaxed">{{ $log->description }}</p>
+                            </div>
+                        @endif
+                        @if ($place = ($log->placeName() ?? $log->locationSummary()))
+                            <div class="mt-2.5 pt-2 border-t border-neutral-200/70 text-xs flex items-center gap-1.5 text-neutral-600">
+                                <x-ui.icon name="map-pin" class="h-3.5 w-3.5 text-primary-500 shrink-0" />
+                                <span><strong class="text-neutral-700">Location:</strong> {{ $place }}</span>
+                            </div>
+                        @endif
+                    </div>
+
+                    @if ($hasBoth)
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="rounded-lg border border-neutral-200 bg-neutral-50/50 p-3.5">
+                                <p class="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2.5">Before (Previous Values)</p>
+                                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                    @foreach ($log->old_values as $field => $value)
+                                        <div class="rounded-md bg-white p-2.5 border border-neutral-100 shadow-2xs">
+                                            <dt class="font-medium text-neutral-500">{{ \Illuminate\Support\Str::headline($field) }}</dt>
+                                            <dd class="mt-1 font-mono text-neutral-800 break-words">
+                                                {{ is_array($value) ? json_encode($value, JSON_UNESCAPED_SLASHES) : (filled($value) ? $value : '—') }}
+                                            </dd>
+                                        </div>
+                                    @endforeach
+                                </dl>
+                            </div>
+
+                            <div class="rounded-lg border border-primary-200 bg-primary-50/20 p-3.5">
+                                <p class="text-xs font-semibold uppercase tracking-wider text-primary-700 mb-2.5">After (New Values)</p>
+                                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                    @foreach ($log->new_values as $field => $value)
+                                        <div class="rounded-md bg-white p-2.5 border border-primary-100 shadow-2xs">
+                                            <dt class="font-medium text-neutral-500">{{ \Illuminate\Support\Str::headline($field) }}</dt>
+                                            <dd class="mt-1 font-mono text-neutral-800 break-words">
+                                                {{ is_array($value) ? json_encode($value, JSON_UNESCAPED_SLASHES) : (filled($value) ? $value : '—') }}
+                                            </dd>
+                                        </div>
+                                    @endforeach
+                                </dl>
+                            </div>
+                        </div>
+                    @else
+                        <div>
+                            <div class="mb-2 flex items-center justify-between">
+                                <span class="text-xs font-medium text-neutral-600">
+                                    {{ $isSingleAfter ? 'Recorded attributes (After):' : 'Prior attributes snapshot (Before):' }}
+                                </span>
+                                <span class="text-[11px] font-medium text-neutral-400">{{ count($singleValues) }} fields</span>
+                            </div>
+                            <dl class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs">
+                                @foreach ($singleValues as $field => $value)
+                                    <div class="rounded-lg border border-neutral-200 bg-neutral-50/70 p-3">
+                                        <dt class="text-[11px] font-medium text-neutral-500">{{ \Illuminate\Support\Str::headline($field) }}</dt>
+                                        <dd class="mt-1 font-semibold text-neutral-900 break-words">
+                                            @if ($field === 'filesize' && is_numeric($value))
+                                                {{ number_format($value) }} bytes <span class="text-neutral-500 font-normal">({{ round($value / 1024, 1) }} KB)</span>
+                                            @else
+                                                {{ is_array($value) ? json_encode($value, JSON_UNESCAPED_SLASHES) : (filled($value) ? $value : '—') }}
+                                            @endif
+                                        </dd>
+                                    </div>
+                                @endforeach
+                            </dl>
+                        </div>
+                    @endif
+                </div>
+
+                    <div class="flex items-center justify-between pt-3 border-t border-neutral-200">
+                        <a href="{{ route('admin.audit-logs.show', $log) }}"
+                           class="group inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-2xs transition-all duration-150 hover:border-primary-300 hover:bg-primary-50/70 hover:text-primary-700 hover:shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                            <x-ui.icon name="arrow-top-right-on-square" class="w-3.5 h-3.5 text-neutral-400 group-hover:text-primary-600 transition-colors" />
+                            <span>Full Log Details</span>
+                        </a>
+                        <x-ui.button variant="secondary" size="sm" type="button" x-on:click="open = false">
+                            Close
+                        </x-ui.button>
+                    </div>
+                </div>
+            </x-ui.modal>
+        @endif
+    @endforeach
 </x-app-layout>

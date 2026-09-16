@@ -8,6 +8,7 @@ use App\Http\Requests\StoreProcurementRequestRequest;
 use App\Http\Requests\UpdateProcurementRequestRequest;
 use App\Http\Resources\ProcurementRequestResource;
 use App\Models\ProcurementRequest;
+use App\Services\Procurement\ProcurementAuditService;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -22,6 +23,8 @@ class ProcurementRequestController extends Controller implements HasMiddleware
             new Middleware('can:'.Permission::ManageProcurement->value, only: ['update']),
         ];
     }
+
+    public function __construct(private readonly ProcurementAuditService $auditService) {}
 
     public function index(Request $request)
     {
@@ -41,12 +44,36 @@ class ProcurementRequestController extends Controller implements HasMiddleware
         $data = $request->validated();
         $pr = ProcurementRequest::create($data);
 
+        $this->auditService->record(
+            $request->user(),
+            'ProcurementRequest',
+            $pr->id,
+            'created_purchase_request',
+            null,
+            ['request_number' => $pr->request_number, 'item_id' => $pr->item_id, 'quantity' => $pr->requested_quantity]
+        );
+
         return (new ProcurementRequestResource($pr))->response()->setStatusCode(201);
     }
 
     public function update(UpdateProcurementRequestRequest $request, ProcurementRequest $procurement_request)
     {
+        $old = $procurement_request->only(array_keys($request->validated()));
         $procurement_request->update($request->validated());
+        $new = $procurement_request->only(array_keys($request->validated()));
+
+        $action = ($new['status'] ?? null) === 'approved' && ($old['status'] ?? null) !== 'approved'
+            ? 'approved_purchase_request'
+            : 'created_purchase_request';
+
+        $this->auditService->record(
+            $request->user(),
+            'ProcurementRequest',
+            $procurement_request->id,
+            $action,
+            $old,
+            $new
+        );
 
         return new ProcurementRequestResource($procurement_request);
     }

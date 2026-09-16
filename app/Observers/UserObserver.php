@@ -23,6 +23,8 @@ class UserObserver
         'phone',
         'role',
         'status',
+        'avatar_path',
+        'session_timeout_reminder_enabled',
     ];
 
     public function __construct(

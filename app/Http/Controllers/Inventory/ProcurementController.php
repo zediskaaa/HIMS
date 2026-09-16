@@ -219,10 +219,19 @@ class ProcurementController extends Controller implements HasMiddleware
             'evaluation_status' => ['nullable', 'in:pending,approved,rejected'],
         ]);
 
-        ProcurementRequest::create([
+        $pr = ProcurementRequest::create([
             ...$validated,
             'request_number' => 'REQ-'.now()->format('YmdHis'),
         ]);
+
+        $this->auditService->record(
+            auth()->user(),
+            'ProcurementRequest',
+            $pr->id,
+            'created_purchase_request',
+            null,
+            ['request_number' => $pr->request_number, 'item_id' => $pr->item_id, 'quantity' => $pr->requested_quantity]
+        );
 
         return redirect()->route('inventory.purchases')->with('success', 'Procurement request created successfully.');
     }
@@ -236,7 +245,16 @@ class ProcurementController extends Controller implements HasMiddleware
             'notes' => ['nullable', 'string', 'max:255'],
         ]);
 
-        SupplierQuote::create($validated);
+        $quote = SupplierQuote::create($validated);
+
+        $this->auditService->record(
+            auth()->user(),
+            'SupplierQuote',
+            $quote->id,
+            'submitted_supplier_quote',
+            null,
+            ['supplier_id' => $quote->supplier_id, 'quoted_price' => $quote->quoted_price]
+        );
 
         return redirect()->route('inventory.purchases')->with('success', 'Supplier quote submitted successfully.');
     }
@@ -251,9 +269,19 @@ class ProcurementController extends Controller implements HasMiddleware
             'supplier_id' => ['nullable', new ProcurementEligibleSupplier],
         ]);
 
+        $oldStatus = $procurementRequest->status;
         $procurementRequest->fill($validated);
         $procurementRequest->status = 'approved';
         $procurementRequest->save();
+
+        $this->auditService->record(
+            auth()->user(),
+            'ProcurementRequest',
+            $procurementRequest->id,
+            'approved_purchase_request',
+            ['status' => $oldStatus],
+            ['status' => 'approved', 'approved_by' => $procurementRequest->approved_by]
+        );
 
         return redirect()->route('inventory.purchases')->with('success', 'Procurement request approved.');
     }

@@ -120,6 +120,33 @@ class AuditLog extends Model
         return $this->location_latitude.', '.$this->location_longitude;
     }
 
+    /**
+     * Human-readable place name (e.g. "Quezon City, Metro Manila, Philippines").
+     * Uses recorded city/region/country if available, or reverse geocodes
+     * geographic coordinates when only latitude and longitude are recorded.
+     */
+    public function placeName(): ?string
+    {
+        $parts = array_values(array_unique(array_filter([
+            $this->location_city,
+            $this->location_region,
+            $this->location_country,
+        ])));
+
+        if ($parts !== []) {
+            return implode(', ', $parts);
+        }
+
+        if ($this->location_latitude !== null && $this->location_longitude !== null) {
+            return \App\Services\AuditReverseGeocoder::resolve(
+                (float) $this->location_latitude,
+                (float) $this->location_longitude
+            );
+        }
+
+        return null;
+    }
+
     public function locationSourceLabel(): ?string
     {
         return match ($this->location_source) {
