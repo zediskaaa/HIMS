@@ -226,7 +226,10 @@
                 class="mx-auto max-w-4xl rounded-2xl bg-white shadow-2xl ring-1 ring-neutral-900/10 overflow-hidden"
                 @click.away="showReceiveModal = false"
             >
-                <form action="{{ route('inventory.receiving.store') }}" method="POST" class="space-y-6">
+                <form action="{{ route('inventory.receiving.store') }}" method="POST" class="space-y-6"
+                      data-confirm-title="Submit goods receipt (GRN)"
+                      data-confirm-message="Are you sure you want to finalize this receiving intake? Received items will be placed into the inspection buffer."
+                      data-confirm-label="Finalize Receipt">
                     @csrf
                     <input type="hidden" name="purchase_order_id" :value="selectedPo ? selectedPo.id : ''">
 

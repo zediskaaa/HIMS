@@ -216,7 +216,10 @@
                                             @if($adj->status === 'pending_second_approval' && auth()->id() === $adj->approved_by_id)
                                                 <span class="text-xs text-neutral-400 italic">Signed (Tier 1)</span>
                                             @else
-                                                <form action="{{ route('inventory.adjustments.approve', $adj) }}" method="POST" class="inline">
+                                                <form action="{{ route('inventory.adjustments.approve', $adj) }}" method="POST" class="inline"
+                                                      data-confirm-title="Approve stock adjustment"
+                                                      data-confirm-message="Are you sure you want to authorize this stock adjustment? On-hand inventory will be adjusted immediately."
+                                                      data-confirm-label="Authorize Adjustment">
                                                     @csrf
                                                     <button type="submit" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
                                                         {{ $adj->status === 'pending_second_approval' ? 'Tier 2 Authorize' : 'Authorize Adjustment' }}

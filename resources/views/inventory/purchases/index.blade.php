@@ -428,7 +428,10 @@
                         </div>
                     </div>
 
-                    <form method="POST" action="{{ route('inventory.purchases.enterprise-requests.store') }}" class="mt-4 grid gap-4 md:grid-cols-3">
+                    <form method="POST" action="{{ route('inventory.purchases.enterprise-requests.store') }}" class="mt-4 grid gap-4 md:grid-cols-3"
+                          data-confirm-title="Submit procurement request"
+                          data-confirm-message="Are you sure you want to submit this procurement request for department review?"
+                          data-confirm-label="Submit Request">
                         @csrf
                         {{-- Requisition Title --}}
                         <div>
@@ -664,7 +667,10 @@
                         <span class="rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-700">Sealed Bidding Protocol</span>
                     </div>
 
-                    <form method="POST" action="{{ route('inventory.purchases.rfqs.store') }}" class="mt-4 grid gap-4 md:grid-cols-3">
+                    <form method="POST" action="{{ route('inventory.purchases.rfqs.store') }}" class="mt-4 grid gap-4 md:grid-cols-3"
+                          data-confirm-title="Issue Request for Quotation (RFQ)"
+                          data-confirm-message="Are you sure you want to publish this RFQ to invited suppliers?"
+                          data-confirm-label="Issue RFQ">
                         @csrf
                         <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">RFQ Event Title</label>
@@ -804,7 +810,10 @@
                                                         View Matrix
                                                     </button>
                                                     @can('evaluate_bids')
-                                                    <form method="POST" action="{{ route('inventory.purchases.rfqs.evaluate', $rfq) }}">
+                                                    <form method="POST" action="{{ route('inventory.purchases.rfqs.evaluate', $rfq) }}"
+                                                          data-confirm-title="Run RFQ evaluation matrix"
+                                                          data-confirm-message="Are you sure you want to run the comparative evaluation matrix on submitted bids?"
+                                                          data-confirm-label="Run Matrix">
                                                         @csrf
                                                         <button type="submit" title="Re-run comparative evaluation matrix" class="rounded border border-neutral-200 p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 transition">
                                                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -816,7 +825,10 @@
                                                 </div>
                                             @else
                                                 @can('evaluate_bids')
-                                                <form method="POST" action="{{ route('inventory.purchases.rfqs.evaluate', $rfq) }}">
+                                                <form method="POST" action="{{ route('inventory.purchases.rfqs.evaluate', $rfq) }}"
+                                                      data-confirm-title="Run RFQ evaluation matrix"
+                                                      data-confirm-message="Are you sure you want to run the comparative evaluation matrix on submitted bids?"
+                                                      data-confirm-label="Run Matrix">
                                                     @csrf
                                                     <button type="submit" class="inline-flex items-center gap-1 rounded bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-800 shadow-sm transition">
                                                         <svg class="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -905,7 +917,10 @@
                                                         </span>
                                                         @if($activeEvaluatedRfq->status->value !== 'awarded')
                                                             @can('award_procurement')
-                                                            <form method="POST" action="{{ route('inventory.purchases.rfqs.award', $activeEvaluatedRfq) }}" class="mt-1">
+                                                            <form method="POST" action="{{ route('inventory.purchases.rfqs.award', $activeEvaluatedRfq) }}" class="mt-1"
+                                                                  data-confirm-title="Award procurement contract / RFQ"
+                                                                  data-confirm-message="Are you sure you want to award this contract to the selected supplier and initiate Delegation of Authority (DOA)?"
+                                                                  data-confirm-label="Award &amp; Initiate DOA">
                                                                 @csrf
                                                                 <input type="hidden" name="supplier_quote_id" value="{{ $eval->supplier_quote_id }}">
                                                                 <button type="submit" class="rounded bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-emerald-700">
@@ -985,13 +1000,20 @@
                                 @if($chain->status === 'pending')
                                     @can('approve_purchase_order')
                                     <div class="mt-4 flex items-center justify-end gap-2 border-t border-neutral-100 pt-3">
-                                        <form method="POST" action="{{ route('inventory.purchases.approval-chains.approve', $chain) }}">
+                                        <form method="POST" action="{{ route('inventory.purchases.approval-chains.approve', $chain) }}"
+                                              data-confirm-title="Authorize procurement approval step"
+                                              data-confirm-message="Are you sure you want to authorize this approval step for Chain #{{ $chain->id }} (₱{{ number_format($chain->total_commitment_amount, 2) }})?"
+                                              data-confirm-label="Authorize Step">
                                             @csrf
                                             <button type="submit" class="rounded bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
                                                 Authorize Step
                                             </button>
                                         </form>
-                                        <form method="POST" action="{{ route('inventory.purchases.approval-chains.reject', $chain) }}">
+                                        <form method="POST" action="{{ route('inventory.purchases.approval-chains.reject', $chain) }}"
+                                              data-confirm-title="Reject procurement approval step"
+                                              data-confirm-message="Are you sure you want to reject this approval chain? The procurement commitment will be halted."
+                                              data-confirm-label="Reject Step"
+                                              data-confirm-variant="danger">
                                             @csrf
                                             <input type="hidden" name="rejection_reason" value="Executive budget re-allocation">
                                             <button type="submit" class="rounded border border-neutral-300 px-3.5 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100">
@@ -1038,7 +1060,10 @@
                                     </div>
                                 </div>
                             @else
-                                <form id="direct-po-form" x-ref="purchaseOrderForm" method="POST" action="{{ route('inventory.purchases.orders.store') }}" class="space-y-4 p-4" data-loading-text="Creating purchase order..." x-on:submit="if (! $refs.purchaseOrderForm.checkValidity()) { $refs.poTerms.open = true }">
+                                <form id="direct-po-form" x-ref="purchaseOrderForm" method="POST" action="{{ route('inventory.purchases.orders.store') }}" class="space-y-4 p-4" data-loading-text="Creating purchase order..." x-on:submit="if (! $refs.purchaseOrderForm.checkValidity()) { $refs.poTerms.open = true }"
+                                      data-confirm-title="Issue Purchase Order"
+                                      data-confirm-message="Are you sure you want to issue this purchase order? Financial commitments will be recorded."
+                                      data-confirm-label="Issue PO">
                                     @csrf
 
                                     <x-ui.field name="item_id" label="Inventory item" type="select" required x-model="itemId">
@@ -1756,7 +1781,10 @@
                             </div>
 
                             @can('create_requisition')
-                            <form id="procurement-request-form" method="POST" action="{{ route('inventory.purchases.requests.store') }}" class="grid grid-cols-12 gap-x-3 gap-y-2.5">
+                            <form id="procurement-request-form" method="POST" action="{{ route('inventory.purchases.requests.store') }}" class="grid grid-cols-12 gap-x-3 gap-y-2.5"
+                                  data-confirm-title="Submit purchase request"
+                                  data-confirm-message="Are you sure you want to submit this purchase request?"
+                                  data-confirm-label="Submit Request">
                                 @csrf
                                 {{-- Row 1: Title (8 cols) & Priority (4 cols) --}}
                                 <div class="col-span-12 sm:col-span-8">
@@ -1913,7 +1941,10 @@
                                         </div>
                                     </div>
                                 @else
-                                    <form id="supplier-quote-form" method="POST" action="{{ route('inventory.purchases.quotes.store') }}" class="grid grid-cols-12 gap-x-3 gap-y-2.5">
+                                    <form id="supplier-quote-form" method="POST" action="{{ route('inventory.purchases.quotes.store') }}" class="grid grid-cols-12 gap-x-3 gap-y-2.5"
+                                          data-confirm-title="Submit supplier quote"
+                                          data-confirm-message="Are you sure you want to record this supplier quotation?"
+                                          data-confirm-label="Submit Quote">
                                         @csrf
                                         <div class="col-span-12 sm:col-span-7">
                                             <label for="quote-request" class="mb-1 block text-xs font-semibold text-neutral-700">

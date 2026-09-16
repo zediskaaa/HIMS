@@ -570,7 +570,10 @@
                             <button @click="verifyModalOpen = false" class="rounded-lg p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100">&times;</button>
                         </div>
 
-                        <form :action="'/inventory/logistics/documents/' + verifyDocId + '/verify'" method="POST" class="mt-4 space-y-3.5">
+                        <form :action="'/inventory/logistics/documents/' + verifyDocId + '/verify'" method="POST" class="mt-4 space-y-3.5"
+                              data-confirm-title="Verify logistics document"
+                              data-confirm-message="Are you sure you want to record this document verification audit decision?"
+                              data-confirm-label="Submit Verification">
                             @csrf
                             <p class="text-xs text-neutral-600">Reviewing cryptographic record <span class="font-mono font-bold text-neutral-900" x-text="verifyDocTracking"></span>.</p>
 
@@ -611,7 +614,11 @@
                             <button @click="supersedeModalOpen = false" class="rounded-lg p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100">&times;</button>
                         </div>
 
-                        <form :action="'/inventory/logistics/documents/' + supersedeDocId + '/supersede'" method="POST" enctype="multipart/form-data" class="mt-4 space-y-3.5">
+                        <form :action="'/inventory/logistics/documents/' + supersedeDocId + '/supersede'" method="POST" enctype="multipart/form-data" class="mt-4 space-y-3.5"
+                              data-confirm-title="Supersede logistics document"
+                              data-confirm-message="Are you sure you want to supersede this document with a new revision? The current version will be archived as superseded."
+                              data-confirm-label="Upload Revision"
+                              data-confirm-variant="warning">
                             @csrf
                             <p class="text-xs text-neutral-600">The current version of <span class="font-mono font-bold text-neutral-900" x-text="supersedeDocTracking"></span> will be marked as Superseded. Historical audits remain immutable.</p>
 

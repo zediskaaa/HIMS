@@ -56,7 +56,10 @@
                 <div class="flex items-center gap-2">
                     @if($review->isDraft())
                         @can(\App\Enums\Permission::CreateProcessReview->value)
-                        <form action="{{ route('reviews.submit', $review) }}" method="POST">
+                        <form action="{{ route('reviews.submit', $review) }}" method="POST"
+                              data-confirm-title="Submit review for BAC approval"
+                              data-confirm-message="Are you sure you want to submit this review for formal Bids and Awards Committee (BAC) approval?"
+                              data-confirm-label="Submit for Approval">
                             @csrf
                             <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
@@ -67,7 +70,10 @@
                     @elseif($review->isSubmitted())
                         @can(\App\Enums\Permission::ApproveProcessReview->value)
                         @if($review->canBeApprovedBy(auth()->user()))
-                            <form action="{{ route('reviews.approve', $review) }}" method="POST">
+                            <form action="{{ route('reviews.approve', $review) }}" method="POST"
+                                  data-confirm-title="Approve process review"
+                                  data-confirm-message="Are you sure you want to formally approve and sign off on this review?"
+                                  data-confirm-label="Approve Review">
                                 @csrf
                                 <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
@@ -717,7 +723,11 @@
                 <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
                     <h3 class="text-lg font-bold text-neutral-900">Return Review to Draft (Rejection)</h3>
                     <p class="text-xs text-neutral-600">Provide an authoritative justification for returning this review to the evaluator.</p>
-                    <form action="{{ route('reviews.reject', $review) }}" method="POST" class="space-y-4">
+                    <form action="{{ route('reviews.reject', $review) }}" method="POST" class="space-y-4"
+                          data-confirm-title="Reject process review"
+                          data-confirm-message="Are you sure you want to return this review to draft? The evaluator will be notified to revise findings."
+                          data-confirm-label="Confirm Rejection"
+                          data-confirm-variant="danger">
                         @csrf
                         <textarea name="rejection_reason" rows="3" required placeholder="Specify what operational parameters or findings require recalculation..."
                                   class="w-full rounded-lg border-neutral-300 text-sm shadow-sm focus:border-rose-500 focus:ring-rose-500"></textarea>
@@ -736,7 +746,10 @@
                 <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
                     <h3 class="text-lg font-bold text-neutral-900">Execute Intervention: <span x-text="implementTitle"></span></h3>
                     <p class="text-xs text-neutral-600">Confirm execution of this corrective intervention. Operational parameters such as standard lead times will be synchronized.</p>
-                    <form :action="implementUrl" method="POST" class="space-y-4">
+                    <form :action="implementUrl" method="POST" class="space-y-4"
+                          data-confirm-title="Implement corrective action"
+                          data-confirm-message="Are you sure you want to mark this corrective intervention as implemented? Operational parameters will be updated."
+                          data-confirm-label="Mark Implemented">
                         @csrf
                         <textarea name="implementation_notes" rows="3" placeholder="Document implementation memo number, supplier communication, or change details..."
                                   class="w-full rounded-lg border-neutral-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>

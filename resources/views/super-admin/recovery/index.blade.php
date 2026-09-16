@@ -15,12 +15,15 @@
                     <span>Full Health Diagnostics</span>
                 </a>
 
-                <form method="POST" action="{{ route('admin.recovery.rebuild-cache') }}" class="inline">
+                <form method="POST" action="{{ route('admin.recovery.rebuild-cache') }}" class="inline"
+                      data-confirm-title="Rebuild application cache"
+                      data-confirm-message="Are you sure you want to flush and rebuild the application configuration, routing, and view caches?"
+                      data-confirm-label="Rebuild Cache"
+                      data-confirm-variant="warning">
                     @csrf
                     <button
                         type="submit"
                         class="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-semibold text-neutral-700 shadow-sm transition hover:bg-neutral-50"
-                        onclick="return confirm('Rebuild system application cache? Stale cache will be flushed and warmed.');"
                     >
                         <svg class="h-4 w-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -29,12 +32,15 @@
                     </button>
                 </form>
 
-                <form method="POST" action="{{ route('admin.recovery.retry-all-jobs') }}" class="inline">
+                <form method="POST" action="{{ route('admin.recovery.retry-all-jobs') }}" class="inline"
+                      data-confirm-title="Retry all failed jobs"
+                      data-confirm-message="Are you sure you want to dispatch retries for all recorded failed background queue jobs?"
+                      data-confirm-label="Retry All Jobs"
+                      data-confirm-variant="warning">
                     @csrf
                     <button
                         type="submit"
                         class="inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-neutral-800"
-                        onclick="return confirm('Retry all recorded failed background queue jobs?');"
                     >
                         <svg class="h-4 w-4 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
@@ -411,12 +417,14 @@
                                         </button>
 
                                         @if ($record->canRetry())
-                                            <form method="POST" action="{{ route('admin.recovery.retry', $record) }}" class="inline">
+                                            <form method="POST" action="{{ route('admin.recovery.retry', $record) }}" class="inline"
+                                                  data-confirm-title="Execute smart retry"
+                                                  data-confirm-message="Are you sure you want to execute an idempotent retry for incident #{{ $record->error_id }}?"
+                                                  data-confirm-label="Smart Retry">
                                                 @csrf
                                                 <button
                                                     type="submit"
                                                     class="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-500 transition shadow-2xs whitespace-nowrap"
-                                                    onclick="return confirm('Initiate smart retry for incident #{{ $record->error_id }}?');"
                                                     title="Execute idempotent retry"
                                                 >
                                                     <svg class="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
@@ -426,12 +434,14 @@
                                         @endif
 
                                         @if ($record->isPending())
-                                            <form method="POST" action="{{ route('admin.recovery.resolve', $record) }}" class="inline">
+                                            <form method="POST" action="{{ route('admin.recovery.resolve', $record) }}" class="inline"
+                                                  data-confirm-title="Resolve incident"
+                                                  data-confirm-message="Are you sure you want to mark incident #{{ $record->error_id }} as resolved?"
+                                                  data-confirm-label="Mark Resolved">
                                                 @csrf
                                                 <button
                                                     type="submit"
                                                     class="inline-flex items-center gap-1 rounded-lg border border-neutral-300 bg-neutral-50 px-2 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-100 transition shadow-2xs whitespace-nowrap"
-                                                    onclick="return confirm('Mark incident #{{ $record->error_id }} as resolved?');"
                                                     title="Mark incident resolved"
                                                 >
                                                     <svg class="h-3 w-3 text-neutral-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -574,12 +584,14 @@
                             </button>
 
                             @if ($record->canRetry())
-                                <form method="POST" action="{{ route('admin.recovery.retry', $record) }}" class="flex-1">
+                                <form method="POST" action="{{ route('admin.recovery.retry', $record) }}" class="flex-1"
+                                      data-confirm-title="Execute smart retry"
+                                      data-confirm-message="Are you sure you want to execute an idempotent retry for incident #{{ $record->error_id }}?"
+                                      data-confirm-label="Smart Retry">
                                     @csrf
                                     <button
                                         type="submit"
                                         class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-xs font-semibold text-white hover:bg-emerald-500 transition shadow-sm"
-                                        onclick="return confirm('Initiate smart retry for incident #{{ $record->error_id }}?');"
                                     >
                                         <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                                         <span>Smart Retry</span>
@@ -588,12 +600,14 @@
                             @endif
 
                             @if ($record->isPending())
-                                <form method="POST" action="{{ route('admin.recovery.resolve', $record) }}" class="flex-1">
+                                <form method="POST" action="{{ route('admin.recovery.resolve', $record) }}" class="flex-1"
+                                      data-confirm-title="Resolve incident"
+                                      data-confirm-message="Are you sure you want to mark incident #{{ $record->error_id }} as resolved?"
+                                      data-confirm-label="Mark Resolved">
                                     @csrf
                                     <button
                                         type="submit"
                                         class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-50 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-100 transition shadow-sm"
-                                        onclick="return confirm('Mark incident #{{ $record->error_id }} as resolved?');"
                                     >
                                         <svg class="h-3.5 w-3.5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                         <span>Resolve</span>
@@ -769,12 +783,14 @@
                                     <span class="block">{{ $job->failed_at }}</span>
                                 </td>
                                 <td class="px-3 py-2.5 align-top text-right">
-                                    <form method="POST" action="{{ route('admin.recovery.retry-job', $job->uuid) }}" class="inline">
+                                    <form method="POST" action="{{ route('admin.recovery.retry-job', $job->uuid) }}" class="inline"
+                                          data-confirm-title="Retry failed queue job"
+                                          data-confirm-message="Are you sure you want to retry this queue job now?"
+                                          data-confirm-label="Retry Job">
                                         @csrf
                                         <button
                                             type="submit"
                                             class="rounded-lg bg-neutral-900 px-3 py-1 text-[11px] font-semibold text-white hover:bg-neutral-800 transition shadow-sm"
-                                            onclick="return confirm('Retry this queue job now?');"
                                         >
                                             Retry Job
                                         </button>
@@ -799,12 +815,14 @@
                         </p>
                         <div class="flex items-center justify-between pt-1">
                             <span class="text-neutral-400 text-[11px]">{{ $job->failed_at }}</span>
-                            <form method="POST" action="{{ route('admin.recovery.retry-job', $job->uuid) }}" class="inline">
+                            <form method="POST" action="{{ route('admin.recovery.retry-job', $job->uuid) }}" class="inline"
+                                  data-confirm-title="Retry failed queue job"
+                                  data-confirm-message="Are you sure you want to retry this queue job now?"
+                                  data-confirm-label="Retry Job">
                                 @csrf
                                 <button
                                     type="submit"
                                     class="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-800 transition"
-                                    onclick="return confirm('Retry this queue job now?');"
                                 >
                                     Retry Job
                                 </button>

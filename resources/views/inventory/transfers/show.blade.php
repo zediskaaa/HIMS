@@ -206,7 +206,10 @@
                 <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity" @click="receiveModalOpen = false"></div>
 
                 <div class="inline-block w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:align-middle">
-                    <form action="{{ route('inventory.transfers.receive', $stockTransfer) }}" method="POST">
+                    <form action="{{ route('inventory.transfers.receive', $stockTransfer) }}" method="POST"
+                          data-confirm-title="Confirm destination stock receipt"
+                          data-confirm-message="Are you sure you want to confirm receipt for Transfer #{{ $stockTransfer->transfer_number }}? Received quantities will be added to the destination location, and any damaged or lost items will be written off."
+                          data-confirm-label="Confirm Receipt">
                         @csrf
                         <div class="bg-white px-6 pt-6 pb-4">
                             <div class="flex items-center gap-3">

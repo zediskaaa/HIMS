@@ -540,6 +540,10 @@ const startDecisionConfirmations = () => {
     const message = dialog?.querySelector('[data-decision-message]');
     const cancelButton = dialog?.querySelector('[data-decision-cancel]');
     const confirmButton = dialog?.querySelector('[data-decision-confirm]');
+    const iconContainer = dialog?.querySelector('[data-decision-icon-container]');
+    const iconWarning = dialog?.querySelector('[data-decision-icon-warning]');
+    const iconDanger = dialog?.querySelector('[data-decision-icon-danger]');
+    const iconInfo = dialog?.querySelector('[data-decision-icon-info]');
 
     if (typeof HTMLDialogElement === 'undefined'
         || !(dialog instanceof HTMLDialogElement)
@@ -554,7 +558,7 @@ const startDecisionConfirmations = () => {
     let pending = null;
     let processing = false;
 
-    const decisionFor = (form) => {
+    const decisionFor = (form, submitter = null) => {
         if (form.matches('[data-confirm-mfa]')) {
             const enabled = form.querySelector('input[name="mfa_enabled"][type="checkbox"]')?.checked ?? false;
             const originallyEnabled = form.dataset.originalMfa === '1';
@@ -567,6 +571,7 @@ const startDecisionConfirmations = () => {
                     ? 'Are you sure you want to turn on MFA?'
                     : 'Are you sure you want to turn off MFA?',
                 label: enabled ? 'Turn On MFA' : 'Turn Off MFA',
+                variant: enabled ? 'primary' : 'warning',
             };
         }
 
@@ -581,16 +586,34 @@ const startDecisionConfirmations = () => {
                 title: 'Confirm account change',
                 message: 'Are you sure you want to change your sign-in email address?',
                 label: 'Change Email',
+                variant: 'primary',
             };
         }
 
-        const confirmationMessage = form.dataset.confirmMessage?.trim();
+        const confirmationMessage = submitter?.dataset?.confirmMessage?.trim()
+            || form.dataset.confirmMessage?.trim();
         if (!confirmationMessage) return null;
 
+        const title = submitter?.dataset?.confirmTitle?.trim()
+            || form.dataset.confirmTitle?.trim()
+            || 'Confirm action';
+
+        const label = submitter?.dataset?.confirmLabel?.trim()
+            || form.dataset.confirmLabel?.trim()
+            || 'Confirm';
+
+        const variant = submitter?.dataset?.confirmVariant?.trim()
+            || form.dataset.confirmVariant?.trim()
+            || (submitter?.matches('[data-confirm-destructive], .bg-danger-600, .text-danger-700')
+                || form.matches('[data-confirm-destructive]')
+                ? 'danger'
+                : 'primary');
+
         return {
-            title: form.dataset.confirmTitle?.trim() || 'Confirm action',
+            title,
             message: confirmationMessage,
-            label: form.dataset.confirmLabel?.trim() || 'Confirm',
+            label,
+            variant,
         };
     };
 
@@ -599,6 +622,14 @@ const startDecisionConfirmations = () => {
         cancelButton.disabled = false;
         confirmButton.disabled = false;
         confirmButton.removeAttribute('aria-busy');
+        confirmButton.classList.remove('bg-danger-600', 'border-danger-600', 'hover:bg-danger-700', 'hover:border-danger-700', 'active:bg-danger-700', 'focus-visible:ring-danger-500');
+        confirmButton.classList.add('bg-primary-600', 'border-primary-600', 'hover:bg-primary-700', 'hover:border-primary-700', 'active:bg-primary-800', 'focus-visible:ring-primary-500');
+        if (iconContainer) {
+            iconContainer.className = 'flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning-50 text-warning-700';
+            iconDanger?.classList.add('hidden');
+            iconWarning?.classList.remove('hidden');
+            iconInfo?.classList.add('hidden');
+        }
     };
 
     const closeDialog = ({ restoreFocus = true } = {}) => {
@@ -663,8 +694,8 @@ const startDecisionConfirmations = () => {
         });
     };
 
-    // This listener is registered before the session and loading listeners so
-    // Cancel has no side effects and no loading UI can appear prematurely.
+    // This listener is registered in the capture phase so form-level listeners
+    // and loading indicators do not fire until after user confirmation.
     document.addEventListener('submit', (event) => {
         const form = event.target;
         if (!(form instanceof HTMLFormElement)) return;
@@ -674,28 +705,62 @@ const startDecisionConfirmations = () => {
             return;
         }
 
-        const decision = decisionFor(form);
+        const submitter = event.submitter instanceof HTMLButtonElement
+            || event.submitter instanceof HTMLInputElement
+            ? event.submitter
+            : null;
+
+        const decision = decisionFor(form, submitter);
         if (!decision) return;
 
         event.preventDefault();
+        event.stopImmediatePropagation();
 
         if (dialog.open || processing) return;
 
         pending = {
             form,
-            submitter: event.submitter instanceof HTMLButtonElement
-                || event.submitter instanceof HTMLInputElement
-                ? event.submitter
-                : null,
+            submitter,
             focusedBeforeOpen: document.activeElement,
         };
 
         title.textContent = decision.title;
         message.textContent = decision.message;
         confirmButton.textContent = decision.label;
+
+        const isDanger = decision.variant === 'danger';
+        const isInfo = decision.variant === 'info';
+
+        if (iconContainer) {
+            if (isDanger) {
+                iconContainer.className = 'flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-danger-50 text-danger-700';
+                iconDanger?.classList.remove('hidden');
+                iconWarning?.classList.add('hidden');
+                iconInfo?.classList.add('hidden');
+            } else if (isInfo) {
+                iconContainer.className = 'flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700';
+                iconDanger?.classList.add('hidden');
+                iconWarning?.classList.add('hidden');
+                iconInfo?.classList.remove('hidden');
+            } else {
+                iconContainer.className = 'flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning-50 text-warning-700';
+                iconDanger?.classList.add('hidden');
+                iconWarning?.classList.remove('hidden');
+                iconInfo?.classList.add('hidden');
+            }
+        }
+
+        if (isDanger) {
+            confirmButton.classList.remove('bg-primary-600', 'border-primary-600', 'hover:bg-primary-700', 'hover:border-primary-700', 'active:bg-primary-800', 'focus-visible:ring-primary-500');
+            confirmButton.classList.add('bg-danger-600', 'border-danger-600', 'hover:bg-danger-700', 'hover:border-danger-700', 'active:bg-danger-700', 'focus-visible:ring-danger-500');
+        } else {
+            confirmButton.classList.remove('bg-danger-600', 'border-danger-600', 'hover:bg-danger-700', 'hover:border-danger-700', 'active:bg-danger-700', 'focus-visible:ring-danger-500');
+            confirmButton.classList.add('bg-primary-600', 'border-primary-600', 'hover:bg-primary-700', 'hover:border-primary-700', 'active:bg-primary-800', 'focus-visible:ring-primary-500');
+        }
+
         dialog.showModal();
         window.requestAnimationFrame(() => cancelButton.focus());
-    });
+    }, true);
 
     cancelButton.addEventListener('click', cancel);
     confirmButton.addEventListener('click', confirm);

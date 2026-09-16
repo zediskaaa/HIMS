@@ -8,8 +8,16 @@
 >
     <div class="p-5 sm:p-6">
         <div class="flex items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning-50 text-warning-700" aria-hidden="true">
-                <x-ui.icon name="exclamation-triangle" class="h-5 w-5" />
+            <span data-decision-icon-container class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning-50 text-warning-700" aria-hidden="true">
+                <span data-decision-icon-warning>
+                    <x-ui.icon name="exclamation-triangle" class="h-5 w-5" />
+                </span>
+                <span data-decision-icon-danger class="hidden">
+                    <x-ui.icon name="exclamation-circle" class="h-5 w-5" />
+                </span>
+                <span data-decision-icon-info class="hidden">
+                    <x-ui.icon name="information-circle" class="h-5 w-5" />
+                </span>
             </span>
 
             <div class="min-w-0 flex-1">

@@ -174,7 +174,11 @@
                     <button type="button" @click="showVaultModal = false" class="text-neutral-400 hover:text-neutral-600">&times;</button>
                 </div>
 
-                <form method="POST" action="{{ route('inventory.warehousing.narcotics.store') }}" class="mt-4 space-y-4">
+                <form method="POST" action="{{ route('inventory.warehousing.narcotics.store') }}" class="mt-4 space-y-4"
+                      data-confirm-title="Record narcotics vault transaction"
+                      data-confirm-message="Are you sure you want to record this controlled substances transaction? This will be permanently recorded in the dangerous drugs vault ledger."
+                      data-confirm-label="Record Transaction"
+                      data-confirm-variant="warning">
                     @csrf
                     <div>
                         <label class="text-xs font-semibold uppercase text-neutral-500">Movement Direction *</label>

@@ -294,7 +294,10 @@
                 <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity" @click="newRequisitionModal = false"></div>
 
                 <div class="inline-block w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:align-middle">
-                    <form action="{{ route('inventory.requisitions.store') }}" method="POST">
+                    <form action="{{ route('inventory.requisitions.store') }}" method="POST"
+                          data-confirm-title="Submit store requisition"
+                          data-confirm-message="Are you sure you want to submit this store requisition for approval?"
+                          data-confirm-label="Submit Requisition">
                         @csrf
                         <div class="bg-white px-6 pt-6 pb-4">
                             <div class="flex items-center gap-3">

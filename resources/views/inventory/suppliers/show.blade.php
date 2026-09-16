@@ -211,7 +211,10 @@
                             <x-ui.table.td><span class="text-xs">{{ $document->required_for_accreditation ? 'Required for this review' : 'Supporting' }}</span>@if($document->blocks_procurement_when_invalid)<span class="block text-xs font-medium text-danger-700">Blocks when invalid</span>@endif @if(!$document->is_current)<span class="block text-xs text-neutral-500">Historical version</span>@endif</x-ui.table.td>
                             <x-ui.table.td>
                                 @if ($canReview && $document->is_current && $document->verification_status === \App\Enums\SupplierDocumentStatus::Pending && $document->uploaded_by !== auth()->id())
-                                    <form method="POST" action="{{ route('inventory.suppliers.documents.verify', [$supplier, $document]) }}" class="space-y-2">
+                                    <form method="POST" action="{{ route('inventory.suppliers.documents.verify', [$supplier, $document]) }}" class="space-y-2"
+                                          data-confirm-title="Verify supplier document"
+                                          data-confirm-message="Are you sure you want to record this document verification decision for {{ $document->document_type }}?"
+                                          data-confirm-label="Record Decision">
                                         @csrf @method('PATCH')
                                         <select name="decision" class="rounded-md border-neutral-300 text-xs"><option value="verified">Verify</option><option value="rejected">Reject</option></select>
                                         <input name="review_notes" class="block w-44 rounded-md border-neutral-300 text-xs" placeholder="Reason if rejected">
@@ -260,9 +263,16 @@
                             <x-ui.table.td><x-ui.badge :status="$product->is_active ? 'active' : 'inactive'">{{ $product->is_active ? 'Active' : 'Inactive' }}</x-ui.badge>@if($product->is_preferred)<x-ui.badge variant="primary">Preferred</x-ui.badge>@endif
                                 @can(\App\Enums\Permission::ManageSuppliers->value)
                                 @if($product->is_active)
-                                    <form method="POST" action="{{ route('inventory.suppliers.products.deactivate', [$supplier, $product]) }}" class="mt-2">@csrf @method('PATCH')<button class="text-xs text-danger-700 hover:underline">Deactivate</button></form>
+                                    <form method="POST" action="{{ route('inventory.suppliers.products.deactivate', [$supplier, $product]) }}" class="mt-2"
+                                          data-confirm-title="Deactivate supplier product"
+                                          data-confirm-message="Are you sure you want to deactivate {{ $product->item?->name ?? 'this product' }} for this supplier?"
+                                          data-confirm-label="Deactivate Product"
+                                          data-confirm-variant="danger">@csrf @method('PATCH')<button class="text-xs text-danger-700 hover:underline">Deactivate</button></form>
                                 @else
-                                    <form method="POST" action="{{ route('inventory.suppliers.products.reactivate', [$supplier, $product]) }}" class="mt-2">@csrf @method('PATCH')<button class="text-xs text-primary-700 hover:underline">Reactivate</button></form>
+                                    <form method="POST" action="{{ route('inventory.suppliers.products.reactivate', [$supplier, $product]) }}" class="mt-2"
+                                          data-confirm-title="Reactivate supplier product"
+                                          data-confirm-message="Are you sure you want to reactivate {{ $product->item?->name ?? 'this product' }} for this supplier?"
+                                          data-confirm-label="Reactivate Product">@csrf @method('PATCH')<button class="text-xs text-primary-700 hover:underline">Reactivate</button></form>
                                 @endif
                                 @endcan
                             </x-ui.table.td>
@@ -286,7 +296,7 @@
                     <x-ui.table.head><x-ui.table.th>Contract</x-ui.table.th><x-ui.table.th>Period</x-ui.table.th><x-ui.table.th>Terms</x-ui.table.th><x-ui.table.th>Status</x-ui.table.th></x-ui.table.head>
                     <tbody>
                     @forelse($supplier->contracts as $contract)
-                        <x-ui.table.row><x-ui.table.td><span class="font-medium">{{ $contract->contract_number }}</span><span class="block text-xs text-neutral-500">{{ $contract->contract_type ?: 'Type not specified' }}</span></x-ui.table.td><x-ui.table.td>{{ $contract->starts_at->format('M d, Y') }} — {{ $contract->ends_at?->format('M d, Y') ?? 'open-ended' }}</x-ui.table.td><x-ui.table.td><span class="block text-xs">Payment: {{ $contract->payment_terms ?: '—' }}</span><span class="block text-xs">Delivery: {{ $contract->delivery_terms ?: '—' }}</span></x-ui.table.td><x-ui.table.td><x-ui.badge :status="$contract->effectiveStatus()">{{ str($contract->effectiveStatus())->headline() }}</x-ui.badge>@can(\App\Enums\Permission::ManageSuppliers->value)<form method="POST" action="{{ route('inventory.suppliers.contracts.update', [$supplier, $contract]) }}" class="mt-2">@csrf @method('PATCH')<input type="hidden" name="status" value="{{ $contract->status === 'active' ? 'inactive' : 'active' }}"><button class="text-xs text-primary-700 hover:underline">Mark {{ $contract->status === 'active' ? 'inactive' : 'active' }}</button></form>@endcan</x-ui.table.td></x-ui.table.row>
+                        <x-ui.table.row><x-ui.table.td><span class="font-medium">{{ $contract->contract_number }}</span><span class="block text-xs text-neutral-500">{{ $contract->contract_type ?: 'Type not specified' }}</span></x-ui.table.td><x-ui.table.td>{{ $contract->starts_at->format('M d, Y') }} — {{ $contract->ends_at?->format('M d, Y') ?? 'open-ended' }}</x-ui.table.td><x-ui.table.td><span class="block text-xs">Payment: {{ $contract->payment_terms ?: '—' }}</span><span class="block text-xs">Delivery: {{ $contract->delivery_terms ?: '—' }}</span></x-ui.table.td><x-ui.table.td><x-ui.badge :status="$contract->effectiveStatus()">{{ str($contract->effectiveStatus())->headline() }}</x-ui.badge>@can(\App\Enums\Permission::ManageSuppliers->value)<form method="POST" action="{{ route('inventory.suppliers.contracts.update', [$supplier, $contract]) }}" class="mt-2" data-confirm-title="Change contract status" data-confirm-message="Are you sure you want to change the status of Contract {{ $contract->contract_number }} to {{ $contract->status === 'active' ? 'inactive' : 'active' }}?" data-confirm-label="Update Status">@csrf @method('PATCH')<input type="hidden" name="status" value="{{ $contract->status === 'active' ? 'inactive' : 'active' }}"><button class="text-xs text-primary-700 hover:underline">Mark {{ $contract->status === 'active' ? 'inactive' : 'active' }}</button></form>@endcan</x-ui.table.td></x-ui.table.row>
                     @empty <x-ui.table.empty :colspan="4" icon="document-text" title="No contracts recorded" message="Add a reference when a supplier agreement actually exists." /> @endforelse
                     </tbody>
                 </x-ui.table>
@@ -565,7 +575,11 @@
                 @if ($errors->any() && old('_supplier_form') === 'link-product')
                     <x-ui.alert variant="danger" title="Product could not be linked" class="mb-4">Review the highlighted fields and try again.</x-ui.alert>
                 @endif
-                <form method="POST" action="{{ route('inventory.suppliers.products.store', $supplier) }}" class="space-y-3">
+                <form method="POST" action="{{ route('inventory.suppliers.products.store', $supplier) }}"
+                      data-confirm-title="Link catalog item"
+                      data-confirm-message="Are you sure you want to link this catalog item to this supplier?"
+                      data-confirm-label="Link item"
+                      class="space-y-3">
                     @csrf
                     <input type="hidden" name="_supplier_form" value="link-product">
                     <x-ui.field name="item_id" label="Inventory item" type="select" :options="$items->mapWithKeys(fn($item) => [$item->id => $item->name.' ('.$item->sku.')'])->all()" placeholder="Select item" required />
@@ -592,7 +606,11 @@
                 @if ($errors->any() && old('_supplier_form') === 'record-price')
                     <x-ui.alert variant="danger" title="Price could not be recorded" class="mb-4">Review the highlighted fields and try again.</x-ui.alert>
                 @endif
-                <form method="POST" action="{{ route('inventory.suppliers.prices.store', $supplier) }}" class="space-y-3">
+                <form method="POST" action="{{ route('inventory.suppliers.prices.store', $supplier) }}"
+                      data-confirm-title="Record product price"
+                      data-confirm-message="Are you sure you want to commit this price schedule for this supplier product?"
+                      data-confirm-label="Record price"
+                      class="space-y-3">
                     @csrf
                     <input type="hidden" name="_supplier_form" value="record-price">
                     <x-ui.field name="supplier_product_id" label="Supplier product" type="select" :options="$activeProducts->mapWithKeys(fn($p) => [$p->id => $p->item->name])->all()" required />
@@ -616,7 +634,11 @@
             @if ($errors->any() && old('_supplier_form') === 'add-contract')
                 <x-ui.alert variant="danger" title="Contract could not be recorded" class="mb-4">Review the highlighted fields and try again.</x-ui.alert>
             @endif
-            <form method="POST" action="{{ route('inventory.suppliers.contracts.store', $supplier) }}" class="space-y-3">
+            <form method="POST" action="{{ route('inventory.suppliers.contracts.store', $supplier) }}"
+                  data-confirm-title="Register contract"
+                  data-confirm-message="Are you sure you want to register this procurement contract reference?"
+                  data-confirm-label="Register contract"
+                  class="space-y-3">
                 @csrf
                 <input type="hidden" name="_supplier_form" value="add-contract">
                 <x-ui.field name="contract_number" label="Contract number" required />
@@ -655,7 +677,10 @@
                 @endif
 
                 @if ($canDecide && $supplier->accreditation_status === \App\Enums\SupplierAccreditationStatus::PendingReview)
-                    <form method="POST" action="{{ route('inventory.suppliers.approve', $supplier) }}" class="space-y-3">
+                    <form method="POST" action="{{ route('inventory.suppliers.approve', $supplier) }}" class="space-y-3"
+                          data-confirm-title="Approve supplier accreditation"
+                          data-confirm-message="Are you sure you want to approve accreditation for {{ $supplier->name }}? The supplier will become active for procurement."
+                          data-confirm-label="Approve Supplier">
                         @csrf
                         <input type="hidden" name="_supplier_form" value="lifecycle">
                         <x-ui.field name="expires_at" label="Accreditation valid until" type="date" hint="Leave blank only when the approving policy has no fixed renewal date." />
@@ -666,7 +691,11 @@
                         </label>
                         <x-ui.button type="submit" class="w-full" data-loading-text="Approving...">Approve Accreditation</x-ui.button>
                     </form>
-                    <form method="POST" action="{{ route('inventory.suppliers.reject', $supplier) }}" class="space-y-3 border-t border-neutral-200 pt-4">
+                    <form method="POST" action="{{ route('inventory.suppliers.reject', $supplier) }}" class="space-y-3 border-t border-neutral-200 pt-4"
+                          data-confirm-title="Reject supplier accreditation"
+                          data-confirm-message="Are you sure you want to reject accreditation for {{ $supplier->name }}? A rejection reason will be permanently recorded."
+                          data-confirm-label="Reject Supplier"
+                          data-confirm-variant="danger">
                         @csrf
                         <input type="hidden" name="_supplier_form" value="lifecycle">
                         <x-ui.field name="decision_notes" label="Rejection reason" type="textarea" rows="2" required />
@@ -677,13 +706,21 @@
                 @endif
 
                 @if ($canApprove && $supplier->status === \App\Enums\SupplierStatus::Active)
-                    <form method="POST" action="{{ route('inventory.suppliers.suspend', $supplier) }}" class="space-y-3 border-t border-neutral-200 pt-4">
+                    <form method="POST" action="{{ route('inventory.suppliers.suspend', $supplier) }}" class="space-y-3 border-t border-neutral-200 pt-4"
+                          data-confirm-title="Suspend supplier"
+                          data-confirm-message="Are you sure you want to suspend {{ $supplier->name }}? This supplier will be blocked from new purchase orders and deliveries."
+                          data-confirm-label="Suspend Supplier"
+                          data-confirm-variant="danger">
                         @csrf
                         <input type="hidden" name="_supplier_form" value="lifecycle">
                         <x-ui.field name="suspension_reason" label="Suspension reason" type="textarea" rows="2" required />
                         <x-ui.button type="submit" variant="danger" class="w-full" data-loading-text="Suspending...">Suspend Procurement Use</x-ui.button>
                     </form>
-                    <form method="POST" action="{{ route('inventory.suppliers.inactivate', $supplier) }}" class="space-y-3 border-t border-neutral-200 pt-4">
+                    <form method="POST" action="{{ route('inventory.suppliers.inactivate', $supplier) }}" class="space-y-3 border-t border-neutral-200 pt-4"
+                          data-confirm-title="Inactivate supplier"
+                          data-confirm-message="Are you sure you want to mark {{ $supplier->name }} as inactive?"
+                          data-confirm-label="Inactivate Supplier"
+                          data-confirm-variant="danger">
                         @csrf
                         <input type="hidden" name="_supplier_form" value="lifecycle">
                         <x-ui.field name="inactivation_reason" label="Inactivation reason" type="textarea" rows="2" required />

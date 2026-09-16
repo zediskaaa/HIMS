@@ -15,7 +15,11 @@
             </div>
             <div class="flex items-center gap-3">
                 @if(in_array($cycleCountDoc->status, ['completed', 'recount_pending']) && auth()->user()->can(\App\Enums\Permission::ApproveAdjustment->value) && auth()->id() !== $cycleCountDoc->assigned_counter_id)
-                    <form action="{{ route('inventory.cycle-counts.approve', $cycleCountDoc) }}" method="POST">
+                    <form action="{{ route('inventory.cycle-counts.approve', $cycleCountDoc) }}" method="POST"
+                          data-confirm-title="Approve cycle count reconciliation"
+                          data-confirm-message="Are you sure you want to approve this count sheet? Any reported variances will post adjustments directly into the stock ledger."
+                          data-confirm-label="Approve &amp; Post Variances"
+                          data-confirm-variant="warning">
                         @csrf
                         <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

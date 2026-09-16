@@ -201,7 +201,10 @@
                 <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity" @click="releaseModalOpen = false"></div>
 
                 <div class="inline-block w-full max-w-lg transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:align-middle">
-                    <form :action="'{{ url('/inventory/qc') }}/' + (selectedInspection ? selectedInspection.id : '') + '/release'" method="POST">
+                    <form :action="'{{ url('/inventory/qc') }}/' + (selectedInspection ? selectedInspection.id : '') + '/release'" method="POST"
+                          data-confirm-title="Release QC inspected goods"
+                          data-confirm-message="Are you sure you want to approve and release these inspected items into active warehouse stock?"
+                          data-confirm-label="Approve &amp; Release">
                         @csrf
                         <div class="bg-white px-6 pt-6 pb-4">
                             <div class="flex items-center gap-3">
@@ -273,7 +276,11 @@
                 <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity" @click="rejectModalOpen = false"></div>
 
                 <div class="inline-block w-full max-w-lg transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:align-middle">
-                    <form :action="'{{ url('/inventory/qc') }}/' + (selectedInspection ? selectedInspection.id : '') + '/reject'" method="POST">
+                    <form :action="'{{ url('/inventory/qc') }}/' + (selectedInspection ? selectedInspection.id : '') + '/reject'" method="POST"
+                          data-confirm-title="Reject QC inspected goods"
+                          data-confirm-message="Are you sure you want to reject these items? They will be routed to the quarantine area for return to supplier."
+                          data-confirm-label="Reject &amp; Quarantine"
+                          data-confirm-variant="danger">
                         @csrf
                         <div class="bg-white px-6 pt-6 pb-4">
                             <div class="flex items-center gap-3">

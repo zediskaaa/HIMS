@@ -184,7 +184,10 @@
                     <button type="button" @click="showConsumeModal = false" class="text-neutral-400 hover:text-neutral-600">&times;</button>
                 </div>
 
-                <form method="POST" action="{{ route('inventory.warehousing.consignment.consume') }}" class="mt-4 space-y-4">
+                <form method="POST" action="{{ route('inventory.warehousing.consignment.consume') }}" class="mt-4 space-y-4"
+                      data-confirm-title="Consume consignment inventory"
+                      data-confirm-message="Are you sure you want to record the consumption of this consignment item? This triggers billing and inventory deduction."
+                      data-confirm-label="Confirm Consumption">
                     @csrf
                     <div>
                         <label for="cons_item_id" class="text-xs font-semibold uppercase text-neutral-500">Surgical Consignment Implant *</label>

@@ -91,6 +91,9 @@
             <form id="create-inventory-item-form"
                   method="POST"
                   action="{{ route('inventory.items.store') }}"
+                  data-confirm-title="Create inventory item"
+                  data-confirm-message="Are you sure you want to add this item to the catalog? Any initial stock will be posted to the inventory ledger."
+                  data-confirm-label="Create item"
                   @submit="isSubmitting = true"
                   class="overflow-y-auto px-5 py-4 flex-1 space-y-4 text-left text-xs">
                 @csrf

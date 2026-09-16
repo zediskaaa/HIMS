@@ -368,7 +368,10 @@
                 <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity" @click="issueModalOpen = false"></div>
 
                 <div class="inline-block w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:align-middle">
-                    <form action="{{ route('inventory.requisitions.issue', $requisition) }}" method="POST">
+                    <form action="{{ route('inventory.requisitions.issue', $requisition) }}" method="POST"
+                          data-confirm-title="Confirm stock issuance"
+                          data-confirm-message="Are you sure you want to issue stock for Requisition #{{ $requisition->requisition_number }}? Reserved stock will be physically deducted immediately."
+                          data-confirm-label="Confirm Issuance">
                         @csrf
                         <div class="bg-white px-6 pt-6 pb-4">
                             <div class="flex items-center gap-3">
@@ -429,7 +432,10 @@
                 <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity" @click="ackModalOpen = false"></div>
 
                 <div class="inline-block w-full max-w-lg transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:align-middle">
-                    <form action="{{ route('inventory.requisitions.acknowledge', $requisition) }}" method="POST">
+                    <form action="{{ route('inventory.requisitions.acknowledge', $requisition) }}" method="POST"
+                          data-confirm-title="Acknowledge handover"
+                          data-confirm-message="Are you sure you want to confirm receipt and handover for Requisition #{{ $requisition->requisition_number }}?"
+                          data-confirm-label="Confirm Acknowledgment">
                         @csrf
                         <div class="bg-white px-6 pt-6 pb-4">
                             <div class="flex items-center gap-3">
@@ -477,7 +483,11 @@
                 <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity" @click="rejectModalOpen = false"></div>
 
                 <div class="inline-block w-full max-w-lg transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:align-middle">
-                    <form action="{{ route('inventory.requisitions.reject', $requisition) }}" method="POST">
+                    <form action="{{ route('inventory.requisitions.reject', $requisition) }}" method="POST"
+                          data-confirm-title="Reject store requisition"
+                          data-confirm-message="Are you sure you want to reject Requisition #{{ $requisition->requisition_number }}? Reserved stock will be released back to general inventory."
+                          data-confirm-label="Reject Requisition"
+                          data-confirm-variant="danger">
                         @csrf
                         <div class="bg-white px-6 pt-6 pb-4">
                             <div class="flex items-center gap-3">
@@ -527,7 +537,11 @@
                 <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity" @click="cancelModalOpen = false"></div>
 
                 <div class="inline-block w-full max-w-lg transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:align-middle">
-                    <form action="{{ route('inventory.requisitions.cancel', $requisition) }}" method="POST">
+                    <form action="{{ route('inventory.requisitions.cancel', $requisition) }}" method="POST"
+                          data-confirm-title="Cancel store requisition"
+                          data-confirm-message="Are you sure you want to cancel Requisition #{{ $requisition->requisition_number }}? This operation cannot be undone."
+                          data-confirm-label="Cancel Requisition"
+                          data-confirm-variant="danger">
                         @csrf
                         <div class="bg-white px-6 pt-6 pb-4">
                             <div class="flex items-center gap-3">

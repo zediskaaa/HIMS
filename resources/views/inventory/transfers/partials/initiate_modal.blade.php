@@ -11,7 +11,10 @@
         <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity" @click="newTransferModal = false"></div>
 
         <div class="relative w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all my-auto z-10">
-            <form action="{{ route('inventory.transfers.store') }}" method="POST">
+            <form action="{{ route('inventory.transfers.store') }}" method="POST"
+                  data-confirm-title="Dispatch stock transfer"
+                  data-confirm-message="Are you sure you want to dispatch this stock transfer? Items will immediately be deducted from the origin location and placed in-transit."
+                  data-confirm-label="Dispatch Transfer">
                 @csrf
                 <div class="bg-white px-6 pt-6 pb-4">
                     <div class="flex items-center gap-3">

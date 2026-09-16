@@ -367,7 +367,10 @@
                             <button @click="dockModalOpen = false" class="text-neutral-400 hover:text-neutral-600">&times;</button>
                         </div>
 
-                        <form :action="'/inventory/logistics/shipments/' + selectedShipment + '/dock-arrival'" method="POST" class="mt-4 space-y-4">
+                        <form :action="'/inventory/logistics/shipments/' + selectedShipment + '/dock-arrival'" method="POST" class="mt-4 space-y-4"
+                              data-confirm-title="Record dock arrival"
+                              data-confirm-message="Are you sure you want to record the physical dock arrival for this shipment?"
+                              data-confirm-label="Confirm Dock Arrival">
                             @csrf
                             <p class="text-xs text-neutral-600">Arrival intake for <span class="font-bold text-neutral-900" x-text="selectedShipmentNumber"></span> at HIMS Receiving Dock.</p>
 

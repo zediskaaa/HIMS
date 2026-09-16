@@ -400,6 +400,9 @@
             <form
                 method="POST"
                 action="{{ route('inventory.suppliers.store') }}"
+                data-confirm-title="Create draft supplier"
+                data-confirm-message="Are you sure you want to register this new supplier? A draft profile will be created for compliance review."
+                data-confirm-label="Create draft supplier"
                 enctype="multipart/form-data"
                 class="space-y-4"
                 x-data="{

@@ -244,7 +244,10 @@
                             <button @click="genModalOpen = false" class="text-neutral-400 hover:text-neutral-600">&times;</button>
                         </div>
 
-                        <form :action="'/inventory/logistics/receipts/' + selectedGrnId + '/iar'" method="POST" class="mt-4 space-y-4">
+                        <form :action="'/inventory/logistics/receipts/' + selectedGrnId + '/iar'" method="POST" class="mt-4 space-y-4"
+                              data-confirm-title="Generate IAR document"
+                              data-confirm-message="Are you sure you want to generate an official Inspection and Acceptance Report for this delivery?"
+                              data-confirm-label="Generate IAR">
                             @csrf
                             <p class="text-xs text-neutral-600">Generating formal statutory report from Goods Receipt <span class="font-bold text-neutral-900" x-text="selectedGrnNumber"></span>.</p>
 

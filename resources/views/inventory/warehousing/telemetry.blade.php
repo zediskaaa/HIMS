@@ -220,7 +220,11 @@
                     <button type="button" @click="showReleaseModal = false" class="text-neutral-400 hover:text-neutral-600">&times;</button>
                 </div>
 
-                <form :action="'/inventory/warehousing/telemetry/' + releaseLocationId + '/release'" method="POST" class="mt-4 space-y-4">
+                <form :action="'/inventory/warehousing/telemetry/' + releaseLocationId + '/release'" method="POST" class="mt-4 space-y-4"
+                      data-confirm-title="Release quarantine hold"
+                      data-confirm-message="Are you sure you want to release the cold-chain excursion hold on this location? Active picking inventory will be restored."
+                      data-confirm-label="Authorize Release"
+                      data-confirm-variant="warning">
                     @csrf
                     <div>
                         <p class="text-xs text-neutral-600 mb-2">You are releasing the excursion hold on location <span class="font-mono font-bold text-neutral-900" x-text="releaseLocationCode"></span>. This action restores held batches to active picking inventory.</p>

@@ -130,7 +130,10 @@
                             <button @click="inspectModalOpen = false" class="text-neutral-400 hover:text-neutral-600">&times;</button>
                         </div>
 
-                        <form action="{{ route('inventory.logistics.iar.technical-inspection', $iar) }}" method="POST" class="mt-4 space-y-4">
+                        <form action="{{ route('inventory.logistics.iar.technical-inspection', $iar) }}" method="POST" class="mt-4 space-y-4"
+                              data-confirm-title="Submit technical inspection"
+                              data-confirm-message="Are you sure you want to sign off on the technical inspection findings for this IAR?"
+                              data-confirm-label="Submit Inspection">
                             @csrf
                             <p class="text-xs text-neutral-600">Signing as Technical Inspector. Buyer cannot sign inspection per Segregation of Duties.</p>
 
@@ -177,7 +180,10 @@
                             <button @click="acceptModalOpen = false" class="text-neutral-400 hover:text-neutral-600">&times;</button>
                         </div>
 
-                        <form action="{{ route('inventory.logistics.iar.custodial-acceptance', $iar) }}" method="POST" class="mt-4 space-y-4">
+                        <form action="{{ route('inventory.logistics.iar.custodial-acceptance', $iar) }}" method="POST" class="mt-4 space-y-4"
+                              data-confirm-title="Confirm custodial acceptance"
+                              data-confirm-message="Are you sure you want to accept custodial responsibility for these received items? Stock will be posted to the hospital inventory."
+                              data-confirm-label="Approve Acceptance">
                             @csrf
                             <p class="text-xs text-neutral-600">Signing as Property / Supply Custodian. Items will be formally posted to the hospital stock ledger.</p>
 
@@ -222,7 +228,11 @@
                             <button @click="coaModalOpen = false" class="text-neutral-400 hover:text-neutral-600">&times;</button>
                         </div>
 
-                        <form action="{{ route('inventory.logistics.iar.transmit-coa', $iar) }}" method="POST" class="mt-4 space-y-4">
+                        <form action="{{ route('inventory.logistics.iar.transmit-coa', $iar) }}" method="POST" class="mt-4 space-y-4"
+                              data-confirm-title="Transmit to Commission on Audit (COA)"
+                              data-confirm-message="Are you sure you want to officially transmit this completed IAR package to COA? This action will be permanently recorded in the audit log."
+                              data-confirm-label="Transmit to COA"
+                              data-confirm-variant="warning">
                             @csrf
                             <p class="text-xs text-neutral-600">Per COA Circular, a copy of the IAR must be transmitted to the resident auditor within 5 days of delivery acceptance.</p>
 

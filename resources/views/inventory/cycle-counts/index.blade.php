@@ -15,7 +15,10 @@
             <div class="flex flex-wrap items-center gap-2">
                 <x-ui.button variant="secondary" :href="route('inventory.items')" icon="arrow-left">Back to Inventory</x-ui.button>
                 @can(\App\Enums\Permission::PerformCycleCount->value)
-                    <form action="{{ route('inventory.cycle-counts.abc') }}" method="POST" class="inline">
+                    <form action="{{ route('inventory.cycle-counts.abc') }}" method="POST" class="inline"
+                          data-confirm-title="Recalculate ABC classification"
+                          data-confirm-message="Are you sure you want to recalculate ABC classifications for all inventory items based on consumption history?"
+                          data-confirm-label="Recalculate ABC">
                         @csrf
                         <button type="submit" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 transition">
                             <svg class="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -207,7 +210,10 @@
                 <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity" @click="scheduleModal = false"></div>
 
                 <div class="inline-block w-full max-w-lg transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:align-middle">
-                    <form action="{{ route('inventory.cycle-counts.schedule') }}" method="POST">
+                    <form action="{{ route('inventory.cycle-counts.schedule') }}" method="POST"
+                          data-confirm-title="Schedule cycle count session"
+                          data-confirm-message="Are you sure you want to generate a new cycle count session and generate count sheets?"
+                          data-confirm-label="Schedule Count">
                         @csrf
                         <div class="bg-white px-6 pt-6 pb-4">
                             <div class="flex items-center gap-3">

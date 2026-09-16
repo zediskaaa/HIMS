@@ -45,7 +45,7 @@
 
         @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
             @if (in_array($warehouseTask->status, [\App\Enums\WarehouseTaskStatus::Ready, \App\Enums\WarehouseTaskStatus::Assigned, \App\Enums\WarehouseTaskStatus::PartiallyCompleted], true))
-                <x-ui.card title="Begin physical work"><form method="POST" action="{{ route('inventory.warehouse-tasks.start', $warehouseTask) }}">@csrf<x-ui.button type="submit">Start task</x-ui.button></form></x-ui.card>
+                <x-ui.card title="Begin physical work"><form method="POST" action="{{ route('inventory.warehouse-tasks.start', $warehouseTask) }}" data-confirm-title="Start warehouse task" data-confirm-message="Are you sure you want to start this warehouse task and begin physical handling?" data-confirm-label="Start Task">@csrf<x-ui.button type="submit">Start task</x-ui.button></form></x-ui.card>
             @elseif ($warehouseTask->status === \App\Enums\WarehouseTaskStatus::InProgress)
                 @php
                     $acceptedScans = $warehouseTask->scans->where('outcome', 'accepted')->count();
@@ -133,7 +133,7 @@
                     <p class="mt-2 text-xs text-neutral-500">Identifiers stay as text so leading zeroes, separators, lots, and serials are preserved.</p>
                 </x-ui.card>
                 <x-ui.card title="Complete quantity" subtitle="Stock posts only after all required scans succeed.">
-                    <form method="POST" action="{{ route('inventory.warehouse-tasks.complete', $warehouseTask) }}" class="flex flex-col gap-3 sm:flex-row sm:items-end">@csrf
+                    <form method="POST" action="{{ route('inventory.warehouse-tasks.complete', $warehouseTask) }}" class="flex flex-col gap-3 sm:flex-row sm:items-end" data-confirm-title="Complete warehouse task" data-confirm-message="Are you sure you want to mark this task as completed? Stock movements will be posted." data-confirm-label="Complete Task">@csrf
                         <div><label class="text-sm font-medium">Quantity</label><input type="number" name="quantity" min="1" max="{{ $warehouseTask->remainingQuantity() }}" step="1" required value="{{ $warehouseTask->remainingQuantity() }}" class="mt-1 w-40 rounded-lg border-neutral-300"></div>
                         <x-ui.button type="submit">Post and complete</x-ui.button>
                     </form>
@@ -146,13 +146,13 @@
                 <div class="space-y-3">@forelse ($warehouseTask->scans as $scan)<div class="rounded-lg border border-neutral-200 p-3"><div class="flex justify-between gap-2"><span class="font-mono text-sm">{{ $scan->normalized_value }}</span><x-ui.badge :status="$scan->outcome" :variant="$scan->outcome === 'identified' ? 'warning' : null">{{ ucfirst($scan->outcome) }}</x-ui.badge></div><p class="mt-1 text-xs text-neutral-600">{{ $scan->message }} · {{ $scan->created_at?->format('M j, Y g:i A') }}</p></div>@empty<p class="text-sm text-neutral-500">No scans recorded.</p>@endforelse</div>
             </x-ui.card>
             <x-ui.card title="Exceptions">
-                <div class="space-y-3">@forelse ($warehouseTask->exceptions as $exception)<div class="rounded-lg border border-rose-200 bg-rose-50 p-3"><p class="font-mono text-xs font-semibold text-rose-800">{{ $exception->exception_number }}</p><p class="text-sm font-semibold text-rose-900">{{ str($exception->exception_type)->replace('_', ' ')->title() }}</p><p class="text-sm text-rose-800">{{ $exception->details }}</p>@can(\App\Enums\Permission::ResolveWarehouseExceptions->value)@if($exception->status !== 'resolved')<form method="POST" action="{{ route('inventory.warehouse-exceptions.resolve', $exception) }}" class="mt-3 space-y-2">@csrf<textarea name="resolution" required maxlength="2000" rows="2" class="w-full rounded-lg border-rose-300" placeholder="Investigation and resolution"></textarea><x-ui.button type="submit" size="sm">Resolve</x-ui.button></form>@endif @endcan</div>@empty<p class="text-sm text-neutral-500">No exceptions recorded.</p>@endforelse</div>
+                <div class="space-y-3">@forelse ($warehouseTask->exceptions as $exception)<div class="rounded-lg border border-rose-200 bg-rose-50 p-3"><p class="font-mono text-xs font-semibold text-rose-800">{{ $exception->exception_number }}</p><p class="text-sm font-semibold text-rose-900">{{ str($exception->exception_type)->replace('_', ' ')->title() }}</p><p class="text-sm text-rose-800">{{ $exception->details }}</p>@can(\App\Enums\Permission::ResolveWarehouseExceptions->value)@if($exception->status !== 'resolved')<form method="POST" action="{{ route('inventory.warehouse-exceptions.resolve', $exception) }}" class="mt-3 space-y-2" data-confirm-title="Resolve warehouse exception" data-confirm-message="Are you sure you want to mark this exception as resolved with your documented investigation?" data-confirm-label="Resolve Exception">@csrf<textarea name="resolution" required maxlength="2000" rows="2" class="w-full rounded-lg border-rose-300" placeholder="Investigation and resolution"></textarea><x-ui.button type="submit" size="sm">Resolve</x-ui.button></form>@endif @endcan</div>@empty<p class="text-sm text-neutral-500">No exceptions recorded.</p>@endforelse</div>
             </x-ui.card>
         </div>
 
         @can(\App\Enums\Permission::ManageWarehouseTasks->value)
             @if (! in_array($warehouseTask->status, [\App\Enums\WarehouseTaskStatus::Completed, \App\Enums\WarehouseTaskStatus::Cancelled], true))
-                <x-ui.card title="Cancel task"><form method="POST" action="{{ route('inventory.warehouse-tasks.cancel', $warehouseTask) }}" data-confirm-title="Cancel warehouse task" data-confirm-message="The task will close without moving stock. Continue?" data-confirm-label="Cancel task" class="flex flex-col gap-3 sm:flex-row">@csrf<input type="text" name="reason" required maxlength="1000" placeholder="Required cancellation reason" class="flex-1 rounded-lg border-neutral-300"><x-ui.button type="submit" variant="danger">Cancel task</x-ui.button></form></x-ui.card>
+                <x-ui.card title="Cancel task"><form method="POST" action="{{ route('inventory.warehouse-tasks.cancel', $warehouseTask) }}" data-confirm-title="Cancel warehouse task" data-confirm-message="The task will close without moving stock. Continue?" data-confirm-label="Cancel task" data-confirm-variant="danger" class="flex flex-col gap-3 sm:flex-row">@csrf<input type="text" name="reason" required maxlength="1000" placeholder="Required cancellation reason" class="flex-1 rounded-lg border-neutral-300"><x-ui.button type="submit" variant="danger">Cancel task</x-ui.button></form></x-ui.card>
             @endif
         @endcan
 </x-app-layout>
