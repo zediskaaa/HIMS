@@ -40,10 +40,6 @@
                     <p class="mt-3 max-w-sm text-sm leading-6 text-neutral-300">{{ $description }}</p>
                 </div>
             </div>
-            <div class="mt-5 flex items-center gap-2 border-t border-white/10 pt-4 text-xs text-neutral-400">
-                <span class="h-1.5 w-1.5 rounded-full bg-success-500"></span>
-                Highest privilege tier &middot; Activity is audited
-            </div>
         </header>
     @elseif ($isAdmin)
         <header class="animate-fade-up [animation-delay:320ms]">
@@ -140,16 +136,7 @@
         </div>
 
         <div>
-            <div class="flex items-center justify-between gap-4">
-                <x-input-label for="password" :value="__('Password')" class="text-neutral-700 dark:text-neutral-300" />
-
-                <a
-                    class="rounded text-xs font-medium text-primary-600 transition-colors hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
-                    href="{{ $forgotPasswordUrl }}"
-                >
-                    {{ __('Forgot password?') }}
-                </a>
-            </div>
+            <x-input-label for="password" :value="__('Password')" class="text-neutral-700 dark:text-neutral-300" />
 
             <div class="relative mt-2">
                 <style>
@@ -180,17 +167,16 @@
                 </button>
             </div>
             <x-input-error :messages="$errors->get('password')" class="mt-2 text-danger-600" />
-        </div>
 
-        <label for="remember_me" class="flex w-fit cursor-pointer items-center gap-2.5 text-sm text-neutral-600 dark:text-neutral-400">
-            <input
-                id="remember_me"
-                type="checkbox"
-                class="rounded border-neutral-300 text-primary-600 shadow-sm focus:ring-primary-500 dark:border-neutral-600"
-                name="remember"
-            >
-            <span>{{ __('Keep me signed in') }}</span>
-        </label>
+            <div class="mt-2">
+                <a
+                    class="rounded text-xs font-medium text-primary-600 transition-colors hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                    href="{{ $forgotPasswordUrl }}"
+                >
+                    {{ __('Forgot password?') }}
+                </a>
+            </div>
+        </div>
 
         <x-ui.button
             type="submit"
@@ -202,17 +188,4 @@
             {{ $submitLabel }}
         </x-ui.button>
     </form>
-
-    <div class="flex items-center gap-2.5 border-t border-neutral-200 pt-6 text-xs leading-5 text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
-        <x-ui.icon name="shield-check" class="h-4 w-4 shrink-0 {{ $isSuperAdmin ? 'text-warning-600 dark:text-warning-400' : 'text-primary-600 dark:text-primary-400' }}" />
-        <p>
-            @if ($isSuperAdmin)
-                Privileged access is monitored, time-limited, and recorded.
-            @elseif ($isAdmin)
-                Administrative actions are role-scoped and auditable.
-            @else
-                For authorized hospital personnel only. Your session is securely protected.
-            @endif
-        </p>
-    </div>
 </div>

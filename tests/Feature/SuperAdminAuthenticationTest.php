@@ -35,14 +35,15 @@ class SuperAdminAuthenticationTest extends TestCase
             ->assertSee('Super Admin Login')
             ->assertSee('Privileged system access')
             ->assertSee('System-wide governance, secured at the highest level.')
-            ->assertSee('Highest privilege tier')
             ->assertSee('Access governance')
             ->assertSee('Security control')
             ->assertSee('Audit oversight')
             ->assertSee('Email address')
             ->assertSee('Password')
-            ->assertSee('Keep me signed in')
+            ->assertSee('Forgot password?')
             ->assertSee('Sign in as Super Admin')
+            ->assertDontSee('Highest privilege tier')
+            ->assertDontSee('Keep me signed in')
             ->assertDontSee('Access is limited to the administration modules assigned to your account.');
     }
 

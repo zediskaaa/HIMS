@@ -42,8 +42,9 @@ class AdminAuthenticationTest extends TestCase
             ->assertSee('Audit records')
             ->assertSee('Email address')
             ->assertSee('Password')
-            ->assertSee('Keep me signed in')
+            ->assertSee('Forgot password?')
             ->assertSee('Sign in as Admin')
+            ->assertDontSee('Keep me signed in')
             ->assertDontSee('Highest privilege tier')
             ->assertDontSee('Privileged system access');
     }
