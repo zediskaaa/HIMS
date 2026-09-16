@@ -1512,185 +1512,485 @@
                 </x-ui.modal>
             </div>
             {{-- ======================================================== TAB 6: Standard Canvassing --}}
-            <div x-show="activeTab === 'legacy_canvass'" class="space-y-6">
-                {{-- Stage 1 --}}
-                <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-[var(--text)]">Stage 1 • Planning &amp; Demand Forecasting</h3>
-                    <p class="mt-2 text-sm text-[var(--muted)]">
-                        Forecasts are now calculated from consumption history — average daily usage, safety stock,
-                        reorder point and a suggested order quantity per item — rather than entered by hand.
-                    </p>
-                    <a href="{{ route('inventory.demand-forecast') }}"
-                       class="mt-4 inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2 font-semibold text-white">
-                        Open Demand Forecasting
-                    </a>
-                </div>
+            {{-- ======================================================== TAB 6: Standard Canvassing --}}
+            @php
+                $initialCanvassStep = 1;
+                if (session('success') && str_contains(session('success'), 'Procurement request')) {
+                    $initialCanvassStep = 3;
+                } elseif (session('success') && str_contains(session('success'), 'Supplier quote')) {
+                    $initialCanvassStep = 3;
+                } elseif (old('procurement_request_id') || old('quoted_price') || $errors->hasAny(['procurement_request_id', 'supplier_id', 'quoted_price', 'notes'])) {
+                    $initialCanvassStep = 3;
+                } elseif (old('title') || old('item_id') || old('requested_quantity') || $errors->hasAny(['title', 'item_id', 'requested_quantity', 'priority', 'description', 'preferred_supplier', 'evaluation_status', 'evaluation_score', 'approved_by', 'approval_notes'])) {
+                    $initialCanvassStep = 2;
+                }
+            @endphp
+            <div
+                x-show="activeTab === 'legacy_canvass'"
+                x-data="{
+                    canvassStep: {{ $initialCanvassStep }},
+                    hasExistingRequests: {{ $requests->isNotEmpty() ? 'true' : 'false' }},
 
-                {{-- Demand plans list --}}
-                <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-[var(--text)]">Demand plans</h3>
-                    <div id="demand-plans-list" class="mt-4 space-y-2">
-                        <p class="rounded-lg border border-dashed border-[var(--border)] bg-[var(--background)] px-3 py-4 text-sm text-[var(--muted)]">Loading demand plans from API...</p>
+                    proceedFromStep2() {
+                        const form = document.getElementById('procurement-request-form');
+                        if (form) {
+                            if (!form.checkValidity()) {
+                                form.reportValidity();
+                                return;
+                            }
+                            form.submit();
+                        } else {
+                            this.canvassStep = 3;
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }
+                    },
+
+                    proceedFromStep3() {
+                        const form = document.getElementById('supplier-quote-form');
+                        if (form) {
+                            if (!form.checkValidity()) {
+                                form.reportValidity();
+                                return;
+                            }
+                            form.submit();
+                        } else {
+                            this.activeTab = 'orders_revisions';
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }
+                    }
+                }"
+                class="space-y-3"
+            >
+
+                {{-- Stepper Progress Tracker (Non-clickable) --}}
+                <div class="rounded-xl border border-neutral-200 bg-white p-2 sm:p-2.5 shadow-xs">
+                    <div class="flex items-center justify-between gap-2 overflow-x-auto select-none">
+                        <!-- Step 1 Tracker -->
+                        <div
+                            class="flex items-center gap-2 flex-1 min-w-[150px] py-1.5 px-2 rounded-lg text-left transition-all cursor-default"
+                            :class="canvassStep === 1 ? 'bg-primary-50 ring-1 ring-primary-500/30' : (canvassStep > 1 ? 'bg-white' : 'opacity-75')">
+                            <div
+                                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors"
+                                :class="canvassStep === 1 ? 'bg-primary-600 text-white shadow-2xs' : (canvassStep > 1 ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-600')">
+                                <template x-if="canvassStep > 1">
+                                    <x-ui.icon name="check" class="w-3 h-3" />
+                                </template>
+                                <template x-if="canvassStep <= 1">
+                                    <span>1</span>
+                                </template>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold leading-tight" :class="canvassStep === 1 ? 'text-primary-900' : (canvassStep > 1 ? 'text-emerald-950' : 'text-neutral-700')">
+                                    Step 1: Planning
+                                </p>
+                                <p class="text-[11px] text-neutral-500 truncate">Demand &amp; Forecasts</p>
+                            </div>
+                        </div>
+
+                        <!-- Step 1 -> 2 Divider Arrow -->
+                        <div class="hidden sm:flex items-center text-neutral-300">
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </div>
+
+                        <!-- Step 2 Tracker -->
+                        <div
+                            class="flex items-center gap-2 flex-1 min-w-[150px] py-1.5 px-2 rounded-lg text-left transition-all cursor-default"
+                            :class="canvassStep === 2 ? 'bg-primary-50 ring-1 ring-primary-500/30' : (hasExistingRequests ? 'bg-white' : 'opacity-75')">
+                            <div
+                                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors"
+                                :class="canvassStep === 2 ? 'bg-primary-600 text-white shadow-2xs' : (hasExistingRequests ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-600')">
+                                <template x-if="hasExistingRequests">
+                                    <x-ui.icon name="check" class="w-3 h-3" />
+                                </template>
+                                <template x-if="!hasExistingRequests">
+                                    <span>2</span>
+                                </template>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold leading-tight" :class="canvassStep === 2 ? 'text-primary-900' : (hasExistingRequests ? 'text-emerald-950' : 'text-neutral-700')">
+                                    Step 2: Requisition
+                                </p>
+                                <p class="text-[11px] text-neutral-500 truncate">Procurement Request</p>
+                            </div>
+                        </div>
+
+                        <!-- Step 2 -> 3 Divider Arrow -->
+                        <div class="hidden sm:flex items-center text-neutral-300">
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </div>
+
+                        <!-- Step 3 Tracker -->
+                        <div
+                            class="flex items-center gap-2 flex-1 min-w-[150px] py-1.5 px-2 rounded-lg text-left transition-all cursor-default"
+                            :class="canvassStep === 3 ? 'bg-primary-50 ring-1 ring-primary-500/30' : (hasExistingRequests ? 'bg-white' : 'opacity-60')">
+                            <div
+                                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors"
+                                :class="canvassStep === 3 ? 'bg-primary-600 text-white shadow-2xs' : 'bg-neutral-200 text-neutral-600'">
+                                <span>3</span>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold leading-tight" :class="canvassStep === 3 ? 'text-primary-900' : 'text-neutral-700'">
+                                    Step 3: Canvass &amp; Orders
+                                </p>
+                                <p class="text-[11px] text-neutral-500 truncate">Quotes &amp; PO Workspace</p>
+                            </div>
+                        </div>
                     </div>
-                    <x-ui.loader id="demand-plans-api-status" size="sm" label="Loading demand plans from API..." class="mt-3 text-sm text-[var(--muted)]" />
                 </div>
 
-                @can('create_requisition')
-                {{-- Stage 2 • Procurement request --}}
-                <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-[var(--text)]">Stage 2 • Procurement request</h3>
-                    <form method="POST" action="{{ route('inventory.purchases.requests.store') }}" class="mt-4 grid gap-4 md:grid-cols-2">
-                        @csrf
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Title</label>
-                            <input type="text" name="title" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" required />
+                {{-- ==================== STEP 1: Planning & Demand Forecasting ==================== --}}
+                <div x-show="canvassStep === 1" class="space-y-3">
+                    {{-- Step 1 Top Bar: Stage Info & Navigation Actions --}}
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 rounded-xl border border-neutral-200 bg-white px-3.5 py-2 sm:py-2.5 shadow-xs">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="inline-flex items-center rounded-md bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-700 ring-1 ring-inset ring-primary-600/20">Step 1 of 3</span>
+                            <h3 class="text-xs sm:text-sm font-bold text-neutral-900">Planning &amp; Demand Forecasting</h3>
+                            <span class="hidden md:inline text-xs text-neutral-300">|</span>
+                            <p class="hidden md:inline text-xs text-neutral-500">Review forecasted demand before generating procurement requisitions.</p>
                         </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Priority</label>
-                            <select name="priority" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2">
-                                <option value="low">Low</option>
-                                <option value="medium" selected>Medium</option>
-                                <option value="high">High</option>
-                            </select>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <a href="{{ route('inventory.demand-forecast') }}"
+                               class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-2xs hover:bg-neutral-50 hover:text-neutral-900 transition">
+                                <x-ui.icon name="chart-bar" class="w-3.5 h-3.5 text-neutral-500" />
+                                <span>Open Demand Forecasting</span>
+                            </a>
                         </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Item</label>
-                            <select id="request-item-select" name="item_id" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" required>
-                                <option value="">Select item</option>
-                                @foreach($items as $item)
-                                    <option value="{{ $item->id }}">{{ $item->name }} ({{ $item->sku }})</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Requested quantity</label>
-                            <input type="number" name="requested_quantity" min="1" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" required />
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Description</label>
-                            <textarea name="description" rows="3" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2"></textarea>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Preferred supplier</label>
-                            <select id="request-supplier-select" name="supplier_id" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2">
-                                <option value="">Select supplier</option>
-                                @foreach($suppliers as $supplier)
-                                    <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Evaluation status</label>
-                            <select name="evaluation_status" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2">
-                                <option value="pending">Pending</option>
-                                <option value="approved">Approved</option>
-                                <option value="rejected">Rejected</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Evaluation score</label>
-                            <input type="number" step="0.01" name="evaluation_score" min="0" max="100" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Approved by</label>
-                            <input type="text" name="approved_by" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="mb-1 block text-sm font-medium text-[var(--text)]">Approval notes</label>
-                            <textarea name="approval_notes" rows="2" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2"></textarea>
-                        </div>
-                        <div class="md:col-span-2">
-                            <button type="submit" class="rounded-xl bg-[var(--primary)] px-4 py-2 font-semibold text-white">Create request</button>
-                        </div>
-                    </form>
-                </div>
-                @endcan
-
-                {{-- Procurement requests API-fed list --}}
-                <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-[var(--text)]">Procurement requests</h3>
-                    <div id="procurement-requests-list" class="mt-4 space-y-3">
-                        <p class="rounded-lg border border-dashed border-[var(--border)] bg-[var(--background)] px-3 py-4 text-sm text-[var(--muted)]">Loading procurement requests from API...</p>
                     </div>
-                    <x-ui.loader id="procurement-requests-api-status" size="sm" label="Loading procurement requests from API..." class="mt-3 text-sm text-[var(--muted)]" />
-                </div>
 
-                @can('manage_sourcing')
-                {{-- Stage 3 • Supplier quotation --}}
-                <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-[var(--text)]">Stage 3 &bull; Supplier quotation</h3>
-                    <p class="mt-2 text-sm text-[var(--muted)]">
-                        Record what each vendor quoted against a request. Canvass several suppliers on the
-                        same request, then approve the request naming the one you picked.
-                    </p>
+                    {{-- Side-by-Side: Planning & Forecasting Insights (Left) & Demand Plans List (Right) --}}
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+                        {{-- Left: Planning & Forecasting Guidelines Card (7 cols) --}}
+                        <div class="lg:col-span-7 rounded-xl border border-neutral-200 bg-white p-3.5 sm:p-4 shadow-xs">
+                            <div class="border-b border-neutral-100 pb-2.5 mb-3">
+                                <h4 class="text-xs sm:text-sm font-bold text-neutral-900">Demand Forecasting Overview</h4>
+                                <p class="text-[11px] text-neutral-500">Automated calculation metrics based on inventory consumption history.</p>
+                            </div>
 
-                    @if ($requests->isEmpty())
-                        <p class="mt-4 rounded-lg border border-dashed border-[var(--border)] bg-[var(--background)] px-3 py-4 text-sm text-[var(--muted)]">
-                            Create a procurement request first — a quote has to attach to one.
-                        </p>
-                    @else
-                        <form method="POST" action="{{ route('inventory.purchases.quotes.store') }}" class="mt-4 grid gap-4 md:grid-cols-2">
-                            @csrf
-                            <div>
-                                <label for="quote-request" class="mb-1 block text-sm font-medium text-[var(--text)]">Procurement request</label>
-                                <select id="quote-request" name="procurement_request_id" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" required>
-                                    <option value="">Select request</option>
-                                    @foreach ($requests as $procurementRequest)
-                                        <option value="{{ $procurementRequest->id }}" @selected(old('procurement_request_id') == $procurementRequest->id)>
-                                            {{ $procurementRequest->request_number }} — {{ $procurementRequest->title }}
-                                            ({{ $procurementRequest->item?->name ?? 'no item' }})
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('procurement_request_id')" class="mt-1" />
-                            </div>
-                            <div>
-                                <label for="quote-supplier" class="mb-1 block text-sm font-medium text-[var(--text)]">Supplier</label>
-                                <select id="quote-supplier" name="supplier_id" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" required>
-                                    <option value="">Select supplier</option>
-                                    @foreach ($suppliers as $supplier)
-                                        <option value="{{ $supplier->id }}" @selected(old('supplier_id') == $supplier->id)>
-                                            {{ $supplier->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('supplier_id')" class="mt-1" />
-                            </div>
-                            <div>
-                                <label class="mb-1 block text-sm font-medium text-[var(--text)]">Quoted price (₱)</label>
-                                <input type="number" step="0.01" name="quoted_price" value="{{ old('quoted_price') }}" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" required />
-                                <x-input-error :messages="$errors->get('quoted_price')" class="mt-1" />
-                            </div>
-                            <div>
-                                <label class="mb-1 block text-sm font-medium text-[var(--text)]">Notes</label>
-                                <input type="text" name="notes" value="{{ old('notes') }}" class="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2" />
-                            </div>
-                            <div class="md:col-span-2">
-                                <button type="submit" class="rounded-xl bg-[var(--primary)] px-4 py-2 font-semibold text-white">Record quote</button>
-                            </div>
-                        </form>
-                    @endif
-                </div>
-                @endcan
+                            <div class="space-y-3">
+                                <p class="text-xs text-neutral-600 leading-relaxed">
+                                    Forecasts are calculated automatically from consumption history (average daily usage, safety stock, reorder point and suggested quantity) rather than entered manually.
+                                </p>
 
-                {{-- Supplier quotations API list --}}
-                <div class="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-[var(--text)]">Supplier quotations</h3>
-                    <div id="supplier-quotes-list" class="mt-4 space-y-3">
-                        <p class="rounded-lg border border-dashed border-[var(--border)] bg-[var(--background)] px-3 py-4 text-sm text-[var(--muted)]">Loading supplier quotes from API...</p>
-                    </div>
-                    <x-ui.loader id="supplier-quotes-api-status" size="sm" label="Loading supplier quotes from API..." class="mt-3 text-sm text-[var(--muted)]" />
-                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                                    <div class="rounded-lg border border-neutral-100 bg-neutral-50/70 p-2.5">
+                                        <div class="flex items-center gap-1.5 text-primary-700">
+                                            <x-ui.icon name="chart-bar" class="w-4 h-4" />
+                                            <span class="text-xs font-semibold">Daily Usage</span>
+                                        </div>
+                                        <p class="mt-1 text-[11px] text-neutral-500">Averaged across real clinical and warehouse transactions.</p>
+                                    </div>
+                                    <div class="rounded-lg border border-neutral-100 bg-neutral-50/70 p-2.5">
+                                        <div class="flex items-center gap-1.5 text-amber-700">
+                                            <x-ui.icon name="shield-check" class="w-4 h-4" />
+                                            <span class="text-xs font-semibold">Safety Stock</span>
+                                        </div>
+                                        <p class="mt-1 text-[11px] text-neutral-500">Dynamic safety buffers based on supplier lead times.</p>
+                                    </div>
+                                    <div class="rounded-lg border border-neutral-100 bg-neutral-50/70 p-2.5">
+                                        <div class="flex items-center gap-1.5 text-emerald-700">
+                                            <x-ui.icon name="arrow-trending-up" class="w-4 h-4" />
+                                            <span class="text-xs font-semibold">Suggested Qty</span>
+                                        </div>
+                                        <p class="mt-1 text-[11px] text-neutral-500">Automated order batches avoiding excess storage costs.</p>
+                                    </div>
+                                </div>
 
-                <div class="rounded-xl border border-primary-100 bg-primary-50/50 p-4">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h3 class="text-sm font-semibold text-primary-900">Continue to purchase orders</h3>
-                            <p class="mt-1 text-xs text-primary-700">Order creation, status tracking, details, and receiving actions are consolidated in the primary workspace.</p>
+                                <div class="pt-2 flex items-center justify-between border-t border-neutral-100">
+                                    <span class="text-xs text-neutral-500">Ready to create a purchase requisition?</span>
+                                    <x-ui.button type="button" variant="primary" size="sm" icon="arrow-right" @click="canvassStep = 2; window.scrollTo({ top: 0, behavior: 'smooth' })">
+                                        Proceed to Step 2
+                                    </x-ui.button>
+                                </div>
+                            </div>
                         </div>
-                        <x-ui.button type="button" size="sm" x-on:click="activeTab = 'orders_revisions'; window.scrollTo({ top: 0, behavior: 'smooth' })">
-                            Open PO workspace
-                        </x-ui.button>
+
+                        {{-- Right: Live Demand Plans List (5 cols) --}}
+                        <div class="lg:col-span-5 rounded-xl border border-neutral-200 bg-white p-3.5 sm:p-4 shadow-xs">
+                            <div class="flex items-center justify-between border-b border-neutral-100 pb-2.5 mb-3">
+                                <div>
+                                    <h4 class="text-xs sm:text-sm font-bold text-neutral-900">Demand plans</h4>
+                                    <p class="text-[11px] text-neutral-500">Generated automated plans</p>
+                                </div>
+                                <x-ui.loader id="demand-plans-api-status" size="sm" label="Loading..." class="text-xs text-neutral-400" />
+                            </div>
+                            <div id="demand-plans-list" class="space-y-2 max-h-[580px] overflow-y-auto pr-1">
+                                <p class="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/70 px-3 py-2.5 text-xs text-neutral-500">Loading demand plans from API...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- ==================== STEP 2: Procurement Request ==================== --}}
+                <div x-show="canvassStep === 2" class="space-y-3">
+                    {{-- Step 2 Top Bar: Stage Info & Navigation Actions --}}
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 rounded-xl border border-neutral-200 bg-white px-3.5 py-2 sm:py-2.5 shadow-xs">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="inline-flex items-center rounded-md bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-700 ring-1 ring-inset ring-primary-600/20">Step 2 of 3</span>
+                            <h3 class="text-xs sm:text-sm font-bold text-neutral-900">Procurement request</h3>
+                            <span class="hidden md:inline text-xs text-neutral-300">|</span>
+                            <p class="hidden md:inline text-xs text-neutral-500">Fill in requisition details or review submitted requests.</p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <x-ui.button type="button" variant="secondary" size="sm" icon="arrow-left" @click="canvassStep = 1; window.scrollTo({ top: 0, behavior: 'smooth' })">
+                                Back: Planning
+                            </x-ui.button>
+                            @if ($requests->isNotEmpty())
+                                <x-ui.button type="button" variant="secondary" size="sm" @click="canvassStep = 3; window.scrollTo({ top: 0, behavior: 'smooth' })">
+                                    <span>Skip to Quotes</span>
+                                    <x-ui.icon name="chevron-right" class="w-3.5 h-3.5 ml-1" />
+                                </x-ui.button>
+                            @endif
+                            <x-ui.button type="button" variant="primary" size="sm" icon="arrow-right" @click="proceedFromStep2()">
+                                <span>Save &amp; Next: Quotations</span>
+                            </x-ui.button>
+                        </div>
+                    </div>
+
+                    {{-- Side-by-Side: Requisition Form (Left) & Procurement Requests List (Right) --}}
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+                        {{-- Left: Create Requisition Form --}}
+                        <div class="lg:col-span-7 rounded-xl border border-neutral-200 bg-white p-3.5 sm:p-4 shadow-xs">
+                            <div class="border-b border-neutral-100 pb-2.5 mb-3">
+                                <h4 class="text-xs sm:text-sm font-bold text-neutral-900">New Requisition Form</h4>
+                                <p class="text-[11px] text-neutral-500">Fields marked with an asterisk (<span class="text-danger-600 font-bold">*</span>) are required.</p>
+                            </div>
+
+                            @can('create_requisition')
+                            <form id="procurement-request-form" method="POST" action="{{ route('inventory.purchases.requests.store') }}" class="grid grid-cols-12 gap-x-3 gap-y-2.5">
+                                @csrf
+                                {{-- Row 1: Title (8 cols) & Priority (4 cols) --}}
+                                <div class="col-span-12 sm:col-span-8">
+                                    <label class="mb-1 block text-xs font-semibold text-neutral-700">
+                                        Title <span class="text-danger-600">*</span>
+                                    </label>
+                                    <input type="text" name="title" placeholder="e.g. Monthly Clinical PPE Restock" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors" required />
+                                </div>
+                                <div class="col-span-12 sm:col-span-4">
+                                    <label class="mb-1 block text-xs font-semibold text-neutral-700">Priority</label>
+                                    <select name="priority" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors">
+                                        <option value="low">Low</option>
+                                        <option value="medium" selected>Medium</option>
+                                        <option value="high">High</option>
+                                    </select>
+                                </div>
+
+                                {{-- Row 2: Item (8 cols) & Requested quantity (4 cols) --}}
+                                <div class="col-span-12 sm:col-span-8">
+                                    <label class="mb-1 block text-xs font-semibold text-neutral-700">
+                                        Item <span class="text-danger-600">*</span>
+                                    </label>
+                                    <select id="request-item-select" name="item_id" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors" required>
+                                        <option value="">Select item</option>
+                                        @foreach($items as $item)
+                                            <option value="{{ $item->id }}">{{ $item->name }} ({{ $item->sku }})</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-span-12 sm:col-span-4">
+                                    <label class="mb-1 block text-xs font-semibold text-neutral-700">
+                                        Requested quantity <span class="text-danger-600">*</span>
+                                    </label>
+                                    <input type="number" name="requested_quantity" min="1" placeholder="e.g. 100" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 font-mono transition-colors" required />
+                                </div>
+
+                                {{-- Row 3: Description --}}
+                                <div class="col-span-12">
+                                    <label class="mb-1 block text-xs font-semibold text-neutral-700">Description</label>
+                                    <textarea name="description" rows="2" placeholder="Requisition rationale, usage context, or technical specifications (optional)" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"></textarea>
+                                </div>
+
+                                {{-- Row 4: Preferred supplier (7 cols) & Evaluation status (5 cols) --}}
+                                <div class="col-span-12 sm:col-span-7">
+                                    <label class="mb-1 block text-xs font-semibold text-neutral-700">Preferred supplier</label>
+                                    <select id="request-supplier-select" name="supplier_id" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors">
+                                        <option value="">Select supplier (optional)</option>
+                                        @foreach($suppliers as $supplier)
+                                            <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-span-12 sm:col-span-5">
+                                    <label class="mb-1 block text-xs font-semibold text-neutral-700">Evaluation status</label>
+                                    <select name="evaluation_status" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors">
+                                        <option value="pending">Pending</option>
+                                        <option value="approved">Approved</option>
+                                        <option value="rejected">Rejected</option>
+                                    </select>
+                                </div>
+
+                                {{-- Row 5: Evaluation score (4 cols) & Approved by (8 cols) --}}
+                                <div class="col-span-12 sm:col-span-4">
+                                    <label class="mb-1 block text-xs font-semibold text-neutral-700">Evaluation score</label>
+                                    <input type="number" step="0.01" name="evaluation_score" min="0" max="100" placeholder="0 - 100" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 font-mono transition-colors" />
+                                </div>
+                                <div class="col-span-12 sm:col-span-8">
+                                    <label class="mb-1 block text-xs font-semibold text-neutral-700">Approved by</label>
+                                    <input type="text" name="approved_by" placeholder="Approver name" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors" />
+                                </div>
+
+                                {{-- Row 6: Approval notes --}}
+                                <div class="col-span-12">
+                                    <label class="mb-1 block text-xs font-semibold text-neutral-700">Approval notes</label>
+                                    <textarea name="approval_notes" rows="2" placeholder="Conditions, budget tags, or approval remarks (optional)" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"></textarea>
+                                </div>
+
+                                {{-- Action Row --}}
+                                <div class="col-span-12 flex items-center justify-end pt-1">
+                                    <x-ui.button type="submit" size="sm" icon="plus">Create request</x-ui.button>
+                                </div>
+                            </form>
+                            @else
+                            <p class="text-xs text-neutral-500">You do not have permission to create procurement requests.</p>
+                            @endcan
+                        </div>
+
+                        {{-- Right: Live Procurement Requests List --}}
+                        <div class="lg:col-span-5 rounded-xl border border-neutral-200 bg-white p-3.5 sm:p-4 shadow-xs">
+                            <div class="flex items-center justify-between border-b border-neutral-100 pb-2.5 mb-3">
+                                <div>
+                                    <h4 class="text-xs sm:text-sm font-bold text-neutral-900">Procurement requests</h4>
+                                    <p class="text-[11px] text-neutral-500">List of submitted requisitions</p>
+                                </div>
+                                <x-ui.loader id="procurement-requests-api-status" size="sm" label="Loading..." class="text-xs text-neutral-400" />
+                            </div>
+                            <div id="procurement-requests-list" class="space-y-2 max-h-[580px] overflow-y-auto pr-1">
+                                <p class="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/70 px-3 py-2.5 text-xs text-neutral-500">Loading procurement requests from API...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- ==================== STEP 3: Supplier Quotation & Purchase Orders ==================== --}}
+                <div x-show="canvassStep === 3" class="space-y-3">
+                    {{-- Step 3 Top Bar: Stage Info & Navigation Actions --}}
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 rounded-xl border border-neutral-200 bg-white px-3.5 py-2 sm:py-2.5 shadow-xs">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="inline-flex items-center rounded-md bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-700 ring-1 ring-inset ring-primary-600/20">Step 3 of 3</span>
+                            <span class="sr-only">Stage 3 &bull; Supplier quotation</span>
+                            <h3 class="text-xs sm:text-sm font-bold text-neutral-900">Supplier quotation</h3>
+                            <span class="hidden md:inline text-xs text-neutral-300">|</span>
+                            <p class="hidden md:inline text-xs text-neutral-500">Record vendor quotes against an approved request. Canvass multiple suppliers, then proceed to PO.</p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <x-ui.button type="button" variant="secondary" size="sm" icon="arrow-left" @click="canvassStep = 2; window.scrollTo({ top: 0, behavior: 'smooth' })">
+                                Back: Procurement request
+                            </x-ui.button>
+                            <x-ui.button type="button" variant="secondary" size="sm" x-on:click="activeTab = 'orders_revisions'; window.scrollTo({ top: 0, behavior: 'smooth' })">
+                                <span>PO Workspace</span>
+                                <x-ui.icon name="chevron-right" class="w-3.5 h-3.5 ml-1" />
+                            </x-ui.button>
+                            @if ($requests->isEmpty())
+                                <x-ui.button type="button" variant="secondary" size="sm" icon="arrow-left" @click="canvassStep = 2; window.scrollTo({ top: 0, behavior: 'smooth' })">
+                                    Complete Requisition First
+                                </x-ui.button>
+                            @else
+                                <x-ui.button type="button" variant="primary" size="sm" icon="check" @click="proceedFromStep3()">
+                                    Record Quote &amp; Proceed
+                                </x-ui.button>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Side-by-Side: Supplier Quote Form (Left) & Supplier Quotations List (Right) --}}
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+                        {{-- Left: Supplier Quotation Form --}}
+                        <div class="lg:col-span-7 rounded-xl border border-neutral-200 bg-white p-3.5 sm:p-4 shadow-xs">
+                            <div class="border-b border-neutral-100 pb-2.5 mb-3">
+                                <h4 class="text-xs sm:text-sm font-bold text-neutral-900">Record Vendor Quotation</h4>
+                                <p class="text-[11px] text-neutral-500">Attach competitive supplier pricing to an approved request.</p>
+                            </div>
+
+                            @can('manage_sourcing')
+                                @if ($requests->isEmpty())
+                                    <div class="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/70 p-5 text-center">
+                                        <x-ui.icon name="document-text" class="mx-auto h-7 w-7 text-neutral-400 mb-1.5" />
+                                        <p class="text-xs font-semibold text-neutral-700">Create a procurement request first</p>
+                                        <p class="mt-0.5 text-[11px] text-neutral-500">A quote has to attach to one before quotes can be recorded.</p>
+                                        <div class="mt-3">
+                                            <x-ui.button type="button" variant="primary" size="sm" icon="arrow-left" @click="canvassStep = 2; window.scrollTo({ top: 0, behavior: 'smooth' })">
+                                                Go to Step 2: Requisition
+                                            </x-ui.button>
+                                        </div>
+                                    </div>
+                                @else
+                                    <form id="supplier-quote-form" method="POST" action="{{ route('inventory.purchases.quotes.store') }}" class="grid grid-cols-12 gap-x-3 gap-y-2.5">
+                                        @csrf
+                                        <div class="col-span-12 sm:col-span-7">
+                                            <label for="quote-request" class="mb-1 block text-xs font-semibold text-neutral-700">
+                                                Procurement request <span class="text-danger-600">*</span>
+                                            </label>
+                                            <select id="quote-request" name="procurement_request_id" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors" required>
+                                                <option value="">Select request</option>
+                                                @foreach ($requests as $procurementRequest)
+                                                    <option value="{{ $procurementRequest->id }}" @selected(old('procurement_request_id') == $procurementRequest->id)>
+                                                        {{ $procurementRequest->request_number }} — {{ $procurementRequest->title }}
+                                                        ({{ $procurementRequest->item?->name ?? 'no item' }})
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            <x-input-error :messages="$errors->get('procurement_request_id')" class="mt-1" />
+                                        </div>
+                                        <div class="col-span-12 sm:col-span-5">
+                                            <label for="quote-supplier" class="mb-1 block text-xs font-semibold text-neutral-700">
+                                                Supplier <span class="text-danger-600">*</span>
+                                            </label>
+                                            <select id="quote-supplier" name="supplier_id" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors" required>
+                                                <option value="">Select supplier</option>
+                                                @foreach ($suppliers as $supplier)
+                                                    <option value="{{ $supplier->id }}" @selected(old('supplier_id') == $supplier->id)>
+                                                        {{ $supplier->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            <x-input-error :messages="$errors->get('supplier_id')" class="mt-1" />
+                                        </div>
+                                        <div class="col-span-12 sm:col-span-5">
+                                            <label class="mb-1 block text-xs font-semibold text-neutral-700">
+                                                Quoted price (₱) <span class="text-danger-600">*</span>
+                                            </label>
+                                            <input type="number" step="0.01" min="0.01" name="quoted_price" value="{{ old('quoted_price') }}" placeholder="0.00" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 font-mono transition-colors" required />
+                                            <x-input-error :messages="$errors->get('quoted_price')" class="mt-1" />
+                                        </div>
+                                        <div class="col-span-12 sm:col-span-7">
+                                            <label class="mb-1 block text-xs font-semibold text-neutral-700">Notes</label>
+                                            <input type="text" name="notes" value="{{ old('notes') }}" placeholder="Terms or remarks (optional)" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors" />
+                                        </div>
+                                        <div class="col-span-12 flex items-center justify-end pt-1">
+                                            <x-ui.button type="submit" size="sm" icon="check">Record quote</x-ui.button>
+                                        </div>
+                                    </form>
+                                @endif
+                            @else
+                                <p class="text-xs text-neutral-500">You do not have permission to record supplier quotations.</p>
+                            @endcan
+                        </div>
+
+                        {{-- Right: Live Supplier Quotations List --}}
+                        <div class="lg:col-span-5 rounded-xl border border-neutral-200 bg-white p-3.5 sm:p-4 shadow-xs">
+                            <div class="flex items-center justify-between border-b border-neutral-100 pb-2.5 mb-3">
+                                <div>
+                                    <h4 class="text-xs sm:text-sm font-bold text-neutral-900">Supplier quotations</h4>
+                                    <p class="text-[11px] text-neutral-500">Vendor pricing submitted</p>
+                                </div>
+                                <x-ui.loader id="supplier-quotes-api-status" size="sm" label="Loading..." class="text-xs text-neutral-400" />
+                            </div>
+                            <div id="supplier-quotes-list" class="space-y-2 max-h-[580px] overflow-y-auto pr-1">
+                                <p class="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/70 px-3 py-2.5 text-xs text-neutral-500">Loading supplier quotes from API...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Handover to PO workspace card --}}
+                    <div class="rounded-xl border border-primary-100 bg-primary-50/60 p-2.5 sm:p-3">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h3 class="text-xs sm:text-sm font-semibold text-primary-950">Continue to purchase orders</h3>
+                                <p class="text-[11px] text-primary-800">Order creation, status tracking, details, and receiving actions are consolidated in the primary workspace.</p>
+                            </div>
+                            <x-ui.button type="button" size="sm" x-on:click="activeTab = 'orders_revisions'; window.scrollTo({ top: 0, behavior: 'smooth' })">
+                                Open PO workspace
+                            </x-ui.button>
+                        </div>
                     </div>
                 </div>
             </div>
