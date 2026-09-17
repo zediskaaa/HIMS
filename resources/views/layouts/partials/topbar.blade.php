@@ -1,15 +1,14 @@
 <header class="sticky top-0 z-30 flex min-w-0 max-w-full items-center gap-3 h-16 px-4 sm:px-6 lg:px-8
                bg-white/95 backdrop-blur border-b border-neutral-200
                dark:bg-neutral-900/95 dark:border-neutral-800">
-    {{-- Sidebar toggle --}}
+    {{-- Sidebar toggle (small screens only) --}}
     <button
         type="button"
         x-on:click="sidebarOpen = !sidebarOpen"
-        class="p-2 -ml-2 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900
+        class="p-2 -ml-2 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 lg:hidden
                dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100
                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
         :aria-expanded="sidebarOpen ? 'true' : 'false'"
-        title="Toggle navigation"
     >
         <span class="sr-only">Toggle navigation</span>
         <x-ui.icon name="bars-3" class="w-5 h-5" />

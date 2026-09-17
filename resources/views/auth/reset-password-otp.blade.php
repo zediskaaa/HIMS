@@ -41,7 +41,7 @@
                 <x-input-error :messages="$errors->get('otp')" class="mt-2 text-danger-600" />
             </div>
 
-            <x-ui.button type="submit" size="lg" data-loading-text="Verifying..." class="w-full">
+            <x-ui.button type="submit" size="lg" icon="shield-check" data-loading-text="Verifying..." class="w-full">
                 {{ __('Verify code') }}
             </x-ui.button>
         </form>

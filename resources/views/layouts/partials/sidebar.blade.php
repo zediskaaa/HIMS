@@ -1,32 +1,21 @@
 <aside
-    class="fixed inset-y-0 left-0 z-40 flex w-64 max-w-[calc(100vw-2rem)] flex-col bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 transition-transform duration-200 -translate-x-full"
+    class="fixed inset-y-0 left-0 z-40 flex w-64 max-w-[calc(100vw-2rem)] flex-col bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800
+           transition-transform duration-200 lg:translate-x-0"
     :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
 >
     {{-- Brand --}}
-    <div class="flex items-center justify-between gap-2.5 h-16 px-5 border-b border-neutral-200 dark:border-neutral-800 shrink-0">
-        <div class="flex items-center gap-2.5 min-w-0">
-            <img src="{{ asset('img/hims-logo.png') }}" alt="" class="hims-keep-light h-9 w-9 shrink-0 rounded-md bg-white object-cover ring-1 ring-inset ring-neutral-200 dark:ring-neutral-700" />
-            <div class="min-w-0">
-                <p class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 leading-tight truncate">DJNRMHS</p>
-                <p class="text-[11px] text-neutral-500 dark:text-neutral-400 leading-tight truncate">
-                    {{ match (\App\Support\AuthenticationContext::authenticatedGuard()) {
-                        \App\Support\AuthenticationContext::SUPER_ADMIN_GUARD => 'Super Admin Panel',
-                        \App\Support\AuthenticationContext::ADMIN_GUARD => 'Admin Panel',
-                        default => 'Staff Panel',
-                    } }}
-                </p>
-            </div>
+    <div class="flex items-center gap-2.5 h-16 px-5 border-b border-neutral-200 dark:border-neutral-800 shrink-0">
+        <img src="{{ asset('img/hims-logo.png') }}" alt="" class="hims-keep-light h-9 w-9 shrink-0 rounded-md bg-white object-cover ring-1 ring-inset ring-neutral-200 dark:ring-neutral-700" />
+        <div class="min-w-0">
+            <p class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 leading-tight truncate">DJNRMHS</p>
+            <p class="text-[11px] text-neutral-500 dark:text-neutral-400 leading-tight truncate">
+                {{ match (\App\Support\AuthenticationContext::authenticatedGuard()) {
+                    \App\Support\AuthenticationContext::SUPER_ADMIN_GUARD => 'Super Admin Panel',
+                    \App\Support\AuthenticationContext::ADMIN_GUARD => 'Admin Panel',
+                    default => 'Staff Panel',
+                } }}
+            </p>
         </div>
-
-        {{-- Mobile close button --}}
-        <button
-            type="button"
-            x-on:click="sidebarOpen = false"
-            class="p-1.5 -mr-1.5 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:hidden"
-            aria-label="Close navigation"
-        >
-            <x-ui.icon name="x-mark" class="w-5 h-5" />
-        </button>
     </div>
 
     {{--

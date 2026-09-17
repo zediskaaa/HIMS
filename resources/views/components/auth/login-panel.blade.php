@@ -181,6 +181,7 @@
         <x-ui.button
             type="submit"
             size="lg"
+            icon="arrow-right-on-rectangle"
             data-loading-text="Signing in..."
             class="w-full {{ $isSuperAdmin ? '!border-neutral-900 !bg-neutral-900 hover:!border-primary-950 hover:!bg-primary-950 focus-visible:!ring-warning-500 dark:!border-neutral-100 dark:!bg-neutral-100 dark:!text-neutral-900 dark:hover:!border-white dark:hover:!bg-white' : '' }}"
         >
