@@ -130,7 +130,6 @@
                                     </td>
 
                                     <td class="px-6 py-4 text-xs font-mono text-neutral-500">
-                                        <div>IP: {{ $log->ip_address ?? '127.0.0.1' }}</div>
                                         <div class="text-[10px] text-neutral-400 truncate max-w-xs">{{ $log->user_agent ?? 'System Console' }}</div>
                                     </td>
                                 </tr>

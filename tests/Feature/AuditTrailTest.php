@@ -225,7 +225,8 @@ class AuditTrailTest extends TestCase
             ->assertSee('Target')
             ->assertSee('Description')
             ->assertSee('Date &amp; Time', false)
-            ->assertSee('IP Address')
+            ->assertSee('Actions')
+            ->assertDontSee('IP Address')
             ->assertDontSee('<th scope="col" class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-600 whitespace-nowrap bg-neutral-50 text-left">Origin</th>', false)
             ->assertDontSee('<th scope="col" class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-600 whitespace-nowrap bg-neutral-50 text-left">Device</th>', false);
 
@@ -965,5 +966,52 @@ class AuditTrailTest extends TestCase
         ]);
 
         $this->assertSame('Cebu City, Central Visayas, Philippines', $storedLog->placeName());
+    }
+
+    public function test_audit_logger_and_requests_resolve_client_ip_from_proxies_and_cdn_headers(): void
+    {
+        $admin = $this->admin();
+
+        // 1. Standard reverse proxy / tunnel X-Forwarded-For
+        $request = Request::create('/test', 'GET', [], [], [], [
+            'REMOTE_ADDR' => '127.0.0.1',
+            'HTTP_X_FORWARDED_FOR' => '203.177.45.67',
+        ]);
+        app()->instance('request', $request);
+
+        $logger = app(AuditLogger::class);
+        $log1 = $logger->log(AuditAction::LoggedIn, $admin, 'Login via tunnel');
+        $this->assertSame('203.177.45.67', $log1->ip_address);
+
+        // 2. Cloudflare CF-Connecting-IP header
+        $requestCf = Request::create('/test', 'GET', [], [], [], [
+            'REMOTE_ADDR' => '127.0.0.1',
+            'HTTP_CF_CONNECTING_IP' => '112.198.78.90',
+        ]);
+        app()->instance('request', $requestCf);
+
+        $log2 = $logger->log(AuditAction::LoggedIn, $admin, 'Login via Cloudflare');
+        $this->assertSame('112.198.78.90', $log2->ip_address);
+
+        // 3. Nginx / reverse proxy X-Real-IP header
+        $requestRealIp = Request::create('/test', 'GET', [], [], [], [
+            'REMOTE_ADDR' => '127.0.0.1',
+            'HTTP_X_REAL_IP' => '175.176.89.12',
+        ]);
+        app()->instance('request', $requestRealIp);
+
+        $log3 = $logger->log(AuditAction::LoggedIn, $admin, 'Login via Nginx');
+        $this->assertSame('175.176.89.12', $log3->ip_address);
+
+        // 4. Full HTTP request through the Laravel pipeline with trusted proxies
+        $this->actingAs($admin)
+            ->withServerVariables([
+                'REMOTE_ADDR' => '127.0.0.1',
+                'HTTP_X_FORWARDED_FOR' => '180.190.20.10',
+            ])
+            ->get(route('admin.users.index'))
+            ->assertOk();
+
+        $this->assertSame('180.190.20.10', request()->ip());
     }
 }

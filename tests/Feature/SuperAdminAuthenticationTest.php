@@ -186,6 +186,7 @@ class SuperAdminAuthenticationTest extends TestCase
             'role' => UserRole::Administrator->value,
             'department' => 'Administration',
             'phone' => '09179876543',
+            'current_password' => 'password',
         ])->assertSessionHasNoErrors()
             ->assertSessionHas('account_created_success', 'Account created successfully.')
             ->assertRedirect(route('admin.users.index'));

@@ -215,7 +215,7 @@
                 <x-ui.table.th>Target</x-ui.table.th>
                 <x-ui.table.th>Description</x-ui.table.th>
                 <x-ui.table.th>Date &amp; Time</x-ui.table.th>
-                <x-ui.table.th>IP Address</x-ui.table.th>
+                <x-ui.table.th class="text-right">Actions</x-ui.table.th>
             </x-ui.table.head>
             <tbody>
                 @forelse ($logs as $log)
@@ -293,15 +293,12 @@
                             </x-ui.badge>
                         </x-ui.table.td>
 
-                        <x-ui.table.td muted class="whitespace-nowrap">
-                            <span class="font-mono text-xs text-neutral-600">{{ $log->ip_address ?? '—' }}</span>
-                            <div class="mt-1.5">
-                                <a href="{{ route('admin.audit-logs.show', $log) }}"
-                                   class="inline-flex items-center justify-center rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 shadow-2xs transition-all duration-150 hover:border-primary-300 hover:bg-primary-50/70 hover:text-primary-700 hover:shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                                   title="View full audit log details">
-                                    Details
-                                </a>
-                            </div>
+                        <x-ui.table.td class="whitespace-nowrap text-right">
+                            <a href="{{ route('admin.audit-logs.show', $log) }}"
+                               class="inline-flex items-center justify-center rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 shadow-2xs transition-all duration-150 hover:border-primary-300 hover:bg-primary-50/70 hover:text-primary-700 hover:shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                               title="View full audit log details">
+                                Details
+                            </a>
                         </x-ui.table.td>
                     </x-ui.table.row>
                 @empty

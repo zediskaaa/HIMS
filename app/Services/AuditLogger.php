@@ -44,7 +44,7 @@ class AuditLogger
         $request = app()->bound('request') ? app(Request::class) : null;
         $eventId = (string) Str::uuid();
         $displayTimezone = (string) config('app.timezone', 'UTC');
-        $ipAddress = $request?->ip();
+        $ipAddress = $this->resolveClientIp($request);
         $deviceContext = $request === null ? [] : $this->deviceContext->resolve($request);
         $locationContext = $this->locationContext($request, $ipAddress);
 
@@ -200,5 +200,24 @@ class AuditLogger
         }
 
         return $this->geoIpLocator->locate($ipAddress);
+    }
+
+    private function resolveClientIp(?Request $request): ?string
+    {
+        if ($request === null) {
+            return null;
+        }
+
+        foreach (['cf-connecting-ip', 'x-real-ip', 'x-forwarded-for'] as $header) {
+            $candidate = $request->header($header);
+            if (is_string($candidate) && trim($candidate) !== '') {
+                $candidate = trim(explode(',', $candidate)[0]);
+                if (filter_var($candidate, FILTER_VALIDATE_IP)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return $request->ip();
     }
 }

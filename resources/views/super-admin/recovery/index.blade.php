@@ -566,10 +566,6 @@
                                 <div class="text-neutral-700 mt-0.5">{{ $record->created_at->setTimezone(config('app.timezone'))->format('M d, Y H:i') }}</div>
                                 <div class="text-[10px] text-neutral-400">{{ $record->created_at->diffForHumans() }}</div>
                             </div>
-                            <div>
-                                <span class="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Network / IP</span>
-                                <div class="font-mono text-neutral-600 mt-0.5">{{ $record->ip_address ?? '—' }}</div>
-                            </div>
                         </div>
 
                         {{-- Action Buttons --}}

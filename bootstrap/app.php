@@ -23,6 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Trust reverse proxies and tunnels (e.g. ngrok, cloudflare, local forwarders)
+        // so $request->ip() resolves the client's actual remote IP instead of 127.0.0.1.
+        $middleware->trustProxies(at: '*');
+
         // The Blade screens call /api/v1/* with the session cookie rather than a
         // bearer token. Without this, the api group never starts a session, so
         // auth:sanctum cannot resolve the logged-in user and every call 401s.

@@ -98,10 +98,6 @@
                         <dd class="mt-1 break-words font-medium text-neutral-800">{{ $log->target_reference ?? $log->target_name ?? 'None' }}</dd>
                     </div>
                     <div>
-                        <dt class="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">IP address</dt>
-                        <dd class="mt-1 font-mono text-xs text-neutral-800">{{ $log->ip_address ?? 'Not recorded' }}</dd>
-                    </div>
-                    <div>
                         <dt class="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Device</dt>
                         <dd class="mt-1 font-medium text-neutral-800 break-words">{{ $log->deviceSummary() ?? 'Unavailable' }}</dd>
                     </div>
