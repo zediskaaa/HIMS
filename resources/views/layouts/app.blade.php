@@ -29,6 +29,14 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <style>
+        /* Suppress layout transitions during initial page load and after navigation */
+        .hims-app-shell:not([data-ready]) aside,
+        .hims-app-shell:not([data-ready]) .transition-\[padding\],
+        .hims-app-shell:not([data-ready]) .transition-transform {
+            transition-duration: 0s !important;
+            transition: none !important;
+        }
+
         @media print {
             .hims-app-shell > aside,
             .hims-app-shell header,
@@ -72,6 +80,7 @@
             sidebarOpen: window.innerWidth >= 1024,
             isMobile: window.innerWidth < 1024,
             init() {
+                this.$el.setAttribute('data-ready', '');
                 window.addEventListener('resize', () => {
                     const mobile = window.innerWidth < 1024;
                     if (mobile !== this.isMobile) {
@@ -98,8 +107,8 @@
         ></div>
 
         <div
-            class="w-full min-w-0 max-w-full transition-[padding] duration-200"
-            :class="sidebarOpen ? 'lg:pl-64' : 'lg:pl-0'"
+            class="w-full min-w-0 max-w-full lg:pl-64 transition-[padding] duration-200"
+            :class="{ 'lg:pl-64': sidebarOpen, 'lg:pl-0': !sidebarOpen }"
         >
             @include('layouts.partials.topbar')
 

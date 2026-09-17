@@ -315,4 +315,26 @@ class SuperAdminProvisioningTest extends TestCase
 
         $this->assertDatabaseMissing('users', ['email' => 'invalid@example.com']);
     }
+
+    public function test_user_form_renders_role_permissions_modal_instead_of_inline_list(): void
+    {
+        $superAdmin = $this->provisionedSuperAdmin();
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get(route('admin.users.create'))
+            ->assertOk()
+            ->assertSee('form-role-permissions-modal')
+            ->assertSee('View Role Permissions')
+            ->assertSee('Assigned Role Access')
+            ->assertDontSee('This role can');
+
+        $viewer = User::factory()->viewer()->create();
+        $this->get(route('admin.users.edit', $viewer))
+            ->assertOk()
+            ->assertSee('form-role-permissions-modal')
+            ->assertSee('View Role Permissions')
+            ->assertSee('Assigned Role Access')
+            ->assertDontSee('This role can');
+    }
 }
+

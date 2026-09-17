@@ -1,6 +1,6 @@
 <aside
-    class="fixed inset-y-0 left-0 z-40 flex w-64 max-w-[calc(100vw-2rem)] flex-col bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 transition-transform duration-200 shadow-xl lg:shadow-none -translate-x-full"
-    :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+    class="fixed inset-y-0 left-0 z-40 flex w-64 max-w-[calc(100vw-2rem)] flex-col bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 transition-transform duration-200 shadow-xl lg:shadow-none -translate-x-full lg:translate-x-0"
+    :class="{ 'translate-x-0 lg:translate-x-0': sidebarOpen, '-translate-x-full lg:-translate-x-full': !sidebarOpen }"
 >
     {{-- Brand --}}
     <div class="flex items-center justify-between gap-2.5 h-16 px-5 border-b border-neutral-200 dark:border-neutral-800 shrink-0">
@@ -48,7 +48,7 @@
         class="flex-1 px-3 py-4 space-y-3 overflow-y-auto"
         aria-label="Main navigation"
         x-data="{ activeDropdown: '{{ $initialOpenDropdown }}' }"
-        x-on:click="if (isMobile() && $event.target.closest('a')) sidebarOpen = false"
+        x-on:click="if (isMobile && $event.target.closest('a')) sidebarOpen = false"
     >
         {{-- 1. Core Dashboard --}}
         <div class="space-y-0.5">
