@@ -52,7 +52,7 @@
         @php
             try {
                 if (\Illuminate\Support\Facades\Schema::hasTable('system_recovery_records')) {
-                    $pendingRecoveryCount = \App\Models\SystemRecoveryRecord::pending()->count();
+                    $pendingRecoveryCount = \App\Models\SystemRecoveryRecord::open()->count();
                 }
             } catch (\Throwable) {
                 $pendingRecoveryCount = 0;
@@ -124,7 +124,7 @@
                     icon="exclamation-triangle"
                     tone="warning"
                     hint="Recovery review required"
-                    :href="route('admin.recovery.index')"
+                    :href="route('super-admin.recovery.index')"
                     :compact="true"
                     data-recovery-incident-card
                 >

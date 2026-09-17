@@ -39,7 +39,7 @@
         $initialOpenDropdown = null;
         if (request()->routeIs(
             'admin.users.*', 'admin.permissions', 'admin.audit-logs.*',
-            'admin.recovery.*', 'super-admin.recovery.*'
+            'super-admin.recovery.*'
         )) {
             $initialOpenDropdown = 'administration';
         }
@@ -158,7 +158,7 @@
             @php
                 $isAdminActive = request()->routeIs(
                     'admin.users.*', 'admin.permissions', 'admin.audit-logs.*',
-                    'admin.recovery.*', 'super-admin.recovery.*'
+                    'super-admin.recovery.*'
                 );
             @endphp
             <x-ui.nav-dropdown
@@ -183,10 +183,10 @@
                 @endcan
 
                 @can(\App\Enums\Permission::ManageSystemRecovery->value)
-                    <x-ui.nav-item sub :href="route('admin.recovery.index')" :active="request()->routeIs('admin.recovery.index', 'super-admin.recovery.index', 'admin.recovery.show')">
+                    <x-ui.nav-item sub :href="route('super-admin.recovery.index')" :active="request()->routeIs('super-admin.recovery.index', 'super-admin.recovery.show')">
                         Recovery Center
                     </x-ui.nav-item>
-                    <x-ui.nav-item sub :href="route('admin.recovery.health')" :active="request()->routeIs('admin.recovery.health', 'super-admin.recovery.health')">
+                    <x-ui.nav-item sub :href="route('super-admin.recovery.health')" :active="request()->routeIs('super-admin.recovery.health')">
                         Health Telemetry
                     </x-ui.nav-item>
                 @endcan

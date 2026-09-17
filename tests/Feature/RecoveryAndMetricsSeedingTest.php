@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RecoveryStatus;
 use App\Enums\UserRole;
 use App\Models\AuditLog;
 use App\Models\InventoryAdjustment;
@@ -12,8 +13,10 @@ use App\Models\ProcurementSavingsLog;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Models\SupplierScorecard;
+use App\Models\SystemRecoveryAttempt;
 use App\Models\SystemRecoveryRecord;
 use App\Models\User;
+use App\Services\Import\ImportStagingService;
 use Database\Seeders\ErrorRecoveryDemoSeeder;
 use Database\Seeders\OperationalMetricsDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -66,28 +69,42 @@ class RecoveryAndMetricsSeedingTest extends TestCase
         $this->seed(ErrorRecoveryDemoSeeder::class);
 
         $this->assertSame(8, SystemRecoveryRecord::count());
-        $this->assertGreaterThanOrEqual(1, SystemRecoveryRecord::pending()->count());
-        $this->assertGreaterThanOrEqual(1, SystemRecoveryRecord::resolved()->count());
+        $this->assertSame(4, SystemRecoveryRecord::open()->count());
+        $this->assertGreaterThanOrEqual(1, SystemRecoveryRecord::recovered()->count());
         $this->assertGreaterThanOrEqual(1, SystemRecoveryRecord::retryable()->count());
 
         // Check specific incident attributes
         $importIncident = SystemRecoveryRecord::where('error_id', 'REC-2026-IMP-001')->firstOrFail();
-        $this->assertSame('imports', $importIncident->module);
-        $this->assertSame('pending', $importIncident->status);
+        $this->assertSame('Imports', $importIncident->module);
+        $this->assertSame(RecoveryStatus::Failed, $importIncident->status);
         $this->assertTrue($importIncident->is_retryable);
         $this->assertIsArray($importIncident->technical_details);
-        $this->assertArrayHasKey('detected_headers', $importIncident->technical_details);
+        $this->assertSame(
+            ['target' => 'items', 'staged_rows' => 120],
+            $importIncident->technical_details['context']
+        );
 
-        // Check failed jobs
-        $this->assertSame(2, DB::table('failed_jobs')->count());
+        // The seeded token has genuinely lapsed, so the incident is a truthful
+        // stand-in for an expired import session rather than a failed retry.
+        $this->assertNull(app(ImportStagingService::class)->retrieve(
+            $importIncident->retry_payload['import_token'],
+            $this->inventoryManager->id
+        ));
+
+        // Check failed jobs: exactly one, and it is the incident's reference target.
+        $this->assertSame(1, DB::table('failed_jobs')->count());
         $this->assertDatabaseHas('failed_jobs', [
             'uuid' => '550e8400-e29b-41d4-a716-446655440000',
             'queue' => 'notifications',
         ]);
+        $this->assertSame(
+            '550e8400-e29b-41d4-a716-446655440000',
+            SystemRecoveryRecord::where('error_id', 'REC-2026-QUE-002')->value('reference_id')
+        );
 
-        // Check audit logs
-        $recoveryLogs = AuditLog::where('module', 'System Recovery')->get();
-        $this->assertGreaterThanOrEqual(3, $recoveryLogs->count());
+        // The Audit Trail is append-only and records what people did. The seeder
+        // seeds incidents, so it deliberately writes nothing there.
+        $this->assertSame(0, AuditLog::where('module', 'System Recovery')->count());
     }
 
     private function createItem(string $name = 'Paracetamol', string $sku = 'MED-PARA-500'): InventoryItem
@@ -173,12 +190,44 @@ class RecoveryAndMetricsSeedingTest extends TestCase
         $this->seed(ErrorRecoveryDemoSeeder::class);
 
         $response = $this->actingAs($this->superAdmin, 'super_admin')
-            ->get(route('admin.recovery.index'));
+            ->get(route('super-admin.recovery.index'));
 
         $response->assertOk();
+
+        // Incidents across the whole status vocabulary are listed.
         $response->assertSee('REC-2026-IMP-001');
-        $response->assertSee('REC-2026-TXN-002');
-        $response->assertSee('REC-2026-EXP-004');
-        $response->assertSee('DispatchNearExpiryStockAlerts');
+        $response->assertSee('REC-2026-TXN-006');
+        $response->assertSee('REC-2026-EXP-008');
+
+        // Their real attributes, not just their IDs.
+        $response->assertSee('Data import');
+        $response->assertSee('data_import');
+        $response->assertSee('PDEA-2026-08');
+        $response->assertSee('Connection could not be established with host smtp.hospital.local:587');
+        $response->assertSee('Deadlock found when trying to get lock');
+
+        // The detail page carries the traceability fields the list omits.
+        $this->actingAs($this->superAdmin, 'super_admin')
+            ->get(route('super-admin.recovery.show', SystemRecoveryRecord::where('error_id', 'REC-2026-QUE-002')->firstOrFail()))
+            ->assertOk()
+            ->assertSee('SendQueuedNotifications')
+            ->assertSee('550e8400-e29b-41d4-a716-446655440000')
+            ->assertSee('System / Automated');
+
+        // The summary tiles are computed from those records. Attempts never inflate
+        // the incident counts: four seeded attempts belong to three incidents.
+        $metrics = $response->viewData('metrics');
+
+        $this->assertSame(8, $metrics['total']);
+        $this->assertSame(4, $metrics['open']);
+        $this->assertSame(1, $metrics['recovered']);
+        $this->assertSame(1, $metrics['resolved']);
+        $this->assertSame(1, $metrics['recovery_failed']);
+        $this->assertSame(1, $metrics['awaiting_worker']);
+        $this->assertSame(2, $metrics['failed_attempts']);
+        $this->assertSame(4, SystemRecoveryAttempt::count());
+
+        // One recovered and one recovery-failed incident have a verdict: 1 of 2.
+        $this->assertSame(50, $metrics['success_rate']);
     }
 }

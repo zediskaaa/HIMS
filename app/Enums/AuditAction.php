@@ -101,6 +101,7 @@ enum AuditAction: string
     case RejectedProcessReview = 'rejected_process_review';
     case ImplementedProcessRecommendation = 'implemented_process_recommendation';
     case TriggeredRecoveryAction = 'triggered_recovery_action';
+    case ResolvedRecoveryIncident = 'resolved_recovery_incident';
     case SystemOperationFailed = 'system_operation_failed';
     case SystemOperationRecovered = 'system_operation_recovered';
     case SystemHealthMaintenance = 'system_health_maintenance';
@@ -207,6 +208,7 @@ enum AuditAction: string
             self::RejectedProcessReview => 'Rejected Process Review',
             self::ImplementedProcessRecommendation => 'Implemented Process Recommendation',
             self::TriggeredRecoveryAction => 'Triggered Recovery Action',
+            self::ResolvedRecoveryIncident => 'Resolved Recovery Incident',
             self::SystemOperationFailed => 'System Operation Failed',
             self::SystemOperationRecovered => 'System Operation Recovered',
             self::SystemHealthMaintenance => 'System Health Maintenance',

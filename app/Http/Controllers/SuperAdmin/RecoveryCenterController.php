@@ -4,24 +4,33 @@ namespace App\Http\Controllers\SuperAdmin;
 
 use App\Enums\AuditAction;
 use App\Enums\Permission;
+use App\Enums\RecoveryAttemptOutcome;
+use App\Enums\RecoveryStatus;
+use App\Exceptions\RecoveryNotRetryableException;
 use App\Http\Controllers\Controller;
+use App\Models\SystemRecoveryAttempt;
 use App\Models\SystemRecoveryRecord;
 use App\Services\AuditLogger;
 use App\Services\Recovery\SmartRetryService;
 use App\Services\Recovery\SystemHealthService;
 use Carbon\CarbonImmutable;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Throwable;
 
+/**
+ * Super Administrator surface for recorded system failures.
+ *
+ * Every number here is counted from the incident table, one row per incident, so
+ * a retried incident is never counted twice. Recovery actions delegate to
+ * SmartRetryService, which re-executes the operation and reports what it
+ * actually observed.
+ */
 class RecoveryCenterController extends Controller implements HasMiddleware
 {
     public function __construct(
@@ -44,7 +53,7 @@ class RecoveryCenterController extends Controller implements HasMiddleware
     public function index(Request $request): View
     {
         $filters = $request->validate([
-            'status' => ['nullable', Rule::in(['pending', 'in_progress', 'resolved', 'retried', 'ignored', 'failed_permanently'])],
+            'status' => ['nullable', Rule::enum(RecoveryStatus::class)],
             'module' => ['nullable', 'string', 'max:50'],
             'search' => ['nullable', 'string', 'max:100'],
             'date_from' => ['nullable', 'date_format:Y-m-d'],
@@ -67,7 +76,7 @@ class RecoveryCenterController extends Controller implements HasMiddleware
                 $q->where('error_id', 'like', $term)
                     ->orWhere('error_summary', 'like', $term)
                     ->orWhere('operation', 'like', $term)
-                    ->orWhere('exception_class', 'like', $term);
+                    ->orWhere('reference_id', 'like', $term);
             });
         }
 
@@ -81,54 +90,48 @@ class RecoveryCenterController extends Controller implements HasMiddleware
             $query->where('created_at', '<=', $to);
         }
 
-        $records = $query->paginate(15)->withQueryString();
-
-        $failedJobsCount = 0;
-        try {
-            if (Schema::hasTable('failed_jobs')) {
-                $failedJobsCount = DB::table('failed_jobs')->count();
-            }
-        } catch (Throwable) {
-            $failedJobsCount = 0;
-        }
-
-        $metrics = [
-            'total' => SystemRecoveryRecord::count(),
-            'pending' => SystemRecoveryRecord::pending()->count(),
-            'resolved' => SystemRecoveryRecord::resolved()->count(),
-            'failed_jobs' => $failedJobsCount,
-        ];
-
-        $quickHealth = [
-            'database' => $this->healthService->checkDatabase(),
-            'queue' => $this->healthService->checkQueue(),
-            'storage' => $this->healthService->checkStorage(),
-            'cache' => $this->healthService->checkCache(),
-        ];
-
-        $recentFailedJobs = $this->healthService->getRecentFailedJobs(5);
-        $availableModules = SystemRecoveryRecord::distinct()->pluck('module')->filter()->values();
-
         return view('super-admin.recovery.index', [
-            'records' => $records,
+            'records' => $query->paginate(15)->withQueryString(),
             'filters' => $filters,
-            'metrics' => $metrics,
-            'quickHealth' => $quickHealth,
-            'recentFailedJobs' => $recentFailedJobs,
-            'availableModules' => $availableModules,
+            'metrics' => $this->metrics(),
+            'statuses' => RecoveryStatus::cases(),
+            'availableModules' => SystemRecoveryRecord::query()->distinct()->pluck('module')->filter()->sort()->values(),
         ]);
     }
 
-    public function show(SystemRecoveryRecord $record, Request $request): JsonResponse|View
+    /**
+     * Aggregate figures, each counted from the incident table directly.
+     *
+     * @return array<string, mixed>
+     */
+    private function metrics(): array
     {
-        $record->load(['user', 'resolvedBy']);
+        $total = SystemRecoveryRecord::count();
+        $open = SystemRecoveryRecord::open()->count();
+        $recovered = SystemRecoveryRecord::recovered()->count();
+        $resolved = SystemRecoveryRecord::where('status', RecoveryStatus::Resolved)->count();
+        $recoveryFailed = SystemRecoveryRecord::where('status', RecoveryStatus::RecoveryFailed)->count();
 
-        if ($request->wantsJson()) {
-            return response()->json([
-                'success' => true,
-                'record' => $record,
-            ]);
-        }
+        // Only incidents whose recovery attempt produced a verdict can be judged,
+        // and each incident contributes exactly once regardless of attempt count.
+        $withVerdict = $recovered + $recoveryFailed;
+
+        return [
+            'total' => $total,
+            'open' => $open,
+            'recovered' => $recovered,
+            'resolved' => $resolved,
+            'recovery_failed' => $recoveryFailed,
+            'awaiting_worker' => SystemRecoveryRecord::where('status', RecoveryStatus::RecoveryPending)->count(),
+            'failed_attempts' => SystemRecoveryAttempt::where('outcome', RecoveryAttemptOutcome::Failed)->count(),
+            'new_last_24h' => SystemRecoveryRecord::where('created_at', '>=', now()->subDay())->count(),
+            'success_rate' => $withVerdict > 0 ? (int) round($recovered / $withVerdict * 100) : null,
+        ];
+    }
+
+    public function show(SystemRecoveryRecord $record): View
+    {
+        $record->load(['user', 'resolvedBy', 'attempts.actor']);
 
         return view('super-admin.recovery.show', [
             'record' => $record,
@@ -141,94 +144,93 @@ class RecoveryCenterController extends Controller implements HasMiddleware
         $actor = Auth::user();
 
         try {
-            $this->retryService->retry($record, $actor);
+            $outcome = $this->retryService->retry($record, $actor);
+        } catch (RecoveryNotRetryableException $e) {
+            // The refusal is a state condition, not a fault; its message is safe
+            // to show because it never carries internal exception detail.
+            return back()->with('error', sprintf('Incident %s was not retried. %s', $record->error_id, $e->getMessage()));
+        } catch (Throwable $e) {
+            Log::error('Recovery retry failed unexpectedly.', [
+                'recovery_record_id' => $record->getKey(),
+                'error_id' => $record->error_id,
+                'exception' => $e,
+            ]);
 
-            return back()->with('success', sprintf(
-                'Incident #%s has been successfully retried and recovered.',
+            return back()->with('error', sprintf(
+                'Incident %s could not be retried because of an unexpected error. Technical details were written to the application log.',
                 $record->error_id
             ));
-        } catch (Throwable $e) {
-            return back()->with('error', sprintf(
-                'Smart retry for incident #%s failed: %s',
-                $record->error_id,
-                $e->getMessage()
-            ));
         }
+
+        return back()->with(
+            match ($outcome->outcome) {
+                RecoveryAttemptOutcome::Succeeded => 'success',
+                RecoveryAttemptOutcome::Dispatched => 'info',
+                default => 'error',
+            },
+            sprintf('Incident %s. %s', $record->error_id, $outcome->message)
+        );
     }
 
+    /**
+     * Close an incident after the Super Administrator verified the underlying
+     * problem was dealt with outside the automated recovery path.
+     */
     public function resolve(Request $request, SystemRecoveryRecord $record): RedirectResponse
     {
         $validated = $request->validate([
-            'notes' => ['nullable', 'string', 'max:1000'],
+            'notes' => ['required', 'string', 'min:10', 'max:1000'],
         ]);
+
+        if ($record->status->isTerminal()) {
+            return back()->with('error', sprintf('Incident %s is already closed as %s.', $record->error_id, $record->status->label()));
+        }
+
+        if ($record->status->isInFlight()) {
+            return back()->with('error', sprintf(
+                'Incident %s is still waiting on a recovery attempt. Let the attempt finish before closing it.',
+                $record->error_id
+            ));
+        }
 
         /** @var \App\Models\User $actor */
         $actor = Auth::user();
+        $previousStatus = $record->status;
 
-        $oldStatus = $record->status;
-        $record->update([
-            'status' => 'resolved',
+        $record->forceFill([
+            'status' => RecoveryStatus::Resolved,
             'resolved_by_user_id' => $actor->getKey(),
             'resolved_at' => now(),
-            'resolution_notes' => $validated['notes'] ?? 'Manually marked as resolved by Super Administrator.',
-        ]);
+            'resolution_notes' => $validated['notes'],
+        ])->save();
 
         $this->auditLogger->log(
-            action: AuditAction::SystemOperationRecovered,
+            action: AuditAction::ResolvedRecoveryIncident,
             actor: $actor,
             description: sprintf(
-                'Super Administrator marked incident [%s] as resolved: %s',
+                'Super Administrator closed incident [%s] (%s in %s) as resolved after verifying the underlying problem outside the automated recovery path. No retry was executed by this action. Reason: %s',
                 $record->error_id,
-                $record->resolution_notes
+                $record->operation,
+                $record->module,
+                $validated['notes']
             ),
             target: $record,
             targetName: $record->error_id,
-            oldValues: ['status' => $oldStatus],
-            newValues: ['status' => 'resolved', 'resolved_at' => now()->toIso8601String()],
-            module: 'System Recovery',
-            category: 'System',
-            outcome: 'success'
+            oldValues: ['status' => $previousStatus->value],
+            newValues: [
+                'status' => RecoveryStatus::Resolved->value,
+                'resolution_notes' => $validated['notes'],
+            ],
+            businessReason: $validated['notes'],
         );
 
-        return back()->with('success', sprintf('Incident #%s marked as resolved.', $record->error_id));
-    }
-
-    public function ignore(SystemRecoveryRecord $record): RedirectResponse
-    {
-        /** @var \App\Models\User $actor */
-        $actor = Auth::user();
-
-        $oldStatus = $record->status;
-        $record->update([
-            'status' => 'ignored',
-            'resolved_by_user_id' => $actor->getKey(),
-            'resolved_at' => now(),
-            'resolution_notes' => 'Dismissed / ignored by Super Administrator.',
-        ]);
-
-        $this->auditLogger->log(
-            action: AuditAction::TriggeredRecoveryAction,
-            actor: $actor,
-            description: sprintf('Super Administrator ignored incident [%s].', $record->error_id),
-            target: $record,
-            targetName: $record->error_id,
-            oldValues: ['status' => $oldStatus],
-            newValues: ['status' => 'ignored'],
-            module: 'System Recovery',
-            category: 'System'
-        );
-
-        return back()->with('info', sprintf('Incident #%s dismissed.', $record->error_id));
+        return back()->with('success', sprintf('Incident %s closed as resolved.', $record->error_id));
     }
 
     public function health(): View
     {
-        $diagnostics = $this->healthService->runFullDiagnostics();
-        $recentFailedJobs = $this->healthService->getRecentFailedJobs(15);
-
         return view('super-admin.recovery.health', [
-            'diagnostics' => $diagnostics,
-            'recentFailedJobs' => $recentFailedJobs,
+            'diagnostics' => $this->healthService->runFullDiagnostics(),
         ]);
     }
 
@@ -237,52 +239,8 @@ class RecoveryCenterController extends Controller implements HasMiddleware
         /** @var \App\Models\User $actor */
         $actor = Auth::user();
 
-        $success = $this->healthService->rebuildCache($actor);
+        $result = $this->healthService->rebuildCache($actor);
 
-        if ($success) {
-            return back()->with('success', 'Application cache was cleared and successfully rebuilt.');
-        }
-
-        return back()->with('error', 'Failed to clear application cache.');
-    }
-
-    public function retryJob(string $uuid): RedirectResponse
-    {
-        /** @var \App\Models\User $actor */
-        $actor = Auth::user();
-
-        $exitCode = Artisan::call('queue:retry', ['id' => [$uuid]]);
-
-        $this->auditLogger->log(
-            action: AuditAction::TriggeredRecoveryAction,
-            actor: $actor,
-            description: sprintf('Super Administrator retried queue job [%s] (Exit code: %d).', $uuid, $exitCode),
-            target: null,
-            targetName: $uuid,
-            oldValues: [],
-            newValues: ['queue_job_uuid' => $uuid, 'exit_code' => $exitCode],
-            module: 'System Recovery',
-            category: 'System'
-        );
-
-        if ($exitCode === 0) {
-            return back()->with('success', sprintf('Queue job [%s] was re-queued for execution.', $uuid));
-        }
-
-        return back()->with('error', sprintf('Failed to retry queue job [%s].', $uuid));
-    }
-
-    public function retryAllJobs(): RedirectResponse
-    {
-        /** @var \App\Models\User $actor */
-        $actor = Auth::user();
-
-        $exitCode = $this->healthService->retryAllFailedJobs($actor);
-
-        if ($exitCode === 0) {
-            return back()->with('success', 'All recorded failed queue jobs have been re-dispatched.');
-        }
-
-        return back()->with('error', 'Failed to dispatch all queue jobs.');
+        return back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 }

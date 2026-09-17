@@ -1,185 +1,161 @@
+@php
+    use Illuminate\Support\Str;
+
+    // Diagnostics report their own observed state, so the panel only maps that
+    // state onto a palette rather than deciding on a colour of its own.
+    $statusStyles = [
+        'healthy' => ['badge' => 'success', 'tone' => 'text-success-700 dark:text-emerald-400'],
+        'warning' => ['badge' => 'warning', 'tone' => 'text-warning-700 dark:text-amber-400'],
+        'degraded' => ['badge' => 'warning', 'tone' => 'text-warning-700 dark:text-amber-400'],
+        'unhealthy' => ['badge' => 'danger', 'tone' => 'text-danger-700 dark:text-rose-400'],
+        'info' => ['badge' => 'neutral', 'tone' => 'text-neutral-600 dark:text-neutral-400'],
+    ];
+
+    $overall = $diagnostics['overall_status'];
+    $overallStyles = match ($overall) {
+        'healthy' => ['border-success-200 bg-success-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/30', 'text-success-700 dark:text-emerald-400', 'health', 'All monitored subsystems are reporting healthy.'],
+        'warning' => ['border-warning-200 bg-warning-50/60 dark:border-amber-900/60 dark:bg-amber-950/30', 'text-warning-700 dark:text-amber-400', 'exclamation-triangle', 'At least one subsystem needs attention. Details are below.'],
+        default => ['border-danger-200 bg-danger-50/60 dark:border-rose-900/60 dark:bg-rose-950/30', 'text-danger-700 dark:text-rose-400', 'exclamation-triangle', 'A subsystem is not responding. Review the failing check below.'],
+    };
+
+    // Only checks that actually report a status are listed; every value below is
+    // read straight off the service's own return array.
+    $checks = [
+        ['title' => 'Database engine', 'icon' => 'server', 'data' => $diagnostics['database'], 'rows' => [
+            ['Driver', $diagnostics['database']['driver'] ?? 'Unknown', true],
+            ['Database', $diagnostics['database']['database'] ?? 'Unknown', true],
+            ['Query latency', ($diagnostics['database']['latency_ms'] ?? 0) . ' ms', false],
+        ]],
+        ['title' => 'Queue and background pipeline', 'icon' => 'inbox', 'data' => $diagnostics['queue'], 'rows' => [
+            ['Driver', $diagnostics['queue']['driver'] ?? 'Unknown', true],
+            ['Pending jobs', (string) ($diagnostics['queue']['pending_count'] ?? 0), false],
+            ['Failed jobs', (string) ($diagnostics['queue']['failed_count'] ?? 0), false],
+        ]],
+        ['title' => 'Storage', 'icon' => 'folder', 'data' => $diagnostics['storage'], 'rows' => [
+            ['Write access', ($diagnostics['storage']['write_permission'] ?? false) ? 'Verified' : 'Not writable', false],
+            ['Free space', isset($diagnostics['storage']['free_space_gb']) ? $diagnostics['storage']['free_space_gb'] . ' GB' : 'Not reported', false],
+        ]],
+        ['title' => 'Application cache', 'icon' => 'bolt', 'data' => $diagnostics['cache'], 'rows' => [
+            ['Store', $diagnostics['cache']['store'] ?? 'Unknown', true],
+            ['Round-trip latency', ($diagnostics['cache']['latency_ms'] ?? 0) . ' ms', false],
+        ]],
+        ['title' => 'Local backups', 'icon' => 'archive-box', 'data' => $diagnostics['backups'], 'rows' => [
+            ['Archives found', (string) ($diagnostics['backups']['backup_count'] ?? 0), false],
+            ['Most recent', $diagnostics['backups']['last_backup_at'] ?? 'None recorded', false],
+        ]],
+    ];
+@endphp
+
 <x-app-layout>
     <x-ui.page-header
         title="System Health Diagnostics"
+        subtitle="Live checks against the database, queue, storage, cache, and local backups."
         :breadcrumbs="[
             'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
-            'Recovery Center' => route('admin.recovery.index'),
-            'Health Diagnostics' => null
+            'Recovery Center' => route('super-admin.recovery.index'),
+            'Health Diagnostics' => null,
         ]"
     >
         <x-slot:actions>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
                 <a
-                    href="{{ route('admin.recovery.index') }}"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50 transition"
+                    href="{{ route('super-admin.recovery.index') }}"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-semibold text-neutral-700 shadow-sm transition hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
                 >
-                    <svg class="h-4 w-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                    <x-ui.icon name="arrow-left" class="h-4 w-4" />
                     <span>Back to Incidents</span>
                 </a>
 
-                <button
-                    type="button"
-                    onclick="window.location.reload();"
-                    class="inline-flex items-center gap-1.5 rounded-lg bg-primary-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary-600 transition"
+                {{-- A plain navigation re-runs every check for real; there is no
+                     cached or previously computed result to refresh. --}}
+                <a
+                    href="{{ route('super-admin.recovery.health') }}"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-primary-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-600"
                 >
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    <span>Re-Run Diagnostics</span>
-                </button>
+                    <x-ui.icon name="arrow-path" class="h-4 w-4" />
+                    <span>Re-run Diagnostics</span>
+                </a>
             </div>
         </x-slot:actions>
     </x-ui.page-header>
 
-    {{-- Overall Status Banner --}}
-    <div class="rounded-2xl border p-5 shadow-sm {{ $diagnostics['overall_status'] === 'healthy' ? 'border-emerald-200 bg-emerald-50/60' : ($diagnostics['overall_status'] === 'warning' ? 'border-amber-200 bg-amber-50/60' : 'border-rose-200 bg-rose-50/60') }}">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {{ $diagnostics['overall_status'] === 'healthy' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700' }}">
-                    @if ($diagnostics['overall_status'] === 'healthy')
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    @else
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                    @endif
+    <div class="rounded-lg border p-4 shadow-sm sm:p-5 {{ $overallStyles[0] }}">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-start gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/70 dark:bg-neutral-900/60 {{ $overallStyles[1] }}">
+                    <x-ui.icon :name="$overallStyles[2]" class="h-5 w-5" />
                 </span>
                 <div>
-                    <h3 class="text-base font-bold text-neutral-900">
-                        {{ $diagnostics['overall_status'] === 'healthy' ? 'All Systems Operational' : 'Subsystem Warnings Detected' }}
-                    </h3>
-                    <p class="text-xs text-neutral-600 mt-0.5">Telemetry evaluated at {{ $diagnostics['timestamp'] }}</p>
+                    <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                        {{ Str::headline($overall) }}
+                    </h2>
+                    <p class="mt-0.5 text-xs text-neutral-600 dark:text-neutral-400">{{ $overallStyles[3] }}</p>
+                    <p class="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+                        Evaluated {{ $diagnostics['timestamp'] }}
+                    </p>
                 </div>
             </div>
 
-            <span class="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider {{ $diagnostics['overall_status'] === 'healthy' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
-                {{ strtoupper($diagnostics['overall_status']) }}
-            </span>
+            <x-ui.badge :variant="$statusStyles[$overall]['badge'] ?? 'neutral'">{{ Str::headline($overall) }}</x-ui.badge>
         </div>
     </div>
 
-    {{-- Subsystems Detailed Grid --}}
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-        {{-- Database Subsystem --}}
-        <div class="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm space-y-4">
-            <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
-                <div class="flex items-center gap-2.5">
-                    <span class="rounded-lg bg-primary-50 p-2 text-primary-700">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
-                    </span>
-                    <h4 class="font-bold text-neutral-900">Database Engine</h4>
-                </div>
-                <span class="rounded px-2 py-0.5 text-xs font-bold uppercase {{ $diagnostics['database']['status'] === 'healthy' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}">
-                    {{ $diagnostics['database']['status'] }}
-                </span>
-            </div>
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        @foreach ($checks as $check)
+            @php
+                $status = $check['data']['status'] ?? 'info';
+                $style = $statusStyles[$status] ?? $statusStyles['info'];
+            @endphp
 
-            <dl class="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                    <dt class="text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">Driver</dt>
-                    <dd class="font-mono text-neutral-900 font-bold mt-0.5">{{ $diagnostics['database']['driver'] }}</dd>
-                </div>
-                <div>
-                    <dt class="text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">Database Name</dt>
-                    <dd class="font-mono text-neutral-900 font-bold mt-0.5 truncate">{{ $diagnostics['database']['database'] }}</dd>
-                </div>
-                <div>
-                    <dt class="text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">Query Latency</dt>
-                    <dd class="font-bold text-neutral-900 mt-0.5">{{ $diagnostics['database']['latency_ms'] }} ms</dd>
-                </div>
-                <div>
-                    <dt class="text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">Connection Check</dt>
-                    <dd class="font-semibold text-emerald-700 mt-0.5">Read/Write Verified</dd>
-                </div>
-            </dl>
-            <p class="text-xs text-neutral-500 border-t border-neutral-100 pt-3">{{ $diagnostics['database']['message'] }}</p>
-        </div>
+            <x-ui.card>
+                <x-slot:header>
+                    <div class="flex items-center gap-2">
+                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+                            <x-ui.icon :name="$check['icon']" class="h-4 w-4" />
+                        </span>
+                        <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ $check['title'] }}</h3>
+                    </div>
+                </x-slot:header>
 
-        {{-- Queue Subsystem --}}
-        <div class="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm space-y-4">
-            <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
-                <div class="flex items-center gap-2.5">
-                    <span class="rounded-lg bg-indigo-50 p-2 text-indigo-700">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                    </span>
-                    <h4 class="font-bold text-neutral-900">Queue &amp; Background Pipeline</h4>
-                </div>
-                <span class="rounded px-2 py-0.5 text-xs font-bold uppercase {{ $diagnostics['queue']['status'] === 'healthy' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
-                    {{ $diagnostics['queue']['status'] }}
-                </span>
-            </div>
+                <x-slot:actions>
+                    <x-ui.badge :variant="$style['badge']" dot>{{ Str::headline($status) }}</x-ui.badge>
+                </x-slot:actions>
 
-            <dl class="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                    <dt class="text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">Driver</dt>
-                    <dd class="font-mono text-neutral-900 font-bold mt-0.5">{{ $diagnostics['queue']['driver'] }}</dd>
-                </div>
-                <div>
-                    <dt class="text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">Pending Tasks</dt>
-                    <dd class="font-bold text-neutral-900 mt-0.5">{{ $diagnostics['queue']['pending_count'] }}</dd>
-                </div>
-                <div>
-                    <dt class="text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">Failed Tasks</dt>
-                    <dd class="font-bold text-rose-700 mt-0.5">{{ $diagnostics['queue']['failed_count'] }}</dd>
-                </div>
-                <div>
-                    <dt class="text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">Status</dt>
-                    <dd class="font-semibold {{ $diagnostics['queue']['failed_count'] > 0 ? 'text-amber-700' : 'text-emerald-700' }} mt-0.5">
-                        {{ $diagnostics['queue']['failed_count'] > 0 ? 'Action Required' : 'Operational' }}
-                    </dd>
-                </div>
-            </dl>
-            <p class="text-xs text-neutral-500 border-t border-neutral-100 pt-3">{{ $diagnostics['queue']['message'] }}</p>
-        </div>
+                <dl class="grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
+                    @foreach ($check['rows'] as [$label, $value, $mono])
+                        <div class="min-w-0">
+                            <dt class="font-semibold uppercase tracking-wider text-[10px] text-neutral-400 dark:text-neutral-500">{{ $label }}</dt>
+                            <dd @class([
+                                'mt-0.5 break-words text-neutral-800 dark:text-neutral-200',
+                                'font-mono' => $mono,
+                            ])>{{ $value }}</dd>
+                        </div>
+                    @endforeach
+                </dl>
 
-        {{-- Storage Subsystem --}}
-        <div class="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm space-y-4">
-            <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
-                <div class="flex items-center gap-2.5">
-                    <span class="rounded-lg bg-teal-50 p-2 text-teal-700">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-                    </span>
-                    <h4 class="font-bold text-neutral-900">Storage / Disks</h4>
-                </div>
-                <span class="rounded px-2 py-0.5 text-xs font-bold uppercase {{ $diagnostics['storage']['status'] === 'healthy' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}">
-                    {{ $diagnostics['storage']['status'] }}
-                </span>
-            </div>
-
-            <dl class="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                    <dt class="text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">Free Space</dt>
-                    <dd class="font-bold text-neutral-900 mt-0.5">{{ $diagnostics['storage']['free_space_gb'] ?? 'N/A' }} GB</dd>
-                </div>
-                <div>
-                    <dt class="text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">Write Access</dt>
-                    <dd class="font-semibold text-emerald-700 mt-0.5">Verified / Writable</dd>
-                </div>
-            </dl>
-            <p class="text-xs text-neutral-500 border-t border-neutral-100 pt-3">{{ $diagnostics['storage']['message'] }}</p>
-        </div>
-
-        {{-- Cache Subsystem --}}
-        <div class="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm space-y-4">
-            <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
-                <div class="flex items-center gap-2.5">
-                    <span class="rounded-lg bg-amber-50 p-2 text-amber-700">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    </span>
-                    <h4 class="font-bold text-neutral-900">Application Cache</h4>
-                </div>
-                <span class="rounded px-2 py-0.5 text-xs font-bold uppercase {{ $diagnostics['cache']['status'] === 'healthy' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}">
-                    {{ $diagnostics['cache']['status'] }}
-                </span>
-            </div>
-
-            <dl class="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                    <dt class="text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">Active Store</dt>
-                    <dd class="font-mono text-neutral-900 font-bold mt-0.5">{{ $diagnostics['cache']['store'] }}</dd>
-                </div>
-                <div>
-                    <dt class="text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">Round-Trip Latency</dt>
-                    <dd class="font-bold text-neutral-900 mt-0.5">{{ $diagnostics['cache']['latency_ms'] }} ms</dd>
-                </div>
-            </dl>
-            <p class="text-xs text-neutral-500 border-t border-neutral-100 pt-3">{{ $diagnostics['cache']['message'] }}</p>
-        </div>
+                <p class="mt-4 border-t border-neutral-100 pt-3 text-xs text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+                    {{ $check['data']['message'] ?? 'No detail reported.' }}
+                </p>
+            </x-ui.card>
+        @endforeach
     </div>
+
+    {{-- Queue failures are counted above and recorded as incidents in the Recovery
+         Center; listing the raw failed_jobs rows here as well would duplicate that
+         data and invite a second, untraceable retry control. --}}
+    @if (($diagnostics['queue']['failed_count'] ?? 0) > 0)
+        <div class="rounded-lg border border-warning-200 bg-warning-50/60 p-4 text-xs dark:border-amber-900/60 dark:bg-amber-950/30">
+            <p class="flex items-start gap-2 text-warning-800 dark:text-amber-200">
+                <x-ui.icon name="information-circle" class="mt-px h-4 w-4 shrink-0" />
+                <span>
+                    {{ $diagnostics['queue']['failed_count'] }}
+                    {{ Str::plural('job', $diagnostics['queue']['failed_count']) }}
+                    {{ $diagnostics['queue']['failed_count'] === 1 ? 'is' : 'are' }} recorded in the failed jobs table.
+                    Each of those failures raises an incident in the
+                    <a href="{{ route('super-admin.recovery.index') }}" class="font-semibold underline">Recovery Center</a>,
+                    which is where a retry can be run with a full audit record.
+                </span>
+            </p>
+        </div>
+    @endif
 </x-app-layout>

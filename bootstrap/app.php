@@ -39,7 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->redirectGuestsTo(fn (Request $request) => match (true) {
             $request->is('super-admin/*') => route('super-admin.login'),
-            $request->routeIs('admin.audit-logs.*', 'admin.recovery.*') => route('super-admin.login'),
+            $request->routeIs('admin.audit-logs.*') => route('super-admin.login'),
             $request->is('admin/*') => route('admin.login'),
             default => route('login'),
         });

@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Observers\UserObserver;
 use App\Services\AuditLogger;
 use App\Services\HimsNotificationService;
+use App\Services\Recovery\QueueJobRecoveryService;
 use App\Support\AuditBrowserLocation;
 use App\Support\AuthenticationPanel;
 use App\View\Composers\NotificationComposer;
@@ -18,6 +19,8 @@ use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Auth\Events\PasswordReset as PasswordResetEvent;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
@@ -40,8 +43,26 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->registerPermissionGates();
         $this->registerAuditLogging();
+        $this->registerRecoveryReconciliation();
         $this->registerPasswordResetUrls();
         View::composer('layouts.partials.topbar', NotificationComposer::class);
+    }
+
+    /**
+     * Reconcile recovery incidents with what the queue worker actually did.
+     *
+     * A queued retry can only be dispatched, never awaited, so these events are
+     * what turn a "Recovery Pending" incident into a confirmed outcome.
+     */
+    private function registerRecoveryReconciliation(): void
+    {
+        Event::listen(function (JobFailed $event): void {
+            app(QueueJobRecoveryService::class)->handleFailure($event);
+        });
+
+        Event::listen(function (JobProcessed $event): void {
+            app(QueueJobRecoveryService::class)->handleSuccess($event);
+        });
     }
 
     /**

@@ -2,6 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RecoveryFailureType;
+use App\Enums\RecoveryRetryHandler;
+use App\Enums\RecoveryStatus;
+use App\Models\SystemRecoveryRecord;
 use App\Models\User;
 use App\Support\AuthenticationContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -165,11 +169,33 @@ class DecisionConfirmationTest extends TestCase
     {
         $superAdmin = User::factory()->superAdministrator()->create();
 
+        // A retryable incident, so the retry control the dialog guards is present.
+        SystemRecoveryRecord::create([
+            'error_id' => 'REC-CONFIRM-001',
+            'module' => 'Queue',
+            'failure_type' => RecoveryFailureType::QueueJob,
+            'operation' => 'queue_job',
+            'error_summary' => 'Connection could not be established with host smtp.hospital.local:587',
+            'status' => RecoveryStatus::Failed,
+            'strategy_applied' => 'queue_worker_failure',
+            'is_retryable' => true,
+            'retry_handler' => RecoveryRetryHandler::QueueJob,
+            'retry_payload' => ['failed_job_uuid' => 'e9b1c4a7-2d63-4f80-9a15-6b3c8e0d7f42'],
+        ]);
+
         $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
-            ->get(route('admin.recovery.index'))
+            ->get(route('super-admin.recovery.index'))
             ->assertOk()
-            ->assertSee('data-confirm-title="Rebuild application cache"', false)
-            ->assertSee('data-confirm-title="Retry all failed jobs"', false)
+            ->assertSee('data-confirm-title="Clear application cache"', false)
+            ->assertSee('data-confirm-title="Run recovery attempt"', false)
+            ->assertDontSee('onclick="return confirm', false);
+
+        // The confirm copy must say what the retry does not do.
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get(route('super-admin.recovery.show', SystemRecoveryRecord::where('error_id', 'REC-CONFIRM-001')->firstOrFail()))
+            ->assertOk()
+            ->assertSee('data-confirm-title="Run recovery attempt"', false)
+            ->assertSee('does not mark the incident recovered unless the operation genuinely succeeds.', false)
             ->assertDontSee('onclick="return confirm', false);
     }
 

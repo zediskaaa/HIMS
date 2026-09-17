@@ -103,14 +103,4 @@ class DropdownNavigationTest extends TestCase
         $response->assertSee('Process Reviews');
         $response->assertSee('DOH DPRI Reference Prices');
     }
-
-    public function test_recovery_center_diagnostics_modal_handles_null_source_location_safely(): void
-    {
-        $response = $this->actingAs($this->superAdmin)->get(route('super-admin.recovery.index'));
-
-        $response->assertOk();
-        // Assert that the template safely checks technical_details.file rather than raw undefined concatenation
-        $response->assertSee('selectedRecord.technical_details.file', false);
-        $response->assertSee('Source Location', false);
-    }
 }

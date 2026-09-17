@@ -6,6 +6,9 @@ use App\Enums\AuditAction;
 use App\Enums\NotificationDestination;
 use App\Enums\NotificationPriority;
 use App\Enums\Permission;
+use App\Enums\RecoveryFailureType;
+use App\Enums\RecoveryRetryHandler;
+use App\Enums\RecoveryStatus;
 use App\Exceptions\SafeOperationException;
 use App\Models\SystemRecoveryRecord;
 use App\Models\User;
@@ -20,11 +23,45 @@ use Illuminate\Support\Str;
 use PDOException;
 use Throwable;
 
+/**
+ * Records genuine operation failures as recovery incidents.
+ *
+ * A record is written only when an operation actually failed; nothing here
+ * fabricates an incident. Stack traces are never persisted — they belong in the
+ * server log, and the stored copy of the failure message is redacted so that
+ * credentials captured in an exception never reach the Recovery Center or the
+ * Audit Trail.
+ */
 class SafeExecutionService
 {
     private const MAX_DEADLOCK_RETRIES = 3;
 
     private const SENSITIVE_KEY_PATTERN = '/(?:password|passphrase|token|secret|otp|totp|authorization|cookie|session|api[_-]?key|private[_-]?key|file[_-]?(?:content|contents)|document[_-]?content)/i';
+
+    /**
+     * Credential shapes that commonly appear inside an exception message, such as
+     * a DSN echoed back by the database driver.
+     */
+    private const MESSAGE_REDACTIONS = [
+        '/(?<=:\/\/)[^:\/\s@]+:[^@\/\s]+(?=@)/' => '[REDACTED]',
+        '/\b(password|passwd|pwd|secret|token|api[_-]?key|authorization)\s*[=:]\s*[^\s,;)\]]+/i' => '$1=[REDACTED]',
+        '/\bBearer\s+[A-Za-z0-9\-._~+\/]{8,}=*/i' => 'Bearer [REDACTED]',
+    ];
+
+    /**
+     * Retry-payload keys that name an operational handle rather than a credential.
+     *
+     * These are exempt from the sensitive-key redaction: the handler reads them
+     * back to re-run the operation, so redacting them would silently disable the
+     * recovery path they exist to enable. The values still pass through
+     * `redact()`, so a credential embedded in the value itself is still removed.
+     */
+    private const RETRY_PAYLOAD_IDENTIFIER_KEYS = [
+        'import_token',
+        'failed_job_uuid',
+        'job_uuid',
+        'job_id',
+    ];
 
     public function __construct(
         private readonly AuditLogger $auditLogger,
@@ -50,8 +87,10 @@ class SafeExecutionService
         callable $callback,
         array $context = [],
         bool $isRetryable = false,
-        ?string $retryHandler = null,
-        ?array $retryPayload = null
+        ?RecoveryRetryHandler $retryHandler = null,
+        ?array $retryPayload = null,
+        ?string $affectedResource = null,
+        ?string $referenceId = null
     ): mixed {
         $attempts = 0;
         $delayMs = 50;
@@ -79,7 +118,9 @@ class SafeExecutionService
                     isRetryable: $isRetryable,
                     retryHandler: $retryHandler,
                     retryPayload: $retryPayload,
-                    strategy: 'automatic_rollback'
+                    strategy: 'automatic_rollback',
+                    affectedResource: $affectedResource,
+                    referenceId: $referenceId
                 );
 
                 $userMessage = $this->getUserFriendlyMessage($module, $operation);
@@ -105,6 +146,10 @@ class SafeExecutionService
     /**
      * Execute a primary operation, falling back to a safe default if an exception occurs.
      *
+     * The fallback swallows the exception, so this method is responsible for
+     * putting the full detail into the server log; the incident itself keeps only
+     * the redacted summary.
+     *
      * @template T
      * @param callable(): T $primary
      * @param callable(Throwable): T $fallback
@@ -121,6 +166,12 @@ class SafeExecutionService
         try {
             return $primary();
         } catch (Throwable $e) {
+            Log::error('Operation fell back to a safe default after a failure.', [
+                'module' => $module,
+                'operation' => $operation,
+                'exception' => $e,
+            ]);
+
             $this->recordFailure(
                 exception: $e,
                 module: $module,
@@ -137,6 +188,9 @@ class SafeExecutionService
     /**
      * Persist an error failure record with sanitized diagnostics and audit attribution.
      *
+     * Callers that swallow the exception are responsible for logging it; the
+     * original throwable is deliberately not written to the database.
+     *
      * @param array<string, mixed> $context
      * @param array<string, mixed>|null $retryPayload
      */
@@ -146,11 +200,14 @@ class SafeExecutionService
         string $operation,
         array $context = [],
         bool $isRetryable = false,
-        ?string $retryHandler = null,
+        ?RecoveryRetryHandler $retryHandler = null,
         ?array $retryPayload = null,
-        string $strategy = 'automatic_rollback'
+        string $strategy = 'automatic_rollback',
+        ?RecoveryFailureType $failureType = null,
+        ?string $affectedResource = null,
+        ?string $referenceId = null
     ): SystemRecoveryRecord {
-        $errorId = 'REC-' . strtoupper(Str::random(10));
+        $errorId = $this->generateErrorId();
         /** @var User|null $actor */
         $actor = Auth::user();
         $request = app()->bound('request') ? app(Request::class) : null;
@@ -160,39 +217,46 @@ class SafeExecutionService
             : 'System / Automated';
 
         $sanitizedContext = $this->sanitize($context);
-        $sanitizedPayload = $retryPayload !== null ? $this->sanitize($retryPayload) : null;
+        $sanitizedPayload = $retryPayload !== null
+            ? $this->sanitize($retryPayload, self::RETRY_PAYLOAD_IDENTIFIER_KEYS)
+            : null;
+        $redactedMessage = $this->redact($exception->getMessage());
 
-        $technicalDetails = [
-            'error_id' => $errorId,
-            'message' => $exception->getMessage(),
-            'file' => $this->sanitizePath($exception->getFile()),
-            'line' => $exception->getLine(),
-            'code' => $exception->getCode(),
-            'trace' => $this->formatStackTrace($exception),
-            'context' => $sanitizedContext,
-            'url' => $request?->fullUrl(),
-            'method' => $request?->method(),
-            'user_agent' => $request?->userAgent(),
-        ];
-
-        $summary = Str::limit($exception->getMessage(), 490, '...');
-        if (empty(trim($summary))) {
+        $summary = Str::limit($redactedMessage, 490, '...');
+        if (trim($summary) === '') {
             $summary = sprintf('System exception [%s] during %s in %s.', class_basename($exception), $operation, $module);
         }
+
+        // Only retryable incidents get a handler; the status vocabulary follows
+        // from that so the UI never offers a retry that cannot run.
+        $handler = $isRetryable ? $retryHandler : null;
+        $status = $handler !== null ? RecoveryStatus::Failed : RecoveryStatus::NotRecoverable;
 
         $record = SystemRecoveryRecord::create([
             'error_id' => $errorId,
             'user_id' => $actor?->getKey(),
             'user_snapshot' => $userSnapshot,
             'module' => $module,
+            'failure_type' => $failureType ?? $this->inferFailureType($module, $operation, $handler),
             'operation' => $operation,
             'error_summary' => $summary,
-            'exception_class' => get_class($exception),
-            'technical_details' => $technicalDetails,
-            'status' => 'pending',
+            'affected_resource' => $affectedResource,
+            'reference_id' => $referenceId,
+            'exception_class' => $exception::class,
+            'technical_details' => [
+                'error_id' => $errorId,
+                'message' => $redactedMessage,
+                'file' => $this->sanitizePath($exception->getFile()),
+                'line' => $exception->getLine(),
+                'code' => $exception->getCode(),
+                'context' => $sanitizedContext,
+                'url' => $request?->fullUrl(),
+                'method' => $request?->method(),
+            ],
+            'status' => $status,
             'strategy_applied' => $strategy,
-            'is_retryable' => $isRetryable,
-            'retry_handler' => $retryHandler,
+            'is_retryable' => $handler !== null,
+            'retry_handler' => $handler,
             'retry_payload' => $sanitizedPayload,
             'retry_count' => 0,
             'ip_address' => $request?->ip(),
@@ -220,10 +284,8 @@ class SafeExecutionService
                     'error_id' => $errorId,
                     'exception_class' => class_basename($exception),
                     'strategy' => $strategy,
-                    'is_retryable' => $isRetryable,
+                    'is_retryable' => $handler !== null,
                 ],
-                module: 'System Recovery',
-                category: 'System',
                 outcome: 'failure'
             );
         } catch (Throwable $auditException) {
@@ -250,6 +312,45 @@ class SafeExecutionService
         return $record;
     }
 
+    /**
+     * Incident references are quoted to operators and used to look incidents up,
+     * so a collision would be a real traceability defect rather than a cosmetic one.
+     */
+    private function generateErrorId(): string
+    {
+        do {
+            $errorId = 'REC-' . strtoupper(Str::random(10));
+        } while (SystemRecoveryRecord::where('error_id', $errorId)->exists());
+
+        return $errorId;
+    }
+
+    private function inferFailureType(
+        string $module,
+        string $operation,
+        ?RecoveryRetryHandler $handler
+    ): RecoveryFailureType {
+        if ($handler === RecoveryRetryHandler::Import) {
+            return RecoveryFailureType::Import;
+        }
+
+        if ($handler === RecoveryRetryHandler::QueueJob) {
+            return RecoveryFailureType::QueueJob;
+        }
+
+        $haystack = Str::lower($module . ' ' . $operation);
+
+        return match (true) {
+            Str::contains($haystack, ['import']) => RecoveryFailureType::Import,
+            Str::contains($haystack, ['export', 'report']) => RecoveryFailureType::Export,
+            Str::contains($haystack, ['queue', 'job']) => RecoveryFailureType::QueueJob,
+            Str::contains($haystack, ['database', 'transaction', 'deadlock']) => RecoveryFailureType::Database,
+            Str::contains($haystack, ['file', 'upload', 'document', 'storage']) => RecoveryFailureType::FileProcessing,
+            Str::contains($haystack, ['integration', 'api', 'telemetry', 'sync', 'iot']) => RecoveryFailureType::Integration,
+            default => RecoveryFailureType::Application,
+        };
+    }
+
     private function isTransientDeadlock(Throwable $e): bool
     {
         if ($e instanceof QueryException) {
@@ -274,28 +375,44 @@ class SafeExecutionService
 
     /**
      * @param array<string, mixed> $data
+     * @param array<int, string> $identifierKeys keys treated as operational handles
      * @return array<string, mixed>
      */
-    public function sanitize(array $data): array
+    public function sanitize(array $data, array $identifierKeys = []): array
     {
         $sanitized = [];
 
         foreach ($data as $key => $value) {
-            if (is_string($key) && preg_match(self::SENSITIVE_KEY_PATTERN, $key)) {
+            if (is_string($key)
+                && preg_match(self::SENSITIVE_KEY_PATTERN, $key)
+                && ! in_array($key, $identifierKeys, true)) {
                 $sanitized[$key] = '[REDACTED]';
                 continue;
             }
 
             if (is_array($value)) {
-                $sanitized[$key] = $this->sanitize($value);
-            } elseif (is_string($value) && strlen($value) > 1000) {
-                $sanitized[$key] = Str::limit($value, 500, '... [TRUNCATED]');
+                $sanitized[$key] = $this->sanitize($value, $identifierKeys);
+            } elseif (is_string($value)) {
+                $sanitized[$key] = Str::limit($this->redact($value), 500, '... [TRUNCATED]');
             } else {
                 $sanitized[$key] = $value;
             }
         }
 
         return $sanitized;
+    }
+
+    /**
+     * Strip credential-shaped text from a free-text value. Applied to exception
+     * messages and context strings, which may echo a DSN or a token verbatim.
+     */
+    public function redact(string $text): string
+    {
+        foreach (self::MESSAGE_REDACTIONS as $pattern => $replacement) {
+            $text = (string) preg_replace($pattern, $replacement, $text);
+        }
+
+        return $text;
     }
 
     private function sanitizePath(string $path): string
@@ -306,33 +423,6 @@ class SafeExecutionService
         }
 
         return basename($path);
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function formatStackTrace(Throwable $e): array
-    {
-        $lines = [];
-        $trace = $e->getTrace();
-        $count = 0;
-
-        foreach ($trace as $frame) {
-            if ($count++ >= 15) {
-                $lines[] = '... and more frames';
-                break;
-            }
-
-            $file = isset($frame['file']) ? $this->sanitizePath($frame['file']) : '[internal function]';
-            $line = $frame['line'] ?? '?';
-            $class = $frame['class'] ?? '';
-            $type = $frame['type'] ?? '';
-            $func = $frame['function'] ?? '';
-
-            $lines[] = sprintf('#%d %s(%s): %s%s%s()', $count, $file, $line, $class, $type, $func);
-        }
-
-        return $lines;
     }
 
     private function getUserFriendlyMessage(string $module, string $operation): string

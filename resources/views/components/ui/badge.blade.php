@@ -24,6 +24,13 @@
         'out_of_stock' => 'danger', 'expired' => 'danger', 'rejected' => 'danger',
         'cancelled' => 'danger', 'critical' => 'danger', 'open' => 'danger',
 
+        // recovery incidents — a failure is red, work in flight is amber, a
+        // verified recovery is green, and "no retry exists" is simply inert
+        'recovery_failed' => 'danger', 'failed' => 'danger',
+        'recovery_pending' => 'warning', 'retrying' => 'warning',
+        'recovered' => 'success',
+        'not_recoverable' => 'neutral',
+
         // neutral — inert states
         'draft' => 'neutral', 'inactive' => 'neutral', 'archived' => 'neutral',
         'current' => 'success', 'suspended' => 'danger',

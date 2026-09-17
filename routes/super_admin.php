@@ -68,11 +68,8 @@ Route::prefix('super-admin')->name('super-admin.')->group(function () {
         Route::get('recovery', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'index'])->name('recovery.index');
         Route::get('recovery/health', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'health'])->name('recovery.health');
         Route::post('recovery/rebuild-cache', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'rebuildCache'])->name('recovery.rebuild-cache');
-        Route::post('recovery/retry-all-jobs', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'retryAllJobs'])->name('recovery.retry-all-jobs');
-        Route::post('recovery/retry-job/{uuid}', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'retryJob'])->name('recovery.retry-job');
         Route::get('recovery/{record}', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'show'])->name('recovery.show');
         Route::post('recovery/{record}/retry', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'retry'])->name('recovery.retry');
         Route::post('recovery/{record}/resolve', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'resolve'])->name('recovery.resolve');
-        Route::post('recovery/{record}/ignore', [\App\Http\Controllers\SuperAdmin\RecoveryCenterController::class, 'ignore'])->name('recovery.ignore');
     });
 });

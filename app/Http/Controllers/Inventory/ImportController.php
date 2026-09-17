@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Inventory;
 use App\Enums\NotificationDestination;
 use App\Enums\NotificationPriority;
 use App\Enums\Permission;
+use App\Enums\RecoveryFailureType;
+use App\Enums\RecoveryRetryHandler;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
 use App\Models\StorageLocation;
@@ -15,6 +17,7 @@ use App\Services\Import\DataImportReader;
 use App\Services\Import\DataImportValidator;
 use App\Services\Import\ImportStagingService;
 use App\Services\Import\ImportTemplateGenerator;
+use App\Services\Recovery\SafeExecutionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -33,6 +36,7 @@ class ImportController extends Controller implements HasMiddleware
         private readonly ImportTemplateGenerator $templates,
         private readonly ImportStagingService $staging,
         private readonly HimsNotificationService $notifications,
+        private readonly SafeExecutionService $recovery,
     ) {}
 
     /**
@@ -239,6 +243,29 @@ class ImportController extends Controller implements HasMiddleware
                 'suppliers' => 'suppliers',
                 default => 'records',
             };
+
+            // The staging payload is deliberately kept: the executor rolled the
+            // whole batch back, so the exact validated rows are still on hand and
+            // the Recovery Center can genuinely replay them. The token is stored
+            // as the reference ID so the incident is traceable back to the import
+            // session that produced it.
+            try {
+                $this->recovery->recordFailure(
+                    exception: $e,
+                    module: 'Imports',
+                    operation: 'data_import',
+                    context: ['target' => $target, 'staged_rows' => count($staged['records'])],
+                    isRetryable: true,
+                    retryHandler: RecoveryRetryHandler::Import,
+                    retryPayload: ['import_token' => $token, 'target' => $target],
+                    strategy: 'automatic_rollback',
+                    failureType: RecoveryFailureType::Import,
+                    affectedResource: $targetName,
+                    referenceId: $token,
+                );
+            } catch (Throwable $recoveryException) {
+                report($recoveryException);
+            }
 
             try {
                 $this->notifications->sendToUser(

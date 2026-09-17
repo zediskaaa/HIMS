@@ -28,7 +28,6 @@ use App\Http\Controllers\Inventory\TelemetryController;
 use App\Http\Controllers\Inventory\WarehouseTaskController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\SuperAdmin\RecoveryCenterController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
 
@@ -311,17 +310,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // The role-versus-module matrix, generated from the same enum the gates are
     // registered from, so it cannot drift from what is actually enforced.
     Route::get('/permissions', [PermissionMatrixController::class, 'index'])->name('permissions');
-
-    // System Recovery Center (Super Admin only)
-    Route::get('/recovery', [RecoveryCenterController::class, 'index'])->name('recovery.index');
-    Route::get('/recovery/health', [RecoveryCenterController::class, 'health'])->name('recovery.health');
-    Route::post('/recovery/rebuild-cache', [RecoveryCenterController::class, 'rebuildCache'])->name('recovery.rebuild-cache');
-    Route::post('/recovery/retry-all-jobs', [RecoveryCenterController::class, 'retryAllJobs'])->name('recovery.retry-all-jobs');
-    Route::post('/recovery/retry-job/{uuid}', [RecoveryCenterController::class, 'retryJob'])->name('recovery.retry-job');
-    Route::get('/recovery/{record}', [RecoveryCenterController::class, 'show'])->name('recovery.show');
-    Route::post('/recovery/{record}/retry', [RecoveryCenterController::class, 'retry'])->name('recovery.retry');
-    Route::post('/recovery/{record}/resolve', [RecoveryCenterController::class, 'resolve'])->name('recovery.resolve');
-    Route::post('/recovery/{record}/ignore', [RecoveryCenterController::class, 'ignore'])->name('recovery.ignore');
 });
 
 require __DIR__.'/auth.php';

@@ -2,54 +2,138 @@
 
 namespace Database\Seeders;
 
-use App\Enums\AuditAction;
+use App\Enums\RecoveryAttemptOutcome;
+use App\Enums\RecoveryFailureType;
+use App\Enums\RecoveryRetryHandler;
+use App\Enums\RecoveryStatus;
 use App\Enums\UserRole;
+use App\Models\SystemRecoveryAttempt;
 use App\Models\SystemRecoveryRecord;
 use App\Models\User;
-use App\Services\AuditLogger;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use RuntimeException;
 
+/**
+ * Sample recovery incidents for demonstration and local development.
+ *
+ * Every record here uses the same status vocabulary, retry handlers, and
+ * technical-detail shape that the running system writes, so the Recovery Center
+ * renders these exactly as it renders a real incident. Nothing is written to the
+ * Audit Trail: that log is append-only and records what people actually did, so
+ * seeding invented entries there would misattribute actions to real accounts.
+ * Real recovery actions produce their own audit entries at runtime.
+ *
+ * Guarded against production and idempotent, so running it twice changes nothing.
+ */
 class ErrorRecoveryDemoSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new RuntimeException('Recovery Center demonstration incidents are disabled in production.');
+        }
+
         $superAdmin = User::active()->role(UserRole::SuperAdministrator)->oldest('id')->first();
-        $admin = User::active()->role(UserRole::Administrator)->oldest('id')->first();
         $inventoryManager = User::active()->role(UserRole::InventoryManager)->oldest('id')->first();
         $warehouseStaff = User::active()->role(UserRole::WarehouseStaff)->oldest('id')->first();
         $pharmacyStaff = User::active()->role(UserRole::PharmacyStaff)->oldest('id')->first();
 
-        // 1. Seed System Recovery Records
-        $recoveryIncidents = [
+        // The one live failed job the queue retry path can genuinely re-dispatch.
+        // Its UUID is the incident's reference ID, which is what the retry handler
+        // looks the row up by.
+        $failedJobUuid = '550e8400-e29b-41d4-a716-446655440000';
+        $this->seedFailedJob($failedJobUuid);
+
+        $incidents = $this->incidents(
+            $superAdmin,
+            $inventoryManager,
+            $warehouseStaff,
+            $pharmacyStaff,
+            $failedJobUuid,
+        );
+
+        foreach ($incidents as $incident) {
+            SystemRecoveryRecord::updateOrCreate(
+                ['error_id' => $incident['error_id']],
+                $incident
+            );
+        }
+
+        $this->seedAttempts($superAdmin);
+    }
+
+    /**
+     * A failed job row with no incident of its own is dead weight, so exactly one
+     * is seeded and it is wired to the queue incident below.
+     */
+    private function seedFailedJob(string $uuid): void
+    {
+        DB::table('failed_jobs')->updateOrInsert(
+            ['uuid' => $uuid],
+            [
+                'connection' => 'database',
+                'queue' => 'notifications',
+                'payload' => json_encode([
+                    'uuid' => $uuid,
+                    'displayName' => 'Illuminate\\Notifications\\SendQueuedNotifications',
+                    'job' => 'Illuminate\\Queue\\CallQueuedHandler@go',
+                    'maxTries' => 3,
+                    'timeout' => 60,
+                    'data' => ['commandName' => 'Illuminate\\Notifications\\SendQueuedNotifications'],
+                ], JSON_THROW_ON_ERROR),
+                'exception' => "Symfony\\Component\\Mailer\\Exception\\TransportException: Connection could not be established with host smtp.hospital.local:587\nStack trace:\n#0 /var/www/vendor/symfony/mailer/Transport/Smtp/Stream/AbstractStream.php(128): stream_socket_client()\n#1 /var/www/vendor/laravel/framework/src/Illuminate/Queue/CallQueuedHandler.php(120): Illuminate\\Notifications\\SendQueuedNotifications->handle()",
+                'failed_at' => now()->subHours(6),
+            ]
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function incidents(
+        ?User $superAdmin,
+        ?User $inventoryManager,
+        ?User $warehouseStaff,
+        ?User $pharmacyStaff,
+        string $failedJobUuid,
+    ): array {
+        // A staged import token that no longer resolves. The retry handler reports
+        // that truthfully rather than replaying anything, which is the same path a
+        // real expired import takes.
+        $lapsedImportToken = (string) Str::uuid();
+
+        return [
             [
                 'error_id' => 'REC-2026-IMP-001',
                 'user_id' => $inventoryManager?->id,
-                'user_snapshot' => $inventoryManager ? "{$inventoryManager->name} ({$inventoryManager->email})" : 'Pharmacy Inventory Manager',
-                'module' => 'imports',
-                'operation' => 'inventory_csv_import',
-                'error_summary' => "Failed to import batch inventory: Missing required header 'lot_number' at row 1.",
-                'exception_class' => 'League\Csv\InvalidArgumentException',
+                'user_snapshot' => $this->snapshot($inventoryManager, 'Pharmacy Inventory Manager'),
+                'module' => 'Imports',
+                'failure_type' => RecoveryFailureType::Import,
+                'operation' => 'data_import',
+                'error_summary' => "SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'lot_number' cannot be null (connection: mysql, sql: insert into `item_batches`)",
+                'affected_resource' => 'inventory items',
+                'reference_id' => $lapsedImportToken,
+                'exception_class' => 'Illuminate\Database\QueryException',
                 'technical_details' => [
-                    'message' => "Required header 'lot_number' is missing from uploaded inventory CSV.",
-                    'code' => 0,
-                    'file' => 'app/Services/DataImportService.php',
-                    'line' => 142,
-                    'detected_headers' => ['item_code', 'quantity', 'expiry_date', 'storage_location'],
-                    'required_headers' => ['item_code', 'quantity', 'lot_number', 'expiry_date'],
-                    'context' => 'Pre-import header schema verification',
+                    'message' => "SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'lot_number' cannot be null",
+                    'file' => 'app/Services/Import/DataImportExecutor.php',
+                    'line' => 74,
+                    'code' => '23000',
+                    'context' => ['target' => 'items', 'staged_rows' => 120],
+                    'url' => 'http://hims.test/api/v1/inventory/import/commit',
+                    'method' => 'POST',
                 ],
-                'status' => 'pending',
+                'status' => RecoveryStatus::Failed,
                 'strategy_applied' => 'automatic_rollback',
                 'is_retryable' => true,
-                'retry_handler' => 'import',
-                'retry_payload' => [
-                    'file_path' => 'imports/batch_rx_quarantine_202609.csv',
-                    'original_filename' => 'batch_rx_quarantine_202609.csv',
-                    'rows_staged' => 120,
-                ],
+                'retry_handler' => RecoveryRetryHandler::Import,
+                'retry_payload' => ['import_token' => $lapsedImportToken, 'target' => 'items'],
                 'retry_count' => 0,
                 'last_retried_at' => null,
+                'last_attempt_outcome' => null,
+                'last_attempt_error' => null,
                 'resolved_by_user_id' => null,
                 'resolved_at' => null,
                 'resolution_notes' => null,
@@ -58,129 +142,30 @@ class ErrorRecoveryDemoSeeder extends Seeder
                 'updated_at' => now()->subHours(2),
             ],
             [
-                'error_id' => 'REC-2026-TXN-002',
-                'user_id' => $warehouseStaff?->id,
-                'user_snapshot' => $warehouseStaff ? "{$warehouseStaff->name} ({$warehouseStaff->email})" : 'Warehouse Dock Officer',
-                'module' => 'inventory',
-                'operation' => 'stock_movement_batch_commit',
-                'error_summary' => 'Deadlock encountered during simultaneous emergency requisition fulfillment and bulk restock.',
-                'exception_class' => 'Illuminate\Database\QueryException',
-                'technical_details' => [
-                    'message' => 'SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock; try restarting transaction',
-                    'code' => '40001',
-                    'sql' => 'update `item_stock_levels` set `quantity` = `quantity` - 50 where `item_id` = 2 and `storage_location_id` = 1',
-                    'conflicting_transactions' => ['txn_emergency_er_requisition_784', 'txn_grn_dock_restock_209'],
-                    'deadlock_cycles' => 1,
-                ],
-                'status' => 'retried',
-                'strategy_applied' => 'deadlock_retry',
-                'is_retryable' => true,
-                'retry_handler' => 'generic',
-                'retry_payload' => [
-                    'affected_items' => [2, 3],
-                    'source_location_id' => 1,
-                    'quantity_delta' => 50,
-                ],
-                'retry_count' => 2,
-                'last_retried_at' => now()->subHour(),
-                'resolved_by_user_id' => $superAdmin?->id,
-                'resolved_at' => now()->subHour(),
-                'resolution_notes' => 'Deadlock retry strategy successfully re-attempted transaction with exponential backoff. Stock ledger balances fully reconciled without discrepancies.',
-                'ip_address' => '192.168.10.62',
-                'created_at' => now()->subHours(3),
-                'updated_at' => now()->subHour(),
-            ],
-            [
-                'error_id' => 'REC-2026-EXT-003',
+                'error_id' => 'REC-2026-QUE-002',
                 'user_id' => null,
-                'user_snapshot' => 'System Automated Worker (Cron Poller)',
-                'module' => 'procurement',
-                'operation' => 'dpri_price_sync',
-                'error_summary' => 'DOH DPRI external reference price endpoint timed out (HTTP 504 Gateway Timeout).',
-                'exception_class' => 'Illuminate\Http\Client\ConnectionException',
-                'technical_details' => [
-                    'message' => 'cURL error 28: Operation timed out after 30001 milliseconds with 0 out of 0 bytes received',
-                    'endpoint' => 'https://dpri.doh.gov.ph/api/v2/prices/2026',
-                    'http_code' => 504,
-                    'attempt' => 3,
-                    'retry_after_seconds' => 300,
-                ],
-                'status' => 'resolved',
-                'strategy_applied' => 'safe_default',
-                'is_retryable' => true,
-                'retry_handler' => 'generic',
-                'retry_payload' => [
-                    'edition_year' => 2026,
-                    'fallback_cache_used' => true,
-                ],
-                'retry_count' => 1,
-                'last_retried_at' => now()->subHours(20),
-                'resolved_by_user_id' => $superAdmin?->id,
-                'resolved_at' => now()->subHours(20),
-                'resolution_notes' => 'Applied local cached DPRI ceiling prices fallback table to avoid blocking active purchase orders. DOH portal connection re-established and validated.',
-                'ip_address' => '127.0.0.1',
-                'created_at' => now()->subDay(),
-                'updated_at' => now()->subHours(20),
-            ],
-            [
-                'error_id' => 'REC-2026-EXP-004',
-                'user_id' => $pharmacyStaff?->id,
-                'user_snapshot' => $pharmacyStaff ? "{$pharmacyStaff->name} ({$pharmacyStaff->email})" : 'Hospital Pharmacist',
-                'module' => 'reports',
-                'operation' => 'export_narcotics_report',
-                'error_summary' => 'Export failed during PDF rendering: Temporary storage allocation exceeded for high-resolution surgical logs.',
-                'exception_class' => 'RuntimeException',
-                'technical_details' => [
-                    'message' => 'Temporary buffer exceeded memory ceiling (128MB) while building PDEA Annex F multi-page audit report.',
-                    'allocated_memory' => '134217728 bytes',
-                    'page_count_rendered' => 84,
-                    'report_code' => 'PDEA_FORM_8_DANGEROUS_DRUGS',
-                ],
-                'status' => 'pending',
-                'strategy_applied' => 'queued_for_review',
-                'is_retryable' => true,
-                'retry_handler' => 'export',
-                'retry_payload' => [
-                    'report_type' => 'pdea_narcotics_monthly',
-                    'period_from' => '2026-08-01',
-                    'period_to' => '2026-08-31',
-                    'format' => 'pdf',
-                    'split_by_vault' => true,
-                ],
-                'retry_count' => 0,
-                'last_retried_at' => null,
-                'resolved_by_user_id' => null,
-                'resolved_at' => null,
-                'resolution_notes' => null,
-                'ip_address' => '192.168.10.88',
-                'created_at' => now()->subHours(5),
-                'updated_at' => now()->subHours(5),
-            ],
-            [
-                'error_id' => 'REC-2026-QUE-005',
-                'user_id' => null,
-                'user_snapshot' => 'Laravel Queue Worker (worker-notifications-1)',
-                'module' => 'queue',
-                'operation' => 'process_expiry_alerts_job',
-                'error_summary' => 'Failed processing queued job App\Jobs\DispatchNearExpiryStockAlerts: SMTP mailer connection refused.',
+                'user_snapshot' => 'System / Automated',
+                'module' => 'Queue',
+                'failure_type' => RecoveryFailureType::QueueJob,
+                'operation' => 'queue_job',
+                'error_summary' => 'Connection could not be established with host smtp.hospital.local:587',
+                'affected_resource' => 'SendQueuedNotifications',
+                'reference_id' => $failedJobUuid,
                 'exception_class' => 'Symfony\Component\Mailer\Exception\TransportException',
                 'technical_details' => [
-                    'message' => 'Connection could not be established with host mail.hospital.local:25 :stream_socket_client(): unable to connect to mail.hospital.local:25',
-                    'queue' => 'notifications',
-                    'job_uuid' => '550e8400-e29b-41d4-a716-446655440000',
-                    'attempts' => 3,
+                    'message' => 'Connection could not be established with host smtp.hospital.local:587',
+                    'context' => ['connection' => 'database', 'queue' => 'notifications'],
+                    'method' => 'CLI',
                 ],
-                'status' => 'pending',
-                'strategy_applied' => 'queued_for_review',
+                'status' => RecoveryStatus::Failed,
+                'strategy_applied' => 'queue_worker_failure',
                 'is_retryable' => true,
-                'retry_handler' => 'queue_job',
-                'retry_payload' => [
-                    'job_id' => 1,
-                    'job_uuid' => '550e8400-e29b-41d4-a716-446655440000',
-                    'queue' => 'notifications',
-                ],
+                'retry_handler' => RecoveryRetryHandler::QueueJob,
+                'retry_payload' => ['failed_job_uuid' => $failedJobUuid],
                 'retry_count' => 0,
                 'last_retried_at' => null,
+                'last_attempt_outcome' => null,
+                'last_attempt_error' => null,
                 'resolved_by_user_id' => null,
                 'resolved_at' => null,
                 'resolution_notes' => null,
@@ -189,199 +174,309 @@ class ErrorRecoveryDemoSeeder extends Seeder
                 'updated_at' => now()->subHours(6),
             ],
             [
-                'error_id' => 'REC-2026-IOT-006',
-                'user_id' => null,
-                'user_snapshot' => 'IoT Telemetry Ingestion Service',
-                'module' => 'warehousing',
-                'operation' => 'cold_chain_iot_telemetry',
-                'error_summary' => 'Transient sensor jitter detected on Cold Storage Zone C sensor #4: Value -999.0°C outside physical range.',
-                'exception_class' => 'UnexpectedValueException',
+                'error_id' => 'REC-2026-IMP-003',
+                'user_id' => $warehouseStaff?->id,
+                'user_snapshot' => $this->snapshot($warehouseStaff, 'Warehouse Dock Officer'),
+                'module' => 'Imports',
+                'failure_type' => RecoveryFailureType::Import,
+                'operation' => 'data_import',
+                'error_summary' => "SQLSTATE[42S22]: Column not found: 1054 Unknown column 'storage_location' in 'field list'",
+                'affected_resource' => 'storage locations',
+                'reference_id' => 'b7c1e4a2-5f38-4d19-9c60-2a7e8f1b3d40',
+                'exception_class' => 'Illuminate\Database\QueryException',
                 'technical_details' => [
-                    'sensor_id' => 'TEMP-WH-01-COLD-04',
-                    'location' => 'Cold Chain Vaccine Refrigerator A',
-                    'reported_value' => -999.0,
-                    'valid_range' => [2.0, 8.0],
-                    'cause' => 'Hardware telemetry bus voltage dip during battery change',
+                    'message' => "SQLSTATE[42S22]: Column not found: 1054 Unknown column 'storage_location' in 'field list'",
+                    'file' => 'app/Services/Import/DataImportExecutor.php',
+                    'line' => 118,
+                    'code' => '42S22',
+                    'context' => ['target' => 'locations', 'staged_rows' => 24],
+                    'url' => 'http://hims.test/api/v1/inventory/import/commit',
+                    'method' => 'POST',
                 ],
-                'status' => 'ignored',
+                'status' => RecoveryStatus::RecoveryFailed,
+                'strategy_applied' => 'automatic_rollback',
+                'is_retryable' => true,
+                'retry_handler' => RecoveryRetryHandler::Import,
+                'retry_payload' => ['import_token' => 'b7c1e4a2-5f38-4d19-9c60-2a7e8f1b3d40', 'target' => 'locations'],
+                'retry_count' => 2,
+                'last_retried_at' => now()->subMinutes(90),
+                'last_attempt_outcome' => RecoveryAttemptOutcome::Failed,
+                'last_attempt_error' => 'The staged import data has expired or was already consumed. Re-upload the source file and run the import again.',
+                'resolved_by_user_id' => null,
+                'resolved_at' => null,
+                'resolution_notes' => null,
+                'ip_address' => '192.168.10.62',
+                'created_at' => now()->subHours(4),
+                'updated_at' => now()->subMinutes(90),
+            ],
+            [
+                'error_id' => 'REC-2026-QUE-004',
+                'user_id' => null,
+                'user_snapshot' => 'System / Automated',
+                'module' => 'Queue',
+                'failure_type' => RecoveryFailureType::QueueJob,
+                'operation' => 'queue_job',
+                'error_summary' => 'Maximum execution time of 60 seconds exceeded while rendering the near-expiry alert digest',
+                'affected_resource' => 'SendQueuedNotifications',
+                'reference_id' => 'c8f2a1d3-6e49-4b28-8a71-3c9d2e5f7a16',
+                'exception_class' => 'Symfony\Component\Process\Exception\ProcessTimedOutException',
+                'technical_details' => [
+                    'message' => 'Maximum execution time of 60 seconds exceeded',
+                    'context' => ['connection' => 'database', 'queue' => 'notifications'],
+                    'method' => 'CLI',
+                ],
+                // A queued job was re-dispatched and the worker confirmed it ran.
+                'status' => RecoveryStatus::Recovered,
+                'strategy_applied' => 'queue_worker_failure',
+                'is_retryable' => true,
+                'retry_handler' => RecoveryRetryHandler::QueueJob,
+                'retry_payload' => ['failed_job_uuid' => 'c8f2a1d3-6e49-4b28-8a71-3c9d2e5f7a16'],
+                'retry_count' => 1,
+                'last_retried_at' => now()->subHours(22),
+                'last_attempt_outcome' => RecoveryAttemptOutcome::Dispatched,
+                'last_attempt_error' => null,
+                'resolved_by_user_id' => $superAdmin?->id,
+                'resolved_at' => now()->subHours(21),
+                'resolution_notes' => sprintf('Recovered by %s on attempt #1.', $superAdmin?->name ?? 'Super Administrator'),
+                'ip_address' => '127.0.0.1',
+                'created_at' => now()->subDay(),
+                'updated_at' => now()->subHours(21),
+            ],
+            [
+                'error_id' => 'REC-2026-QUE-005',
+                'user_id' => null,
+                'user_snapshot' => 'System / Automated',
+                'module' => 'Queue',
+                'failure_type' => RecoveryFailureType::QueueJob,
+                'operation' => 'queue_job',
+                'error_summary' => 'Deadlock found when trying to get lock while writing the stock alert digest',
+                'affected_resource' => 'SendQueuedNotifications',
+                'reference_id' => 'd4a7b9c0-1f52-4e83-9b26-5a8c7d3e0f91',
+                'exception_class' => 'Illuminate\Database\QueryException',
+                'technical_details' => [
+                    'message' => 'SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock',
+                    'context' => ['connection' => 'database', 'queue' => 'notifications'],
+                    'method' => 'CLI',
+                ],
+                // Re-dispatched and handed to a worker; the outcome is not yet
+                // observable, so the incident stays open until the worker reports.
+                'status' => RecoveryStatus::RecoveryPending,
+                'strategy_applied' => 'queue_worker_failure',
+                'is_retryable' => true,
+                'retry_handler' => RecoveryRetryHandler::QueueJob,
+                'retry_payload' => ['failed_job_uuid' => 'd4a7b9c0-1f52-4e83-9b26-5a8c7d3e0f91'],
+                'retry_count' => 1,
+                'last_retried_at' => now()->subMinutes(12),
+                'last_attempt_outcome' => RecoveryAttemptOutcome::Dispatched,
+                'last_attempt_error' => null,
+                'resolved_by_user_id' => null,
+                'resolved_at' => null,
+                'resolution_notes' => null,
+                'ip_address' => '127.0.0.1',
+                'created_at' => now()->subHours(3),
+                'updated_at' => now()->subMinutes(12),
+            ],
+            [
+                'error_id' => 'REC-2026-TXN-006',
+                'user_id' => $warehouseStaff?->id,
+                'user_snapshot' => $this->snapshot($warehouseStaff, 'Warehouse Dock Officer'),
+                'module' => 'Inventory',
+                'failure_type' => RecoveryFailureType::Database,
+                'operation' => 'stock_movement',
+                'error_summary' => 'SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock; try restarting transaction',
+                'affected_resource' => 'item_stock_levels #2 at location #1',
+                'reference_id' => 'REQ-2026-0042',
+                'exception_class' => 'Illuminate\Database\QueryException',
+                'technical_details' => [
+                    'message' => 'SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock; try restarting transaction',
+                    'file' => 'app/Services/Inventory/StockMovementService.php',
+                    'line' => 213,
+                    'code' => '40001',
+                    'context' => ['item_id' => 2, 'storage_location_id' => 1, 'quantity_delta' => -50],
+                    'url' => 'http://hims.test/inventory/requisitions/REQ-2026-0042/issue',
+                    'method' => 'POST',
+                ],
+                // The transaction rolled back and there is no safe way to replay a
+                // movement whose originating request has already ended.
+                'status' => RecoveryStatus::NotRecoverable,
+                'strategy_applied' => 'automatic_rollback',
+                'is_retryable' => false,
+                'retry_handler' => null,
+                'retry_payload' => null,
+                'retry_count' => 0,
+                'last_retried_at' => null,
+                'last_attempt_outcome' => null,
+                'last_attempt_error' => null,
+                'resolved_by_user_id' => null,
+                'resolved_at' => null,
+                'resolution_notes' => null,
+                'ip_address' => '192.168.10.62',
+                'created_at' => now()->subHours(8),
+                'updated_at' => now()->subHours(8),
+            ],
+            [
+                'error_id' => 'REC-2026-EXT-007',
+                'user_id' => null,
+                'user_snapshot' => 'System / Automated',
+                'module' => 'Procurement',
+                'failure_type' => RecoveryFailureType::Integration,
+                'operation' => 'dpri_price_sync',
+                'error_summary' => 'cURL error 28: Operation timed out after 30001 milliseconds with 0 bytes received',
+                'affected_resource' => 'DOH DPRI price reference endpoint',
+                'reference_id' => 'DPRI-2026',
+                'exception_class' => 'Illuminate\Http\Client\ConnectionException',
+                'technical_details' => [
+                    'message' => 'cURL error 28: Operation timed out after 30001 milliseconds with 0 bytes received',
+                    'file' => 'app/Services/Procurement/DpriPriceSyncService.php',
+                    'line' => 96,
+                    'code' => 28,
+                    'context' => ['http_code' => 504, 'edition_year' => 2026],
+                    'method' => 'CLI',
+                ],
+                'status' => RecoveryStatus::Resolved,
                 'strategy_applied' => 'safe_default',
                 'is_retryable' => false,
                 'retry_handler' => null,
                 'retry_payload' => null,
                 'retry_count' => 0,
                 'last_retried_at' => null,
+                'last_attempt_outcome' => null,
+                'last_attempt_error' => null,
                 'resolved_by_user_id' => $superAdmin?->id,
-                'resolved_at' => now()->subDays(2),
-                'resolution_notes' => 'Confirmed telemetry spike caused by battery replacement on sensor probe. Sensor recalibrated and now transmitting nominal 4.1°C.',
-                'ip_address' => '192.168.20.15',
-                'created_at' => now()->subDays(2)->subHours(3),
-                'updated_at' => now()->subDays(2),
+                'resolved_at' => now()->subHours(20),
+                'resolution_notes' => 'Confirmed the DOH portal was reachable again and the cached ceiling prices matched the published edition. Closed without a retry because the scheduled sync had already refreshed the prices.',
+                'ip_address' => '127.0.0.1',
+                'created_at' => now()->subDay(),
+                'updated_at' => now()->subHours(20),
             ],
             [
-                'error_id' => 'REC-2026-MIG-007',
-                'user_id' => $admin?->id,
-                'user_snapshot' => $admin ? "{$admin->name} ({$admin->email})" : 'Hospital Administrator',
-                'module' => 'imports',
-                'operation' => 'legacy_excel_migration',
-                'error_summary' => 'Corrupted binary payload encountered in legacy Excel worksheet: File signature mismatch.',
-                'exception_class' => 'PhpOffice\PhpSpreadsheet\Reader\Exception',
+                'error_id' => 'REC-2026-EXP-008',
+                'user_id' => $pharmacyStaff?->id,
+                'user_snapshot' => $this->snapshot($pharmacyStaff, 'Hospital Pharmacist'),
+                'module' => 'Reports',
+                'failure_type' => RecoveryFailureType::Export,
+                'operation' => 'report_export',
+                'error_summary' => 'Allowed memory size of 134217728 bytes exhausted while rendering the dangerous drugs register',
+                'affected_resource' => 'PDEA Form 8 dangerous drugs register',
+                'reference_id' => 'PDEA-2026-08',
+                'exception_class' => 'Symfony\Component\ErrorHandler\Error\FatalError',
                 'technical_details' => [
-                    'message' => 'File format signature 0x00000000 not recognized as valid BIFF8 or OpenXML archive.',
-                    'filename' => 'legacy_pharmacy_archive_2022.xls',
-                    'detected_size' => 4096,
-                    'status' => 'corrupted_archive',
+                    'message' => 'Allowed memory size of 134217728 bytes exhausted (tried to allocate 20480 bytes)',
+                    'file' => 'app/Services/Reports/DangerousDrugsRegisterBuilder.php',
+                    'line' => 158,
+                    'code' => 1,
+                    'context' => ['report_code' => 'PDEA_FORM_8', 'period' => '2026-08', 'pages_rendered' => 84],
+                    'url' => 'http://hims.test/reports/dangerous-drugs/export',
+                    'method' => 'POST',
                 ],
-                'status' => 'failed_permanently',
+                // Export generation has no safe replay path: the export stream is
+                // tied to the request that asked for it.
+                'status' => RecoveryStatus::NotRecoverable,
                 'strategy_applied' => 'automatic_rollback',
                 'is_retryable' => false,
                 'retry_handler' => null,
                 'retry_payload' => null,
                 'retry_count' => 0,
                 'last_retried_at' => null,
-                'resolved_by_user_id' => $superAdmin?->id,
-                'resolved_at' => now()->subDays(3),
-                'resolution_notes' => 'Source media was corrupted during archive extraction. Hospital records department contacted to provide clean tape backup.',
-                'ip_address' => '192.168.10.12',
-                'created_at' => now()->subDays(3)->subHours(5),
-                'updated_at' => now()->subDays(3),
-            ],
-            [
-                'error_id' => 'REC-2026-DIS-008',
-                'user_id' => $warehouseStaff?->id,
-                'user_snapshot' => $warehouseStaff ? "{$warehouseStaff->name} ({$warehouseStaff->email})" : 'Warehouse Staff',
-                'module' => 'inventory',
-                'operation' => 'material_requisition_issuance',
-                'error_summary' => 'Concurrency conflict: Requisition was concurrently modified by another pharmacy terminal.',
-                'exception_class' => 'Illuminate\Database\Eloquent\ModelNotFoundException',
-                'technical_details' => [
-                    'message' => 'Optimistic lock version mismatch during material requisition issuance dispatch.',
-                    'requisition_code' => 'REQ-2026-0042',
-                    'action' => 'issuance_dispatch',
-                ],
-                'status' => 'in_progress',
-                'strategy_applied' => 'automatic_rollback',
-                'is_retryable' => true,
-                'retry_handler' => 'generic',
-                'retry_payload' => [
-                    'requisition_code' => 'REQ-2026-0042',
-                ],
-                'retry_count' => 0,
-                'last_retried_at' => null,
+                'last_attempt_outcome' => null,
+                'last_attempt_error' => null,
                 'resolved_by_user_id' => null,
                 'resolved_at' => null,
                 'resolution_notes' => null,
-                'ip_address' => '192.168.10.66',
-                'created_at' => now()->subMinutes(45),
-                'updated_at' => now()->subMinutes(45),
+                'ip_address' => '192.168.10.88',
+                'created_at' => now()->subHours(11),
+                'updated_at' => now()->subHours(11),
+            ],
+        ];
+    }
+
+    /**
+     * The attempt ledger for the incidents that were retried. Written with
+     * firstOrCreate so a repeated seed cannot duplicate history.
+     */
+    private function seedAttempts(?User $superAdmin): void
+    {
+        $ledger = [
+            'REC-2026-IMP-003' => [
+                [
+                    'attempt_number' => 1,
+                    'outcome' => RecoveryAttemptOutcome::Failed,
+                    'message' => 'The staged import data has expired or was already consumed. Re-upload the source file and run the import again.',
+                    'duration_ms' => 8,
+                ],
+                [
+                    'attempt_number' => 2,
+                    'outcome' => RecoveryAttemptOutcome::Failed,
+                    'message' => 'The staged import data has expired or was already consumed. Re-upload the source file and run the import again.',
+                    'duration_ms' => 6,
+                ],
+            ],
+            'REC-2026-QUE-004' => [
+                [
+                    'attempt_number' => 1,
+                    'outcome' => RecoveryAttemptOutcome::Dispatched,
+                    'message' => 'Queue job [c8f2a1d3-6e49-4b28-8a71-3c9d2e5f7a16] was pushed back onto the notifications queue. Its outcome is confirmed once the worker processes it.',
+                    'duration_ms' => 412,
+                ],
+            ],
+            'REC-2026-QUE-005' => [
+                [
+                    'attempt_number' => 1,
+                    'outcome' => RecoveryAttemptOutcome::Dispatched,
+                    'message' => 'Queue job [d4a7b9c0-1f52-4e83-9b26-5a8c7d3e0f91] was pushed back onto the notifications queue. Its outcome is confirmed once the worker processes it.',
+                    'duration_ms' => 388,
+                ],
             ],
         ];
 
-        foreach ($recoveryIncidents as $incident) {
-            SystemRecoveryRecord::updateOrCreate(
-                ['error_id' => $incident['error_id']],
-                $incident
-            );
-        }
+        foreach ($ledger as $errorId => $attempts) {
+            $record = SystemRecoveryRecord::where('error_id', $errorId)->first();
 
-        // 2. Seed Realistic Failed Jobs in failed_jobs table
-        $failedJobs = [
-            [
-                'uuid' => '550e8400-e29b-41d4-a716-446655440000',
-                'connection' => 'database',
-                'queue' => 'notifications',
-                'payload' => json_encode([
-                    'uuid' => '550e8400-e29b-41d4-a716-446655440000',
-                    'displayName' => 'App\\Jobs\\DispatchNearExpiryStockAlerts',
-                    'job' => 'Illuminate\\Queue\\CallQueuedHandler@go',
-                    'maxTries' => 3,
-                    'timeout' => 60,
-                    'data' => ['commandName' => 'App\\Jobs\\DispatchNearExpiryStockAlerts'],
-                ], JSON_THROW_ON_ERROR),
-                'exception' => "Symfony\\Component\\Mailer\\Exception\\TransportException: Connection could not be established with host mail.hospital.local:25 in /var/www/vendor/symfony/mailer/Transport/Smtp/Stream/AbstractStream.php:128\nStack trace:\n#0 /var/www/app/Jobs/DispatchNearExpiryStockAlerts.php(52): Symfony\\Component\\Mailer\\Transport\\AbstractTransport->send()\n#1 /var/www/vendor/laravel/framework/src/Illuminate/Queue/CallQueuedHandler.php(120): App\\Jobs\\DispatchNearExpiryStockAlerts->handle()",
-                'failed_at' => now()->subHours(6),
-            ],
-            [
-                'uuid' => '550e8400-e29b-41d4-a716-446655440001',
-                'connection' => 'database',
-                'queue' => 'reports',
-                'payload' => json_encode([
-                    'uuid' => '550e8400-e29b-41d4-a716-446655440001',
-                    'displayName' => 'App\\Jobs\\GenerateMonthlyNarcoticsRegisterPdf',
-                    'job' => 'Illuminate\\Queue\\CallQueuedHandler@go',
-                    'maxTries' => 1,
-                    'timeout' => 300,
-                    'data' => [
-                        'commandName' => 'App\\Jobs\\GenerateMonthlyNarcoticsRegisterPdf',
-                        'reportId' => 'PDEA-2026-08',
+            if ($record === null) {
+                continue;
+            }
+
+            // A recovery attempt can only be run by a Super Administrator, so that
+            // is the actor the ledger attributes these to.
+            $occurredAt = $record->last_retried_at ?? $record->created_at;
+
+            foreach ($attempts as $attempt) {
+                $entry = SystemRecoveryAttempt::firstOrCreate(
+                    [
+                        'system_recovery_record_id' => $record->getKey(),
+                        'attempt_number' => $attempt['attempt_number'],
                     ],
-                ], JSON_THROW_ON_ERROR),
-                'exception' => "RuntimeException: Out of memory buffer (134217728 bytes) during PDF stream rendering in /var/www/app/Services/ReportGeneratorService.php:88\nStack trace:\n#0 /var/www/app/Jobs/GenerateMonthlyNarcoticsRegisterPdf.php(64): App\\Services\\ReportGeneratorService->generatePdf()\n#1 /var/www/vendor/laravel/framework/src/Illuminate/Queue/CallQueuedHandler.php(120): App\\Jobs\\GenerateMonthlyNarcoticsRegisterPdf->handle()",
-                'failed_at' => now()->subHours(5),
-            ],
-        ];
+                    [
+                        'outcome' => $attempt['outcome'],
+                        'handler' => $record->retry_handler,
+                        'message' => $attempt['message'],
+                        'actor_user_id' => $superAdmin?->getKey(),
+                        'actor_snapshot' => $this->snapshot($superAdmin, 'System / Automated'),
+                        'duration_ms' => $attempt['duration_ms'],
+                    ]
+                );
 
-        foreach ($failedJobs as $fj) {
-            DB::table('failed_jobs')->updateOrInsert(
-                ['uuid' => $fj['uuid']],
-                $fj
-            );
+                // Timestamps are not mass assignable, so the attempt is placed at
+                // the time the incident records for its retry rather than at seed
+                // time.
+                if ($entry->wasRecentlyCreated) {
+                    $entry->forceFill(['created_at' => $occurredAt, 'updated_at' => $occurredAt])->save();
+                }
+            }
+        }
+    }
+
+    private function snapshot(?User $user, string $fallback): string
+    {
+        if ($user === null) {
+            return $fallback;
         }
 
-        // 3. Seed Audit Trail entries for system failure & recovery events
-        $auditLogger = app(AuditLogger::class);
-
-        // Check if recovery audit entries already exist to avoid duplicate logs on repeated seeding
-        $existingRecoveryAuditCount = DB::table('audit_logs')
-            ->where('module', 'System Recovery')
-            ->count();
-
-        if ($existingRecoveryAuditCount === 0) {
-            // Failure audit log
-            $auditLogger->log(
-                action: AuditAction::SystemOperationFailed,
-                actor: $inventoryManager,
-                description: "Critical import failure rolled back automatically [Ref: REC-2026-IMP-001]. Missing required header 'lot_number'.",
-                oldValues: [],
-                newValues: ['error_id' => 'REC-2026-IMP-001', 'module' => 'imports', 'strategy' => 'automatic_rollback'],
-                module: 'System Recovery',
-                outcome: 'failure',
-                targetReference: 'REC-2026-IMP-001'
-            );
-
-            // Recovery audit log
-            $auditLogger->log(
-                action: AuditAction::SystemOperationRecovered,
-                actor: null,
-                description: 'Database deadlock automatically recovered after transient backoff retry [Ref: REC-2026-TXN-002]. Stock movement committed.',
-                oldValues: ['status' => 'pending', 'retry_count' => 1],
-                newValues: ['status' => 'retried', 'retry_count' => 2, 'strategy' => 'deadlock_retry'],
-                module: 'System Recovery',
-                outcome: 'success',
-                targetReference: 'REC-2026-TXN-002'
-            );
-
-            // Super Admin manual resolution audit log
-            $auditLogger->log(
-                action: AuditAction::TriggeredRecoveryAction,
-                actor: $superAdmin,
-                description: 'Super Administrator marked external API timeout as resolved [Ref: REC-2026-EXT-003]. Fallback cache deployed.',
-                oldValues: ['status' => 'pending'],
-                newValues: ['status' => 'resolved', 'strategy' => 'safe_default', 'notes' => 'Applied local cached DPRI ceiling prices.'],
-                module: 'System Recovery',
-                outcome: 'success',
-                targetReference: 'REC-2026-EXT-003'
-            );
-
-            // System maintenance audit log
-            $auditLogger->log(
-                action: AuditAction::SystemHealthMaintenance,
-                actor: $superAdmin,
-                description: 'Super Administrator triggered system diagnostics cache rebuild and optimized route state.',
-                oldValues: [],
-                newValues: ['action' => 'cache_rebuild', 'status' => 'healthy', 'execution_time_ms' => 142.5],
-                module: 'System Recovery',
-                outcome: 'success'
-            );
-        }
+        return sprintf(
+            '%s (%s, %s)',
+            $user->name,
+            $user->employee_id ?? 'No ID',
+            $user->role?->label() ?? 'Unknown'
+        );
     }
 }
