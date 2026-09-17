@@ -67,7 +67,20 @@
         data-audit-location-url="{{ $auditLocationCaptureUrl }}"
     @endif
 >
-    <div x-data="{ sidebarOpen: false }" class="hims-app-shell min-h-full overflow-x-clip">
+    <div
+        x-data="{
+            sidebarOpen: window.innerWidth >= 1024,
+            init() {
+                window.addEventListener('resize', () => {
+                    if (window.innerWidth < 1024 && this.sidebarOpen) {
+                        this.sidebarOpen = false;
+                    }
+                });
+            }
+        }"
+        x-on:keydown.window.escape="if (window.innerWidth < 1024) sidebarOpen = false"
+        class="hims-app-shell min-h-full overflow-x-clip"
+    >
 
         @include('layouts.partials.sidebar')
 
@@ -81,7 +94,10 @@
             aria-hidden="true"
         ></div>
 
-        <div class="w-full min-w-0 max-w-full lg:pl-64">
+        <div
+            class="w-full min-w-0 max-w-full transition-[padding] duration-200"
+            :class="sidebarOpen ? 'lg:pl-64' : 'lg:pl-0'"
+        >
             @include('layouts.partials.topbar')
 
             <main class="hims-app-content overflow-x-clip px-4 py-6 sm:px-6 lg:px-8 lg:py-8">

@@ -89,7 +89,7 @@
                 <x-input-error :messages="$errors->get('otp')" class="mt-2 text-danger-600" />
             </div>
 
-            <x-ui.button type="submit" size="lg" icon="shield-check" data-loading-text="Verifying..." class="w-full">
+            <x-ui.button type="submit" size="lg" data-loading-text="Verifying..." class="w-full">
                 {{ $method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR_RECOVERY
                     ? __('Reconfigure and sign in')
                     : __('Verify and sign in') }}
