@@ -158,9 +158,11 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="border-t border-neutral-200 px-6 py-4">
-                    {{ $entries->links() }}
-                </div>
+                @if($entries->hasPages())
+                    <div class="border-t border-neutral-200 px-4 py-3 sm:px-5 dark:border-neutral-800">
+                        {{ $entries->links() }}
+                    </div>
+                @endif
             </div>
 
         </div>

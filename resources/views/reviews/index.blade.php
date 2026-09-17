@@ -212,7 +212,9 @@
                 </table>
             </div>
 
-            <div class="mt-4">
-                {{ $reviews->links() }}
-            </div>
+            @if ($reviews->hasPages())
+                <div class="mt-4 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+                    {{ $reviews->links() }}
+                </div>
+            @endif
 </x-app-layout>

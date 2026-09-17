@@ -85,8 +85,9 @@ class InventoryItemController extends Controller implements HasMiddleware
                 fn ($query) => $query->stockStatus($request->query('status')),
             )
             ->when($request->filled('category_id'), fn ($query) => $query->where('category_id', $request->integer('category_id')))
-            ->latest()
-            ->get();
+            ->latest('id')
+            ->paginate(20)
+            ->withQueryString();
 
         $eligibleSuppliers = $canManageItems
             ? Supplier::procurementEligible()->orderBy('name')->get()

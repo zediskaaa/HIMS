@@ -1417,7 +1417,7 @@
                             @endforelse
                         </div>
 
-                        @if($purchaseOrders->hasPages())<footer class="border-t border-neutral-200 bg-neutral-50 px-4 py-3">{{ $purchaseOrders->onEachSide(1)->links() }}</footer>@endif
+                        @if($purchaseOrders->hasPages())<footer class="border-t border-neutral-200 bg-neutral-50 px-4 py-3 sm:px-5 dark:border-neutral-800 dark:bg-neutral-800/60">{{ $purchaseOrders->onEachSide(1)->links() }}</footer>@endif
                     </section>
                 </div>
 

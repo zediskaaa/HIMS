@@ -121,6 +121,10 @@
                     @endforelse
                     </tbody>
                 </x-ui.table>
-                <div class="mt-4">{{ $tasks->links() }}</div>
+                @if ($tasks->hasPages())
+                    <x-slot:footer>
+                        {{ $tasks->links() }}
+                    </x-slot:footer>
+                @endif
             </x-ui.card>
 </x-app-layout>

@@ -101,9 +101,11 @@
                 </table>
             </div>
 
-            <div>
-                {{ $referencePrices->links() }}
-            </div>
+            @if ($referencePrices->hasPages())
+                <div class="mt-4 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+                    {{ $referencePrices->links() }}
+                </div>
+            @endif
 
             {{-- New Reference Price Modal --}}
             @can(\App\Enums\Permission::CreateProcessReview->value)

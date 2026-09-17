@@ -45,6 +45,7 @@ class AppServiceProvider extends ServiceProvider
         $this->registerAuditLogging();
         $this->registerRecoveryReconciliation();
         $this->registerPasswordResetUrls();
+        \Illuminate\Pagination\Paginator::defaultView('vendor.pagination.tailwind');
         View::composer('layouts.partials.topbar', NotificationComposer::class);
     }
 

@@ -184,9 +184,11 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="border-t border-neutral-200 px-6 py-4">
-                    {{ $locations->links() }}
-                </div>
+                @if($locations->hasPages())
+                    <div class="border-t border-neutral-200 px-4 py-3 sm:px-5 dark:border-neutral-800">
+                        {{ $locations->links() }}
+                    </div>
+                @endif
             </div>
 
         </div>

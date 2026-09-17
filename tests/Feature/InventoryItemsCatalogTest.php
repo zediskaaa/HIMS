@@ -225,4 +225,132 @@ class InventoryItemsCatalogTest extends TestCase
         $response->assertSee('CAT-PARA');
         $response->assertDontSee('CAT-COTTON');
     }
+
+    public function test_catalog_paginates_records_at_twenty_items_per_page(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+
+        // Create 35 items so there are 2 full pages (20 + 15)
+        for ($i = 1; $i <= 35; $i++) {
+            InventoryItem::create([
+                'name' => sprintf('Batch Item %02d', $i),
+                'sku' => sprintf('BATCH-%02d', $i),
+                'quantity_on_hand' => 50,
+                'reorder_level' => 10,
+                'unit_cost' => 10,
+                'total_value' => 500,
+            ]);
+        }
+
+        // Page 1
+        $page1Response = $this->actingAs($manager)->get(route('inventory.items'));
+        $page1Response->assertOk();
+        $page1Response->assertSee('Showing');
+        $page1Response->assertSee('1');
+        $page1Response->assertSee('20');
+        $page1Response->assertSee('35');
+        $page1Response->assertSee('items');
+
+        // Check latest 20 items are on page 1 (Batch Item 35 down to 16)
+        $page1Response->assertSee('Batch Item 35');
+        $page1Response->assertSee('Batch Item 16');
+        $page1Response->assertDontSee('Batch Item 15');
+        $page1Response->assertDontSee('Batch Item 01');
+
+        // Page 2
+        $page2Response = $this->actingAs($manager)->get(route('inventory.items', ['page' => 2]));
+        $page2Response->assertOk();
+        $page2Response->assertSee('Showing');
+        $page2Response->assertSee('21');
+        $page2Response->assertSee('35');
+        $page2Response->assertSee('Batch Item 15');
+        $page2Response->assertSee('Batch Item 01');
+        $page2Response->assertDontSee('Batch Item 35');
+    }
+
+    public function test_catalog_pagination_preserves_query_string_filters(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+
+        // Create 25 matching items and 5 non-matching items
+        for ($i = 1; $i <= 25; $i++) {
+            InventoryItem::create([
+                'name' => sprintf('Antibiotic Injection %02d', $i),
+                'sku' => sprintf('ANTI-%02d', $i),
+                'quantity_on_hand' => 100,
+                'reorder_level' => 20,
+                'unit_cost' => 15,
+                'total_value' => 1500,
+            ]);
+        }
+
+        for ($i = 1; $i <= 5; $i++) {
+            InventoryItem::create([
+                'name' => sprintf('Bandage Roll %02d', $i),
+                'sku' => sprintf('BAND-%02d', $i),
+                'quantity_on_hand' => 100,
+                'reorder_level' => 20,
+                'unit_cost' => 5,
+                'total_value' => 500,
+            ]);
+        }
+
+        $response = $this->actingAs($manager)->get(route('inventory.items', ['search' => 'Antibiotic']));
+        $response->assertOk();
+
+        // Should show 25 items matching filter
+        $response->assertSee('25 matching items');
+        $response->assertSee('Showing');
+        $response->assertSee('1');
+        $response->assertSee('20');
+        $response->assertSee('25');
+
+        // Next page link should contain search query string
+        $content = $response->getContent();
+        $this->assertStringContainsString('search=Antibiotic', $content);
+        $this->assertStringContainsString('page=2', $content);
+
+        // Accessing page 2 with search
+        $page2 = $this->actingAs($manager)->get(route('inventory.items', ['search' => 'Antibiotic', 'page' => 2]));
+        $page2->assertOk();
+        $page2->assertSee('Showing');
+        $page2->assertSee('21');
+        $page2->assertSee('25');
+        $page2->assertDontSee('Bandage Roll');
+    }
+
+    public function test_catalog_renders_full_width_layout_and_balanced_columns(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+
+        InventoryItem::create([
+            'name' => 'Meropenem Trihydrate 1g Powder for Injection',
+            'sku' => 'ANT-MER-1G00',
+            'unit' => 'vial',
+            'quantity_on_hand' => 800,
+            'reorder_level' => 200,
+            'unit_cost' => 450,
+            'total_value' => 360000,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('inventory.items'));
+        $response->assertOk();
+
+        $content = $response->getContent();
+
+        // 1. Verify full-width layout container is applied (max-w-none)
+        $this->assertStringContainsString('max-w-none', $content);
+
+        // 2. Verify balanced table columns with appropriate min-width and wrapping control
+        $this->assertStringContainsString('min-w-[280px]', $content);
+        $this->assertStringContainsString('font-mono', $content);
+        $this->assertStringContainsString('whitespace-nowrap', $content);
+
+        // 3. Verify pagination controls are omitted when items fit on one page
+        $this->assertStringNotContainsString('Pagination Navigation', $content);
+
+        // 4. Verify dark mode styling classes
+        $this->assertStringContainsString('dark:bg-neutral-900', $content);
+        $this->assertStringContainsString('dark:border-neutral-800', $content);
+    }
 }

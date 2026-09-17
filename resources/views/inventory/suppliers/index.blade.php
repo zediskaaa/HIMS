@@ -218,7 +218,7 @@
             </div>
 
             @if ($suppliers->hasPages())
-                <div class="border-t border-neutral-200 p-3 sm:p-4">{{ $suppliers->links() }}</div>
+                <div class="border-t border-neutral-200 px-4 py-3 sm:px-5 dark:border-neutral-800">{{ $suppliers->links() }}</div>
             @endif
         </x-ui.card>
 
