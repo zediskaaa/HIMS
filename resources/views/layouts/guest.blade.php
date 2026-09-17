@@ -136,11 +136,7 @@
                                 </div>
                             </div>
                         @else
-                            <p class="inline-flex animate-fade-up items-center gap-2 rounded-full border border-primary-300/20 bg-primary-400/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.14em] text-primary-200 [animation-delay:120ms]">
-                                <span class="h-1.5 w-1.5 animate-ping-dot rounded-full bg-primary-400"></span>
-                                Hospital Inventory Management System
-                            </p>
-                            <h1 class="mt-6 animate-fade-up text-balance text-4xl font-semibold leading-tight tracking-tight text-white [animation-delay:240ms] xl:text-5xl">
+                            <h1 class="animate-fade-up text-balance text-4xl font-semibold leading-tight tracking-tight text-white [animation-delay:240ms] xl:text-5xl">
                                 Hospital supply operations, on one secure record.
                             </h1>
                             <p class="mt-5 max-w-lg animate-fade-up text-base leading-7 text-neutral-300 [animation-delay:360ms]">

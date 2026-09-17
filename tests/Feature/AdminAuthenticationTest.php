@@ -54,7 +54,6 @@ class AdminAuthenticationTest extends TestCase
         $this->get(route('login'))
             ->assertOk()
             ->assertSee('Staff Sign in')
-            ->assertSee('Secure staff portal')
             ->assertDontSee('Administrative access')
             ->assertDontSee('Privileged system access');
     }

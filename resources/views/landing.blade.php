@@ -33,19 +33,12 @@
                         </span>
                     </a>
 
-                    @if (Route::has('login'))
+                    @if (Route::has('login') && \App\Support\AuthenticationContext::authenticatedGuard() !== null)
                         <nav aria-label="Account navigation">
-                            @if (\App\Support\AuthenticationContext::authenticatedGuard() !== null)
-                                <a href="{{ route(\App\Support\AuthenticationContext::dashboardRoute()) }}" class="group inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition duration-300 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/15 focus-visible:ring-offset-neutral-950">
-                                    Dashboard
-                                    <x-ui.icon name="chevron-right" class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-                                </a>
-                            @else
-                                <a href="{{ route('login') }}" class="group inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition duration-300 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/15 focus-visible:ring-offset-neutral-950">
-                                    Staff log in
-                                    <x-ui.icon name="chevron-right" class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-                                </a>
-                            @endif
+                            <a href="{{ route(\App\Support\AuthenticationContext::dashboardRoute()) }}" class="group inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition duration-300 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/15 focus-visible:ring-offset-neutral-950">
+                                Dashboard
+                                <x-ui.icon name="chevron-right" class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
+                            </a>
                         </nav>
                     @endif
                 </header>
@@ -53,14 +46,8 @@
                 <main class="flex flex-1 flex-col justify-center py-14 sm:py-16 lg:py-20">
                     <div class="max-w-3xl">
                         <section>
-                            {{-- The hero reveals top-to-bottom; each delay is one beat after the last. --}}
-                            <p class="inline-flex w-fit max-w-full animate-fade-up items-center gap-2 rounded-full border border-primary-300/20 bg-primary-400/10 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-primary-200 [animation-delay:120ms] sm:text-xs sm:tracking-widest">
-                                <span class="h-1.5 w-1.5 shrink-0 animate-ping-dot rounded-full bg-primary-400"></span>
-                                <span>Hospital Inventory Management System</span>
-                            </p>
-
                             {{-- Keep both phrases as plain text for the landing-page contract. --}}
-                            <h1 class="mt-6 max-w-2xl animate-fade-up text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-white [animation-delay:240ms] sm:text-5xl lg:text-6xl">
+                            <h1 class="max-w-2xl animate-fade-up text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-white [animation-delay:240ms] sm:text-5xl lg:text-6xl">
                                 Supply Chain &amp; Inventory Management that keeps care moving.
                             </h1>
 
@@ -75,13 +62,11 @@
                                             {{-- Light sweeps across the button on hover only, so nothing loops in the background. --}}
                                             <span class="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-full" aria-hidden="true"></span>
                                             <span class="relative">Open dashboard</span>
-                                            <x-ui.icon name="chevron-right" class="relative h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                                         </a>
                                     @else
                                         <a href="{{ route('login') }}" class="group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary-950/30 transition duration-300 hover:-translate-y-0.5 hover:bg-primary-500 hover:shadow-xl hover:shadow-primary-950/40 focus-visible:ring-primary-400 focus-visible:ring-offset-neutral-950">
                                             <span class="pointer-events-none absolute inset-0 -translate-x-full animate-sheen bg-gradient-to-r from-transparent via-white/20 to-transparent" aria-hidden="true"></span>
                                             <span class="relative">Log in to HIMS</span>
-                                            <x-ui.icon name="chevron-right" class="relative h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                                         </a>
                                     @endif
 

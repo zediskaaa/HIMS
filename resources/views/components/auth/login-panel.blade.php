@@ -1,6 +1,6 @@
 @props([
     'action',
-    'badge' => 'Secure staff portal',
+    'badge' => null,
     'heading' => 'Sign in to HIMS',
     'description' => 'Access procurement, inventory, and hospital supply operations from one workspace.',
     'submitLabel' => 'Sign in',
@@ -61,11 +61,6 @@
         </header>
     @else
         <header class="animate-fade-up [animation-delay:320ms]">
-            <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 dark:border-primary-900/60 dark:bg-primary-950/60 dark:text-primary-300">
-                <span class="h-1.5 w-1.5 rounded-full bg-primary-500"></span>
-                {{ $badge }}
-            </div>
-
             <h1 class="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ $heading }}</h1>
             <p class="mt-3 max-w-sm text-sm leading-6 text-neutral-500 dark:text-neutral-400">{{ $description }}</p>
         </header>
