@@ -67,21 +67,40 @@
         data-audit-location-url="{{ $auditLocationCaptureUrl }}"
     @endif
 >
-    <div x-data="{ sidebarOpen: false }" class="hims-app-shell min-h-full overflow-x-clip">
+    <div
+        x-data="{
+            sidebarOpen: window.innerWidth >= 1024,
+            isMobile: window.innerWidth < 1024,
+            init() {
+                window.addEventListener('resize', () => {
+                    const mobile = window.innerWidth < 1024;
+                    if (mobile !== this.isMobile) {
+                        this.isMobile = mobile;
+                        this.sidebarOpen = !mobile;
+                    }
+                });
+            }
+        }"
+        x-on:keydown.window.escape="if (isMobile) sidebarOpen = false"
+        class="hims-app-shell min-h-full overflow-x-clip"
+    >
 
         @include('layouts.partials.sidebar')
 
         {{-- Backdrop for the off-canvas sidebar on small screens --}}
         <div
-            x-show="sidebarOpen"
+            x-show="sidebarOpen && isMobile"
             x-cloak
-            x-transition.opacity
+            x-transition.opacity.duration.200ms
             x-on:click="sidebarOpen = false"
-            class="fixed inset-0 z-30 bg-neutral-900/40 lg:hidden"
+            class="fixed inset-0 z-30 bg-neutral-950/60 backdrop-blur-xs lg:hidden"
             aria-hidden="true"
         ></div>
 
-        <div class="w-full min-w-0 max-w-full lg:pl-64">
+        <div
+            class="w-full min-w-0 max-w-full transition-[padding] duration-200"
+            :class="sidebarOpen ? 'lg:pl-64' : 'lg:pl-0'"
+        >
             @include('layouts.partials.topbar')
 
             <main class="hims-app-content overflow-x-clip px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
