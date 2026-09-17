@@ -32,7 +32,7 @@
 
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2 border-t border-neutral-100">
                 <p class="text-xs text-neutral-500">
-                    Employee accounts are provisioned for hospital operations. Activity is recorded in accordance with the <a href="{{ route('privacy.notice') }}" target="_blank" class="text-primary-600 underline hover:text-primary-700">Privacy Notice</a>.
+                    Employee accounts are provisioned for hospital operations. Activity is recorded in accordance with the <a href="{{ route('privacy.notice', ['return' => url()->current()]) }}" target="_blank" rel="opener" class="text-primary-600 underline hover:text-primary-700">Privacy Notice</a>.
                 </p>
                 <div class="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2 shrink-0 w-full sm:w-auto">
                     <x-ui.button variant="secondary" :href="route('admin.users.index')">Cancel</x-ui.button>

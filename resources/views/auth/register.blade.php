@@ -50,9 +50,9 @@
 
         <p class="mt-4 text-xs text-neutral-500 leading-relaxed">
             By creating an account, you acknowledge that your employee information is processed in accordance with the
-            <a href="{{ route('privacy.notice') }}" class="text-primary-600 underline hover:text-primary-700" target="_blank">Privacy Notice</a>
+            <a href="{{ route('privacy.notice', ['return' => url()->current()]) }}" class="text-primary-600 underline hover:text-primary-700" target="_blank" rel="opener">Privacy Notice</a>
             and
-            <a href="{{ route('terms') }}" class="text-primary-600 underline hover:text-primary-700" target="_blank">Terms of Use</a>.
+            <a href="{{ route('terms', ['return' => url()->current()]) }}" class="text-primary-600 underline hover:text-primary-700" target="_blank" rel="opener">Terms of Use</a>.
         </p>
 
         <div class="flex items-center justify-end mt-4">

@@ -102,5 +102,69 @@ class LegalPagesTest extends TestCase
         $response->assertOk();
         $response->assertSee(route('privacy.notice'));
         $response->assertSee('Privacy Notice');
+        $response->assertSee('return=' . urlencode(route('admin.users.create')));
+    }
+
+    public function test_privacy_notice_shows_contextual_back_button_when_opened_from_user_creation(): void
+    {
+        /** @var User $admin */
+        $admin = User::factory()->create([
+            'role' => \App\Enums\UserRole::Administrator,
+            'status' => \App\Enums\UserStatus::Active,
+        ]);
+
+        $createUrl = route('admin.users.create');
+        $response = $this->actingAs($admin)->get(route('privacy.notice', ['return' => $createUrl]));
+
+        $response->assertOk();
+        $response->assertSee('Back to Create User');
+        $response->assertSee($createUrl);
+        $response->assertSee('Admin Panel');
+        $response->assertSee(route('admin.users.index'));
+        $response->assertDontSee('Return to Home');
+    }
+
+    public function test_terms_shows_contextual_back_button_when_opened_from_user_creation(): void
+    {
+        /** @var User $admin */
+        $admin = User::factory()->create([
+            'role' => \App\Enums\UserRole::Administrator,
+            'status' => \App\Enums\UserStatus::Active,
+        ]);
+
+        $createUrl = route('admin.users.create');
+        $response = $this->actingAs($admin)->get(route('terms', ['return' => $createUrl]));
+
+        $response->assertOk();
+        $response->assertSee('Back to Create User');
+        $response->assertSee($createUrl);
+        $response->assertSee('Admin Panel');
+        $response->assertSee(route('admin.users.index'));
+        $response->assertDontSee('Return to Home');
+    }
+
+    public function test_switching_between_legal_pages_preserves_return_parameter(): void
+    {
+        $createUrl = route('admin.users.create');
+        $response = $this->get(route('privacy.notice', ['return' => $createUrl]));
+
+        $response->assertOk();
+        $response->assertSee(route('terms', ['return' => $createUrl]));
+    }
+
+    public function test_authenticated_staff_sees_dashboard_portal_link(): void
+    {
+        /** @var User $staff */
+        $staff = User::factory()->create([
+            'role' => \App\Enums\UserRole::WarehouseStaff,
+            'status' => \App\Enums\UserStatus::Active,
+        ]);
+
+        $response = $this->actingAs($staff)->get(route('privacy.notice'));
+
+        $response->assertOk();
+        $response->assertSee('Dashboard');
+        $response->assertSee(route('dashboard'));
+        $response->assertDontSee('Staff Portal');
     }
 }

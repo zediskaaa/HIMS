@@ -35,16 +35,92 @@
 <body class="min-h-full bg-[#F4F5F7] font-sans text-[#4A453E] antialiased selection:bg-[#B07E48] selection:text-white">
     <div class="relative min-h-screen py-6 sm:py-10 px-4 sm:px-6 lg:px-8">
 
+@php
+    $rawReturn = request()->query('return');
+    $candidateUrl = null;
+    $currentHost = request()->getHost();
+
+    if ($rawReturn) {
+        if (str_starts_with($rawReturn, '/') && ! str_starts_with($rawReturn, '//')) {
+            $candidateUrl = url($rawReturn);
+        } elseif (filter_var($rawReturn, FILTER_VALIDATE_URL)) {
+            $parsedHost = parse_url($rawReturn, PHP_URL_HOST);
+            if ($parsedHost === $currentHost) {
+                $candidateUrl = $rawReturn;
+            }
+        }
+    }
+
+    if (! $candidateUrl) {
+        $prevUrl = url()->previous();
+        if ($prevUrl && $prevUrl !== url()->current()) {
+            $prevPath = parse_url($prevUrl, PHP_URL_PATH) ?? '';
+            $isLegalAlias = in_array($prevPath, ['/privacy-notice', '/privacy-policy', '/privacy', '/terms-of-use', '/terms-and-conditions', '/terms'], true);
+            $parsedHost = parse_url($prevUrl, PHP_URL_HOST);
+            if (! $isLegalAlias && $parsedHost === $currentHost) {
+                $candidateUrl = $prevUrl;
+            }
+        }
+    }
+
+    if (! $candidateUrl) {
+        if (auth()->check()) {
+            $candidateUrl = auth()->user()->isSuperAdministrator()
+                ? route('super-admin.dashboard')
+                : (auth()->user()->isAdministrator() ? route('admin.users.index') : route('dashboard'));
+        } else {
+            $candidateUrl = url('/');
+        }
+    }
+
+    $candidatePath = parse_url($candidateUrl, PHP_URL_PATH) ?? '/';
+    if (str_contains($candidatePath, '/admin/users/create')) {
+        $backLabel = 'Back to Create User';
+    } elseif (str_contains($candidatePath, '/admin/users')) {
+        $backLabel = 'Back to User Management';
+    } elseif (str_contains($candidatePath, '/admin/audit-logs')) {
+        $backLabel = 'Back to Audit Trail';
+    } elseif (str_starts_with($candidatePath, '/admin/permissions')) {
+        $backLabel = 'Back to Permissions';
+    } elseif (str_starts_with($candidatePath, '/admin/')) {
+        $backLabel = 'Back to Admin Panel';
+    } elseif (str_starts_with($candidatePath, '/super-admin/')) {
+        $backLabel = 'Back to Super Admin';
+    } elseif ($candidatePath === '/dashboard' || str_starts_with($candidatePath, '/inventory/')) {
+        $backLabel = 'Back to Dashboard';
+    } elseif (str_contains($candidatePath, '/login')) {
+        $backLabel = 'Back to Login';
+    } elseif (str_contains($candidatePath, '/register')) {
+        $backLabel = 'Back to Registration';
+    } elseif ($candidatePath === '/' || $candidatePath === '') {
+        $backLabel = 'Return to Home';
+    } else {
+        $backLabel = 'Go Back';
+    }
+
+    $isAuth = auth()->check();
+    $portalUrl = $isAuth
+        ? (auth()->user()->isSuperAdministrator()
+            ? route('super-admin.dashboard')
+            : (auth()->user()->isAdministrator() ? route('admin.users.index') : route('dashboard')))
+        : route('login');
+    $portalLabel = $isAuth
+        ? (auth()->user()->isAdministrator() || auth()->user()->isSuperAdministrator() ? 'Admin Panel' : 'Dashboard')
+        : 'Staff Portal';
+    $portalIcon = $isAuth ? 'squares-2x2' : 'arrow-right-on-rectangle';
+@endphp
         {{-- Top Utility Bar (Screen only) --}}
         <div class="no-print mx-auto mb-6 flex max-w-4xl flex-wrap items-center justify-between gap-3 text-xs font-medium">
-            <a href="{{ url('/') }}" class="inline-flex items-center gap-1.5 text-neutral-600 hover:text-neutral-900 transition-colors">
+            <a href="{{ $candidateUrl }}"
+               onclick="if (window.opener && !window.opener.closed) { window.close(); setTimeout(() => { window.location.href = '{{ $candidateUrl }}'; }, 150); return false; }"
+               class="inline-flex items-center gap-1.5 text-neutral-600 hover:text-neutral-900 transition-colors">
                 <x-ui.icon name="arrow-left" class="h-3.5 w-3.5" />
-                <span>Return to Home</span>
+                <span>{{ $backLabel }}</span>
             </a>
 
             <div class="inline-flex items-center rounded-lg bg-white p-1 shadow-sm ring-1 ring-neutral-200">
                 <span class="rounded-md bg-neutral-100 px-3 py-1 font-semibold text-neutral-900">Privacy Policy</span>
-                <a href="{{ route('terms') }}" class="rounded-md px-3 py-1 text-neutral-600 hover:text-neutral-900 transition-colors">Terms and Conditions</a>
+                <a href="{{ route('terms', request()->query()) }}" class="rounded-md px-3 py-1 text-neutral-600 hover:text-neutral-900 transition-colors">Terms and Conditions</a>
             </div>
 
             <div class="flex items-center gap-3">
@@ -52,9 +128,9 @@
                     <x-ui.icon name="printer" class="h-3.5 w-3.5" />
                     <span>Print / PDF</span>
                 </button>
-                <a href="{{ route('login') }}" class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-white hover:bg-primary-700 shadow-sm transition-colors">
-                    <x-ui.icon name="arrow-right-on-rectangle" class="h-3.5 w-3.5" />
-                    <span>Staff Portal</span>
+                <a href="{{ $portalUrl }}" class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-white hover:bg-primary-700 shadow-sm transition-colors">
+                    <x-ui.icon :name="$portalIcon" class="h-3.5 w-3.5" />
+                    <span>{{ $portalLabel }}</span>
                 </a>
             </div>
         </div>
@@ -298,9 +374,9 @@
             <footer class="mt-12 pt-6 border-t border-[#DCE1E8] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-500">
                 <p>&copy; {{ date('Y') }} [Hospital / Healthcare Facility Name] &bull; Hospital Inventory Management System.</p>
                 <div class="flex items-center gap-4">
-                    <a href="{{ route('terms') }}" class="hover:text-neutral-800 transition-colors">Terms of Use</a>
-                    <a href="{{ url('/') }}" class="hover:text-neutral-800 transition-colors">Home</a>
-                    <a href="{{ route('login') }}" class="hover:text-neutral-800 transition-colors">Staff Login</a>
+                    <a href="{{ route('terms', request()->query()) }}" class="hover:text-neutral-800 transition-colors">Terms of Use</a>
+                    <a href="{{ $candidateUrl }}" onclick="if (window.opener && !window.opener.closed) { window.close(); setTimeout(() => { window.location.href = '{{ $candidateUrl }}'; }, 150); return false; }" class="hover:text-neutral-800 transition-colors">{{ $backLabel }}</a>
+                    <a href="{{ $portalUrl }}" class="hover:text-neutral-800 transition-colors">{{ $isAuth ? $portalLabel : 'Staff Login' }}</a>
                 </div>
             </footer>
 
