@@ -7,6 +7,7 @@
     'autoSubmit' => false,
     'autoClose' => true,
     'eventName' => 'hims-code-scanned',
+    'validateFormat' => null,
     'title' => 'Barcode & 2D QR Scanner',
     'hint' => 'Align barcode, GS1 DataMatrix, or QR code within the viewfinder frame.',
     'showTrigger' => true,
@@ -18,7 +19,8 @@
         targetInputId: '{{ $targetInputId }}',
         autoSubmit: {{ $autoSubmit ? 'true' : 'false' }},
         autoClose: {{ $autoClose ? 'true' : 'false' }},
-        eventName: '{{ $eventName }}'
+        eventName: '{{ $eventName }}',
+        validateFormat: '{{ $validateFormat }}'
     })"
     class="inline-block"
 >
@@ -26,9 +28,9 @@
         <button
             type="button"
             @click="open()"
-            class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-xs hover:bg-neutral-50 hover:text-neutral-900 transition"
+            class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-xs hover:bg-neutral-50 hover:text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-750 transition"
         >
-            <x-ui.icon name="camera" class="h-3.5 w-3.5 text-neutral-600" />
+            <x-ui.icon name="camera" class="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400" />
             <span>{{ $buttonText }}</span>
         </button>
     @endif
@@ -38,25 +40,25 @@
         x-show="isOpen"
         x-cloak
         style="display: none;"
-        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-900/75 p-4 backdrop-blur-xs"
+        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/80 p-4 backdrop-blur-xs"
         @keydown.escape.window="close()"
         role="dialog"
         aria-modal="true"
         aria-labelledby="{{ $id }}-title"
     >
         <div
-            class="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl border border-neutral-200"
+            class="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl border border-neutral-200 dark:border-neutral-800 dark:bg-neutral-900"
             @click.away="close()"
         >
             {{-- Modal Header --}}
-            <div class="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-5 py-3.5">
+            <div class="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-5 py-3.5 dark:border-neutral-800 dark:bg-neutral-850">
                 <div class="flex items-center gap-2.5">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-100 text-primary-700">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-100 text-primary-700 dark:bg-primary-950/80 dark:text-primary-400">
                         <x-ui.icon name="camera" class="h-4 w-4" />
                     </span>
                     <div>
-                        <h3 id="{{ $id }}-title" class="text-sm font-bold text-neutral-900 leading-tight">{{ $title }}</h3>
-                        <p class="text-[11px] text-neutral-500">Live hardware camera capture</p>
+                        <h3 id="{{ $id }}-title" class="text-sm font-bold text-neutral-900 dark:text-neutral-100 leading-tight">{{ $title }}</h3>
+                        <p class="text-[11px] text-neutral-500 dark:text-neutral-400">Live hardware camera capture</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -64,7 +66,7 @@
                         type="button"
                         x-show="isScanning"
                         @click="switchCamera()"
-                        class="inline-flex items-center gap-1 rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 shadow-xs hover:bg-neutral-50"
+                        class="inline-flex items-center gap-1 rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 shadow-xs hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700 transition"
                         title="Switch camera device or orientation"
                     >
                         <x-ui.icon name="arrows-right-left" class="h-3 w-3" />
@@ -73,7 +75,7 @@
                     <button
                         type="button"
                         @click="close()"
-                        class="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 transition"
+                        class="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200 transition"
                         aria-label="Close scanner"
                     >
                         <x-ui.icon name="x-mark" class="h-5 w-5" />
@@ -112,76 +114,50 @@
 
                 {{-- Status / Error Feedback Banner --}}
                 <template x-if="errorMessage">
-                    <div class="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800 space-y-1">
-                        <div class="flex items-center gap-2 font-bold text-red-900">
-                            <x-ui.icon name="exclamation-triangle" class="h-4 w-4 text-red-600 shrink-0" />
+                    <div class="rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-800 dark:border-red-800/80 dark:bg-red-950/50 dark:text-red-300 space-y-1 shadow-2xs">
+                        <div class="flex items-center gap-2 font-bold text-red-900 dark:text-red-200">
+                            <x-ui.icon name="exclamation-triangle" class="h-4 w-4 text-red-600 dark:text-red-400 shrink-0" />
                             <span>Scanner Alert</span>
                         </div>
-                        <p x-text="errorMessage" class="pl-6"></p>
+                        <p x-text="errorMessage" class="pl-6 leading-relaxed"></p>
                     </div>
                 </template>
 
                 {{-- Camera Active Indicator --}}
-                <div x-show="isScanning && !errorMessage" class="flex items-center justify-between text-xs px-1 text-neutral-600">
-                    <span class="flex items-center gap-1.5 font-medium text-emerald-700">
+                <div x-show="isScanning && !errorMessage" class="flex items-center justify-between text-xs px-1 text-neutral-600 dark:text-neutral-400">
+                    <span class="flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
                         <span class="relative flex h-2 w-2">
                             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                             <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
                         Camera Active &amp; Ready
                     </span>
-                    <span class="text-[11px] text-neutral-400 font-mono">1D &bull; 2D &bull; DataMatrix &bull; QR</span>
+                    <span class="text-[11px] text-neutral-400 dark:text-neutral-500 font-mono">1D &bull; 2D &bull; DataMatrix &bull; QR</span>
                 </div>
 
-                <p class="text-xs text-neutral-500 text-center leading-relaxed">
+                <p class="text-xs text-neutral-500 dark:text-neutral-400 text-center leading-relaxed">
                     {{ $hint }}
                 </p>
 
                 {{-- Manual Fallback Entry in Modal --}}
                 @if($targetInputId)
-                    <div class="border-t border-neutral-200 pt-3">
-                        <label class="block text-[11px] font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    <div class="border-t border-neutral-200 pt-3 dark:border-neutral-800">
+                        <label class="block text-[11px] font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 mb-1.5">
                             Or Type / Paste Identifier Directly:
                         </label>
                         <div class="flex gap-2">
                             <input
                                 type="text"
+                                x-model="manualCode"
                                 placeholder="Enter code manually..."
-                                class="min-w-0 flex-1 rounded-lg border-neutral-300 font-mono text-xs shadow-xs focus:border-primary-500 focus:ring-primary-500"
-                                @keydown.enter.prevent="
-                                    if ($el.value.trim()) {
-                                        const target = document.getElementById('{{ $targetInputId }}');
-                                        if (target) {
-                                            target.value = $el.value.trim();
-                                            target.dispatchEvent(new Event('input', { bubbles: true }));
-                                            target.dispatchEvent(new Event('change', { bubbles: true }));
-                                        }
-                                        close();
-                                        @if($autoSubmit)
-                                            target?.closest('form')?.requestSubmit();
-                                        @endif
-                                    }
-                                "
+                                class="min-w-0 flex-1 rounded-lg border-neutral-300 font-mono text-xs shadow-xs focus:border-primary-500 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500"
+                                @keydown.enter.prevent="applyManualCode()"
                             >
                             <x-ui.button
                                 type="button"
                                 variant="primary"
                                 size="sm"
-                                @click="
-                                    const input = $el.previousElementSibling;
-                                    if (input && input.value.trim()) {
-                                        const target = document.getElementById('{{ $targetInputId }}');
-                                        if (target) {
-                                            target.value = input.value.trim();
-                                            target.dispatchEvent(new Event('input', { bubbles: true }));
-                                            target.dispatchEvent(new Event('change', { bubbles: true }));
-                                        }
-                                        close();
-                                        @if($autoSubmit)
-                                            target?.closest('form')?.requestSubmit();
-                                        @endif
-                                    }
-                                "
+                                @click="applyManualCode()"
                             >
                                 Apply
                             </x-ui.button>
@@ -191,7 +167,7 @@
             </div>
 
             {{-- Modal Footer --}}
-            <div class="flex items-center justify-end border-t border-neutral-200 bg-neutral-50 px-5 py-3 gap-2">
+            <div class="flex items-center justify-end border-t border-neutral-200 bg-neutral-50 px-5 py-3 gap-2 dark:border-neutral-800 dark:bg-neutral-850">
                 <x-ui.button
                     type="button"
                     variant="secondary"

@@ -15,6 +15,7 @@ use App\Models\GoodsReceiptNoteLine;
 use App\Models\InventoryItem;
 use App\Models\LogisticsDocument;
 use App\Models\PurchaseOrder;
+use App\Models\Shipment;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Models\User;
@@ -804,4 +805,237 @@ class DocumentTrackingAndLogisticsTest extends TestCase
         $duplicateAttemptResponse->assertRedirect(route('inventory.logistics.documents'));
         $duplicateAttemptResponse->assertSessionHas('error');
     }
+
+    public function test_documents_table_actions_column_alignment_and_slots_across_mixed_statuses(): void
+    {
+        Storage::fake('local');
+        extract($this->createSetup());
+
+        LogisticsDocument::create([
+            'tracking_number' => 'DOC-SUB-001',
+            'version_number' => 1,
+            'document_type' => DocumentType::DeliveryReceipt,
+            'title' => 'Submitted Delivery Receipt',
+            'file_name' => 'sub.pdf',
+            'original_name' => 'sub.pdf',
+            'file_path' => 'logistics/documents/sub.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 1024,
+            'sha256_checksum' => hash('sha256', 'sub'),
+            'status' => 'submitted',
+            'uploaded_by_id' => $buyer->id,
+        ]);
+
+        LogisticsDocument::create([
+            'tracking_number' => 'DOC-VER-001',
+            'version_number' => 1,
+            'document_type' => DocumentType::SalesInvoice,
+            'title' => 'Verified Sales Invoice',
+            'file_name' => 'ver.pdf',
+            'original_name' => 'ver.pdf',
+            'file_path' => 'logistics/documents/ver.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 2048,
+            'sha256_checksum' => hash('sha256', 'ver'),
+            'status' => 'verified',
+            'uploaded_by_id' => $buyer->id,
+            'verified_by_id' => $buyer->id,
+            'verified_at' => now(),
+        ]);
+
+        LogisticsDocument::create([
+            'tracking_number' => 'DOC-ARC-001',
+            'version_number' => 1,
+            'document_type' => DocumentType::PurchaseOrder,
+            'title' => 'Archived Purchase Order',
+            'file_name' => 'arc.pdf',
+            'original_name' => 'arc.pdf',
+            'file_path' => 'logistics/documents/arc.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 3072,
+            'sha256_checksum' => hash('sha256', 'arc'),
+            'status' => 'archived',
+            'uploaded_by_id' => $buyer->id,
+        ]);
+
+        $response = $this->actingAs($buyer)->get(route('inventory.logistics.documents'));
+        $response->assertOk();
+
+        // Check header actions width and alignment
+        $response->assertSee('Actions', false);
+        $response->assertSee('w-80 min-w-80', false);
+        $response->assertSee('grid-cols-[2rem_6rem_4rem_4rem]', false);
+
+        // Check that submitted doc has both Verify and Revise
+        $response->assertSee('Submitted Delivery Receipt');
+        $response->assertSee('Verified Sales Invoice');
+        $response->assertSee('Archived Purchase Order');
+        $response->assertSee('Verify');
+        $response->assertSee('Revise');
+    }
+
+    public function test_shipments_page_renders_space_efficient_full_width_layout(): void
+    {
+        extract($this->createSetup());
+
+        $po = PurchaseOrder::create([
+            'po_number' => 'PO-TEST-SHIP-01',
+            'supplier_id' => $supplier->id,
+            'item_id' => $item->id,
+            'quantity' => 50,
+            'unit_cost' => 1000.00,
+            'total_amount' => 50000.00,
+            'delivery_date' => now()->toDateString(),
+            'status' => PurchaseOrderStatus::Approved->value,
+            'requested_by_id' => $buyer->id,
+        ]);
+
+        Shipment::create([
+            'shipment_number' => 'SHP-2026-TEST1',
+            'purchase_order_id' => $po->id,
+            'supplier_id' => $supplier->id,
+            'carrier_name' => 'FastFreight Logistics Inc.',
+            'tracking_number' => 'TRK-FF-9901',
+            'waybill_number' => 'WB-8812',
+            'vehicle_plate_number' => 'XYZ-1234',
+            'driver_name' => 'Mario Gomez',
+            'driver_contact' => '0917-000-1111',
+            'sscc' => '376123450000100082',
+            'dispatch_date' => now()->subDays(5),
+            'estimated_delivery_date' => now()->subDays(2),
+            'actual_delivery_date' => now(),
+            'status' => 'received',
+            'is_cold_chain' => false,
+            'notes' => 'Docked and accepted.',
+        ]);
+
+        Shipment::create([
+            'shipment_number' => 'SHP-2026-TEST2',
+            'purchase_order_id' => $po->id,
+            'supplier_id' => $supplier->id,
+            'carrier_name' => 'Polar Pharma Cargo',
+            'tracking_number' => 'TRK-PP-7723',
+            'waybill_number' => 'WB-9933',
+            'vehicle_plate_number' => 'ABC-9876',
+            'driver_name' => 'Roberto Cruz',
+            'driver_contact' => '0918-222-3333',
+            'sscc' => '000123456700000015',
+            'dispatch_date' => now()->subDays(1),
+            'estimated_delivery_date' => now()->addDays(2),
+            'status' => 'in_transit',
+            'is_cold_chain' => true,
+            'temp_logger_serial' => 'LOG-2026-X1',
+            'temp_min' => 3.2,
+            'temp_max' => 5.8,
+            'temp_excursion' => false,
+            'notes' => 'Vaccine consignment.',
+        ]);
+
+        $response = $this->actingAs($buyer)->get(route('inventory.logistics.shipments'));
+        $response->assertOk();
+
+        // Check full-width layout
+        $response->assertSee('max-w-none', false);
+
+        // Check header title & action
+        $response->assertSee('Shipments &amp; Carrier Logistics', false);
+        $response->assertSee('Register Inbound Shipment', false);
+
+        // Check table headers
+        $response->assertSee('Shipment &amp; Origin', false);
+        $response->assertSee('Carrier / 3PL Info', false);
+        $response->assertSee('GS1 SSCC Barcode', false);
+        $response->assertSee('Delivery Schedule', false);
+        $response->assertSee('Cold Chain Integrity', false);
+        $response->assertSee('Status', false);
+        $response->assertSee('Dock Action', false);
+
+        // Check shipment records rendered
+        $response->assertSee('SHP-2026-TEST1');
+        $response->assertSee('FastFreight Logistics Inc.');
+        $response->assertSee('3 7612345 000010008 2');
+        $response->assertSee('SHP-2026-TEST2');
+        $response->assertSee('Polar Pharma Cargo');
+        $response->assertSee('Cold Chain');
+        $response->assertSee('LOG-2026-X1');
+
+        // Check Dock Arrival button for in-transit shipment
+        $response->assertSee('Dock Arrival');
+        $response->assertSee('Docked');
+
+        // Check GS1 SSCC camera scanner integration
+        $response->assertSee('camera-scanner-shipment-sscc', false);
+        $response->assertSee('Scan Pallet / Shipment GS1 SSCC Barcode', false);
+        $response->assertSee("validateFormat: 'sscc'", false);
+    }
+
+    public function test_chain_of_custody_page_renders_space_efficient_full_width_layout(): void
+    {
+        extract($this->createSetup());
+
+        $po = PurchaseOrder::create([
+            'po_number' => 'PO-TEST-COC-01',
+            'supplier_id' => $supplier->id,
+            'item_id' => $item->id,
+            'quantity' => 20,
+            'unit_cost' => 1000.00,
+            'total_amount' => 20000.00,
+            'delivery_date' => now()->toDateString(),
+            'status' => PurchaseOrderStatus::Approved->value,
+            'requested_by_id' => $buyer->id,
+        ]);
+
+        $shipment = Shipment::create([
+            'shipment_number' => 'SHP-2026-COC-01',
+            'purchase_order_id' => $po->id,
+            'supplier_id' => $supplier->id,
+            'carrier_name' => 'ColdFleet Express',
+            'tracking_number' => 'TRK-CF-1122',
+            'status' => 'arrived_at_dock',
+        ]);
+
+        ChainOfCustodyLog::create([
+            'custody_number' => 'COC-2026-00001',
+            'trackable_type' => Shipment::class,
+            'trackable_id' => $shipment->id,
+            'event_type' => 'dock_arrival',
+            'releasing_party_name' => 'Danilo Bautista (Fleet Driver)',
+            'receiving_party_name' => 'Ben Santos (Dock Receiving)',
+            'origin_location' => 'Zuellig Warehouse Paranaque',
+            'destination_location' => 'HIMS Receiving Dock Bay 1',
+            'package_condition' => 'good_order',
+            'transferred_at' => now()->subHours(2),
+            'notes' => 'Dock intake complete with zero excursions.',
+            'user_agent' => 'HIMS Dock Handheld Console',
+            'ip_address' => '192.168.10.45',
+        ]);
+
+        $response = $this->actingAs($buyer)->get(route('inventory.logistics.chain-of-custody'));
+        $response->assertOk();
+
+        // Check full-width layout
+        $response->assertSee('max-w-none', false);
+
+        // Check header title & badge
+        $response->assertSee('Chain of Custody Ledger', false);
+        $response->assertSee('Append-Only Immutability Guarded', false);
+
+        // Check table headers
+        $response->assertSee('Timestamp', false);
+        $response->assertSee('Custody Event', false);
+        $response->assertSee('Trackable Reference', false);
+        $response->assertSee('Transfer Parties (Released &rarr; Received)', false);
+        $response->assertSee('Location &amp; Condition', false);
+        $response->assertSee('Forensic Fingerprint', false);
+
+        // Check log record rendered
+        $response->assertSee('Dock Arrival');
+        $response->assertSee('SHP-2026-COC-01');
+        $response->assertSee('Danilo Bautista (Fleet Driver)');
+        $response->assertSee('Ben Santos (Dock Receiving)');
+        $response->assertSee('HIMS Receiving Dock Bay 1');
+        $response->assertSee('Condition: Good Order');
+        $response->assertSee('HIMS Dock Handheld Console');
+    }
 }
+

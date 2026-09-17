@@ -1,14 +1,17 @@
-<x-app-layout>
+<x-app-layout full-width>
     <x-slot name="header">
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-                <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Forensic Physical & Document Accountability</p>
-                <h2 class="text-2xl font-bold text-neutral-900">Chain of Custody Ledger</h2>
+                <span class="inline-flex items-center gap-1.5 rounded-md bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700 ring-1 ring-inset ring-primary-200 dark:bg-primary-950/60 dark:text-primary-300 dark:ring-primary-800/60">
+                    <x-ui.icon name="shield-check" class="h-3 w-3 text-primary-600 dark:text-primary-400" />
+                    Forensic Physical &amp; Document Accountability
+                </span>
+                <h1 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl dark:text-neutral-100">Chain of Custody Ledger</h1>
             </div>
             <div class="flex items-center gap-2">
-                <span class="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
-                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    Append-Only Immutability Guarded
+                <span class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-800/60 shadow-2xs">
+                    <x-ui.icon name="shield-check" class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>Append-Only Immutability Guarded</span>
                 </span>
             </div>
         </div>
@@ -16,138 +19,207 @@
 
     @include('inventory.logistics.partials.nav')
 
-            {{-- Filter Bar --}}
-            <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
-                <form method="GET" action="{{ route('inventory.logistics.chain-of-custody') }}" class="grid gap-3 md:grid-cols-12">
-                    <div class="md:col-span-6">
-                        <label for="search" class="sr-only">Search</label>
-                        <div class="relative">
-                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                <svg class="h-4 w-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                            </div>
-                            <input type="text" name="search" id="search" value="{{ request('search') }}"
-                                   placeholder="Search custodian, party name, location, or remarks..."
-                                   class="block w-full rounded-lg border-neutral-300 pl-10 text-sm focus:border-primary-500 focus:ring-primary-500">
-                        </div>
-                    </div>
-
-                    <div class="md:col-span-4">
-                        <select name="action" class="block w-full rounded-lg border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500">
-                            <option value="">All Custody Event Types</option>
-                            <option value="dock_arrival" {{ request('action') === 'dock_arrival' ? 'selected' : '' }}>Dock Arrival</option>
-                            <option value="dock_receiving" {{ request('action') === 'dock_receiving' ? 'selected' : '' }}>Dock Receiving</option>
-                            <option value="inspection_handover" {{ request('action') === 'inspection_handover' ? 'selected' : '' }}>Inspection Handover</option>
-                            <option value="inspection_completed" {{ request('action') === 'inspection_completed' ? 'selected' : '' }}>Inspection Completed</option>
-                            <option value="acceptance_custody" {{ request('action') === 'acceptance_custody' ? 'selected' : '' }}>Custodial Acceptance</option>
-                            <option value="coa_transmittal" {{ request('action') === 'coa_transmittal' ? 'selected' : '' }}>COA Transmittal</option>
-                        </select>
-                    </div>
-
-                    <div class="flex items-center gap-2 md:col-span-2">
-                        <button type="submit" class="w-full rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800">
-                            Filter
-                        </button>
-                        @if(request()->hasAny(['search', 'action']))
-                            <a href="{{ route('inventory.logistics.chain-of-custody') }}" class="rounded-lg border border-neutral-300 p-2 text-neutral-600 hover:bg-neutral-50" title="Reset">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                            </a>
-                        @endif
-                    </div>
-                </form>
+    <div class="space-y-6">
+        {{-- Flash Notifications --}}
+        @if(session('success'))
+            <div class="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/90 p-3.5 text-sm text-emerald-800 shadow-2xs dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <x-ui.icon name="check-circle" class="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <div class="font-medium">{{ session('success') }}</div>
             </div>
+        @endif
 
-            {{-- CoC Timeline Table --}}
-            <div class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-neutral-200 text-left text-sm">
-                        <thead class="bg-neutral-50 text-xs font-semibold uppercase tracking-wider text-neutral-600">
-                            <tr>
-                                <th class="px-6 py-3.5">Timestamp</th>
-                                <th class="px-6 py-3.5">Custody Event</th>
-                                <th class="px-6 py-3.5">Trackable Reference</th>
-                                <th class="px-6 py-3.5">Transfer Parties (Released &rarr; Received)</th>
-                                <th class="px-6 py-3.5">Location & Condition</th>
-                                <th class="px-6 py-3.5">Forensic Fingerprint</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-neutral-200 bg-white">
-                            @forelse($logs as $log)
-                                <tr class="hover:bg-neutral-50">
-                                    <td class="px-6 py-4 whitespace-nowrap text-xs">
-                                        <div class="font-bold text-neutral-900">{{ $log->transferred_at->format('M d, Y') }}</div>
-                                        <div class="font-mono text-neutral-500">{{ $log->transferred_at->format('H:i:s T') }}</div>
-                                        <div class="text-[10px] text-neutral-400">{{ $log->transferred_at->diffForHumans() }}</div>
-                                    </td>
+        @if(session('error'))
+            <div class="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50/90 p-3.5 text-sm text-red-800 shadow-2xs dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
+                <x-ui.icon name="x-circle" class="h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+                <div class="font-medium">{{ session('error') }}</div>
+            </div>
+        @endif
 
-                                    <td class="px-6 py-4">
-                                        <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold
-                                            @if(str_contains($log->event_type, 'acceptance')) bg-emerald-100 text-emerald-800
-                                            @elseif(str_contains($log->event_type, 'dock') || str_contains($log->event_type, 'inspection')) bg-blue-100 text-blue-800
-                                            @elseif(str_contains($log->event_type, 'coa')) bg-purple-100 text-purple-800
-                                            @else bg-neutral-100 text-neutral-800 @endif">
-                                            {{ ucwords(str_replace('_', ' ', $log->event_type)) }}
-                                        </span>
-                                    </td>
-
-                                    <td class="px-6 py-4 text-xs">
-                                        <div class="font-semibold text-neutral-900">
-                                            {{ class_basename($log->trackable_type) }} #{{ $log->trackable_id }}
-                                        </div>
-                                        <div class="font-mono text-[10px] text-neutral-500">
-                                            @if($log->trackable instanceof \App\Models\Shipment)
-                                                {{ $log->trackable->shipment_number }}
-                                            @elseif($log->trackable instanceof \App\Models\InspectionAcceptanceReport)
-                                                {{ $log->trackable->iar_number }}
-                                            @elseif($log->trackable instanceof \App\Models\LogisticsDocument)
-                                                {{ $log->trackable->tracking_number }}
-                                            @elseif($log->trackable instanceof \App\Models\GoodsReceiptNote)
-                                                {{ $log->trackable->grn_number }}
-                                            @endif
-                                        </div>
-                                    </td>
-
-                                    <td class="px-6 py-4 text-xs">
-                                        <div class="flex items-center gap-1.5 font-medium text-neutral-900">
-                                            <span class="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px]">{{ $log->releasing_party_name ?? ($log->releasingUser->name ?? 'Issuer') }}</span>
-                                            <span class="text-neutral-400">&rarr;</span>
-                                            <span class="rounded bg-primary-50 px-1.5 py-0.5 text-[11px] font-bold text-primary-800">{{ $log->receiving_party_name ?? ($log->receivingUser->name ?? 'Recipient') }}</span>
-                                        </div>
-                                        @if($log->notes)
-                                            <div class="mt-1 text-[11px] text-neutral-600 italic">{{ $log->notes }}</div>
-                                        @endif
-                                    </td>
-
-                                    <td class="px-6 py-4 text-xs">
-                                        <div class="flex items-center gap-1.5 font-semibold text-neutral-800">
-                                            <x-ui.icon name="map-pin" class="h-4 w-4 shrink-0 text-neutral-400" />
-                                            <span>{{ $log->destination_location ?? $log->origin_location }}</span>
-                                        </div>
-                                        <div class="mt-0.5">
-                                            <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium {{ $log->package_condition === 'good_order' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700' }}">
-                                                Condition: {{ ucwords(str_replace('_', ' ', $log->package_condition)) }}
-                                            </span>
-                                        </div>
-                                    </td>
-
-                                    <td class="px-6 py-4 text-xs font-mono text-neutral-500">
-                                        <div class="text-[10px] text-neutral-400 truncate max-w-xs">{{ $log->user_agent ?? 'System Console' }}</div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="px-6 py-12 text-center text-sm text-neutral-500">
-                                        No chain of custody logs found matching your filter criteria.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+        {{-- Search & Filter Toolbar --}}
+        <div class="rounded-xl border border-neutral-200/90 bg-white p-3 shadow-2xs dark:border-neutral-800 dark:bg-neutral-900">
+            <form method="GET" action="{{ route('inventory.logistics.chain-of-custody') }}" class="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+                {{-- Search Input (Largest flexible width) --}}
+                <div class="relative flex-1 min-w-0">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400 dark:text-neutral-500">
+                        <x-ui.icon name="magnifying-glass" class="h-4 w-4" />
+                    </div>
+                    <input type="text" name="search" id="search" value="{{ request('search') }}"
+                           placeholder="Search custodian, party name, location, or remarks..."
+                           class="block w-full rounded-lg border-neutral-300 pl-9 pr-3 py-1.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500">
                 </div>
 
-                @if($logs->hasPages())
-                    <div class="border-t border-neutral-200 px-6 py-4">
-                        {{ $logs->links() }}
-                    </div>
-                @endif
+                {{-- Custody Event Type Filter --}}
+                <div class="w-full sm:w-64">
+                    <select name="action" class="block w-full rounded-lg border-neutral-300 py-1.5 text-xs text-neutral-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
+                        <option value="">All Custody Event Types</option>
+                        <option value="dock_arrival" {{ request('action') === 'dock_arrival' ? 'selected' : '' }}>Dock Arrival</option>
+                        <option value="dock_receiving" {{ request('action') === 'dock_receiving' ? 'selected' : '' }}>Dock Receiving</option>
+                        <option value="inspection_handover" {{ request('action') === 'inspection_handover' ? 'selected' : '' }}>Inspection Handover</option>
+                        <option value="inspection_completed" {{ request('action') === 'inspection_completed' ? 'selected' : '' }}>Inspection Completed</option>
+                        <option value="acceptance_custody" {{ request('action') === 'acceptance_custody' ? 'selected' : '' }}>Custodial Acceptance</option>
+                        <option value="coa_transmittal" {{ request('action') === 'coa_transmittal' ? 'selected' : '' }}>COA Transmittal</option>
+                    </select>
+                </div>
+
+                {{-- Filter Action Buttons --}}
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <button type="submit" class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-neutral-900 px-4 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-neutral-800 dark:bg-primary-600 dark:hover:bg-primary-500 transition">
+                        <x-ui.icon name="funnel" class="h-3.5 w-3.5 text-neutral-300 dark:text-white" />
+                        <span>Filter</span>
+                    </button>
+                    @if(request()->hasAny(['search', 'action']))
+                        <a href="{{ route('inventory.logistics.chain-of-custody') }}" class="inline-flex items-center justify-center rounded-lg border border-neutral-300 bg-white p-1.5 text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:hover:text-neutral-100 transition" title="Reset Filters">
+                            <x-ui.icon name="x-mark" class="h-3.5 w-3.5" />
+                        </a>
+                    @endif
+                </div>
+            </form>
+        </div>
+
+        {{-- Chain of Custody Timeline Table --}}
+        <div class="overflow-hidden rounded-xl border border-neutral-200/90 bg-white shadow-2xs dark:border-neutral-800 dark:bg-neutral-900">
+            <div class="overflow-x-auto min-w-full">
+                <table class="w-full min-w-[1100px] table-fixed divide-y divide-neutral-200 text-left text-xs dark:divide-neutral-800">
+                    <colgroup>
+                        <col class="w-[12%]">
+                        <col class="w-[13%]">
+                        <col class="w-[14%]">
+                        <col class="w-[27%]">
+                        <col class="w-[21%]">
+                        <col class="w-[13%]">
+                    </colgroup>
+                    <thead class="bg-neutral-50/90 text-[11px] font-semibold uppercase tracking-wider text-neutral-600 dark:bg-neutral-800/80 dark:text-neutral-400">
+                        <tr>
+                            <th class="px-5 py-3">Timestamp</th>
+                            <th class="px-5 py-3">Custody Event</th>
+                            <th class="px-5 py-3">Trackable Reference</th>
+                            <th class="px-5 py-3">Transfer Parties (Released &rarr; Received)</th>
+                            <th class="px-5 py-3">Location &amp; Condition</th>
+                            <th class="px-5 py-3">Forensic Fingerprint</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-neutral-200 bg-white dark:divide-neutral-800 dark:bg-neutral-900">
+                        @forelse($logs as $log)
+                            <tr class="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/50 transition-colors">
+                                <td class="px-5 py-3.5 align-top whitespace-nowrap">
+                                    <div class="font-bold text-neutral-900 dark:text-neutral-100">{{ $log->transferred_at->format('M d, Y') }}</div>
+                                    <div class="font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{{ $log->transferred_at->format('H:i:s T') }}</div>
+                                    <div class="mt-0.5 text-[10px] text-neutral-400 dark:text-neutral-500">{{ $log->transferred_at->diffForHumans() }}</div>
+                                </td>
+
+                                <td class="px-5 py-3.5 align-top">
+                                    @php
+                                        $eventBadge = match(true) {
+                                            str_contains($log->event_type, 'acceptance') => 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-800/60',
+                                            str_contains($log->event_type, 'dock') => 'bg-teal-50 text-teal-700 ring-teal-600/20 dark:bg-teal-950/60 dark:text-teal-300 dark:ring-teal-800/60',
+                                            str_contains($log->event_type, 'inspection') => 'bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-950/60 dark:text-blue-300 dark:ring-blue-800/60',
+                                            str_contains($log->event_type, 'coa') => 'bg-purple-50 text-purple-700 ring-purple-600/20 dark:bg-purple-950/60 dark:text-purple-300 dark:ring-purple-800/60',
+                                            default => 'bg-neutral-100 text-neutral-700 ring-neutral-600/20 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700',
+                                        };
+                                    @endphp
+                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset {{ $eventBadge }}">
+                                        {{ ucwords(str_replace('_', ' ', $log->event_type)) }}
+                                    </span>
+                                </td>
+
+                                <td class="px-5 py-3.5 align-top text-xs">
+                                    <div class="font-bold text-neutral-900 dark:text-neutral-100">
+                                        {{ class_basename($log->trackable_type) }} #{{ $log->trackable_id }}
+                                    </div>
+                                    <div class="mt-0.5 font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
+                                        @if($log->trackable instanceof \App\Models\Shipment)
+                                            {{ $log->trackable->shipment_number }}
+                                        @elseif($log->trackable instanceof \App\Models\InspectionAcceptanceReport)
+                                            {{ $log->trackable->iar_number }}
+                                        @elseif($log->trackable instanceof \App\Models\LogisticsDocument)
+                                            {{ $log->trackable->tracking_number }}
+                                        @elseif($log->trackable instanceof \App\Models\GoodsReceiptNote)
+                                            {{ $log->trackable->grn_number }}
+                                        @endif
+                                    </div>
+                                </td>
+
+                                <td class="px-5 py-3.5 align-top text-xs">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="inline-flex items-center rounded-md bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-800 ring-1 ring-inset ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700">
+                                            {{ $log->releasing_party_name ?? ($log->releasingUser->name ?? 'Issuer') }}
+                                        </span>
+                                        <span class="text-neutral-400 dark:text-neutral-500 font-bold">&mdash;</span>
+                                        <span class="inline-flex items-center rounded-md bg-primary-50 px-2 py-0.5 text-[11px] font-bold text-primary-800 ring-1 ring-inset ring-primary-200 dark:bg-primary-950/60 dark:text-primary-300 dark:ring-primary-800/60">
+                                            {{ $log->receiving_party_name ?? ($log->receivingUser->name ?? 'Recipient') }}
+                                        </span>
+                                    </div>
+                                    @if($log->notes)
+                                        <div class="mt-1 text-[11px] text-neutral-600 dark:text-neutral-400 italic leading-relaxed">{{ $log->notes }}</div>
+                                    @endif
+                                </td>
+
+                                <td class="px-5 py-3.5 align-top text-xs">
+                                    <div class="flex items-center gap-1.5 font-semibold text-neutral-900 dark:text-neutral-100">
+                                        <x-ui.icon name="map-pin" class="h-3.5 w-3.5 shrink-0 text-primary-500 dark:text-primary-400" />
+                                        <span class="truncate" title="{{ $log->destination_location ?? ($log->origin_location ?? 'Facility Dock') }}">
+                                            {{ $log->destination_location ?? ($log->origin_location ?? 'Facility Dock') }}
+                                        </span>
+                                    </div>
+                                    @if($log->origin_location && $log->destination_location && $log->origin_location !== $log->destination_location)
+                                        <div class="mt-0.5 text-[10px] text-neutral-500 dark:text-neutral-400 truncate" title="From: {{ $log->origin_location }}">
+                                            From: {{ $log->origin_location }}
+                                        </div>
+                                    @endif
+                                    <div class="mt-1">
+                                        @if($log->package_condition === 'good_order')
+                                            <span class="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-800/60">
+                                                Condition: Good Order
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center rounded-md bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-950/60 dark:text-red-300 dark:ring-red-800/60">
+                                                Condition: {{ ucwords(str_replace('_', ' ', $log->package_condition)) }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                </td>
+
+                                <td class="px-5 py-3.5 align-top text-xs">
+                                    @if($log->custody_number)
+                                        <div class="font-mono text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
+                                            {{ $log->custody_number }}
+                                        </div>
+                                    @endif
+                                    <div class="text-[11px] font-mono text-neutral-500 dark:text-neutral-400 truncate" title="{{ $log->user_agent ?? 'System Console' }}">
+                                        {{ $log->user_agent ?: 'System Console' }}
+                                    </div>
+                                    <div class="mt-0.5 flex items-center gap-1.5 text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">
+                                        @if($log->ip_address)
+                                            <span>IP: {{ $log->ip_address }}</span>
+                                        @endif
+                                        @if($log->verification_method)
+                                            <span class="rounded bg-neutral-100 px-1.5 py-0.5 text-[9px] font-sans text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                                                {{ ucwords(str_replace('_', ' ', $log->verification_method)) }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="px-6 py-12 text-center text-xs">
+                                    <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500">
+                                        <x-ui.icon name="clipboard-document-list" class="h-6 w-6" />
+                                    </div>
+                                    <p class="mt-3 font-semibold text-neutral-700 dark:text-neutral-300">No custody records found</p>
+                                    <p class="mt-1 text-neutral-500 dark:text-neutral-400">No chain of custody logs match the active filter criteria.</p>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
+
+            @if($logs->hasPages())
+                <div class="border-t border-neutral-200 px-5 py-3 dark:border-neutral-800">
+                    {{ $logs->links() }}
+                </div>
+            @endif
+        </div>
+    </div>
 </x-app-layout>
