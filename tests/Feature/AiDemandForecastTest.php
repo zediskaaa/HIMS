@@ -484,6 +484,43 @@ class AiDemandForecastTest extends TestCase
         $this->assertStringContainsString('this.chartAnimationFrame = requestAnimationFrame(animate);', $script);
     }
 
+    public function test_dashboard_chart_tooltip_uses_dynamic_positioning_and_intelligent_boundary_detection(): void
+    {
+        $script = file_get_contents(resource_path('js/app.js'));
+        $view = file_get_contents(resource_path('views/dashboard.blade.php'));
+
+        $this->assertIsString($script);
+        $this->assertIsString($view);
+
+        // SVG accessibility uses aria-label instead of native <title> to prevent white browser popup
+        $this->assertStringContainsString('aria-label="Demand vs Forecast: Historical and forecast inventory demand"', $view);
+        $this->assertStringContainsString('aria-describedby="dashboard-demand-chart-description"', $view);
+        $this->assertStringNotContainsString('<title id="dashboard-demand-chart-title">', $view);
+
+        // Chart and tooltip refs
+        $this->assertStringContainsString('x-ref="chartContainer"', $view);
+        $this->assertStringContainsString('x-ref="chartInspector"', $view);
+        $this->assertStringContainsString('x-ref="chartSvg"', $view);
+
+        // Alpine tooltip state and positioning methods
+        $this->assertStringContainsString('pointerX: null,', $script);
+        $this->assertStringContainsString('pointerY: null,', $script);
+        $this->assertStringContainsString('tooltipX: null,', $script);
+        $this->assertStringContainsString('tooltipY: null,', $script);
+        $this->assertStringContainsString('calculateTooltipPosition(', $script);
+        $this->assertStringContainsString('overflowsContainerRight', $script);
+        $this->assertStringContainsString('overflowsViewportRight', $script);
+        $this->assertStringContainsString('overflowsContainerTop', $script);
+        $this->assertStringContainsString('overflowsViewportTop', $script);
+        $this->assertStringContainsString('overflowsContainerBottom', $script);
+        $this->assertStringContainsString('overflowsViewportBottom', $script);
+        $this->assertStringContainsString('candidateAbove', $script);
+
+        // Dynamic style output without static top: 8px
+        $this->assertStringContainsString('left: ${this.tooltipX}px; top: ${this.tooltipY}px; transform: none;', $script);
+        $this->assertStringNotContainsString('top: 8px;', $script);
+    }
+
     public function test_missing_api_key_uses_a_clearly_labeled_statistical_fallback(): void
     {
         config()->set('services.gemini.key', null);

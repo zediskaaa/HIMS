@@ -402,18 +402,18 @@
 
                         {{-- Combined Demand vs Forecast Card --}}
                         <section
-                            class="min-w-0 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm"
+                            class="min-w-0 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
                             aria-labelledby="dashboard-forecast-overview-title"
                             x-bind:aria-busy="loading"
                         >
-                            <header class="flex flex-col gap-2 border-b border-neutral-200 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                            <header class="flex flex-col gap-2 border-b border-neutral-200 px-3 py-2 sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800">
                                 <div>
                                     <div class="flex items-center gap-2">
-                                        <h3 id="dashboard-forecast-overview-title" class="text-sm font-semibold text-neutral-900">Demand vs Forecast</h3>
+                                        <h3 id="dashboard-forecast-overview-title" class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Demand vs Forecast</h3>
                                         <template x-if="selectedItem()">
-                                            <span class="inline-flex items-center gap-1 rounded-md bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700 ring-1 ring-inset ring-primary-600/20">
+                                            <span class="inline-flex items-center gap-1 rounded-md bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700 ring-1 ring-inset ring-primary-600/20 dark:bg-primary-950/60 dark:text-primary-300 dark:ring-primary-700/50">
                                                 <span class="truncate max-w-[200px]" x-text="selectedItem().item_name"></span>
-                                                <button type="button" x-on:click="selectedItemId = ''" class="hover:text-primary-900" aria-label="Clear selected item">
+                                                <button type="button" x-on:click="selectedItemId = ''" class="hover:text-primary-900 dark:hover:text-primary-200" aria-label="Clear selected item">
                                                     <x-ui.icon name="x-mark" class="h-3 w-3" />
                                                 </button>
                                             </span>
@@ -422,11 +422,11 @@
                                 </div>
 
                                 {{-- Interactive legend and scrubber guidance --}}
-                                <div class="flex flex-wrap items-center gap-2 text-[11px] text-neutral-600 sm:gap-3">
+                                <div class="flex flex-wrap items-center gap-2 text-[11px] text-neutral-600 sm:gap-3 dark:text-neutral-400">
                                     <button
                                         type="button"
                                         class="inline-flex items-center gap-2 rounded-md px-1.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                                        x-bind:class="showActual ? 'text-neutral-800' : 'text-neutral-400 line-through'"
+                                        x-bind:class="showActual ? 'text-neutral-800 dark:text-neutral-200' : 'text-neutral-400 line-through dark:text-neutral-600'"
                                         x-bind:aria-pressed="showActual"
                                         x-on:click="toggleSeries('actual')"
                                     >
@@ -436,7 +436,7 @@
                                     <button
                                         type="button"
                                         class="inline-flex items-center gap-2 rounded-md px-1.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                                        x-bind:class="showForecast ? 'text-neutral-800' : 'text-neutral-400 line-through'"
+                                        x-bind:class="showForecast ? 'text-neutral-800 dark:text-neutral-200' : 'text-neutral-400 line-through dark:text-neutral-600'"
                                         x-bind:aria-pressed="showForecast"
                                         x-on:click="toggleSeries('forecast')"
                                     >
@@ -450,25 +450,26 @@
                                 <div x-show="hasChartData()" class="min-w-0 select-none">
                                     <div
                                         class="relative min-w-0"
+                                        x-ref="chartContainer"
                                         x-on:pointerenter="isHovering = true"
                                         x-on:pointerleave="onChartPointerLeave($event)"
                                     >
                                         <div
                                             x-show="loading"
                                             x-cloak
-                                            class="pointer-events-none absolute right-2 top-2 z-20 inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-white/95 px-2 py-1 text-[11px] font-medium text-primary-700 shadow-sm backdrop-blur-sm"
+                                            class="pointer-events-none absolute right-2 top-2 z-20 inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-white/95 px-2 py-1 text-[11px] font-medium text-primary-700 shadow-sm backdrop-blur-sm dark:border-primary-900/60 dark:bg-neutral-900/95 dark:text-primary-300"
                                         >
-                                            <span class="h-3 w-3 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600 motion-reduce:animate-none" aria-hidden="true"></span>
+                                            <span class="h-3 w-3 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600 motion-reduce:animate-none dark:border-primary-800 dark:border-t-primary-400" aria-hidden="true"></span>
                                             Updating forecast
                                         </div>
 
                                         {{-- Y-axis scale figures (cleanly positioned without overlapping text) --}}
                                         <div class="pointer-events-none absolute left-0.5 top-0 z-10 select-none">
-                                            <span class="text-[9px] font-semibold uppercase tracking-wider text-neutral-400">Units/day</span>
+                                            <span class="text-[9px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">Units/day</span>
                                         </div>
                                         <template x-for="(tick, index) in displayChartTicks()" x-bind:key="`y-label-${index}`">
                                             <span
-                                                class="pointer-events-none absolute left-0.5 z-10 -translate-y-1/2 select-none text-[10px] font-medium tabular-nums text-neutral-400"
+                                                class="pointer-events-none absolute left-0.5 z-10 -translate-y-1/2 select-none text-[10px] font-medium tabular-nums text-neutral-400 dark:text-neutral-500"
                                                 x-bind:style="`top: ${tick.top}%`"
                                                 x-text="formatNumber(tick.value, 1)"
                                             ></span>
@@ -477,6 +478,7 @@
                                         {{-- Interactive Hover Tooltip Popover --}}
                                         <div
                                             data-chart-inspector
+                                            x-ref="chartInspector"
                                             x-show="activePoint && (isHovering || isDragging || isFocused)"
                                             x-cloak
                                             x-transition:enter="transition ease-out duration-150"
@@ -485,21 +487,21 @@
                                             x-transition:leave="transition ease-in duration-100"
                                             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                                             x-transition:leave-end="opacity-0 translate-y-1 scale-95"
-                                            class="pointer-events-none absolute z-30 min-w-[210px] max-w-[280px] rounded-lg border border-neutral-200/90 bg-white/95 p-2.5 shadow-lg backdrop-blur-sm transition-[left,top] duration-75 ease-out"
+                                            class="pointer-events-none absolute z-30 min-w-[210px] max-w-[280px] rounded-lg border border-neutral-200/90 bg-white/95 p-2.5 shadow-lg backdrop-blur-sm transition-[left,top] duration-75 ease-out dark:border-neutral-700/80 dark:bg-neutral-900/95 dark:shadow-2xl dark:shadow-black/50"
                                             x-bind:style="tooltipStyle()"
                                         >
                                             <p class="sr-only">Hover, drag, or use the arrow keys to inspect either line.</p>
 
                                             {{-- Tooltip Header: Date & Horizon Badge --}}
-                                            <div class="mb-2 flex items-center justify-between gap-2 border-b border-neutral-100 pb-1.5">
-                                                <span class="text-xs font-semibold text-neutral-800" x-text="activePoint?.formattedDate"></span>
+                                            <div class="mb-2 flex items-center justify-between gap-2 border-b border-neutral-100 pb-1.5 dark:border-neutral-800">
+                                                <span class="text-xs font-semibold text-neutral-800 dark:text-neutral-100" x-text="activePoint?.formattedDate"></span>
                                                 <template x-if="activePoint?.isFuture">
-                                                    <span class="inline-flex items-center rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-700">
+                                                    <span class="inline-flex items-center rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-700 dark:border-violet-800/80 dark:bg-violet-950/60 dark:text-violet-300">
                                                         AI Forecast
                                                     </span>
                                                 </template>
                                                 <template x-if="!activePoint?.isFuture">
-                                                    <span class="inline-flex items-center rounded border border-primary-200 bg-primary-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary-700">
+                                                    <span class="inline-flex items-center rounded border border-primary-200 bg-primary-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary-700 dark:border-primary-800/80 dark:bg-primary-950/60 dark:text-primary-300">
                                                         Historical
                                                     </span>
                                                 </template>
@@ -511,23 +513,23 @@
                                                     {{-- AI Forecast Row --}}
                                                     <div class="flex items-center justify-between gap-3">
                                                         <div class="flex items-center gap-1.5">
-                                                            <span class="h-2 w-2 rounded-full bg-violet-600 ring-2 ring-violet-200"></span>
-                                                            <span class="font-medium text-neutral-700">AI Forecast:</span>
+                                                            <span class="h-2 w-2 rounded-full bg-violet-600 ring-2 ring-violet-200 dark:ring-violet-900/60"></span>
+                                                            <span class="font-medium text-neutral-700 dark:text-neutral-300">AI Forecast:</span>
                                                         </div>
                                                         <div class="text-right tabular-nums">
-                                                            <span class="font-bold text-violet-700" x-text="formatNumber(activePoint?.forecastPoint?.value ?? activePoint?.value, 1)"></span>
-                                                            <span class="text-[10px] font-normal text-neutral-500">units/day</span>
+                                                            <span class="font-bold text-violet-700 dark:text-violet-400" x-text="formatNumber(activePoint?.forecastPoint?.value ?? activePoint?.value, 1)"></span>
+                                                            <span class="text-[10px] font-normal text-neutral-500 dark:text-neutral-400">units/day</span>
                                                         </div>
                                                     </div>
-                                                    <div class="flex justify-between pl-3.5 text-[10px] tabular-nums text-neutral-400">
+                                                    <div class="flex justify-between pl-3.5 text-[10px] tabular-nums text-neutral-400 dark:text-neutral-400">
                                                         <span>Period total:</span>
                                                         <span x-text="`${formatNumber(activePoint?.forecastPoint?.quantity ?? activePoint?.quantity)} units`"></span>
                                                     </div>
 
                                                     <template x-if="activePoint?.forecastPoint?.confidence">
-                                                        <div class="flex justify-between pl-3.5 text-[10px] text-neutral-400">
+                                                        <div class="flex justify-between pl-3.5 text-[10px] text-neutral-400 dark:text-neutral-400">
                                                             <span>Confidence:</span>
-                                                            <span class="font-medium capitalize text-neutral-600" x-text="activePoint.forecastPoint.confidence"></span>
+                                                            <span class="font-medium capitalize text-neutral-600 dark:text-neutral-300" x-text="activePoint.forecastPoint.confidence"></span>
                                                         </div>
                                                     </template>
 
@@ -540,14 +542,14 @@
                                                     <div class="flex items-center justify-between gap-3">
                                                         <div class="flex items-center gap-1.5">
                                                             <span class="h-2 w-2 rounded-full bg-primary-600"></span>
-                                                            <span class="font-medium text-neutral-700">Recorded Demand:</span>
+                                                            <span class="font-medium text-neutral-700 dark:text-neutral-300">Recorded Demand:</span>
                                                         </div>
                                                         <div class="text-right tabular-nums">
-                                                            <span class="font-bold text-primary-700" x-text="formatNumber(activePoint?.value, 1)"></span>
-                                                            <span class="text-[10px] font-normal text-neutral-500">units/day</span>
+                                                            <span class="font-bold text-primary-700 dark:text-primary-400" x-text="formatNumber(activePoint?.value, 1)"></span>
+                                                            <span class="text-[10px] font-normal text-neutral-500 dark:text-neutral-400">units/day</span>
                                                         </div>
                                                     </div>
-                                                    <div class="text-right text-[10px] tabular-nums text-neutral-400">
+                                                    <div class="text-right text-[10px] tabular-nums text-neutral-400 dark:text-neutral-400">
                                                         <span x-text="`${formatNumber(activePoint?.quantity)} units across ${activePoint?.days || 1} ${(activePoint?.days || 1) === 1 ? 'day' : 'days'}`"></span>
                                                     </div>
                                                 </div>
@@ -555,10 +557,12 @@
                                         </div>
 
                                         <svg
+                                            x-ref="chartSvg"
                                             class="h-48 w-full cursor-crosshair select-none touch-none sm:h-52 lg:h-72 xl:h-80"
                                             viewBox="0 0 760 240"
                                             role="img"
-                                            aria-labelledby="dashboard-demand-chart-title dashboard-demand-chart-description"
+                                            aria-label="Demand vs Forecast: Historical and forecast inventory demand"
+                                            aria-describedby="dashboard-demand-chart-description"
                                             preserveAspectRatio="none"
                                             x-on:pointerdown="onChartPointerDown($event)"
                                             x-on:pointermove="onChartPointerMove($event)"
@@ -571,7 +575,6 @@
                                             x-on:keydown.arrow-left.prevent="stepPoint(-1)"
                                             x-on:keydown.arrow-right.prevent="stepPoint(1)"
                                         >
-                                            <title id="dashboard-demand-chart-title">Demand vs Forecast: Historical and forecast inventory demand</title>
                                             <desc id="dashboard-demand-chart-description">The blue solid line shows recorded consumption. The violet dashed line continues from the historical boundary with the validated AI forecast.</desc>
                                             <defs>
                                                 <linearGradient id="dashboard-historical-area" x1="0" y1="0" x2="0" y2="1">
@@ -712,25 +715,25 @@
 
                                     {{-- Chronological X-axis Labels --}}
                                     <div
-                                        class="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-neutral-100 pt-2 text-xs text-neutral-500 transition-opacity duration-150 motion-reduce:transition-none"
+                                        class="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-neutral-100 pt-2 text-xs text-neutral-500 transition-opacity duration-150 motion-reduce:transition-none dark:border-neutral-800 dark:text-neutral-400"
                                         x-bind:class="chartAnimating ? 'opacity-60' : 'opacity-100'"
                                     >
                                         <div class="flex items-center justify-between gap-2">
-                                            <span class="tabular-nums font-medium text-neutral-700" x-text="chartStartLabel(historicalSeries())"></span>
-                                            <span class="hidden text-neutral-400 sm:inline">Recorded history</span>
+                                            <span class="tabular-nums font-medium text-neutral-700 dark:text-neutral-300" x-text="chartStartLabel(historicalSeries())"></span>
+                                            <span class="hidden text-neutral-400 dark:text-neutral-500 sm:inline">Recorded history</span>
                                         </div>
-                                        <div class="flex items-center gap-1.5 px-3 font-semibold text-neutral-800">
-                                            <span class="h-2 w-2 rounded-full bg-neutral-600"></span>
-                                            <span>Forecast starts (<span class="tabular-nums text-primary-700" x-text="chartTransitionLabel()"></span>)</span>
+                                        <div class="flex items-center gap-1.5 px-3 font-semibold text-neutral-800 dark:text-neutral-200">
+                                            <span class="h-2 w-2 rounded-full bg-neutral-600 dark:bg-neutral-400"></span>
+                                            <span>Forecast starts (<span class="tabular-nums text-primary-700 dark:text-primary-400" x-text="chartTransitionLabel()"></span>)</span>
                                         </div>
                                         <div class="flex items-center justify-between gap-2">
-                                            <span class="hidden text-neutral-400 sm:inline">AI forecast horizon</span>
-                                            <span class="tabular-nums font-semibold text-violet-700" x-text="chartEndLabel(forecastSeries())"></span>
+                                            <span class="hidden text-neutral-400 dark:text-neutral-500 sm:inline">AI forecast horizon</span>
+                                            <span class="tabular-nums font-semibold text-violet-700 dark:text-violet-400" x-text="chartEndLabel(forecastSeries())"></span>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div x-show="!hasChartData()" class="border-y border-neutral-100 py-12 text-center text-sm text-neutral-500">
+                                <div x-show="!hasChartData()" class="border-y border-neutral-100 py-12 text-center text-sm text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
                                     Historical and forecast series are not available for the current selection.
                                 </div>
                             </div>

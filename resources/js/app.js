@@ -1485,6 +1485,10 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     isDragging: false,
     isHovering: false,
     isFocused: false,
+    pointerX: null,
+    pointerY: null,
+    tooltipX: null,
+    tooltipY: null,
     filtersOpen: false,
     showActual: true,
     showForecast: true,
@@ -1509,10 +1513,19 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
                 this.$nextTick(() => this.clearActivePoint());
             });
         });
+        window.addEventListener('resize', () => {
+            if (this.activePoint) {
+                this.calculateTooltipPosition();
+            }
+        });
     },
 
     clearActivePoint() {
         this.activePoint = null;
+        this.pointerX = null;
+        this.pointerY = null;
+        this.tooltipX = null;
+        this.tooltipY = null;
     },
 
     activeFilterCount() {
@@ -2232,15 +2245,23 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         }
         this.isDragging = false;
         this.isHovering = false;
+        this.pointerX = null;
+        this.pointerY = null;
     },
 
     handlePointerPosition(event) {
-        const svg = event.currentTarget;
+        const svg = event.currentTarget || this.$refs.chartSvg;
         if (!svg) return;
         const rect = svg.getBoundingClientRect();
-        if (rect.width <= 0) return;
+        if (rect.width <= 0 || rect.height <= 0) return;
 
         const clientX = event.clientX;
+        const clientY = event.clientY;
+        if (clientX !== undefined && clientY !== undefined) {
+            this.pointerX = clientX - rect.left;
+            this.pointerY = clientY - rect.top;
+        }
+
         const rawX = ((clientX - rect.left) / rect.width) * 760;
         const svgX = Math.max(50, Math.min(725, rawX));
 
@@ -2248,6 +2269,8 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         if (closest) {
             this.setActivePoint(closest);
         }
+
+        this.calculateTooltipPosition(rect);
     },
 
     getNearestPoint(svgX) {
@@ -2289,18 +2312,111 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         };
     },
 
+    calculateTooltipPosition(providedRect = null) {
+        if (!this.activePoint) return;
+
+        const container = this.$refs?.chartContainer || this.$el?.querySelector('.relative.min-w-0') || this.$el;
+        const svg = this.$refs?.chartSvg || container?.querySelector('svg');
+        const rect = providedRect || svg?.getBoundingClientRect() || container?.getBoundingClientRect();
+        if (!rect || rect.width <= 0 || rect.height <= 0) return;
+
+        const pointCssX = (this.activePoint.x / 760) * rect.width;
+        const activeY = (this.activePoint.isFuture && this.activePoint.forecastPoint?.y !== undefined)
+            ? this.activePoint.forecastPoint.y
+            : this.activePoint.y;
+        const pointCssY = (activeY / 240) * rect.height;
+
+        // Anchor to the pointer cursor when within bounds; otherwise anchor to the hovered data point.
+        const hasPointer = this.pointerX !== null && this.pointerY !== null
+            && this.pointerX >= 0 && this.pointerX <= rect.width
+            && this.pointerY >= 0 && this.pointerY <= rect.height;
+
+        const anchorX = hasPointer ? this.pointerX : pointCssX;
+        const anchorY = hasPointer ? this.pointerY : pointCssY;
+
+        const inspectorEl = this.$refs?.chartInspector || container?.querySelector('[data-chart-inspector]');
+        const tipWidth = inspectorEl?.offsetWidth || 240;
+        const tipHeight = inspectorEl?.offsetHeight || 110;
+
+        const gutter = 8;
+        const offset = 14;
+
+        // Horizontal boundary detection:
+        // Default to placing tooltip to the right of cursor/point.
+        // If placing right exceeds chart container or viewport width, flip to the left.
+        let targetX = anchorX + offset;
+        const overflowsContainerRight = (targetX + tipWidth) > (rect.width - gutter);
+        const overflowsViewportRight = (rect.left + targetX + tipWidth) > (window.innerWidth - gutter);
+
+        if (overflowsContainerRight || overflowsViewportRight) {
+            targetX = anchorX - offset - tipWidth;
+        }
+
+        // Boundary safety: if left placement overflows left side, clamp within safe boundaries.
+        const overflowsContainerLeft = targetX < gutter;
+        const overflowsViewportLeft = (rect.left + targetX) < gutter;
+
+        if (overflowsContainerLeft || overflowsViewportLeft) {
+            const minX = Math.max(gutter, gutter - rect.left);
+            const maxX = Math.min(rect.width - tipWidth - gutter, window.innerWidth - gutter - tipWidth - rect.left);
+            if (maxX >= minX) {
+                targetX = Math.max(minX, Math.min(maxX, targetX));
+            } else {
+                targetX = Math.max(0, (rect.width - tipWidth) / 2);
+            }
+        }
+
+        // Vertical boundary detection:
+        // Default to placing tooltip above cursor/point to keep the hovered line/point visible.
+        // If placing above exceeds chart top or viewport top, flip below.
+        let targetY = anchorY - offset - tipHeight;
+        const overflowsContainerTop = targetY < gutter;
+        const overflowsViewportTop = (rect.top + targetY) < gutter;
+
+        if (overflowsContainerTop || overflowsViewportTop) {
+            targetY = anchorY + offset;
+        }
+
+        // If placing below exceeds chart bottom or viewport bottom, check if above is viable or clamp.
+        const overflowsContainerBottom = (targetY + tipHeight) > (rect.height - gutter);
+        const overflowsViewportBottom = (rect.top + targetY + tipHeight) > (window.innerHeight - gutter);
+
+        if (overflowsContainerBottom || overflowsViewportBottom) {
+            const candidateAbove = anchorY - offset - tipHeight;
+            if (candidateAbove >= gutter && (rect.top + candidateAbove) >= gutter) {
+                targetY = candidateAbove;
+            } else {
+                const minY = Math.max(gutter, gutter - rect.top);
+                const maxY = Math.min(rect.height - tipHeight - gutter, window.innerHeight - gutter - tipHeight - rect.top);
+                if (maxY >= minY) {
+                    targetY = Math.max(minY, Math.min(maxY, targetY));
+                } else {
+                    targetY = Math.max(0, (rect.height - tipHeight) / 2);
+                }
+            }
+        }
+
+        this.tooltipX = Math.round(targetX);
+        this.tooltipY = Math.round(targetY);
+    },
+
     tooltipStyle() {
         if (!this.activePoint) return 'display: none;';
-        const pctX = this.activePoint.percentageX ?? 50;
-        if (pctX > 55) {
-            return `left: ${pctX}%; top: 8px; transform: translateX(calc(-100% - 14px));`;
+        if (this.tooltipX !== null && this.tooltipY !== null) {
+            return `left: ${this.tooltipX}px; top: ${this.tooltipY}px; transform: none;`;
         }
-        return `left: ${pctX}%; top: 8px; transform: translateX(14px);`;
+        const pctX = this.activePoint.percentageX ?? 50;
+        const pctY = this.activePoint.percentageY ?? 50;
+        const transformX = pctX > 55 ? 'calc(-100% - 14px)' : '14px';
+        const transformY = pctY < 40 ? '14px' : 'calc(-100% - 14px)';
+        return `left: ${pctX}%; top: ${pctY}%; transform: translate(${transformX}, ${transformY});`;
     },
 
     stepPoint(direction) {
         this.isFocused = true;
         this.isHovering = true;
+        this.pointerX = null;
+        this.pointerY = null;
         const points = this.allChartPoints();
         if (points.length === 0) return;
         const currentIndex = points.findIndex(
@@ -2311,6 +2427,9 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
             Math.min(points.length - 1, (currentIndex >= 0 ? currentIndex : 0) + direction)
         );
         this.setActivePoint(points[nextIndex]);
+        this.$nextTick(() => {
+            this.calculateTooltipPosition();
+        });
     },
 
     historicalDailyRate() {
