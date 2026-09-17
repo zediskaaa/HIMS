@@ -302,6 +302,27 @@
         overflow-x: hidden;
     }
 
+    /* Audit logs table fits desktop and tablet layouts; suppress persistent horizontal scrollbar */
+    .audit-logs-table .hims-table-scroll,
+    .hims-table-scroll:has(.audit-logs-table) {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+        overflow-x: hidden;
+    }
+
+    .audit-logs-table .hims-table-scroll::-webkit-scrollbar,
+    .hims-table-scroll:has(.audit-logs-table)::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+
+    .audit-logs-table th,
+    .audit-logs-table td {
+        padding-right: 0.75rem;
+        padding-left: 0.75rem;
+    }
+
     .loader {
         --color-1: currentColor;
         --size: 1.25px;
