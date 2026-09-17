@@ -894,6 +894,11 @@ class ErrorRecoveryTest extends TestCase
         $response->assertSee('Storage');
         $response->assertSee('Application cache');
         $response->assertSee('Local backups');
+        $response->assertSee('Back to Incidents');
+        $response->assertSee('Re-run Diagnostics');
+        $response->assertSee('lg:col-span-2');
+        $response->assertSee('lg:col-span-3');
+        $response->assertSee('Evaluated');
     }
 
     public function test_super_admin_can_rebuild_cache_and_the_action_is_audited(): void

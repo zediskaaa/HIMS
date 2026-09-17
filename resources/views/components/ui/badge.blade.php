@@ -11,18 +11,19 @@
         // green — settled, healthy, done
         'in_stock' => 'success', 'active' => 'success', 'approved' => 'success',
         'fulfilled' => 'success', 'received' => 'success', 'completed' => 'success',
-        'resolved' => 'success', 'delivered' => 'success',
+        'resolved' => 'success', 'delivered' => 'success', 'healthy' => 'success',
 
         // amber — needs attention, in flight
         'low_stock' => 'warning', 'pending' => 'warning', 'submitted' => 'warning',
         'expiring_soon' => 'warning', 'partially_fulfilled' => 'warning',
         'acknowledged' => 'warning', 'under_review' => 'warning',
         'pending_review' => 'warning', 'action_required' => 'danger',
-        'warning' => 'warning',
+        'warning' => 'warning', 'degraded' => 'warning',
 
         // red — blocked, failed, critical
         'out_of_stock' => 'danger', 'expired' => 'danger', 'rejected' => 'danger',
         'cancelled' => 'danger', 'critical' => 'danger', 'open' => 'danger',
+        'unhealthy' => 'danger',
 
         // recovery incidents — a failure is red, work in flight is amber, a
         // verified recovery is green, and "no retry exists" is simply inert
