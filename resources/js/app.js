@@ -532,6 +532,8 @@ const startSessionMonitor = () => {
     );
 };
 
+const superAdminPasswordVerifiedForms = new WeakSet();
+
 /**
  * One confirmation gate for consequential native form submissions.
  *
@@ -686,6 +688,13 @@ const startDecisionConfirmations = () => {
                 return;
             }
 
+            if (form.matches('[data-super-admin-deactivate]') && typeof window.__openSuperAdminPasswordModal === 'function') {
+                confirmedForms.delete(form);
+                resetDialog();
+                window.__openSuperAdminPasswordModal(form, submitter);
+                return;
+            }
+
             try {
                 form.requestSubmit(submitter ?? undefined);
             } catch {
@@ -705,7 +714,7 @@ const startDecisionConfirmations = () => {
         const form = event.target;
         if (!(form instanceof HTMLFormElement)) return;
 
-        if (confirmedForms.has(form)) {
+        if (confirmedForms.has(form) || superAdminPasswordVerifiedForms.has(form)) {
             confirmedForms.delete(form);
             return;
         }
@@ -780,6 +789,215 @@ const startDecisionConfirmations = () => {
 };
 
 startDecisionConfirmations();
+
+/**
+ * Current-password confirmation gate for sensitive Super Admin account management actions.
+ * Intercepts:
+ * - Create user account (data-super-admin-password="create")
+ * - Edit account details (data-super-admin-password="edit")
+ * - Deactivate user account (data-super-admin-deactivate="true")
+ */
+const startSuperAdminPasswordConfirmation = () => {
+    const dialog = document.querySelector('[data-super-admin-password-modal]');
+    if (!dialog || !(dialog instanceof HTMLDialogElement)) return;
+
+    const form = dialog.querySelector('[data-super-admin-password-form]');
+    const input = dialog.querySelector('[data-super-admin-password-input]');
+    const errorEl = dialog.querySelector('[data-super-admin-password-error]');
+    const cancelButton = dialog.querySelector('[data-super-admin-password-cancel]');
+    const confirmButton = dialog.querySelector('[data-super-admin-password-confirm]');
+    const confirmUrl = dialog.dataset.confirmUrl;
+
+    if (!form || !input || !errorEl || !cancelButton || !confirmButton || !confirmUrl) return;
+
+    let pendingAction = null;
+    let isVerifying = false;
+
+    const resetModal = () => {
+        isVerifying = false;
+        input.value = '';
+        input.disabled = false;
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+        cancelButton.disabled = false;
+        confirmButton.disabled = false;
+        confirmButton.removeAttribute('aria-busy');
+        resetButtonLoading(confirmButton);
+    };
+
+    const closeModal = ({ restoreFocus = true } = {}) => {
+        const focusedBeforeOpen = pendingAction?.focusedBeforeOpen;
+        if (dialog.open) dialog.close();
+        pendingAction = null;
+        resetModal();
+
+        if (restoreFocus && focusedBeforeOpen instanceof HTMLElement && document.contains(focusedBeforeOpen)) {
+            focusedBeforeOpen.focus();
+        }
+    };
+
+    const openModalFor = (targetForm, submitter = null) => {
+        if (dialog.open || isVerifying) return;
+
+        pendingAction = {
+            targetForm,
+            submitter,
+            focusedBeforeOpen: document.activeElement,
+        };
+
+        resetModal();
+        dialog.showModal();
+        window.requestAnimationFrame(() => input.focus());
+    };
+
+    // Expose openModalFor to window for coordination with decision confirmation
+    window.__openSuperAdminPasswordModal = openModalFor;
+
+    const handlePasswordSubmit = async (e) => {
+        e.preventDefault();
+        if (isVerifying || !pendingAction) return;
+
+        const password = input.value.trim();
+        if (!password) {
+            errorEl.textContent = 'Current password is required.';
+            errorEl.classList.remove('hidden');
+            input.focus();
+            return;
+        }
+
+        isVerifying = true;
+        cancelButton.disabled = true;
+        confirmButton.disabled = true;
+        confirmButton.setAttribute('aria-busy', 'true');
+        setButtonLoading(confirmButton, 'Verifying...');
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+        try {
+            const response = await fetch(confirmUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ current_password: password }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                const message = data.errors?.current_password?.[0]
+                    || data.message
+                    || 'Current password is incorrect.';
+                errorEl.textContent = message;
+                errorEl.classList.remove('hidden');
+                isVerifying = false;
+                cancelButton.disabled = false;
+                confirmButton.disabled = false;
+                confirmButton.removeAttribute('aria-busy');
+                resetButtonLoading(confirmButton);
+                input.value = '';
+                input.focus();
+                return;
+            }
+
+            // Password verified successfully!
+            const { targetForm, submitter } = pendingAction;
+            superAdminPasswordVerifiedForms.add(targetForm);
+
+            // Inject the single-use confirmation token
+            let tokenInput = targetForm.querySelector('input[name="super_admin_confirmation_token"]');
+            if (!tokenInput) {
+                tokenInput = document.createElement('input');
+                tokenInput.type = 'hidden';
+                tokenInput.name = 'super_admin_confirmation_token';
+                targetForm.appendChild(tokenInput);
+            }
+            tokenInput.value = data.token || '';
+
+            // Also keep current_password in hidden input if direct verification is fallback
+            let passInput = targetForm.querySelector('input[name="current_password"][data-injected-confirmation]');
+            if (!passInput) {
+                passInput = document.createElement('input');
+                passInput.type = 'hidden';
+                passInput.name = 'current_password';
+                passInput.setAttribute('data-injected-confirmation', 'true');
+                targetForm.appendChild(passInput);
+            }
+            passInput.value = password;
+
+            dialog.close();
+            pendingAction = null;
+            resetModal();
+
+            window.queueMicrotask(() => {
+                if (!targetForm.isConnected) {
+                    superAdminPasswordVerifiedForms.delete(targetForm);
+                    return;
+                }
+                try {
+                    targetForm.requestSubmit(submitter ?? undefined);
+                } catch {
+                    try {
+                        targetForm.requestSubmit();
+                    } catch {
+                        superAdminPasswordVerifiedForms.delete(targetForm);
+                    }
+                }
+            });
+        } catch {
+            errorEl.textContent = 'Unable to verify password. Please check your connection and try again.';
+            errorEl.classList.remove('hidden');
+            isVerifying = false;
+            cancelButton.disabled = false;
+            confirmButton.disabled = false;
+            confirmButton.removeAttribute('aria-busy');
+            resetButtonLoading(confirmButton);
+            input.focus();
+        }
+    };
+
+    form.addEventListener('submit', handlePasswordSubmit);
+    cancelButton.addEventListener('click', () => closeModal());
+    dialog.addEventListener('cancel', (e) => {
+        e.preventDefault();
+        closeModal();
+    });
+    dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) closeModal();
+    });
+
+    // Capture-phase listener for forms that directly require password confirmation (Create & Edit)
+    document.addEventListener('submit', (event) => {
+        const targetForm = event.target;
+        if (!(targetForm instanceof HTMLFormElement)) return;
+
+        if (superAdminPasswordVerifiedForms.has(targetForm)) {
+            superAdminPasswordVerifiedForms.delete(targetForm);
+            return;
+        }
+
+        const isDirectPasswordForm = targetForm.matches('[data-super-admin-password]');
+        if (!isDirectPasswordForm) return;
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        const submitter = event.submitter instanceof HTMLButtonElement
+            || event.submitter instanceof HTMLInputElement
+            ? event.submitter
+            : null;
+
+        openModalFor(targetForm, submitter);
+    }, true);
+};
+
+startSuperAdminPasswordConfirmation();
 startSessionMonitor();
 
 const startAuditLocationConsent = () => {

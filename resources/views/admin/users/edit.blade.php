@@ -31,9 +31,13 @@
     <x-ui.card title="Account Details" subtitle="Leave the password fields blank to keep the current password.">
         <form method="POST" action="{{ route('admin.users.update', $user) }}" class="space-y-5"
               autocomplete="off"
-              data-confirm-title="Confirm account changes"
-              data-confirm-message="Are you sure you want to save these account changes?"
-              data-confirm-label="Save Changes">
+              @if (auth()->user()?->isSuperAdministrator())
+                  data-super-admin-password="edit"
+              @else
+                  data-confirm-title="Confirm account changes"
+                  data-confirm-message="Are you sure you want to save these account changes?"
+                  data-confirm-label="Save Changes"
+              @endif>
             @csrf
             @method('PUT')
 

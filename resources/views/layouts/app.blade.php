@@ -123,6 +123,9 @@
     @include('layouts.partials.toast-notifications')
     @include('layouts.partials.loading-overlay')
     @include('layouts.partials.decision-confirmation')
+    @if (auth()->user()?->isSuperAdministrator())
+        @include('layouts.partials.super-admin-password-confirmation')
+    @endif
 
     <dialog
         data-session-warning

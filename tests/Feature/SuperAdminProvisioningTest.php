@@ -33,6 +33,7 @@ class SuperAdminProvisioningTest extends TestCase
             'role' => $role->value,
             'department' => 'Administration',
             'phone' => '09171234567',
+            'current_password' => self::INITIAL_PASSWORD,
         ];
     }
 
@@ -48,6 +49,7 @@ class SuperAdminProvisioningTest extends TestCase
             'status' => $user->status->value,
             'department' => $user->department,
             'phone' => $user->phone,
+            'current_password' => self::INITIAL_PASSWORD,
         ];
     }
 
@@ -204,7 +206,9 @@ class SuperAdminProvisioningTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
-            ->patch(route('admin.users.toggle-status', $administrator))
+            ->patch(route('admin.users.toggle-status', $administrator), [
+                'current_password' => self::INITIAL_PASSWORD,
+            ])
             ->assertSessionHasNoErrors();
 
         $administrator->refresh();

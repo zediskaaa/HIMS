@@ -8,8 +8,11 @@ use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Rules\PasswordStandard;
 use App\Services\UserAccountService;
+use App\Support\SuperAdminPasswordConfirmation;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Validator;
 
 class StoreUserRequest extends FormRequest
 {
@@ -37,7 +40,27 @@ class StoreUserRequest extends FormRequest
             'status' => ['nullable', Rule::enum(UserStatus::class)],
             'department' => ['required', Rule::enum(UserDepartment::class)],
             'phone' => ['bail', 'required', 'string', 'digits:11', 'regex:/^09[0-9]{9}$/'],
+            'current_password' => ['nullable', 'string'],
+            'super_admin_confirmation_token' => ['nullable', 'string'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $user = $this->user();
+            if ($user?->isSuperAdministrator()) {
+                try {
+                    SuperAdminPasswordConfirmation::validate($this, $user);
+                } catch (ValidationException $e) {
+                    foreach ($e->errors() as $key => $messages) {
+                        foreach ($messages as $message) {
+                            $validator->errors()->add($key, $message);
+                        }
+                    }
+                }
+            }
+        });
     }
 
     /**

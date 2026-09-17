@@ -19,9 +19,13 @@
 
     <x-ui.card title="Account Details" subtitle="Fields marked with an asterisk are required.">
         <form method="POST" action="{{ route('admin.users.store') }}" class="space-y-5" autocomplete="off"
-              data-confirm-title="Create staff user"
-              data-confirm-message="Are you sure you want to create this user account and issue an initial temporary password?"
-              data-confirm-label="Create User">
+              @if (auth()->user()?->isSuperAdministrator())
+                  data-super-admin-password="create"
+              @else
+                  data-confirm-title="Create staff user"
+                  data-confirm-message="Are you sure you want to create this user account and issue an initial temporary password?"
+                  data-confirm-label="Create User"
+              @endif>
             @csrf
 
             @include('admin.users.partials.form', ['user' => null, 'roles' => $roles])

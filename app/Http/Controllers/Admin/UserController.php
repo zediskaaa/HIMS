@@ -11,10 +11,14 @@ use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
 use App\Services\UserAccountService;
+use App\Support\SuperAdminPasswordConfirmation;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class UserController extends Controller implements HasMiddleware
@@ -130,9 +134,41 @@ class UserController extends Controller implements HasMiddleware
             ->with('success', sprintf("%s's account was updated.", $user->name));
     }
 
+    public function confirmPassword(Request $request): JsonResponse
+    {
+        $actor = $request->user();
+
+        if (! $actor?->isSuperAdministrator()) {
+            abort(403, 'Only a Super Administrator can verify this action.');
+        }
+
+        $request->validate([
+            'current_password' => ['required', 'string'],
+        ], [
+            'current_password.required' => 'Current password is required.',
+        ]);
+
+        if (! Hash::check($request->string('current_password')->toString(), $actor->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Current password is incorrect.'],
+            ]);
+        }
+
+        $token = SuperAdminPasswordConfirmation::issueToken($request, $actor);
+
+        return response()->json([
+            'status' => 'confirmed',
+            'token' => $token,
+        ]);
+    }
+
     public function toggleStatus(Request $request, User $user): RedirectResponse
     {
         abort_unless($this->accounts->canManage($request->user(), $user), 403);
+
+        if ($request->user()?->isSuperAdministrator() && $user->isActive()) {
+            SuperAdminPasswordConfirmation::validate($request, $request->user());
+        }
 
         $updated = $this->accounts->toggleStatus($user, $request->user());
 

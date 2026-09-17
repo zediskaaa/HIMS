@@ -29,7 +29,8 @@
                         <form method="POST" action="{{ route('admin.users.toggle-status', $user) }}"
                               data-confirm-title="Confirm account status change"
                               data-confirm-message="Are you sure you want to {{ $user->isActive() ? 'deactivate' : 'reactivate' }} this user?"
-                              data-confirm-label="{{ $user->isActive() ? 'Deactivate' : 'Reactivate' }}">
+                              data-confirm-label="{{ $user->isActive() ? 'Deactivate' : 'Reactivate' }}"
+                              @if (auth()->user()?->isSuperAdministrator() && $user->isActive()) data-super-admin-deactivate="true" @endif>
                             @csrf
                             @method('PATCH')
                             <x-ui.button
