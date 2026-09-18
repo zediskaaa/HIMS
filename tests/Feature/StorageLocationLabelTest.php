@@ -103,4 +103,37 @@ class StorageLocationLabelTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    public function test_warehousing_locations_page_renders_add_storage_bin_modal_and_dispatch_button(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+
+        $response = $this->actingAs($manager)->get(route('inventory.warehousing.locations'));
+
+        $response->assertOk();
+        $response->assertSee('$dispatch(\'open-modal\', \'add-storage-location\')', false);
+        $response->assertSee('add-storage-location');
+        $response->assertSee(route('inventory.warehousing.locations.store'));
+    }
+
+    public function test_can_create_storage_location_via_modal_store_route(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+
+        $response = $this->actingAs($manager)->post(route('inventory.warehousing.locations.store'), [
+            'code' => 'TEST-BIN-01',
+            'name' => 'Test Storage Bin 01',
+            'type' => 'bin',
+            'temperature_classification' => 'ambient',
+            'capacity' => 100,
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('storage_locations', [
+            'code' => 'TEST-BIN-01',
+            'name' => 'Test Storage Bin 01',
+            'type' => 'bin',
+            'status' => 'active',
+        ]);
+    }
 }

@@ -1,25 +1,25 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between" x-data="{ createModal: false }">
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Spatial Topology</p>
-                <h2 class="text-2xl font-bold text-neutral-900">Warehouse Storage Locations</h2>
+                <h2 class="text-2xl font-bold text-neutral-900 dark:text-neutral-100">Warehouse Storage Locations</h2>
             </div>
             <div class="flex items-center gap-2">
                 @can(\App\Enums\Permission::ManageWarehouseTopology->value)
-                    <button type="button" @click="$dispatch('open-create-modal')" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700">
+                    <button type="button" @click="$dispatch('open-modal', 'add-storage-location')" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                         Add Storage Bin
                     </button>
                 @endcan
-                <a href="{{ route('inventory.warehousing.dashboard') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
+                <a href="{{ route('inventory.warehousing.dashboard') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-700">
                     &larr; Warehouse Dashboard
                 </a>
             </div>
         </div>
     </x-slot>
 
-    <div class="space-y-6" x-data="{ showCreateModal: false }" @open-create-modal.window="showCreateModal = true">
+    <div class="space-y-6">
 
             {{-- SWS Consolidated Workflow Navigation --}}
             @include('inventory.warehousing.partials.workflow_nav')
@@ -197,127 +197,120 @@
 
         {{-- Add Storage Location Modal --}}
         @can(\App\Enums\Permission::ManageWarehouseTopology->value)
-        <div x-show="showCreateModal" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/60 p-4 sm:items-center" x-cloak style="display: none;">
-            <div class="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl" @click.away="showCreateModal = false">
-                <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
-                    <h3 class="text-lg font-bold text-neutral-900">Add Warehouse Storage Coordinate</h3>
-                    <button type="button" @click="showCreateModal = false" class="text-neutral-400 hover:text-neutral-600">&times;</button>
+        <x-ui.modal name="add-storage-location" title="Add Warehouse Storage Coordinate" maxWidth="2xl" x-on:open-create-modal.window="open = true">
+            <form method="POST" action="{{ route('inventory.warehousing.locations.store') }}" class="space-y-4" @if ($errors->hasAny(['code', 'name', 'type', 'parent_id', 'capacity', 'max_weight_kg'])) x-init="open = true" @endif>
+                @csrf
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="modal_code" class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">Location Code *</label>
+                        <input type="text" id="modal_code" name="code" value="{{ old('code') }}" required placeholder="e.g. CMW-AMB-A01-R02-B01" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm font-mono focus:border-primary-500 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label for="modal_name" class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">Display Name *</label>
+                        <input type="text" id="modal_name" name="name" value="{{ old('name') }}" required placeholder="e.g. Ambient Bin 01" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
+                    </div>
                 </div>
 
-                <form method="POST" action="{{ route('inventory.warehousing.locations.store') }}" class="mt-4 space-y-4">
-                    @csrf
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <label for="modal_code" class="text-xs font-semibold uppercase text-neutral-500">Location Code *</label>
-                            <input type="text" id="modal_code" name="code" required placeholder="e.g. CMW-AMB-A01-R02-B01" class="mt-1 w-full rounded-lg border-neutral-300 text-sm font-mono focus:border-primary-500 focus:ring-primary-500">
-                        </div>
-                        <div>
-                            <label for="modal_name" class="text-xs font-semibold uppercase text-neutral-500">Display Name *</label>
-                            <input type="text" id="modal_name" name="name" required placeholder="e.g. Ambient Bin 01" class="mt-1 w-full rounded-lg border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500">
-                        </div>
+                <div class="grid gap-4 sm:grid-cols-3">
+                    <div>
+                        <label for="modal_parent" class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">Parent Location</label>
+                        <select id="modal_parent" name="parent_id" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
+                            <option value="">None (Top Level)</option>
+                            @foreach($parentLocations as $parent)
+                                <option value="{{ $parent->id }}" @selected(old('parent_id') == $parent->id)>{{ $parent->code }} ({{ $parent->name }})</option>
+                            @endforeach
+                        </select>
                     </div>
+                    <div>
+                        <label for="modal_type" class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">Coordinate Type *</label>
+                        <select id="modal_type" name="type" required class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
+                            <option value="bin" @selected(old('type', 'bin') === 'bin')>Bin</option>
+                            <option value="shelf" @selected(old('type') === 'shelf')>Shelf / Level</option>
+                            <option value="rack" @selected(old('type') === 'rack')>Rack</option>
+                            <option value="aisle" @selected(old('type') === 'aisle')>Aisle</option>
+                            <option value="zone" @selected(old('type') === 'zone')>Zone</option>
+                            <option value="warehouse" @selected(old('type') === 'warehouse')>Warehouse</option>
+                            <option value="vault" @selected(old('type') === 'vault')>Narcotics Vault</option>
+                            <option value="cold_room" @selected(old('type') === 'cold_room')>Cold Room</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="modal_thermal" class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">Thermal Class</label>
+                        <select id="modal_thermal" name="temperature_classification" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
+                            <option value="ambient" @selected(old('temperature_classification', 'ambient') === 'ambient')>Ambient (15°C-25°C)</option>
+                            <option value="refrigerated" @selected(old('temperature_classification') === 'refrigerated')>Refrigerated (2°C-8°C)</option>
+                            <option value="frozen" @selected(old('temperature_classification') === 'frozen')>Frozen (-20°C)</option>
+                            <option value="ultra_cold" @selected(old('temperature_classification') === 'ultra_cold')>Ultra-Cold (-80°C)</option>
+                        </select>
+                    </div>
+                </div>
 
-                    <div class="grid gap-4 sm:grid-cols-3">
-                        <div>
-                            <label for="modal_parent" class="text-xs font-semibold uppercase text-neutral-500">Parent Location</label>
-                            <select id="modal_parent" name="parent_id" class="mt-1 w-full rounded-lg border-neutral-300 text-sm">
-                                <option value="">None (Top Level)</option>
-                                @foreach($parentLocations as $parent)
-                                    <option value="{{ $parent->id }}">{{ $parent->code }} ({{ $parent->name }})</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label for="modal_type" class="text-xs font-semibold uppercase text-neutral-500">Coordinate Type *</label>
-                            <select id="modal_type" name="type" required class="mt-1 w-full rounded-lg border-neutral-300 text-sm">
-                                <option value="bin" selected>Bin</option>
-                                <option value="shelf">Shelf / Level</option>
-                                <option value="rack">Rack</option>
-                                <option value="aisle">Aisle</option>
-                                <option value="zone">Zone</option>
-                                <option value="warehouse">Warehouse</option>
-                                <option value="vault">Narcotics Vault</option>
-                                <option value="cold_room">Cold Room</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="modal_thermal" class="text-xs font-semibold uppercase text-neutral-500">Thermal Class</label>
-                            <select id="modal_thermal" name="temperature_classification" class="mt-1 w-full rounded-lg border-neutral-300 text-sm">
-                                <option value="ambient">Ambient (15°C-25°C)</option>
-                                <option value="refrigerated">Refrigerated (2°C-8°C)</option>
-                                <option value="frozen">Frozen (-20°C)</option>
-                                <option value="ultra_cold">Ultra-Cold (-80°C)</option>
-                            </select>
-                        </div>
+                <div class="grid gap-4 sm:grid-cols-4 font-mono text-xs">
+                    <div>
+                        <label for="modal_aisle" class="font-sans uppercase text-neutral-500 dark:text-neutral-400 font-semibold">Aisle</label>
+                        <input type="text" id="modal_aisle" name="aisle" value="{{ old('aisle') }}" placeholder="A01" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
                     </div>
+                    <div>
+                        <label for="modal_rack" class="font-sans uppercase text-neutral-500 dark:text-neutral-400 font-semibold">Rack</label>
+                        <input type="text" id="modal_rack" name="rack" value="{{ old('rack') }}" placeholder="R01" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label for="modal_shelf" class="font-sans uppercase text-neutral-500 dark:text-neutral-400 font-semibold">Shelf</label>
+                        <input type="text" id="modal_shelf" name="shelf" value="{{ old('shelf') }}" placeholder="S01" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label for="modal_bin" class="font-sans uppercase text-neutral-500 dark:text-neutral-400 font-semibold">Bin</label>
+                        <input type="text" id="modal_bin" name="bin" value="{{ old('bin') }}" placeholder="B01" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
+                    </div>
+                </div>
 
-                    <div class="grid gap-4 sm:grid-cols-4 font-mono text-xs">
-                        <div>
-                            <label for="modal_aisle" class="font-sans uppercase text-neutral-500 font-semibold">Aisle</label>
-                            <input type="text" id="modal_aisle" name="aisle" placeholder="A01" class="mt-1 w-full rounded-lg border-neutral-300 text-sm">
-                        </div>
-                        <div>
-                            <label for="modal_rack" class="font-sans uppercase text-neutral-500 font-semibold">Rack</label>
-                            <input type="text" id="modal_rack" name="rack" placeholder="R01" class="mt-1 w-full rounded-lg border-neutral-300 text-sm">
-                        </div>
-                        <div>
-                            <label for="modal_shelf" class="font-sans uppercase text-neutral-500 font-semibold">Shelf</label>
-                            <input type="text" id="modal_shelf" name="shelf" placeholder="S01" class="mt-1 w-full rounded-lg border-neutral-300 text-sm">
-                        </div>
-                        <div>
-                            <label for="modal_bin" class="font-sans uppercase text-neutral-500 font-semibold">Bin</label>
-                            <input type="text" id="modal_bin" name="bin" placeholder="B01" class="mt-1 w-full rounded-lg border-neutral-300 text-sm">
-                        </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="modal_capacity" class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">Max Units Capacity</label>
+                        <input type="number" id="modal_capacity" name="capacity" value="{{ old('capacity') }}" min="1" placeholder="e.g. 500" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
                     </div>
+                    <div>
+                        <label for="modal_weight" class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">Max Weight (kg)</label>
+                        <input type="number" step="0.01" id="modal_weight" name="max_weight_kg" value="{{ old('max_weight_kg') }}" placeholder="e.g. 200.00" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
+                    </div>
+                </div>
 
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <label for="modal_capacity" class="text-xs font-semibold uppercase text-neutral-500">Max Units Capacity</label>
-                            <input type="number" id="modal_capacity" name="capacity" min="1" placeholder="e.g. 500" class="mt-1 w-full rounded-lg border-neutral-300 text-sm">
-                        </div>
-                        <div>
-                            <label for="modal_weight" class="text-xs font-semibold uppercase text-neutral-500">Max Weight (kg)</label>
-                            <input type="number" step="0.01" id="modal_weight" name="max_weight_kg" placeholder="e.g. 200.00" class="mt-1 w-full rounded-lg border-neutral-300 text-sm">
-                        </div>
-                    </div>
+                <div class="grid gap-2 sm:grid-cols-3 pt-2 text-xs">
+                    <label class="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
+                        <input type="checkbox" name="is_pick_face" value="1" @checked(old('is_pick_face')) class="rounded border-neutral-300 dark:border-neutral-700 text-primary-600 focus:ring-primary-500">
+                        <span>Pick Face</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
+                        <input type="checkbox" name="is_reserve" value="1" @checked(old('is_reserve')) class="rounded border-neutral-300 dark:border-neutral-700 text-primary-600 focus:ring-primary-500">
+                        <span>Reserve Storage</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
+                        <input type="checkbox" name="is_narcotics_vault" value="1" @checked(old('is_narcotics_vault')) class="rounded border-neutral-300 dark:border-neutral-700 text-purple-600 focus:ring-purple-500">
+                        <span class="font-semibold text-purple-800 dark:text-purple-400">Narcotics Vault</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
+                        <input type="checkbox" name="is_quarantine" value="1" @checked(old('is_quarantine')) class="rounded border-neutral-300 dark:border-neutral-700 text-amber-600 focus:ring-amber-500">
+                        <span>Quarantine Area</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
+                        <input type="checkbox" name="is_receiving_staging" value="1" @checked(old('is_receiving_staging')) class="rounded border-neutral-300 dark:border-neutral-700 text-neutral-600 focus:ring-neutral-500">
+                        <span>Receiving Staging</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
+                        <input type="checkbox" name="is_dispatch_staging" value="1" @checked(old('is_dispatch_staging')) class="rounded border-neutral-300 dark:border-neutral-700 text-neutral-600 focus:ring-neutral-500">
+                        <span>Dispatch Staging</span>
+                    </label>
+                </div>
 
-                    <div class="grid gap-2 sm:grid-cols-3 pt-2 text-xs">
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" name="is_pick_face" value="1" class="rounded border-neutral-300 text-primary-600 focus:ring-primary-500">
-                            <span>Pick Face</span>
-                        </label>
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" name="is_reserve" value="1" class="rounded border-neutral-300 text-primary-600 focus:ring-primary-500">
-                            <span>Reserve Storage</span>
-                        </label>
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" name="is_narcotics_vault" value="1" class="rounded border-neutral-300 text-purple-600 focus:ring-purple-500">
-                            <span class="font-semibold text-purple-800">Narcotics Vault</span>
-                        </label>
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" name="is_quarantine" value="1" class="rounded border-neutral-300 text-amber-600 focus:ring-amber-500">
-                            <span>Quarantine Area</span>
-                        </label>
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" name="is_receiving_staging" value="1" class="rounded border-neutral-300 text-neutral-600 focus:ring-neutral-500">
-                            <span>Receiving Staging</span>
-                        </label>
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" name="is_dispatch_staging" value="1" class="rounded border-neutral-300 text-neutral-600 focus:ring-neutral-500">
-                            <span>Dispatch Staging</span>
-                        </label>
-                    </div>
-
-                    <div class="mt-6 flex justify-end gap-3 border-t border-neutral-100 pt-4">
-                        <button type="button" @click="showCreateModal = false" class="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50">
-                            Cancel
-                        </button>
-                        <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700">
-                            Create Storage Location
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                <div class="mt-6 flex justify-end gap-3 border-t border-neutral-100 dark:border-neutral-800 pt-4">
+                    <button type="button" @click="$dispatch('close-modal', 'add-storage-location')" class="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700">
+                        Cancel
+                    </button>
+                    <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
+                        Create Storage Location
+                    </button>
+                </div>
+            </form>
+        </x-ui.modal>
         @endcan
 </x-app-layout>
