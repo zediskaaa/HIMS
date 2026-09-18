@@ -42,7 +42,8 @@ class StockAdjustmentController extends Controller implements HasMiddleware
         $locations = StorageLocation::where('status', 'active')->orderBy('name')->get();
         $adjustments = InventoryAdjustment::with(['item', 'location', 'requestedBy', 'approvedBy', 'secondApprovedBy'])
             ->latest()
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
         return view('inventory.adjustments.index', compact('items', 'locations', 'adjustments'));
     }

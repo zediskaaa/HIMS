@@ -48,7 +48,7 @@
                 @endcan
             </x-slot:actions>
 
-            <form method="GET" class="border-b border-neutral-200 p-3 sm:p-4" role="search">
+            <form method="GET" action="{{ route('inventory.suppliers') }}" class="border-b border-neutral-200 p-3 sm:p-4" role="search">
                 <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(15rem,1fr)_minmax(10rem,0.55fr)_minmax(9rem,0.45fr)_auto]">
                     <div class="relative">
                         <label for="supplier-search" class="sr-only">Search suppliers</label>

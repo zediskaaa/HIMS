@@ -393,7 +393,7 @@
                             <select x-model="reportType" @change="onReportTypeChange()"
                                     class="w-full text-xs font-medium rounded-lg border-neutral-300 bg-white py-2 focus:border-primary-500 focus:ring-primary-500 shadow-sm text-neutral-900">
                                 <optgroup label="Complete Dossier">
-                                    <option value="all">⭐ All Reports (Complete Hospital Dossier)</option>
+                                    <option value="all">All Reports (Complete Hospital Dossier)</option>
                                 </optgroup>
                                 <optgroup label="Stock & Valuation">
                                     <option value="stock_status">Stock Status & Health</option>

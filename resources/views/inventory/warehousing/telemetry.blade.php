@@ -170,7 +170,6 @@
                 @endif
             </div>
 
-        </div>
 
         @can(\App\Enums\Permission::ManageTelemetryExcursions->value)
         {{-- Ingest Telemetry Modal --}}
@@ -242,4 +241,5 @@
             </div>
         </div>
         @endcan
+    </div>
 </x-app-layout>

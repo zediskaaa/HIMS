@@ -35,7 +35,8 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
     {
         $requisitions = MaterialRequisition::with(['requestingUser', 'approvedBy', 'costCenter', 'lines.item'])
             ->latest()
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
         $items = InventoryItem::active()->orderBy('name')->get();
         $costCenters = CostCenter::where('is_active', true)->orderBy('name')->get();

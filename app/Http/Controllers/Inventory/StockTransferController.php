@@ -38,7 +38,8 @@ class StockTransferController extends Controller implements HasMiddleware
     {
         $transfers = StockTransfer::with(['sourceLocation', 'destinationLocation', 'dispatchedBy', 'receivedBy', 'lines.item'])
             ->latest()
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
         $locations = StorageLocation::where('status', 'active')
             ->where(function ($query) {

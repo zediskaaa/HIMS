@@ -175,7 +175,6 @@
                 @endif
             </div>
 
-        </div>
 
         @can(\App\Enums\Permission::RecordConsignments->value)
         {{-- Record OR Consumption Modal --}}
@@ -264,4 +263,5 @@
             </div>
         </div>
         @endcan
+    </div>
 </x-app-layout>

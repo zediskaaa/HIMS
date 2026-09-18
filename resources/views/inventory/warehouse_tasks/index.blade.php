@@ -92,7 +92,7 @@
             @endcan
 
             <x-ui.card title="Task queue" subtitle="Filter by workflow type or current state.">
-                <form method="GET" class="mb-5 grid gap-3 sm:grid-cols-3">
+                <form method="GET" action="{{ route('inventory.warehouse-tasks.index') }}" class="mb-5 grid gap-3 sm:grid-cols-3">
                     <select name="type" class="rounded-lg border-neutral-300">
                         <option value="">All task types</option>
                         @foreach (\App\Enums\WarehouseTaskType::cases() as $type)<option value="{{ $type->value }}" @selected(request('type') === $type->value)>{{ $type->label() }}</option>@endforeach

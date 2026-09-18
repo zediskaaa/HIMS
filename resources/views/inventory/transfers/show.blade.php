@@ -15,7 +15,7 @@
             </div>
             <div class="flex items-center gap-3">
                 @if(in_array($stockTransfer->status, ['dispatched', 'in_transit']) && auth()->user()->can(\App\Enums\Permission::TransferStock->value))
-                    <button type="button" @click="$dispatch('open-receive-modal')" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
+                    <button type="button" x-data @click="$dispatch('open-receive-modal')" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                         </svg>

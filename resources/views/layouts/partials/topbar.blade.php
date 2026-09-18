@@ -21,22 +21,25 @@
         @endisset
     </div>
 
-    {{-- Search: visual affordance for the demo; wiring lands with global search. --}}
-    <div class="relative hidden sm:block">
-        <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-neutral-400 dark:text-neutral-500">
-            <x-ui.icon name="magnifying-glass" class="w-4 h-4" />
-        </span>
-        <label for="global-search" class="sr-only">Search</label>
-        <input
-            id="global-search"
-            type="search"
-            placeholder="Search items, POs, suppliers"
-            class="w-56 lg:w-72 pl-9 pr-3 py-2 text-sm bg-neutral-50 border border-neutral-300 rounded-md
-                   placeholder:text-neutral-400 focus:bg-white focus:border-primary-500
-                   focus:ring-2 focus:ring-primary-500/30
-                   dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:bg-neutral-900"
-        />
-    </div>
+    @can(\App\Enums\Permission::ViewInventory->value)
+        <form method="GET" action="{{ route('inventory.items') }}" class="relative hidden sm:block" role="search">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-neutral-400 dark:text-neutral-500">
+                <x-ui.icon name="magnifying-glass" class="w-4 h-4" />
+            </span>
+            <label for="global-search" class="sr-only">Search inventory catalogue</label>
+            <input
+                id="global-search"
+                name="search"
+                type="search"
+                value="{{ request('search') }}"
+                placeholder="Search items, SKU, barcode..."
+                class="w-56 lg:w-72 pl-9 pr-3 py-2 text-sm bg-neutral-50 border border-neutral-300 rounded-md
+                       placeholder:text-neutral-400 focus:bg-white focus:border-primary-500
+                       focus:ring-2 focus:ring-primary-500/30
+                       dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:bg-neutral-900"
+            />
+        </form>
+    @endcan
 
     {{-- Dark / Light theme quick toggle --}}
     <x-ui.theme-toggle />
