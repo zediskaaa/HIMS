@@ -135,8 +135,9 @@ class StorageLocationController extends Controller implements HasMiddleware
 
     public function printLabel(Request $request, StorageLocation $storageLocation): View
     {
-        $validated = $request->validate(['copies' => ['required', 'integer', 'min:1', 'max:20']]);
-        $label = $this->labels->create($storageLocation, 'location_qr', (int) $validated['copies'], $request->user());
+        $validated = $request->validate(['copies' => ['nullable', 'integer', 'min:1', 'max:20']]);
+        $copies = (int) ($validated['copies'] ?? 1);
+        $label = $this->labels->create($storageLocation, 'location_qr', $copies, $request->user());
         $qrCode = $this->labels->qrDataUri($label->payload['code']);
 
         return view('inventory.warehouse_tasks.label', compact('label', 'qrCode'));

@@ -178,8 +178,9 @@ class WarehouseTaskController extends Controller implements HasMiddleware
 
     public function printLabel(Request $request, WarehouseTask $warehouseTask): View
     {
-        $validated = $request->validate(['copies' => ['required', 'integer', 'min:1', 'max:20']]);
-        $label = $this->labels->create($warehouseTask, 'task_qr', (int) $validated['copies'], $request->user());
+        $validated = $request->validate(['copies' => ['nullable', 'integer', 'min:1', 'max:20']]);
+        $copies = (int) ($validated['copies'] ?? 1);
+        $label = $this->labels->create($warehouseTask, 'task_qr', $copies, $request->user());
         $qrCode = $this->labels->qrDataUri($label->payload['code']);
 
         return view('inventory.warehouse_tasks.label', compact('label', 'qrCode'));

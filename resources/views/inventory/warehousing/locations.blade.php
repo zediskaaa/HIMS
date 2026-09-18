@@ -163,10 +163,12 @@
                                     </td>
                                     <td class="px-6 py-4 text-right">
                                         @can(\App\Enums\Permission::PrintWarehouseLabels->value)
-                                        <form method="POST" action="{{ route('inventory.storage-locations.label', $loc) }}" class="inline-block">
+                                        <form method="POST" action="{{ route('inventory.storage-locations.label', $loc) }}" target="_blank" class="inline-block">
                                             @csrf
-                                            <button type="submit" title="Print location barcode label" class="rounded border border-neutral-300 p-1 text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900">
-                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                            <input type="hidden" name="copies" value="1">
+                                            <button type="submit" title="Print location barcode label" class="rounded border border-neutral-300 p-1 text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-100">
+                                                <span class="sr-only">Print location barcode label</span>
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                                             </button>
                                         </form>
                                         @else
