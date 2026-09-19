@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\PermissionMatrixController;
+use App\Http\Controllers\Admin\PrivacyGovernanceController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Analytics\ProcessReviewController;
 use App\Http\Controllers\AuthenticatorController;
@@ -28,6 +29,7 @@ use App\Http\Controllers\Inventory\TelemetryController;
 use App\Http\Controllers\Inventory\WarehouseTaskController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PrivacyRequestController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
@@ -289,6 +291,10 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::delete('/profile/authenticator', [AuthenticatorController::class, 'disable'])
         ->middleware('throttle:6,1')
         ->name('profile.authenticator.disable');
+
+    // Data Subject Requests under RA 10173
+    Route::post('/privacy/requests', [PrivacyRequestController::class, 'store'])
+        ->name('privacy.requests.store');
 });
 
 /*
@@ -313,6 +319,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // The role-versus-module matrix, generated from the same enum the gates are
     // registered from, so it cannot drift from what is actually enforced.
     Route::get('/permissions', [PermissionMatrixController::class, 'index'])->name('permissions');
+
+    // Data Privacy Act (RA 10173) & ISO/IEC 27001 Security & Privacy Governance
+    Route::get('/privacy', [PrivacyGovernanceController::class, 'index'])->name('privacy.index');
+    Route::post('/privacy/requests/{privacyRequest}/fulfill', [PrivacyGovernanceController::class, 'fulfillRequest'])->name('privacy.requests.fulfill');
+    Route::post('/privacy/requests/{privacyRequest}/reject', [PrivacyGovernanceController::class, 'rejectRequest'])->name('privacy.requests.reject');
+    Route::get('/privacy/requests/{privacyRequest}/export', [PrivacyGovernanceController::class, 'exportUserData'])->name('privacy.requests.export');
+    Route::post('/privacy/incidents', [PrivacyGovernanceController::class, 'storeIncident'])->name('privacy.incidents.store');
+    Route::put('/privacy/incidents/{incident}', [PrivacyGovernanceController::class, 'updateIncident'])->name('privacy.incidents.update');
+    Route::post('/privacy/retention/sweep', [PrivacyGovernanceController::class, 'sweepRetention'])->name('privacy.retention.sweep');
 });
 
 require __DIR__.'/auth.php';

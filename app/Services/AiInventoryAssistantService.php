@@ -12,6 +12,7 @@ use App\Models\PurchaseOrder;
 use App\Models\StockAlert;
 use App\Models\StockMovement;
 use App\Models\User;
+use App\Services\Privacy\AiDataSanitizerService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -28,6 +29,7 @@ class AiInventoryAssistantService
         private readonly AiDemandForecastService $aiForecasts,
         private readonly AuditLogger $auditLogger,
         private readonly ChatAttachmentProcessor $attachmentProcessor,
+        private readonly AiDataSanitizerService $sanitizer,
     ) {}
 
     /**
@@ -75,6 +77,23 @@ class AiInventoryAssistantService
                     'attachment' => null,
                 ];
             }
+        }
+
+        // Privacy Sanitization: Redact sensitive identifiers (PIN, TIN, phone, card numbers, passwords)
+        $cleanMessage = $this->sanitizer->sanitize($cleanMessage)['sanitized_text'];
+
+        if (! empty($conversationHistory)) {
+            $conversationHistory = array_map(function ($item) {
+                if (is_array($item) && isset($item['content']) && is_string($item['content'])) {
+                    $item['content'] = $this->sanitizer->sanitize($item['content'])['sanitized_text'];
+                }
+
+                return $item;
+            }, $conversationHistory);
+        }
+
+        if ($attachmentData !== null && ! empty($attachmentData['text_content']) && is_string($attachmentData['text_content'])) {
+            $attachmentData['text_content'] = $this->sanitizer->sanitize($attachmentData['text_content'])['sanitized_text'];
         }
 
         $statusHint = $this->determineIntentStatus($cleanMessage, [], $attachmentData);

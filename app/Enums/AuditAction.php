@@ -107,6 +107,12 @@ enum AuditAction: string
     case SystemHealthMaintenance = 'system_health_maintenance';
     case AnalyzedAiChatAttachment = 'analyzed_ai_chat_attachment';
     case FailedAiChatAttachment = 'failed_ai_chat_attachment';
+    case SubmittedPrivacyRequest = 'submitted_privacy_request';
+    case ResolvedPrivacyRequest = 'resolved_privacy_request';
+    case RecordedSecurityIncident = 'recorded_security_incident';
+    case UpdatedSecurityIncident = 'updated_security_incident';
+    case ExecutedDataRetention = 'executed_data_retention';
+    case ExportedSystemReport = 'exported_system_report';
 
     public function label(): string
     {
@@ -214,6 +220,12 @@ enum AuditAction: string
             self::SystemHealthMaintenance => 'System Health Maintenance',
             self::AnalyzedAiChatAttachment => 'Analyzed AI Chat Attachment',
             self::FailedAiChatAttachment => 'Failed AI Chat Attachment',
+            self::SubmittedPrivacyRequest => 'Submitted Privacy Request',
+            self::ResolvedPrivacyRequest => 'Resolved Privacy Request',
+            self::RecordedSecurityIncident => 'Recorded Security Incident',
+            self::UpdatedSecurityIncident => 'Updated Security Incident',
+            self::ExecutedDataRetention => 'Executed Data Retention',
+            self::ExportedSystemReport => 'Exported System Report',
         };
     }
 
@@ -230,6 +242,10 @@ enum AuditAction: string
                 self::UnlockedUser,
             ], true) => 'Authentication',
             in_array($this, [self::CreatedUser, self::UpdatedUser, self::DeletedUser], true) => 'User Administration',
+            str_contains($this->value, 'privacy_request')
+                || str_contains($this->value, 'security_incident')
+                || $this === self::ExecutedDataRetention => 'Privacy & Security Governance',
+            $this === self::ExportedSystemReport => 'Reports & Analytics',
             str_contains($this->value, 'ai_chat') => 'AI Assistant',
             str_contains($this->value, 'supplier') && ! in_array($this, [self::SubmittedSupplierQuote], true) => 'Supplier Management',
             str_contains($this->value, 'purchase_request')
@@ -268,7 +284,7 @@ enum AuditAction: string
     public function category(): string
     {
         return match ($this->module()) {
-            'Authentication' => 'Security',
+            'Authentication', 'Privacy & Security Governance' => 'Security',
             'User Administration' => 'Administration',
             'Supplier Management', 'Procurement' => 'Supplier & Procurement',
             'Logistics' => 'Logistics',

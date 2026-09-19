@@ -38,7 +38,7 @@
     @php
         $initialOpenDropdown = null;
         if (request()->routeIs(
-            'admin.users.*', 'admin.permissions', 'admin.audit-logs.*',
+            'admin.users.*', 'admin.permissions', 'admin.audit-logs.*', 'admin.privacy.*',
             'super-admin.recovery.*'
         )) {
             $initialOpenDropdown = 'administration';
@@ -154,10 +154,10 @@
         @endcanany
 
         {{-- 6. Administration & Governance (Major Tab Dropdown) --}}
-        @canany([\App\Enums\Permission::ManageUsers->value, \App\Enums\Permission::ViewAuditTrail->value, \App\Enums\Permission::ManageSystemRecovery->value])
+        @canany([\App\Enums\Permission::ManageUsers->value, \App\Enums\Permission::ViewAuditTrail->value, \App\Enums\Permission::ManageSystemRecovery->value, \App\Enums\Permission::ManagePrivacyCompliance->value])
             @php
                 $isAdminActive = request()->routeIs(
-                    'admin.users.*', 'admin.permissions', 'admin.audit-logs.*',
+                    'admin.users.*', 'admin.permissions', 'admin.audit-logs.*', 'admin.privacy.*',
                     'super-admin.recovery.*'
                 );
             @endphp
@@ -179,6 +179,12 @@
                 @can(\App\Enums\Permission::ViewAuditTrail->value)
                     <x-ui.nav-item sub :href="route('admin.audit-logs.index')" :active="request()->routeIs('admin.audit-logs.*')">
                         Audit Trail
+                    </x-ui.nav-item>
+                @endcan
+
+                @can(\App\Enums\Permission::ManagePrivacyCompliance->value)
+                    <x-ui.nav-item sub :href="route('admin.privacy.index')" :active="request()->routeIs('admin.privacy.*')">
+                        Privacy &amp; Governance
                     </x-ui.nav-item>
                 @endcan
 

@@ -354,4 +354,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(AiChatConversation::class);
     }
+
+    public function privacyRequests(): HasMany
+    {
+        return $this->hasMany(PrivacyRequest::class, 'user_id');
+    }
 }

@@ -330,25 +330,36 @@
                         Your Rights as a Data Subject
                     </h2>
                     <p class="mb-3">
-                        Under Chapter VIII of Republic Act No. 10173, authorized users whose personal data is processed within HIMS are entitled to the following rights:
+                        Under Chapter VIII of Republic Act No. 10173, authorized users whose personal data is processed within HIMS are entitled to statutory rights including Information, Access, Rectification, Erasure/Deactivation, and Objection:
                     </p>
                     <div class="grid gap-2.5 sm:grid-cols-2 text-xs sm:text-sm">
                         <div class="rounded border border-[#E5E7EB] bg-[#F9FAFB] p-3">
-                            <strong class="text-neutral-900 block mb-1">Right to be Informed</strong>
-                            <span>To be notified of the nature, purpose, and scope of data processing operations.</span>
+                            <strong class="text-neutral-900 block mb-1">Right to be Informed (Sec. 16a)</strong>
+                            <span>To be notified of the nature, purpose, and legal basis of inventory data processing operations.</span>
                         </div>
                         <div class="rounded border border-[#E5E7EB] bg-[#F9FAFB] p-3">
-                            <strong class="text-neutral-900 block mb-1">Right to Access</strong>
-                            <span>To request reasonable access to your personal information recorded in the system.</span>
+                            <strong class="text-neutral-900 block mb-1">Right to Access &amp; Portability (Sec. 16c)</strong>
+                            <span>To request an electronic export of your personal information recorded in the system.</span>
                         </div>
                         <div class="rounded border border-[#E5E7EB] bg-[#F9FAFB] p-3">
-                            <strong class="text-neutral-900 block mb-1">Right to Rectification</strong>
-                            <span>To dispute inaccuracy or error in your personal data and have it corrected.</span>
+                            <strong class="text-neutral-900 block mb-1">Right to Rectification (Sec. 16d)</strong>
+                            <span>To dispute inaccuracy or error in your personal employee data and have it corrected.</span>
                         </div>
                         <div class="rounded border border-[#E5E7EB] bg-[#F9FAFB] p-3">
-                            <strong class="text-neutral-900 block mb-1">Right to Lodge a Complaint</strong>
-                            <span>To file a formal grievance with the National Privacy Commission (<a href="https://privacy.gov.ph" target="_blank" rel="noopener noreferrer" class="text-primary-700 underline font-medium">privacy.gov.ph</a>).</span>
+                            <strong class="text-neutral-900 block mb-1">Right to File a Complaint (Sec. 16a)</strong>
+                            <span>To lodge a formal complaint with the National Privacy Commission (<a href="https://privacy.gov.ph" target="_blank" rel="noopener noreferrer" class="text-primary-700 underline font-medium">privacy.gov.ph</a>).</span>
                         </div>
+                    </div>
+                    <div class="mt-4 rounded-lg bg-neutral-50 border border-neutral-200 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div class="text-xs text-neutral-600">
+                            <strong>Exercising Your Rights:</strong> Authorized staff may submit a formal Data Subject Request directly to the Data Protection Officer through your Account Settings.
+                        </div>
+                        @if ($isAuth)
+                            <a href="{{ route('profile.edit') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary-600 text-white font-medium text-xs hover:bg-primary-700 transition shrink-0">
+                                Open Profile Rights
+                                <x-ui.icon name="arrow-right" class="h-3 w-3" />
+                            </a>
+                        @endif
                     </div>
                 </section>
 
@@ -360,10 +371,12 @@
                     <p class="mb-3">
                         For inquiries concerning this Privacy Notice, the exercise of data privacy rights, or to report an information security concern, please direct communications to:
                     </p>
-                    <div class="rounded-md border border-[#E5E7EB] bg-[#F9FAFB] p-4 text-xs sm:text-sm space-y-1 text-neutral-700">
-                        <p class="font-semibold text-neutral-900">[Hospital / Healthcare Facility Name]</p>
+                    <div class="rounded-md border border-[#E5E7EB] bg-[#F9FAFB] p-4 text-xs sm:text-sm space-y-1.5 text-neutral-700">
+                        <p class="font-semibold text-neutral-900">{{ config('privacy.hospital_name', 'Dr. Jose N. Rodriguez Memorial Hospital and Sanitarium (DJNRMHS)') }}</p>
                         <p><strong>Office:</strong> Office of the Data Protection Officer</p>
-                        <p><strong>Email:</strong> <span class="font-mono text-[#19428F]">[dpo@hospital.gov.ph / privacy@hospital.org]</span></p>
+                        <p><strong>Data Protection Officer:</strong> {{ config('privacy.dpo_name', 'Data Protection Officer') }}</p>
+                        <p><strong>Email:</strong> <a href="mailto:{{ config('privacy.dpo_email', 'dpo@djnrmhs.gov.ph') }}" class="font-mono text-[#19428F] underline">{{ config('privacy.dpo_email', 'dpo@djnrmhs.gov.ph') }}</a></p>
+                        <p><strong>NPC Registration:</strong> <span class="font-mono text-neutral-700">{{ config('privacy.npc_registration_number', 'PIC-2026-HIMS-001') }}</span></p>
                         <p><strong>National Privacy Commission:</strong> <span class="font-mono text-neutral-600">complaints@privacy.gov.ph</span></p>
                     </div>
                 </section>
@@ -372,7 +385,7 @@
 
             {{-- Document Footer --}}
             <footer class="mt-12 pt-6 border-t border-[#DCE1E8] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-500">
-                <p>&copy; {{ date('Y') }} [Hospital / Healthcare Facility Name] &bull; Hospital Inventory Management System.</p>
+                <p>&copy; {{ date('Y') }} {{ config('privacy.hospital_name', 'Dr. Jose N. Rodriguez Memorial Hospital and Sanitarium (DJNRMHS)') }} &bull; Hospital Inventory Management System.</p>
                 <div class="flex items-center gap-4">
                     <a href="{{ route('terms', request()->query()) }}" class="hover:text-neutral-800 transition-colors">Terms of Use</a>
                     <a href="{{ $candidateUrl }}" onclick="if (window.opener && !window.opener.closed) { window.close(); setTimeout(() => { window.location.href = '{{ $candidateUrl }}'; }, 150); return false; }" class="hover:text-neutral-800 transition-colors">{{ $backLabel }}</a>

@@ -7,6 +7,7 @@ use App\Http\Middleware\EnsureMfaIsComplete;
 use App\Http\Middleware\EnsurePasswordIsCurrent;
 use App\Http\Middleware\EnsureSuperAdministrator;
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\EnforceSecurityHeaders;
 use App\Http\Middleware\PreventBackHistoryCache;
 use App\Support\AuthenticationContext;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
@@ -58,6 +59,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureMfaIsComplete::class,
             EnsurePasswordIsCurrent::class,
             PreventBackHistoryCache::class,
+            EnforceSecurityHeaders::class,
         ]);
 
         $middleware->prependToPriorityList(
@@ -74,6 +76,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureMfaIsComplete::class,
             EnsurePasswordIsCurrent::class,
             PreventBackHistoryCache::class,
+            EnforceSecurityHeaders::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

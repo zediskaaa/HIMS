@@ -80,6 +80,7 @@ enum Permission: string
     case ManageUsers = 'manage_users';
     case ViewAuditTrail = 'view_audit_trail';
     case ManageSystemRecovery = 'manage_system_recovery';
+    case ManagePrivacyCompliance = 'manage_privacy_compliance';
 
     public function label(): string
     {
@@ -192,6 +193,7 @@ enum Permission: string
             self::ManageUsers => 'Create, deactivate and provision user accounts.',
             self::ViewAuditTrail => 'Read the append-only organization-wide Audit Trail.',
             self::ManageSystemRecovery => 'Access Super Admin Recovery Center, retry failed operations, and inspect system health.',
+            self::ManagePrivacyCompliance => 'Manage privacy and security governance, data subject requests, and incident response.',
             self::ViewProcessReviews => 'Read evidence-based process review records, findings, and metrics.',
             self::CreateProcessReview => 'Create and submit operational process reviews for supervisory audit.',
             self::ApproveProcessReview => 'Review, approve, or reject operational process review recommendations.',
@@ -223,7 +225,7 @@ enum Permission: string
             self::PerformTechnicalInspection, self::ApproveIarAcceptance, self::ManageChainOfCustody => 'Logistics & Records',
             self::ViewReports, self::GenerateForecasts, self::ViewProcessReviews,
             self::CreateProcessReview, self::ApproveProcessReview, self::ImplementProcessReview => 'Records & Analysis',
-            self::ManageUsers, self::ViewAuditTrail, self::ManageSystemRecovery => 'Administration',
+            self::ManageUsers, self::ViewAuditTrail, self::ManageSystemRecovery, self::ManagePrivacyCompliance => 'Administration',
         };
     }
 

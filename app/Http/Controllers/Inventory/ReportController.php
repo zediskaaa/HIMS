@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Enums\AuditAction;
 use App\Enums\MovementType;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\ItemCategory;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
+use App\Services\AuditLogger;
 use App\Services\InventoryReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,7 +32,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ReportController extends Controller implements HasMiddleware
 {
-    public function __construct(private readonly InventoryReportService $reports) {}
+    public function __construct(
+        private readonly InventoryReportService $reports,
+        private readonly AuditLogger $auditLogger,
+    ) {}
 
     /**
      * @return array<int, Middleware|string>
@@ -149,6 +154,27 @@ class ReportController extends Controller implements HasMiddleware
         }
 
         $report = $this->reports->generateReport($validated, $request->user());
+
+        $this->auditLogger->log(
+            action: AuditAction::ExportedSystemReport,
+            actor: $request->user(),
+            description: sprintf(
+                'Exported report [%s] in [%s] format (%d records).',
+                $report['meta']['report_title'] ?? $validated['report_type'],
+                strtoupper($validated['format']),
+                is_countable($report['data'] ?? null) ? count($report['data']) : 0
+            ),
+            target: null,
+            targetName: $report['meta']['report_title'] ?? $validated['report_type'],
+            newValues: [
+                'report_type' => $validated['report_type'],
+                'format' => $validated['format'],
+                'period' => $validated['period'] ?? null,
+                'record_count' => is_countable($report['data'] ?? null) ? count($report['data']) : 0,
+            ],
+            module: 'Reports & Analytics',
+            category: 'Security',
+        );
 
         return match ($validated['format']) {
             'json' => $this->reports->exportJson($report),

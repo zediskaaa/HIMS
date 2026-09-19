@@ -53,4 +53,7 @@
 
     {{-- Profile Picture Modal --}}
     @include('profile.partials.update-profile-picture-modal')
+
+    {{-- Privacy Data Subject Request Modal --}}
+    @include('profile.partials.privacy-request-modal')
 </x-app-layout>
