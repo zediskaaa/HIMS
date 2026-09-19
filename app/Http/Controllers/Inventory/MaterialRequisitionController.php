@@ -31,9 +31,16 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
 
     public function __construct(private readonly IssuanceEngine $issuanceEngine) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $requisitions = MaterialRequisition::with(['requestingUser', 'approvedBy', 'costCenter', 'lines.item'])
+            ->when($request->filled('search'), function ($query) use ($request): void {
+                $term = '%'.$request->string('search')->trim().'%';
+                $query->where(fn ($q) => $q
+                    ->where('requisition_number', 'like', $term)
+                    ->orWhere('department', 'like', $term)
+                    ->orWhere('justification', 'like', $term));
+            })
             ->latest()
             ->paginate(15)
             ->withQueryString();

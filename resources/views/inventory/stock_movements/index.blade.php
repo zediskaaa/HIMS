@@ -822,7 +822,7 @@
         {{-- MOVEMENT HISTORY (WITH DYNAMIC FILTERS & VERTICAL SCROLLBAR) --}}
         <x-ui.card :padding="false"
                    x-data="{
-                       historySearch: '',
+                       historySearch: @js((string) request('search', '')),
                        historyType: '',
                        historyLocation: '',
                        totalRows: {{ $movements->count() }},

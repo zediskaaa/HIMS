@@ -41,9 +41,19 @@ class StorageLocationController extends Controller implements HasMiddleware
         ];
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
-        $locations = StorageLocation::with('parent')->orderBy('sort_sequence')->orderBy('code')->get();
+        $locations = StorageLocation::with('parent')
+            ->when($request->filled('search'), function ($query) use ($request): void {
+                $term = '%'.$request->string('search')->trim().'%';
+                $query->where(fn ($q) => $q
+                    ->where('code', 'like', $term)
+                    ->orWhere('name', 'like', $term)
+                    ->orWhere('zone', 'like', $term));
+            })
+            ->orderBy('sort_sequence')
+            ->orderBy('code')
+            ->get();
         $parentLocations = StorageLocation::active()->whereNotIn('type', ['bin', 'department'])->orderBy('code')->get();
 
         return view('inventory.storage_locations.index', compact('locations', 'parentLocations'));

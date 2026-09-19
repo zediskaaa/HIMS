@@ -26,6 +26,7 @@ use App\Http\Controllers\Inventory\StockTransferController;
 use App\Http\Controllers\Inventory\StorageLocationController;
 use App\Http\Controllers\Inventory\TelemetryController;
 use App\Http\Controllers\Inventory\WarehouseTaskController;
+use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SupplierController;
@@ -74,6 +75,8 @@ Route::get('/dashboard/ai-assistant/attachment/{message}', [DashboardAiAssistant
  * who holds what, and /admin/permissions for the matrix that renders it.
  */
 Route::middleware('auth:web,admin,super_admin')->group(function () {
+    Route::get('/global-search', [GlobalSearchController::class, 'search'])->name('global-search');
+
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead'])
         ->whereUuid('notification')

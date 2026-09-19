@@ -2755,6 +2755,192 @@ Alpine.data('dashboardLive', (endpoint) => ({
 }));
 
 /**
+ * Global multi-entity search and live autocomplete across HIMS.
+ *
+ * Debounced, cancelable fetch with role-aware results, grouped categories,
+ * keyboard arrow navigation, and passive session heartbeat.
+ */
+Alpine.data('himsGlobalSearch', ({ endpoint, initialQuery = '' }) => ({
+    query: initialQuery,
+    categories: [],
+    flatItems: [],
+    activeIndex: -1,
+    open: false,
+    loading: false,
+    loaded: false,
+    failed: false,
+    errorMessage: '',
+    debounceTimer: null,
+    request: null,
+    debounceDelay: 250,
+
+    init() {
+        if (this.query.trim().length >= 2) {
+            this.fetchResults(this.query.trim());
+        }
+    },
+
+    queue(value) {
+        this.query = value;
+        window.clearTimeout(this.debounceTimer);
+        this.request?.abort();
+        this.request = null;
+        this.failed = false;
+        this.errorMessage = '';
+
+        const trimmed = value.trim();
+        if (trimmed.length < 2) {
+            this.reset();
+            return;
+        }
+
+        this.open = true;
+        this.loading = true;
+        this.debounceTimer = window.setTimeout(
+            () => this.fetchResults(trimmed),
+            this.debounceDelay,
+        );
+    },
+
+    async fetchResults(term) {
+        const controller = new AbortController();
+        this.request = controller;
+
+        try {
+            const url = new URL(endpoint, window.location.origin);
+            url.searchParams.set('query', term);
+
+            const response = await fetch(url, {
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-Session-Activity': 'passive',
+                },
+                signal: controller.signal,
+            });
+
+            if (!response.ok) throw new Error(`Search request failed with status ${response.status}`);
+
+            const data = await response.json();
+
+            if (this.query.trim() !== term) return;
+
+            this.categories = Array.isArray(data.categories) ? data.categories : [];
+            this.rebuildFlatItems();
+            this.loaded = true;
+            this.open = true;
+            this.activeIndex = this.flatItems.length > 0 ? 0 : -1;
+        } catch (error) {
+            if (error.name === 'AbortError') return;
+
+            this.categories = [];
+            this.flatItems = [];
+            this.activeIndex = -1;
+            this.loaded = true;
+            this.failed = true;
+            this.errorMessage = 'Failed to load search results. Please try again.';
+        } finally {
+            if (this.request === controller) {
+                this.request = null;
+                this.loading = false;
+            }
+        }
+    },
+
+    rebuildFlatItems() {
+        const items = [];
+        for (const category of this.categories) {
+            if (Array.isArray(category.items)) {
+                for (const item of category.items) {
+                    items.push(item);
+                }
+            }
+        }
+        this.flatItems = items;
+    },
+
+    move(direction) {
+        if (!this.open) {
+            if (this.query.trim().length >= 2) {
+                this.open = true;
+            }
+            return;
+        }
+
+        if (this.flatItems.length === 0) return;
+
+        if (this.activeIndex < 0) {
+            this.activeIndex = direction > 0 ? 0 : this.flatItems.length - 1;
+        } else {
+            this.activeIndex = (this.activeIndex + direction + this.flatItems.length) % this.flatItems.length;
+        }
+
+        this.$nextTick(() => {
+            const el = document.getElementById(`global-search-item-${this.activeIndex}`);
+            if (el) {
+                el.scrollIntoView({ block: 'nearest' });
+            }
+        });
+    },
+
+    selectActive(event) {
+        if (!this.open || this.activeIndex < 0 || !this.flatItems[this.activeIndex]) {
+            return;
+        }
+
+        event.preventDefault();
+        this.navigate(this.flatItems[this.activeIndex].url);
+    },
+
+    navigate(url) {
+        if (!url) return;
+        this.open = false;
+        window.location.href = url;
+    },
+
+    clear() {
+        this.query = '';
+        this.reset();
+        const input = this.$el.querySelector('input[type="search"]') || document.getElementById('global-search');
+        if (input) {
+            input.focus();
+        }
+    },
+
+    onFocus() {
+        if (this.query.trim().length >= 2) {
+            this.open = true;
+            if (!this.loaded && !this.loading) {
+                this.queue(this.query);
+            }
+        }
+    },
+
+    close() {
+        this.open = false;
+        this.activeIndex = -1;
+    },
+
+    reset() {
+        window.clearTimeout(this.debounceTimer);
+        this.request?.abort();
+        this.request = null;
+        this.categories = [];
+        this.flatItems = [];
+        this.activeIndex = -1;
+        this.loading = false;
+        this.loaded = false;
+        this.failed = false;
+        this.open = false;
+    },
+
+    destroy() {
+        this.reset();
+    },
+}));
+
+/**
  * Server-backed autocomplete for the append-only Audit Trail.
  *
  * Only the current query is sent after the user pauses typing. Previous
