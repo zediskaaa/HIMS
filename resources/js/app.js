@@ -3637,6 +3637,21 @@ Alpine.data('himsAiAssistant', ({
 
         if (!trimmed) return 'Looking into that...';
 
+        // Conversational pleasantries, greetings, acknowledgments, and farewells
+        if (/\b(hi|hello|hey|kamusta|kumusta|good (morning|afternoon|evening)|magandang (araw|umaga|hapon|gabi))\b/i.test(normalized) &&
+            !/\b(stock|item|inventory|reorder|supplier|delivery|expiry|batch|order|requisition)\b/i.test(normalized)) {
+            return 'Replying...';
+        }
+        if (/\b(how are you|kamusta ka|kumusta ka)\b/i.test(normalized)) {
+            return 'Replying...';
+        }
+        if (/\b(salamat|thank you|thanks|noted|okay|alright|got it|sige|ok)\b/i.test(normalized)) {
+            return 'Replying...';
+        }
+        if (/\b(bye|goodbye|paalam|ingat|see you)\b/i.test(normalized)) {
+            return 'Replying...';
+        }
+
         // 1. Item-specific inquiry
         const detectedItem = this.extractItemName(trimmed);
         if (detectedItem) {
@@ -3724,6 +3739,11 @@ Alpine.data('himsAiAssistant', ({
         this.loadingStatus = this.determineStatusMessage(text, attached);
         this.isLoading = true;
 
+        const historyPayload = this.messages.slice(-6).map((m) => ({
+            role: m.role,
+            content: m.content,
+        }));
+
         const userMsg = {
             role: 'user',
             content: text || (attached ? `Please analyze this attached file (${attached.name}).` : ''),
@@ -3732,11 +3752,6 @@ Alpine.data('himsAiAssistant', ({
         };
         this.messages.push(userMsg);
         this.scrollToBottom();
-
-        const historyPayload = this.messages.slice(-6).map((m) => ({
-            role: m.role,
-            content: m.content,
-        }));
 
         try {
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;

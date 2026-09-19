@@ -211,9 +211,11 @@ class DashboardAiAssistantController extends Controller implements HasMiddleware
                 'errors' => ['attachment' => [$e->getMessage()]],
             ], 422);
         } catch (Throwable $e) {
+            report($e);
+
             return response()->json([
                 'status' => 'error',
-                'message' => 'An unexpected error occurred while processing your inquiry.',
+                'message' => 'An unexpected error occurred while processing your inventory inquiry. Please try again or check the system logs.',
             ], 500);
         }
 
