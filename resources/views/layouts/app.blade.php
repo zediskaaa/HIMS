@@ -23,6 +23,18 @@
     {{-- Early zero-flicker theme script --}}
     @include('layouts.partials.theme-script')
 
+    {{-- Early zero-flicker bfcache back-navigation protection --}}
+    <script>
+        (function () {
+            window.addEventListener('pageshow', function (event) {
+                if (event.persisted) {
+                    document.documentElement.style.display = 'none';
+                    window.location.reload();
+                }
+            });
+        })();
+    </script>
+
     {{-- Inter is loaded once, from resources/css/app.css --}}
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
 
@@ -66,6 +78,7 @@
 </head>
 <body
     class="h-full font-sans antialiased bg-neutral-50 dark:bg-neutral-950 text-neutral-800 dark:text-neutral-100"
+    data-login-url="{{ route(\App\Support\AuthenticationContext::loginRoute(\App\Support\AuthenticationContext::authenticatedGuard() ?? 'web')) }}"
     data-session-timeout-seconds="{{ (int) config('session.lifetime') * 60 }}"
     data-session-warning-seconds="{{ (int) config('session.warning_seconds') }}"
     data-session-warning-enabled="{{ auth()->user()?->session_timeout_reminder_enabled === false ? 'false' : 'true' }}"

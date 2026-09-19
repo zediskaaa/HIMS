@@ -59,7 +59,7 @@ class AuthenticationTest extends TestCase
 
         $this->assertGuest();
         $response
-            ->assertRedirect('/')
+            ->assertRedirect(route('login'))
             ->assertSessionMissing('session_timeout');
 
         $this->get(route('login'))

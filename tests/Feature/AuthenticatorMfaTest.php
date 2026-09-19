@@ -244,7 +244,7 @@ class AuthenticatorMfaTest extends TestCase
 
         $this->post(route('login'), $this->credentials($user));
         $this->post(route('login.mfa.verify'), ['otp' => (new Google2FA)->getCurrentOtp($secret)]);
-        $this->post(route('logout'))->assertRedirect('/');
+        $this->post(route('logout'))->assertRedirect(route('login'));
 
         $this->assertTrue($user->fresh()->authenticatorMfaEnabled());
         $this->post(route('login'), $this->credentials($user))

@@ -132,6 +132,13 @@ const startSessionMonitor = () => {
     let previouslyFocusedElement = null;
     let lastAnnouncedSecond = null;
 
+    try {
+        window.localStorage.removeItem(manualLogoutKey);
+        window.localStorage.removeItem(expiredKey);
+    } catch {
+        // Storage can be unavailable in privacy-restricted contexts.
+    }
+
     const readSharedActivity = () => {
         try {
             const value = Number(window.localStorage.getItem(activityKey));
@@ -443,10 +450,14 @@ const startSessionMonitor = () => {
     window.addEventListener('storage', (event) => {
         if (event.key === manualLogoutKey) {
             stopSessionMonitor();
+            document.documentElement.style.display = 'none';
+            const loginUrl = document.body.dataset.loginUrl || '/login';
+            window.location.replace(loginUrl);
             return;
         }
 
         if (event.key === expiredKey) {
+            document.documentElement.style.display = 'none';
             expire(false);
             return;
         }
@@ -463,7 +474,24 @@ const startSessionMonitor = () => {
     });
 
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) scheduleExpiration();
+        if (!document.hidden) {
+            try {
+                if (window.localStorage.getItem(manualLogoutKey)) {
+                    document.documentElement.style.display = 'none';
+                    const loginUrl = document.body.dataset.loginUrl || '/login';
+                    window.location.replace(loginUrl);
+                    return;
+                }
+                if (window.localStorage.getItem(expiredKey)) {
+                    document.documentElement.style.display = 'none';
+                    expire(false);
+                    return;
+                }
+            } catch {
+                // Storage may be restricted.
+            }
+            scheduleExpiration();
+        }
     });
 
     document.addEventListener('submit', (event) => {
@@ -1461,7 +1489,13 @@ const startLoadingIndicators = () => {
     });
 
     window.addEventListener('pageshow', (event) => {
-        if (event.persisted) reset();
+        if (event.persisted) {
+            reset();
+            if (document.querySelector('[data-session-activity-url]')) {
+                document.documentElement.style.display = 'none';
+                window.location.reload();
+            }
+        }
     });
 
     window.addEventListener('pagehide', reset);

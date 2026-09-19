@@ -14,6 +14,7 @@ use App\Support\AuthenticationPanel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Throwable;
@@ -118,8 +119,15 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+        Cookie::queue(Cookie::forget(EnforceSessionInactivity::CONTEXT_COOKIE));
 
-        return redirect()->route('admin.login');
+        return redirect()
+            ->route('admin.login')
+            ->withHeaders([
+                'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => 'Fri, 01 Jan 1990 00:00:00 GMT',
+            ]);
     }
 
     public function expired(Request $request): RedirectResponse
@@ -129,16 +137,28 @@ class AuthenticatedSessionController extends Controller
                 $request,
                 AuthenticationContext::ADMIN_GUARD,
             )) {
-            return redirect()->route('admin.login');
+            return redirect()
+                ->route('admin.login')
+                ->withHeaders([
+                    'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
+                    'Pragma' => 'no-cache',
+                    'Expires' => 'Fri, 01 Jan 1990 00:00:00 GMT',
+                ]);
         }
 
         Auth::guard(AuthenticationContext::ADMIN_GUARD)->logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+        Cookie::queue(Cookie::forget(EnforceSessionInactivity::CONTEXT_COOKIE));
 
         return redirect()
             ->route('admin.login')
-            ->with('session_timeout', true);
+            ->with('session_timeout', true)
+            ->withHeaders([
+                'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => 'Fri, 01 Jan 1990 00:00:00 GMT',
+            ]);
     }
 }

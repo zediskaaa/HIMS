@@ -14,6 +14,7 @@ use App\Support\AuthenticationPanel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Throwable;
@@ -129,10 +130,16 @@ class AuthenticatedSessionController extends Controller
         Auth::guard($guard)->logout();
 
         $request->session()->invalidate();
-
         $request->session()->regenerateToken();
+        Cookie::queue(Cookie::forget(EnforceSessionInactivity::CONTEXT_COOKIE));
 
-        return redirect('/');
+        return redirect()
+            ->route('login')
+            ->withHeaders([
+                'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => 'Fri, 01 Jan 1990 00:00:00 GMT',
+            ]);
     }
 
     /**
@@ -149,16 +156,28 @@ class AuthenticatedSessionController extends Controller
                 $request,
                 AuthenticationContext::WEB_GUARD,
             )) {
-            return redirect()->route('login');
+            return redirect()
+                ->route('login')
+                ->withHeaders([
+                    'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
+                    'Pragma' => 'no-cache',
+                    'Expires' => 'Fri, 01 Jan 1990 00:00:00 GMT',
+                ]);
         }
 
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+        Cookie::queue(Cookie::forget(EnforceSessionInactivity::CONTEXT_COOKIE));
 
         return redirect()
             ->route('login')
-            ->with('session_timeout', true);
+            ->with('session_timeout', true)
+            ->withHeaders([
+                'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => 'Fri, 01 Jan 1990 00:00:00 GMT',
+            ]);
     }
 }

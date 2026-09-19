@@ -159,10 +159,20 @@ class EnforceSessionInactivity
                     'message' => 'Your session has expired due to inactivity. Please log in again.',
                     'code' => 'SESSION_TIMEOUT',
                 ], 401)
-                ->header('X-Session-Expired', 'true');
+                ->header('X-Session-Expired', 'true')
+                ->withHeaders([
+                    'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
+                    'Pragma' => 'no-cache',
+                    'Expires' => 'Fri, 01 Jan 1990 00:00:00 GMT',
+                ]);
         }
 
         return redirect()
-            ->route(AuthenticationContext::loginRoute($guardName));
+            ->route(AuthenticationContext::loginRoute($guardName))
+            ->withHeaders([
+                'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => 'Fri, 01 Jan 1990 00:00:00 GMT',
+            ]);
     }
 }

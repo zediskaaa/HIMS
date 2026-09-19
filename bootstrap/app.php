@@ -7,6 +7,7 @@ use App\Http\Middleware\EnsureMfaIsComplete;
 use App\Http\Middleware\EnsurePasswordIsCurrent;
 use App\Http\Middleware\EnsureSuperAdministrator;
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\PreventBackHistoryCache;
 use App\Support\AuthenticationContext;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
@@ -56,6 +57,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureAuthenticationPanelRole::class,
             EnsureMfaIsComplete::class,
             EnsurePasswordIsCurrent::class,
+            PreventBackHistoryCache::class,
         ]);
 
         $middleware->prependToPriorityList(
@@ -71,6 +73,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureAuthenticationPanelRole::class,
             EnsureMfaIsComplete::class,
             EnsurePasswordIsCurrent::class,
+            PreventBackHistoryCache::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -137,5 +140,9 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return response()->view('errors.500', ['errorId' => $errorId], 500);
+        });
+
+        $exceptions->respond(function (\Symfony\Component\HttpFoundation\Response $response, Throwable $exception, Request $request) {
+            return PreventBackHistoryCache::applyHeaders($request, $response);
         });
     })->create();

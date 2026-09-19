@@ -344,7 +344,7 @@ class AuditTrailTest extends TestCase
             'target_name' => 'Account',
         ]);
 
-        $this->post('/logout')->assertRedirect('/');
+        $this->post('/logout')->assertRedirect(route('login'));
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $user->id,
