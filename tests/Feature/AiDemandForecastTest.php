@@ -539,7 +539,6 @@ class AiDemandForecastTest extends TestCase
         $cached = Cache::get('demand-forecast:v3:90:30');
         $this->assertSame('statistical', $cached['source']);
         $this->assertSame('Statistical Forecast', $cached['source_label']);
-        $this->assertNotEmpty($cached['notice']);
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $manager->id,
@@ -550,7 +549,16 @@ class AiDemandForecastTest extends TestCase
         $this->actingAs($manager)->get(route('inventory.demand-forecast'))
             ->assertOk()
             ->assertSee('Statistical Forecast')
-            ->assertSee('Statistical fallback active');
+            ->assertDontSee('Statistical fallback active')
+            ->assertDontSee('The AI pass that refines this forecast');
+
+        // The dashboard forecasting card shares the same envelope, so the
+        // fallback must not surface there either.
+        $this->actingAs($manager)->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('AI-Based Stock Demand Forecasting')
+            ->assertDontSee('Statistical fallback active')
+            ->assertDontSee('These recommendations use recorded consumption');
     }
 
     /**
@@ -689,10 +697,7 @@ class AiDemandForecastTest extends TestCase
             ->where('action', AuditAction::FailedDemandForecast->value)
             ->firstOrFail();
         $this->assertSame('gemini_invalid_request', data_get($failure->new_values, 'failure_type'));
-        $this->assertStringContainsString(
-            'usable validated forecast',
-            Cache::get('demand-forecast:v3:90:30')['notice'],
-        );
+        $this->assertSame('statistical', Cache::get('demand-forecast:v3:90:30')['source']);
     }
 
     public function test_invalid_ai_item_ids_are_rejected_and_never_rendered(): void

@@ -118,7 +118,7 @@ class AiDemandForecastService
                 $this->generate($actor, $analysisDays, $forecastDays);
             } catch (Throwable $exception) {
                 // The screen already has the statistical forecast, so a failed
-                // warm-up costs the next visitor nothing but a quieter notice.
+                // warm-up costs the next visitor nothing.
                 report($exception);
             }
         });
@@ -142,7 +142,6 @@ class AiDemandForecastService
             $this->statisticalItems($prepared),
             $analysisDays,
             $forecastDays,
-            $this->fallbackNotice('warmup'),
         );
     }
 
@@ -187,7 +186,6 @@ class AiDemandForecastService
                 $this->statisticalItems($prepared),
                 $analysisDays,
                 $forecastDays,
-                $this->fallbackNotice($failureType),
             );
             // Deliberately shorter than an AI result: the failure has to expire
             // with the warm-up window so the next view retries the model rather
@@ -197,7 +195,7 @@ class AiDemandForecastService
             return $fallback;
         }
 
-        $result = $this->resultEnvelope('ai', $aiItems, $analysisDays, $forecastDays, null, $modelUsed);
+        $result = $this->resultEnvelope('ai', $aiItems, $analysisDays, $forecastDays, $modelUsed);
         $this->store($result, $analysisDays, $forecastDays);
 
         $this->audit->record(
@@ -652,7 +650,6 @@ class AiDemandForecastService
         array $items,
         int $analysisDays,
         int $forecastDays,
-        ?string $notice = null,
         ?string $model = null,
     ): array {
         $generatedAt = now();
@@ -673,7 +670,6 @@ class AiDemandForecastService
             'forecast_period' => "Next {$forecastDays} days",
             'generated_at' => $generatedAt->toIso8601String(),
             'expires_at' => $generatedAt->copy()->addMinutes($ttlMinutes)->toIso8601String(),
-            'notice' => $notice,
             'summary' => [
                 'items' => count($items),
                 'high_risk_items' => $collection->where('risk_level', 'high')->count(),
@@ -848,25 +844,6 @@ class AiDemandForecastService
         $status = $exception->response->status();
 
         return $status === 429 || $status >= 500;
-    }
-
-    private function fallbackNotice(string $failureType): string
-    {
-        if ($failureType === 'warmup') {
-            return 'The AI pass that refines this forecast runs in the background; these results have not been sent to Gemini yet.';
-        }
-
-        $reason = match ($failureType) {
-            'missing_api_key' => 'Gemini is not configured on the server.',
-            'gemini_authentication_failed' => 'Gemini rejected the configured credential.',
-            'gemini_model_unavailable' => 'The configured Gemini model is unavailable.',
-            'gemini_rate_limited' => 'Gemini is currently rate limited after several attempts.',
-            'gemini_connection_failed', 'gemini_request_timeout', 'gemini_service_unavailable' => 'Gemini did not respond successfully after several attempts.',
-            'gemini_invalid_request', 'invalid_gemini_json', 'invalid_gemini_response', 'nonsensical_reorder_quantity' => 'Gemini did not return a usable validated forecast.',
-            default => 'Gemini is temporarily unavailable.',
-        };
-
-        return $reason.' These recommendations use recorded consumption and moving-average calculations only.';
     }
 
     private function cacheKey(int $analysisDays, int $forecastDays): string

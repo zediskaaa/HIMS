@@ -179,7 +179,7 @@ class DemandForecastController extends Controller implements HasMiddleware
             ? "The {$forecastDays}-day forecast was loaded from the latest saved result."
             : ($forecast['source'] === 'ai'
                 ? 'AI demand forecast generated from the latest inventory history.'
-                : 'Gemini was unavailable. A clearly labeled statistical forecast is shown instead.');
+                : 'The forecast was generated from recorded inventory history.');
 
         if ($request->expectsJson()) {
             return response()->json([

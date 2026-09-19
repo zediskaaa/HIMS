@@ -199,15 +199,6 @@
                         </button>
                     </div>
 
-                    <div
-                        x-show="forecast?.notice"
-                        x-cloak
-                        class="rounded-lg border border-warning-200 bg-warning-50 px-3 py-2"
-                    >
-                        <p class="text-xs font-semibold text-warning-700">Statistical fallback active</p>
-                        <p class="mt-0.5 text-xs text-warning-700" x-text="forecast?.notice"></p>
-                    </div>
-
                     <div class="grid min-w-0 gap-2.5 rounded-lg border border-neutral-200 bg-neutral-50 p-2.5 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
                         {{-- Item Selection --}}
                         <div class="min-w-0 space-y-1.5 sm:col-span-2 lg:col-span-3">

@@ -100,14 +100,6 @@
                     </div>
                 </x-slot:header>
 
-                @if ($aiForecast['notice'])
-                    <div class="px-4 pt-4">
-                        <x-ui.alert variant="warning" title="Statistical fallback active">
-                            {{ $aiForecast['notice'] }}
-                        </x-ui.alert>
-                    </div>
-                @endif
-
                 <div class="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
                     @foreach ([
                         ['High risk', $aiForecast['summary']['high_risk_items'], 'border-danger-200 bg-danger-50 text-danger-900'],
