@@ -1645,8 +1645,42 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         }).slice(0, 6);
     },
 
+    modalItem: null,
+    selectedAnalysisItem: null,
+
     highRiskCount() {
         return this.filteredItems().filter((item) => item.risk_level === 'high').length;
+    },
+
+    moderateRiskCount() {
+        return this.filteredItems().filter((item) => item.risk_level === 'medium').length;
+    },
+
+    lowRiskCount() {
+        return this.filteredItems().filter((item) => item.risk_level === 'low').length;
+    },
+
+    itemsRequiringReorderCount() {
+        return this.filteredItems().filter((item) => Number(item.recommended_reorder_quantity || 0) > 0).length;
+    },
+
+    insightText() {
+        return this.insight();
+    },
+
+    openAnalysisModal(item) {
+        this.selectedAnalysisItem = item;
+        this.modalItem = item;
+        this.$dispatch('open-modal', 'ai-forecast-explanation-modal');
+    },
+
+    openCurrentInsightModal() {
+        const item = this.selectedItem()
+            || this.filteredItems().find((i) => i.risk_level === 'high')
+            || this.filteredItems()[0];
+        if (item) {
+            this.openAnalysisModal(item);
+        }
     },
 
     lowStockRiskCount() {
@@ -2527,16 +2561,16 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
 
     riskClasses(risk) {
         return {
-            high: 'bg-danger-50 text-danger-700 ring-danger-600/20',
-            medium: 'bg-warning-50 text-warning-700 ring-warning-600/20',
-            low: 'bg-success-50 text-success-700 ring-success-600/20',
-        }[risk] || 'bg-neutral-100 text-neutral-700 ring-neutral-500/20';
+            high: 'bg-danger-50 text-danger-700 ring-danger-600/20 dark:bg-rose-950/80 dark:text-rose-300 dark:ring-rose-500/40',
+            medium: 'bg-warning-50 text-warning-700 ring-warning-600/20 dark:bg-amber-950/80 dark:text-amber-300 dark:ring-amber-500/40',
+            low: 'bg-success-50 text-success-700 ring-success-600/20 dark:bg-emerald-950/80 dark:text-emerald-300 dark:ring-emerald-500/40',
+        }[risk] || 'bg-neutral-100 text-neutral-700 ring-neutral-500/20 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700';
     },
 
     sourceClasses() {
         return this.forecast?.source === 'ai'
-            ? 'bg-primary-50 text-primary-700 ring-primary-600/20'
-            : 'bg-warning-50 text-warning-700 ring-warning-600/20';
+            ? 'bg-primary-50 text-primary-700 ring-primary-600/20 dark:bg-primary-950/80 dark:text-primary-300 dark:ring-primary-500/40'
+            : 'bg-warning-50 text-warning-700 ring-warning-600/20 dark:bg-warning-950/80 dark:text-warning-300 dark:ring-warning-500/40';
     },
 
     formatNumber(value, maximumFractionDigits = 0) {
@@ -2695,6 +2729,117 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
                 this.forecastRequest = null;
             }
         }
+    },
+
+    activeTab: 'ai',
+    selectedAnalysisItem: null,
+
+    openAnalysisModal(item) {
+        this.selectedAnalysisItem = item;
+        this.$dispatch('open-modal', 'ai-forecast-explanation-modal');
+    },
+
+    openCurrentInsightModal() {
+        const target = this.selectedItem()
+            || this.topItems()[0]
+            || this.filteredItems()[0]
+            || (this.allItems().length > 0 ? this.allItems()[0] : null);
+        if (target) {
+            this.openAnalysisModal(target);
+        } else {
+            this.$dispatch('open-modal', 'ai-forecast-explanation-modal');
+        }
+    },
+
+    insightText() {
+        if (this.allItems().length === 0) {
+            return 'No AI forecast generated yet for this period. Click Refresh AI Forecast or adjust parameters to generate demand insights.';
+        }
+        const sel = this.selectedItem();
+        if (sel) {
+            return sel.explanation || `${sel.item_name} has predicted demand of ${this.formatNumber(sel.predicted_demand)} units. Current stock is ${this.formatNumber(sel.current_stock)} units.`;
+        }
+        const top = this.topItems()[0];
+        if (top && top.explanation) {
+            const highRisk = this.highRiskCount();
+            if (highRisk > 0) {
+                return `${highRisk} ${highRisk === 1 ? 'item is' : 'items are'} at high stockout risk. ${top.item_name}: ${top.explanation}`;
+            }
+            return `${top.item_name}: ${top.explanation}`;
+        }
+        return this.insight();
+    },
+
+    itemMatchesFilter(item) {
+        const needle = this.search.trim().toLowerCase();
+        const matchesCategory = this.category === '' || String(item.category_id ?? '') === String(this.category);
+        const matchesRisk = this.risk === '' || item.risk_level === this.risk;
+        const matchesSelected = !this.selectedItemId || String(item.item_id) === String(this.selectedItemId);
+        const searchable = `${item.item_name ?? ''} ${item.sku ?? ''} ${item.category ?? ''}`.toLowerCase();
+        return matchesCategory && matchesRisk && matchesSelected && (needle === '' || searchable.includes(needle));
+    },
+
+    statMatchesFilter(name, sku) {
+        const needle = this.search.trim().toLowerCase();
+        if (!needle) return true;
+        return `${name} ${sku}`.toLowerCase().includes(needle);
+    },
+
+    itemsRequiringReorderCount() {
+        return this.filteredItems().filter((item) => Number(item.recommended_reorder_quantity || 0) > 0).length;
+    },
+
+    moderateRiskCount() {
+        return this.filteredItems().filter((item) => item.risk_level === 'medium').length;
+    },
+
+    totalHistoricalUsage() {
+        const sel = this.selectedItem();
+        if (sel) return Number(sel.historical_consumption || 0);
+        return this.filteredItems().reduce((total, item) => total + Number(item.historical_consumption || 0), 0);
+    },
+
+    demandVelocityPercent() {
+        const hist = this.historicalDailyRate();
+        const pred = this.predictedDailyRate();
+        if (hist <= 0) return pred > 0 ? 100 : 0;
+        return Math.round(((pred - hist) / hist) * 100);
+    },
+
+    formatVelocity(val) {
+        if (val > 0) return `+${val}%`;
+        return `${val}%`;
+    },
+
+    velocityLabel() {
+        const vel = this.demandVelocityPercent();
+        if (vel > 15) return 'Surging demand';
+        if (vel > 5) return 'Rising vs history';
+        if (vel < -15) return 'Sharp decline';
+        if (vel < -5) return 'Decreasing trend';
+        return 'Stable consumption';
+    },
+
+    coverageValue() {
+        const sel = this.selectedItem();
+        if (sel) {
+            return sel.days_of_cover !== null && sel.days_of_cover !== undefined
+                ? this.formatNumber(sel.days_of_cover)
+                : '—';
+        }
+        const highRisk = this.highRiskCount();
+        if (highRisk > 0) return `${highRisk} at risk`;
+        return 'Adequate';
+    },
+
+    coverageSubtext() {
+        const sel = this.selectedItem();
+        if (sel) {
+            const reorderPt = Number(sel.reorder_point || 0);
+            const stock = Number(sel.current_stock || 0);
+            return stock <= reorderPt ? 'Below reorder point' : 'Above safety threshold';
+        }
+        return `${this.filteredItems().length} active items`;
     },
 }));
 
