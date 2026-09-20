@@ -57,6 +57,11 @@ class QualityControlService
             }
 
             $targetLocation = StorageLocation::findOrFail($targetLocationId);
+            if ($targetLocation->status !== 'active') {
+                throw ValidationException::withMessages([
+                    'target_location_id' => ["Target storage location {$targetLocation->name} ({$targetLocation->code}) is inactive and cannot receive new inventory. Select an active location."]
+                ]);
+            }
             $this->compatibilityService->assertCompatible($targetLocation, $item, $acceptedQuantity);
             $receivingStaging = StorageLocation::query()
                 ->active()

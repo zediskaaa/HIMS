@@ -100,6 +100,9 @@ class SmartWarehousingController extends Controller implements HasMiddleware
         if ($request->filled('type')) {
             $query->where('type', $request->type);
         }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
         if ($request->filled('thermal')) {
             $query->where('temperature_classification', $request->thermal);
         }
@@ -113,6 +116,12 @@ class SmartWarehousingController extends Controller implements HasMiddleware
         }
 
         $locations = $query->paginate(25)->withQueryString();
+        $locations->getCollection()->transform(function ($loc) {
+            $loc->pending_inbound_count = $loc->pendingInboundCount();
+
+            return $loc;
+        });
+
         $parentLocations = StorageLocation::whereIn('type', ['warehouse', 'zone', 'aisle', 'rack'])->orderBy('name')->get();
 
         return view('inventory.warehousing.locations', compact('locations', 'parentLocations'));

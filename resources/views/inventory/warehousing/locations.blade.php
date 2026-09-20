@@ -27,6 +27,17 @@
         @if(session('success'))
             <x-ui.alert variant="success" :message="session('success')" />
         @endif
+        <template x-if="statusSuccessMessage">
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/60 p-4 text-sm text-emerald-800 dark:text-emerald-300 flex items-center justify-between shadow-2xs">
+                <div class="flex items-center gap-2">
+                    <svg class="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span x-text="statusSuccessMessage"></span>
+                </div>
+                <button type="button" @click="statusSuccessMessage = null" class="text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-200">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </template>
         @if($errors->any())
             <x-ui.alert variant="danger" title="Validation errors occurred">
                 <ul class="list-disc pl-5">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
@@ -35,7 +46,7 @@
 
         {{-- Filter Bar --}}
         <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-2xs dark:border-neutral-800 dark:bg-neutral-900">
-            <form method="GET" action="{{ route('inventory.warehousing.locations') }}" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <form method="GET" action="{{ route('inventory.warehousing.locations') }}" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 <div>
                     <label for="search" class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">Search</label>
                     <input type="text" id="search" name="search" value="{{ request('search') }}" placeholder="Code, name, or barcode..." class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
@@ -47,6 +58,14 @@
                         @foreach(['warehouse' => 'Warehouse', 'zone' => 'Zone', 'aisle' => 'Aisle', 'rack' => 'Rack', 'shelf' => 'Shelf', 'bin' => 'Bin', 'cold_room' => 'Cold Room', 'vault' => 'Narcotics Vault'] as $k => $v)
                             <option value="{{ $k }}" @selected(request('type') === $k)>{{ $v }}</option>
                         @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="status" class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">Status</label>
+                    <select id="status" name="status" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
+                        <option value="">All Statuses</option>
+                        <option value="active" @selected(request('status') === 'active')>Active</option>
+                        <option value="inactive" @selected(request('status') === 'inactive')>Inactive</option>
                     </select>
                 </div>
                 <div>
@@ -80,13 +99,14 @@
                             <th class="px-4 py-3 sm:px-5">Type & Topology</th>
                             <th class="px-4 py-3 sm:px-5">Thermal Class</th>
                             <th class="px-4 py-3 sm:px-5">Capacity & Occupancy</th>
+                            <th class="px-4 py-3 sm:px-5">Status</th>
                             <th class="px-4 py-3 sm:px-5">Special Designation</th>
                             <th class="px-4 py-3 sm:px-5 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @forelse($locations as $loc)
-                            <tr class="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/50 transition-colors">
+                            <tr id="location-row-{{ $loc->id }}" data-location-id="{{ $loc->id }}" data-location-code="{{ $loc->code }}" data-location-name="{{ $loc->name }}" class="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/50 transition-colors">
                                 <td class="px-4 py-2.5 sm:px-5 sm:py-3">
                                     <div class="font-mono text-sm font-bold text-neutral-900 dark:text-neutral-100">{{ $loc->code }}</div>
                                     <div class="text-xs text-neutral-500 dark:text-neutral-400">{{ $loc->name }}</div>
@@ -142,10 +162,13 @@
                                         <div class="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">Max {{ $loc->max_weight_kg }} kg</div>
                                     @endif
                                 </td>
+                                <td id="location-status-cell-{{ $loc->id }}" class="px-4 py-2.5 sm:px-5 sm:py-3 whitespace-nowrap">
+                                    <x-ui.badge :status="$loc->status" :dot="true" />
+                                </td>
                                 <td class="px-4 py-2.5 sm:px-5 sm:py-3">
                                     <div class="flex flex-wrap gap-1">
                                         @if($loc->is_narcotics_vault)
-                                            <span class="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-purple-800 dark:bg-purple-950 dark:text-purple-300">Narcotics Vault</span>
+                                             <span class="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-purple-800 dark:bg-purple-950 dark:text-purple-300">Narcotics Vault</span>
                                         @endif
                                         @if($loc->is_hazardous_containment)
                                             <span class="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-rose-800 dark:bg-rose-950 dark:text-rose-300">Hazardous / Cytotoxic</span>
@@ -177,6 +200,34 @@
                                             </span>
                                         </button>
 
+                                        @if(auth()->user()?->isSuperAdministrator())
+                                            <span id="location-status-btn-container-{{ $loc->id }}" class="inline-flex items-center">
+                                                @if($loc->status === 'active')
+                                                    <button
+                                                        type="button"
+                                                        id="btn-deactivate-location-{{ $loc->id }}"
+                                                        @click="openDeactivateModal({{ $loc->id }}, '{{ addslashes($loc->code) }}', '{{ addslashes($loc->name) }}', {{ $loc->active_items_count ?? 0 }}, {{ $loc->totalQuantity() }}, {{ $loc->pending_inbound_count ?? $loc->pendingInboundCount() }})"
+                                                        data-confirm-prompt="Are you sure you want to deactivate {{ $loc->code }} ({{ $loc->name }})?"
+                                                        class="inline-flex items-center gap-1 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/60 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/80 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                        title="Deactivate this storage location">
+                                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                                                        <span>Deactivate</span>
+                                                    </button>
+                                                @else
+                                                    <button
+                                                        type="button"
+                                                        id="btn-activate-location-{{ $loc->id }}"
+                                                        @click="openActivateModal({{ $loc->id }}, '{{ addslashes($loc->code) }}', '{{ addslashes($loc->name) }}')"
+                                                        data-confirm-prompt="Are you sure you want to reactivate {{ $loc->code }} ({{ $loc->name }})?"
+                                                        class="inline-flex items-center gap-1 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/80 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                                        title="Reactivate this storage location">
+                                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                        <span>Activate</span>
+                                                    </button>
+                                                @endif
+                                            </span>
+                                        @endif
+
                                         @can(\App\Enums\Permission::PrintWarehouseLabels->value)
                                         <form method="POST" action="{{ route('inventory.storage-locations.label', $loc) }}" target="_blank" class="inline-block">
                                             @csrf
@@ -192,7 +243,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="py-12 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                                <td colspan="7" class="py-12 text-center text-sm text-neutral-500 dark:text-neutral-400">
                                     No storage locations found matching criteria.
                                 </td>
                             </tr>
@@ -460,7 +511,392 @@
             </div>
         </div>
 
-    </div>
+        {{-- Step 1: Deactivation Reason & Impact Modal (Super Admin only) --}}
+        @if(auth()->user()?->isSuperAdministrator())
+        <div
+            x-show="deactivateModal"
+            x-cloak
+            x-on:keydown.escape.window="closeDeactivateModal()"
+            class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deactivate-modal-title"
+        >
+            <div
+                x-show="deactivateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                @click="closeDeactivateModal()"
+                class="fixed inset-0 bg-neutral-900/60 dark:bg-black/75 backdrop-blur-xs"
+                aria-hidden="true"
+            ></div>
+
+            <div
+                x-show="deactivateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-95"
+                class="relative w-full max-w-lg rounded-xl border border-amber-200 bg-white shadow-xl dark:border-amber-900/50 dark:bg-neutral-900 p-6 z-10 space-y-4"
+            >
+                <div class="flex items-start gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 id="deactivate-modal-title" class="text-lg font-bold text-neutral-900 dark:text-neutral-100">
+                            Deactivate Storage Location
+                        </h3>
+                        <p class="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+                            Specify the reason for deactivation and review location inventory before proceeding to confirmation.
+                        </p>
+                    </div>
+                </div>
+
+                {{-- Location Impact Summary Card --}}
+                <div class="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 p-3.5 text-xs space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-neutral-500 dark:text-neutral-400">Location:</span>
+                        <span class="font-semibold text-neutral-900 dark:text-neutral-100 font-mono" x-text="(targetLocation?.code || '') + ' — ' + (targetLocation?.name || '')"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-neutral-500 dark:text-neutral-400">Current status:</span>
+                        <span class="font-semibold text-emerald-600 dark:text-emerald-400">Active</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-neutral-500 dark:text-neutral-400">Distinct items:</span>
+                        <span class="font-semibold text-neutral-900 dark:text-neutral-100" x-text="targetLocation?.itemsCount || 0"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-neutral-500 dark:text-neutral-400">Remaining stock:</span>
+                        <span class="font-semibold text-neutral-900 dark:text-neutral-100" x-text="(targetLocation?.totalStock || 0).toLocaleString() + ' units'"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-neutral-500 dark:text-neutral-400">Pending inbound transactions:</span>
+                        <span class="font-semibold" :class="(targetLocation?.pendingInbound || 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-900 dark:text-neutral-100'" x-text="targetLocation?.pendingInbound || 0"></span>
+                    </div>
+                </div>
+
+                <template x-if="(targetLocation?.pendingInbound || 0) > 0">
+                    <div class="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/60 p-3 text-xs text-amber-800 dark:text-amber-300">
+                        <strong>Notice:</strong> There are <span class="font-bold" x-text="targetLocation?.pendingInbound"></span> pending inbound transaction(s) destined for this location. Incoming deliveries and transfers cannot be received into this location once deactivated.
+                    </div>
+                </template>
+
+                <template x-if="submitError">
+                    <div class="rounded-lg border border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/60 p-3 text-xs text-red-800 dark:text-red-300 flex items-center justify-between">
+                        <span x-text="submitError"></span>
+                        <button type="button" @click="submitError = null" class="text-red-500 hover:text-red-700">&times;</button>
+                    </div>
+                </template>
+
+                <form @submit.prevent="openDeactivateConfirmModal()" class="space-y-4">
+                    <div>
+                        <label for="deactivate-reason" class="block text-xs font-semibold uppercase text-neutral-700 dark:text-neutral-300">
+                            Reason for Deactivation <span class="text-red-500">*</span> <span class="font-normal text-neutral-500">(Required for audit trail)</span>
+                        </label>
+                        <textarea
+                            id="deactivate-reason"
+                            name="reason"
+                            rows="2"
+                            x-model="reason"
+                            required
+                            placeholder="e.g. Warehouse under renovation, consolidation to Main Warehouse..."
+                            class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-sm text-neutral-900 dark:text-neutral-100 focus:border-amber-500 focus:ring-amber-500"
+                        ></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            @click="closeDeactivateModal()"
+                            class="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            id="proceed-deactivate-btn"
+                            class="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-2xs hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                        >
+                            <span>Deactivate Location</span>
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {{-- Step 2: Confirmation Modal for Deactivation (with Yes / Cancel) --}}
+        <div
+            x-show="confirmDeactivateModal"
+            x-cloak
+            x-on:keydown.escape.window="closeDeactivateConfirmModal()"
+            class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-deactivate-title"
+        >
+            <div
+                x-show="confirmDeactivateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                @click="closeDeactivateConfirmModal()"
+                class="fixed inset-0 bg-neutral-900/60 dark:bg-black/75 backdrop-blur-xs"
+                aria-hidden="true"
+            ></div>
+
+            <div
+                x-show="confirmDeactivateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-95"
+                class="relative w-full max-w-md rounded-xl border border-amber-200 bg-white shadow-xl dark:border-amber-900/50 dark:bg-neutral-900 p-6 z-10 space-y-4"
+            >
+                <div class="flex items-start gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 id="confirm-deactivate-title" class="text-lg font-bold text-neutral-900 dark:text-neutral-100">
+                            Are you sure you want to deactivate this storage location?
+                        </h3>
+                        <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+                            Are you sure you want to deactivate <span class="font-mono font-bold text-neutral-900 dark:text-neutral-100" x-text="targetLocation?.code"></span> (<span x-text="targetLocation?.name"></span>)? Once deactivated, this location cannot receive new inventory or Purchase Orders. Existing stock can still be released or transferred out. The location and its history will remain intact.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/40 p-3 text-xs space-y-1">
+                    <div class="text-neutral-500 dark:text-neutral-400">Recorded Reason:</div>
+                    <div class="font-medium text-neutral-800 dark:text-neutral-200 italic" x-text="reason"></div>
+                </div>
+
+                <template x-if="submitError">
+                    <div class="rounded-lg border border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/60 p-3 text-xs text-red-800 dark:text-red-300 flex items-center justify-between">
+                        <span x-text="submitError"></span>
+                        <button type="button" @click="submitError = null" class="text-red-500 hover:text-red-700">&times;</button>
+                    </div>
+                </template>
+
+                <div class="flex justify-end gap-3 pt-2">
+                    <button
+                        type="button"
+                        @click="closeDeactivateConfirmModal()"
+                        :disabled="submitting"
+                        class="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 disabled:opacity-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        id="confirm-deactivate-btn"
+                        @click="submitDeactivate()"
+                        :disabled="submitting"
+                        class="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-2xs hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <svg x-show="submitting" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span x-text="submitting ? 'Deactivating...' : 'Yes, Deactivate Location'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {{-- Step 1: Reactivation Reason Modal (Super Admin only) --}}
+        <div
+            x-show="activateModal"
+            x-cloak
+            x-on:keydown.escape.window="closeActivateModal()"
+            class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="activate-modal-title"
+        >
+            <div
+                x-show="activateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                @click="closeActivateModal()"
+                class="fixed inset-0 bg-neutral-900/60 dark:bg-black/75 backdrop-blur-xs"
+                aria-hidden="true"
+            ></div>
+
+            <div
+                x-show="activateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-95"
+                class="relative w-full max-w-md rounded-xl border border-emerald-200 bg-white shadow-xl dark:border-emerald-900/50 dark:bg-neutral-900 p-6 z-10 space-y-4"
+            >
+                <div class="flex items-start gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 id="activate-modal-title" class="text-lg font-bold text-neutral-900 dark:text-neutral-100">
+                            Reactivate Storage Location
+                        </h3>
+                        <p class="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+                            Specify the reason for reactivating <span class="font-mono font-bold" x-text="targetLocation?.code"></span> before proceeding to confirmation.
+                        </p>
+                    </div>
+                </div>
+
+                <template x-if="submitError">
+                    <div class="rounded-lg border border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/60 p-3 text-xs text-red-800 dark:text-red-300 flex items-center justify-between">
+                        <span x-text="submitError"></span>
+                        <button type="button" @click="submitError = null" class="text-red-500 hover:text-red-700">&times;</button>
+                    </div>
+                </template>
+
+                <form @submit.prevent="openActivateConfirmModal()" class="space-y-4">
+                    <div>
+                        <label for="activate-reason" class="block text-xs font-semibold uppercase text-neutral-700 dark:text-neutral-300">
+                            Reason for Reactivation <span class="font-normal text-neutral-500">(for audit trail)</span>
+                        </label>
+                        <textarea
+                            id="activate-reason"
+                            name="reason"
+                            rows="2"
+                            x-model="reason"
+                            placeholder="e.g. Facility reopening, maintenance completed..."
+                            class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-sm text-neutral-900 dark:text-neutral-100 focus:border-emerald-500 focus:ring-emerald-500"
+                        ></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            @click="closeActivateModal()"
+                            class="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            id="proceed-activate-btn"
+                            class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-2xs hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                        >
+                            <span>Activate Location</span>
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {{-- Step 2: Confirmation Modal for Reactivation (with Yes / Cancel) --}}
+        <div
+            x-show="confirmActivateModal"
+            x-cloak
+            x-on:keydown.escape.window="closeActivateConfirmModal()"
+            class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-activate-title"
+        >
+            <div
+                x-show="confirmActivateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                @click="closeActivateConfirmModal()"
+                class="fixed inset-0 bg-neutral-900/60 dark:bg-black/75 backdrop-blur-xs"
+                aria-hidden="true"
+            ></div>
+
+            <div
+                x-show="confirmActivateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-95"
+                class="relative w-full max-w-md rounded-xl border border-emerald-200 bg-white shadow-xl dark:border-emerald-900/50 dark:bg-neutral-900 p-6 z-10 space-y-4"
+            >
+                <div class="flex items-start gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 id="confirm-activate-title" class="text-lg font-bold text-neutral-900 dark:text-neutral-100">
+                            Are you sure you want to reactivate this storage location?
+                        </h3>
+                        <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+                            Are you sure you want to reactivate <span class="font-mono font-bold text-neutral-900 dark:text-neutral-100" x-text="targetLocation?.code"></span> (<span x-text="targetLocation?.name"></span>)? Once reactivated, this location will be able to receive incoming inventory, purchase orders, and stock transfers normally.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/40 p-3 text-xs space-y-1">
+                    <div class="text-neutral-500 dark:text-neutral-400">Recorded Reason:</div>
+                    <div class="font-medium text-neutral-800 dark:text-neutral-200 italic" x-text="reason || 'Reactivated location'"></div>
+                </div>
+
+                <template x-if="submitError">
+                    <div class="rounded-lg border border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/60 p-3 text-xs text-red-800 dark:text-red-300 flex items-center justify-between">
+                        <span x-text="submitError"></span>
+                        <button type="button" @click="submitError = null" class="text-red-500 hover:text-red-700">&times;</button>
+                    </div>
+                </template>
+
+                <div class="flex justify-end gap-3 pt-2">
+                    <button
+                        type="button"
+                        @click="closeActivateConfirmModal()"
+                        :disabled="submitting"
+                        class="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 disabled:opacity-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        id="confirm-activate-btn"
+                        @click="submitActivate()"
+                        :disabled="submitting"
+                        class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-2xs hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <svg x-show="submitting" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span x-text="submitting ? 'Activating...' : 'Yes, Activate Location'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        @endif
 
     {{-- Add Storage Location Modal --}}
     @can(\App\Enums\Permission::ManageWarehouseTopology->value)
@@ -580,10 +1016,16 @@
         </form>
     </x-ui.modal>
     @endcan
+    </div>
 
     <script>
         function locationItemsManager() {
             return {
+                init() {
+                    window.__locationItemsManager = this;
+                },
+
+                // Location Items Modal State
                 openModal: false,
                 loading: false,
                 errorMessage: null,
@@ -598,6 +1040,18 @@
                     from: 0,
                     to: 0,
                 },
+
+                // Location Lifecycle Modals State (Super Admin)
+                deactivateModal: false,
+                confirmDeactivateModal: false,
+                activateModal: false,
+                confirmActivateModal: false,
+                targetLocation: null,
+                reason: '',
+                submitting: false,
+                submitError: null,
+                statusSuccessMessage: null,
+
                 viewLocationItems(locId, locCode, locName) {
                     this.location = { id: locId, code: locCode, name: locName, full_path: locName, total_quantity: 0 };
                     this.search = '';
@@ -647,6 +1101,208 @@
                 changePage(page) {
                     if (page >= 1 && page <= this.pagination.last_page) {
                         this.fetchItems(page);
+                    }
+                },
+
+                // Lifecycle Actions: Step 1 & Step 2
+                openDeactivateModal(locIdOrData, locCode, locName, itemsCount = 0, totalStock = 0, pendingInbound = 0) {
+                    if (typeof locIdOrData === 'object' && locIdOrData !== null) {
+                        this.targetLocation = {
+                            id: locIdOrData.id,
+                            code: locIdOrData.code,
+                            name: locIdOrData.name,
+                            itemsCount: locIdOrData.itemsCount || 0,
+                            totalStock: locIdOrData.totalStock || 0,
+                            pendingInbound: locIdOrData.pendingInbound || 0,
+                        };
+                    } else {
+                        this.targetLocation = {
+                            id: locIdOrData,
+                            code: locCode,
+                            name: locName,
+                            itemsCount: itemsCount,
+                            totalStock: totalStock,
+                            pendingInbound: pendingInbound,
+                        };
+                    }
+                    this.reason = '';
+                    this.submitError = null;
+                    this.confirmDeactivateModal = false;
+                    this.deactivateModal = true;
+                },
+                closeDeactivateModal() {
+                    this.deactivateModal = false;
+                    this.confirmDeactivateModal = false;
+                    this.targetLocation = null;
+                    this.reason = '';
+                    this.submitError = null;
+                },
+                openDeactivateConfirmModal() {
+                    if (!this.reason || !this.reason.trim()) {
+                        this.submitError = 'Please provide a reason for deactivation.';
+                        return;
+                    }
+                    this.submitError = null;
+                    this.deactivateModal = false;
+                    this.confirmDeactivateModal = true;
+                },
+                closeDeactivateConfirmModal() {
+                    this.confirmDeactivateModal = false;
+                    this.deactivateModal = true;
+                },
+
+                openActivateModal(locIdOrData, locCode, locName) {
+                    if (typeof locIdOrData === 'object' && locIdOrData !== null) {
+                        this.targetLocation = {
+                            id: locIdOrData.id,
+                            code: locIdOrData.code,
+                            name: locIdOrData.name,
+                        };
+                    } else {
+                        this.targetLocation = {
+                            id: locIdOrData,
+                            code: locCode,
+                            name: locName,
+                        };
+                    }
+                    this.reason = '';
+                    this.submitError = null;
+                    this.confirmActivateModal = false;
+                    this.activateModal = true;
+                },
+                closeActivateModal() {
+                    this.activateModal = false;
+                    this.confirmActivateModal = false;
+                    this.targetLocation = null;
+                    this.reason = '';
+                    this.submitError = null;
+                },
+                openActivateConfirmModal() {
+                    this.submitError = null;
+                    this.activateModal = false;
+                    this.confirmActivateModal = true;
+                },
+                closeActivateConfirmModal() {
+                    this.confirmActivateModal = false;
+                    this.activateModal = true;
+                },
+
+                async submitDeactivate() {
+                    if (!this.targetLocation || !this.targetLocation.id) return;
+                    if (!this.reason || !this.reason.trim()) {
+                        this.submitError = 'Please provide a reason for deactivation.';
+                        return;
+                    }
+                    this.submitting = true;
+                    this.submitError = null;
+                    try {
+                        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                            || document.querySelector('input[name="_token"]')?.value;
+                        const res = await fetch(`{{ url('/inventory/storage-locations') }}/${this.targetLocation.id}/status`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': token,
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            body: JSON.stringify({
+                                status: 'inactive',
+                                reason: this.reason.trim()
+                            })
+                        });
+
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                            throw new Error(data.message || `Failed to deactivate location (${res.status})`);
+                        }
+
+                        this.statusSuccessMessage = data.message || `Storage location ${this.targetLocation.code} has been deactivated.`;
+                        this.updateLocationRow(this.targetLocation.id, 'inactive', this.targetLocation.code, this.targetLocation.name, this.targetLocation.itemsCount, this.targetLocation.totalStock);
+                        this.closeDeactivateModal();
+                    } catch (err) {
+                        console.error(err);
+                        this.submitError = err.message || 'An error occurred while deactivating the storage location.';
+                    } finally {
+                        this.submitting = false;
+                    }
+                },
+                async submitActivate() {
+                    if (!this.targetLocation || !this.targetLocation.id) return;
+                    this.submitting = true;
+                    this.submitError = null;
+                    try {
+                        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                            || document.querySelector('input[name="_token"]')?.value;
+                        const res = await fetch(`{{ url('/inventory/storage-locations') }}/${this.targetLocation.id}/status`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': token,
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            body: JSON.stringify({
+                                status: 'active',
+                                reason: this.reason ? this.reason.trim() : 'Reactivated location'
+                            })
+                        });
+
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                            throw new Error(data.message || `Failed to activate location (${res.status})`);
+                        }
+
+                        this.statusSuccessMessage = data.message || `Storage location ${this.targetLocation.code} has been reactivated.`;
+                        this.updateLocationRow(this.targetLocation.id, 'active', this.targetLocation.code, this.targetLocation.name, this.targetLocation.itemsCount, this.targetLocation.totalStock);
+                        this.closeActivateModal();
+                    } catch (err) {
+                        console.error(err);
+                        this.submitError = err.message || 'An error occurred while activating the storage location.';
+                    } finally {
+                        this.submitting = false;
+                    }
+                },
+                updateLocationRow(locId, newStatus, code, name, itemsCount = 0, totalStock = 0) {
+                    const statusCell = document.getElementById(`location-status-cell-${locId}`);
+                    if (statusCell) {
+                        if (newStatus === 'active') {
+                            statusCell.innerHTML = `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>Active</span>`;
+                        } else {
+                            statusCell.innerHTML = `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-300"><span class="h-1.5 w-1.5 rounded-full bg-neutral-400"></span>Inactive</span>`;
+                        }
+                    }
+                    const btnContainer = document.getElementById(`location-status-btn-container-${locId}`);
+                    if (btnContainer) {
+                        const safeCode = (code || '').replace(/'/g, "\\'");
+                        const safeName = (name || '').replace(/'/g, "\\'");
+                        if (newStatus === 'active') {
+                            btnContainer.innerHTML = `
+                                <button
+                                    type="button"
+                                    id="btn-deactivate-location-${locId}"
+                                    onclick="window.__locationItemsManager?.openDeactivateModal(${locId}, '${safeCode}', '${safeName}', ${itemsCount}, ${totalStock}, 0)"
+                                    data-confirm-prompt="Are you sure you want to deactivate ${safeCode} (${safeName})?"
+                                    class="inline-flex items-center gap-1 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/60 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/80 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                    title="Deactivate this storage location">
+                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                                    <span>Deactivate</span>
+                                </button>
+                            `;
+                        } else {
+                            btnContainer.innerHTML = `
+                                <button
+                                    type="button"
+                                    id="btn-activate-location-${locId}"
+                                    onclick="window.__locationItemsManager?.openActivateModal(${locId}, '${safeCode}', '${safeName}')"
+                                    data-confirm-prompt="Are you sure you want to reactivate ${safeCode} (${safeName})?"
+                                    class="inline-flex items-center gap-1 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/80 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    title="Reactivate this storage location">
+                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    <span>Activate</span>
+                                </button>
+                            `;
+                        }
                     }
                 }
             };

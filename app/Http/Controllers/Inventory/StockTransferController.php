@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class StockTransferController extends Controller implements HasMiddleware
@@ -41,13 +42,26 @@ class StockTransferController extends Controller implements HasMiddleware
             ->paginate(15)
             ->withQueryString();
 
-        $locations = StorageLocation::where('status', 'active')
+        $sourceLocations = StorageLocation::where(function ($query) {
+                $query->where('status', 'active')
+                    ->orWhereHas('stockLevels', fn ($q) => $q->where('quantity', '>', 0));
+            })
             ->where(function ($query) {
                 $query->whereNull('zone')
                     ->orWhere('zone', '!=', 'In-Transit');
             })
             ->orderBy('name')
             ->get();
+
+        $destinationLocations = StorageLocation::where('status', 'active')
+            ->where(function ($query) {
+                $query->whereNull('zone')
+                    ->orWhere('zone', '!=', 'In-Transit');
+            })
+            ->orderBy('name')
+            ->get();
+
+        $locations = $destinationLocations;
 
         $items = InventoryItem::where('quantity_on_hand', '>', 0)->orderBy('name')->get();
 
@@ -62,7 +76,7 @@ class StockTransferController extends Controller implements HasMiddleware
             $locationStockMap[$sl->storage_location_id][$sl->item_id] = (int) $sl->available_qty;
         }
 
-        return view('inventory.transfers.index', compact('transfers', 'locations', 'items', 'locationStockMap'));
+        return view('inventory.transfers.index', compact('transfers', 'locations', 'sourceLocations', 'destinationLocations', 'items', 'locationStockMap'));
     }
 
     public function show(StockTransfer $stockTransfer): View
@@ -76,7 +90,12 @@ class StockTransferController extends Controller implements HasMiddleware
     {
         $validated = $request->validate([
             'source_location_id' => ['required', 'exists:storage_locations,id'],
-            'destination_location_id' => ['required', 'exists:storage_locations,id', 'different:source_location_id'],
+            'destination_location_id' => [
+                'required',
+                'exists:storage_locations,id',
+                'different:source_location_id',
+                Rule::exists('storage_locations', 'id')->where('status', 'active'),
+            ],
             'notes' => ['nullable', 'string', 'max:500'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.item_id' => ['required', 'exists:inventory_items,id'],
@@ -84,9 +103,17 @@ class StockTransferController extends Controller implements HasMiddleware
             'lines.*.item_batch_id' => ['nullable', 'exists:item_batches,id'],
         ], [
             'destination_location_id.different' => 'The origin and destination locations cannot be the same.',
+            'destination_location_id.exists' => 'This location is inactive and cannot receive new inventory. Select an active location.',
             'lines.*.quantity.min' => 'Quantity must be at least 1 unit.',
             'lines.*.quantity.max' => 'Quantity cannot exceed 999,999 units per line item.',
         ]);
+
+        $destLocation = StorageLocation::find($validated['destination_location_id']);
+        if (! $destLocation || $destLocation->status !== 'active') {
+            return redirect()->back()
+                ->withErrors(['destination_location_id' => 'This location is inactive and cannot receive new inventory. Select an active location.'])
+                ->withInput();
+        }
 
         $sourceLocation = StorageLocation::find($validated['source_location_id']);
         $insufficientErrors = [];

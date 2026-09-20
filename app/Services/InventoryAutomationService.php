@@ -261,10 +261,33 @@ class InventoryAutomationService
     }
 
     /**
+     * Assert that a storage location is active and eligible to receive inbound inventory.
+     *
+     * @throws ValidationException
+     */
+    public function assertLocationActiveForInbound(?int $locationId): void
+    {
+        if ($locationId === null) {
+            return;
+        }
+
+        $location = StorageLocation::find($locationId);
+        if ($location && $location->status !== 'active') {
+            throw ValidationException::withMessages([
+                'to_location_id' => ['This location is inactive and cannot receive new inventory. Select an active location.'],
+            ]);
+        }
+    }
+
+    /**
      * Apply a signed delta to one balance row, creating it when needed.
      */
     public function adjustStockLevel(int $itemId, int $locationId, ?int $batchId, int $delta): ItemStockLevel
     {
+        if ($delta > 0) {
+            $this->assertLocationActiveForInbound($locationId);
+        }
+
         $level = ItemStockLevel::lockForUpdate()->firstOrCreate(
             [
                 'item_id' => $itemId,
@@ -282,6 +305,10 @@ class InventoryAutomationService
 
     public function adjustQuarantinedStock(int $itemId, int $locationId, ?int $batchId, int $delta): ItemStockLevel
     {
+        if ($delta > 0) {
+            $this->assertLocationActiveForInbound($locationId);
+        }
+
         $level = ItemStockLevel::lockForUpdate()->firstOrCreate(
             [
                 'item_id' => $itemId,
@@ -413,6 +440,7 @@ class InventoryAutomationService
         ?int $userId,
         ?Model $reference
     ): array {
+        $this->assertLocationActiveForInbound($toLocationId);
         $this->adjustStockLevel($item->id, $toLocationId, $batchId, $quantity);
 
         return [$this->writeMovement($item, $type, $quantity, $batchId, null, $toLocationId, $validated, $userId, $reference)];
@@ -444,6 +472,7 @@ class InventoryAutomationService
 
             // A transfer puts the same batch down again at the destination.
             if ($type->incrementsDestination() && $toLocationId !== null) {
+                $this->assertLocationActiveForInbound((int) $toLocationId);
                 $this->adjustStockLevel($item->id, (int) $toLocationId, $slice['batch_id'], $slice['quantity']);
             }
 
@@ -482,6 +511,10 @@ class InventoryAutomationService
         }
 
         $batchId = $validated['item_batch_id'] ?? null;
+
+        if ($delta > 0) {
+            $this->assertLocationActiveForInbound((int) $locationId);
+        }
 
         if ($delta < 0 && $this->availableAt($item->id, (int) $locationId, $batchId) < abs($delta)) {
             throw ValidationException::withMessages([

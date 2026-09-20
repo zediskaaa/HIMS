@@ -215,7 +215,7 @@
                 <select name="storage_location_id" class="w-full rounded-lg border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500">
                     <option value="">All locations</option>
                     @foreach ($locations as $location)
-                        <option value="{{ $location->id }}" @selected((string) ($activeFilters['storage_location_id'] ?? '') === (string) $location->id)>{{ $location->name }}</option>
+                        <option value="{{ $location->id }}" @selected((string) ($activeFilters['storage_location_id'] ?? '') === (string) $location->id)>{{ $location->name }}{{ $location->status === 'inactive' ? ' (Inactive)' : '' }}</option>
                     @endforeach
                 </select>
             </label>
@@ -503,7 +503,7 @@
                                     class="w-full text-xs rounded-lg border-neutral-300 bg-white py-1.5 focus:border-primary-500 focus:ring-primary-500 shadow-sm">
                                 <option value="">All Locations</option>
                                 @foreach ($locations as $location)
-                                    <option value="{{ $location->id }}">{{ $location->name }} ({{ $location->code }})</option>
+                                    <option value="{{ $location->id }}">{{ $location->name }} ({{ $location->code }}){{ $location->status === 'inactive' ? ' [Inactive]' : '' }}</option>
                                 @endforeach
                             </select>
                         </div>

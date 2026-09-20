@@ -40,6 +40,12 @@ class TransferService
                 ]);
             }
 
+            if ($destLocation->status !== 'active') {
+                throw ValidationException::withMessages([
+                    'destination_location_id' => ["Destination location {$destLocation->name} ({$destLocation->code}) is inactive and cannot receive transferred stock. Select an active location."]
+                ]);
+            }
+
             // Virtual In-Transit location
             $inTransitLocation = StorageLocation::firstOrCreate(
                 ['code' => 'LOC-IN-TRANSIT'],
@@ -179,6 +185,13 @@ class TransferService
                 $item = InventoryItem::lockForUpdate()->findOrFail($line->item_id);
                 $inTransitLocId = $tr->in_transit_location_id;
                 $destLocId = $tr->destination_location_id;
+
+                $destLocation = StorageLocation::find($destLocId);
+                if (! $destLocation || $destLocation->status !== 'active') {
+                    throw ValidationException::withMessages([
+                        'destination_location_id' => ["Destination location is inactive and cannot receive transferred inventory. Reassign or reactivate location to receive."]
+                    ]);
+                }
 
                 // 1. Decrement In-Transit balance
                 $this->automationService->adjustInTransitStock($item->id, $inTransitLocId, $line->item_batch_id, -$line->dispatched_quantity);

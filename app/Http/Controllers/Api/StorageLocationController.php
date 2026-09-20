@@ -65,12 +65,13 @@ class StorageLocationController extends Controller implements HasMiddleware
     public function update(UpdateStorageLocationRequest $request, StorageLocation $storage_location)
     {
         $data = $request->validated();
-        $this->validateHierarchy([...$storage_location->toArray(), ...$data]);
-        if (($data['status'] ?? null) === 'inactive' && ($storage_location->totalQuantity() > 0 || $storage_location->children()->exists())) {
-            throw ValidationException::withMessages([
-                'status' => 'A location with stock or child locations cannot be deactivated.',
-            ]);
+
+        if (array_key_exists('status', $data) && $data['status'] !== $storage_location->status) {
+            abort_unless($request->user()?->isSuperAdministrator(), 403, 'Only Super Administrators can change storage location status.');
         }
+
+        $this->validateHierarchy([...$storage_location->toArray(), ...$data]);
+
         if (array_key_exists('code', $data)) {
             $data['code'] = strtoupper($data['code'] ?: $storage_location->code);
             $data['barcode_value'] = $data['code'];

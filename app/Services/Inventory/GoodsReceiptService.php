@@ -64,6 +64,10 @@ class GoodsReceiptService
                 ]
             );
 
+            if ($quarantineLocation->status !== 'active') {
+                throw new DomainException("Receiving location {$quarantineLocation->name} ({$quarantineLocation->code}) is inactive and cannot receive new inventory.");
+            }
+
             $grnNumber = 'GRN-'.now()->format('Ymd').'-'.Str::ulid();
 
             $grn = GoodsReceiptNote::create([

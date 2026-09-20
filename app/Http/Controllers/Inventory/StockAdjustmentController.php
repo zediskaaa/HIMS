@@ -75,6 +75,15 @@ class StockAdjustmentController extends Controller implements HasMiddleware
                 ->with('info', 'No adjustment applied — the recorded count already matches.');
         }
 
+        if ($delta > 0) {
+            $loc = StorageLocation::find($locationId);
+            if (! $loc || $loc->status !== 'active') {
+                return redirect()->route('inventory.adjustments')
+                    ->withErrors(['location_id' => 'This location is inactive and cannot receive new inventory. Select an active location.'])
+                    ->withInput();
+            }
+        }
+
         $explanation = $validated['explanation'] ?? $validated['reason'] ?? 'Standard inventory count reconciliation';
         $reasonCode = $validated['reason_code'] ?? ($validated['adjustment_type'] === 'correction' ? 'count_variance' : 'data_correction');
 

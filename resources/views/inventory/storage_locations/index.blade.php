@@ -37,6 +37,7 @@
             </x-ui.card>
         @endcan
 
+        <div x-data="{ deactivateModal: false, confirmDeactivateModal: false, activateModal: false, confirmActivateModal: false, targetLocation: null, reason: '', reasonError: null }" class="space-y-6">
         <x-ui.card title="Location registry" subtitle="Occupancy is calculated from the authoritative location balance.">
             <x-ui.table>
                 <x-ui.table.head><tr><x-ui.table.th>Code / location</x-ui.table.th><x-ui.table.th>Type</x-ui.table.th><x-ui.table.th>Classification</x-ui.table.th><x-ui.table.th>Purpose</x-ui.table.th><x-ui.table.th>Occupancy</x-ui.table.th><x-ui.table.th>Status</x-ui.table.th><x-ui.table.th>Controls</x-ui.table.th></tr></x-ui.table.head>
@@ -49,9 +50,369 @@
                     <x-ui.table.td><x-ui.badge :status="$location->status">{{ str($location->status)->title() }}</x-ui.badge></x-ui.table.td>
                     <x-ui.table.td><div class="flex min-w-52 flex-wrap gap-2">
                         @can(\App\Enums\Permission::PrintWarehouseLabels->value)<form method="POST" action="{{ route('inventory.storage-locations.label', $location) }}" target="_blank">@csrf<input type="hidden" name="copies" value="1"><button class="text-xs font-semibold text-primary-700 hover:underline">Print QR</button></form>@endcan
-                        @can(\App\Enums\Permission::ManageLocations->value)<form method="POST" action="{{ route('inventory.storage-locations.status', $location) }}" class="flex items-center gap-1" data-confirm-title="Update location status" data-confirm-message="Are you sure you want to change the status of this location? Blocked or inactive locations cannot receive or store items." data-confirm-label="Update Status" data-confirm-variant="warning">@csrf @method('PATCH')<select name="status" class="rounded border-neutral-300 py-1 text-xs">@foreach(['active'=>'Active','blocked'=>'Blocked','inactive'=>'Inactive'] as $value=>$label)<option value="{{ $value }}" @selected($location->status===$value)>{{ $label }}</option>@endforeach</select><input name="reason" required maxlength="1000" placeholder="Reason" class="w-24 rounded border-neutral-300 py-1 text-xs"><button class="text-xs font-semibold text-primary-700 hover:underline">Apply</button></form>@endcan
+                        @if(auth()->user()?->isSuperAdministrator())
+                            @if($location->status === 'active')
+                                <button
+                                    type="button"
+                                    @click="targetLocation = { id: {{ $location->id }}, code: '{{ addslashes($location->code) }}', name: '{{ addslashes($location->name) }}' }; reason = ''; reasonError = null; confirmDeactivateModal = false; deactivateModal = true;"
+                                    data-confirm-title="Are you sure you want to deactivate this storage location?"
+                                    data-confirm-prompt="Are you sure you want to deactivate {{ $location->code }} ({{ $location->name }})?"
+                                    data-confirm-label="Yes, Deactivate Location"
+                                    class="text-xs font-semibold text-amber-700 hover:underline">
+                                    Deactivate
+                                </button>
+                            @else
+                                <button
+                                    type="button"
+                                    @click="targetLocation = { id: {{ $location->id }}, code: '{{ addslashes($location->code) }}', name: '{{ addslashes($location->name) }}' }; reason = ''; reasonError = null; confirmActivateModal = false; activateModal = true;"
+                                    data-confirm-title="Are you sure you want to reactivate this storage location?"
+                                    data-confirm-prompt="Are you sure you want to reactivate {{ $location->code }} ({{ $location->name }})?"
+                                    data-confirm-label="Yes, Activate Location"
+                                    class="text-xs font-semibold text-emerald-700 hover:underline">
+                                    Activate
+                                </button>
+                            @endif
+                            <form method="POST" action="{{ route('inventory.storage-locations.status', $location) }}" class="flex items-center gap-1" data-confirm-title="Update location status" data-confirm-message="Are you sure you want to change the status of {{ $location->code }} ({{ $location->name }})? Inactive locations cannot receive new inventory." data-confirm-label="Update Status" data-confirm-variant="warning">@csrf @method('PATCH')<select name="status" class="rounded border-neutral-300 py-1 text-xs">@foreach(['active'=>'Active','blocked'=>'Blocked','inactive'=>'Inactive'] as $value=>$label)<option value="{{ $value }}" @selected($location->status===$value)>{{ $label }}</option>@endforeach</select><input name="reason" required maxlength="1000" placeholder="Reason" class="w-24 rounded border-neutral-300 py-1 text-xs"><button class="text-xs font-semibold text-primary-700 hover:underline">Apply</button></form>
+                        @endif
                     </div></x-ui.table.td>
                 </x-ui.table.row>@empty<x-ui.table.empty colspan="7" title="No storage locations" message="Configure the real warehouse hierarchy before creating physical tasks." />@endforelse</tbody>
             </x-ui.table>
         </x-ui.card>
+
+        {{-- Step 1: Deactivation Reason Modal (Super Admin only) --}}
+        @if(auth()->user()?->isSuperAdministrator())
+        <div
+            x-show="deactivateModal"
+            x-cloak
+            x-on:keydown.escape.window="deactivateModal = false"
+            class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reg-deactivate-modal-title"
+        >
+            <div
+                x-show="deactivateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                @click="deactivateModal = false"
+                class="fixed inset-0 bg-neutral-900/60 dark:bg-black/75 backdrop-blur-xs"
+                aria-hidden="true"
+            ></div>
+
+            <div
+                x-show="deactivateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-95"
+                class="relative w-full max-w-lg rounded-xl border border-amber-200 bg-white shadow-xl dark:border-amber-900/50 dark:bg-neutral-900 p-6 z-10 space-y-4"
+            >
+                <div class="flex items-start gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 id="reg-deactivate-modal-title" class="text-lg font-bold text-neutral-900 dark:text-neutral-100">
+                            Deactivate Storage Location
+                        </h3>
+                        <p class="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+                            Provide the reason for deactivating <span class="font-mono font-bold" x-text="targetLocation?.code"></span> (<span x-text="targetLocation?.name"></span>) before proceeding to confirmation.
+                        </p>
+                    </div>
+                </div>
+
+                <template x-if="reasonError">
+                    <div class="rounded-lg border border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/60 p-3 text-xs text-red-800 dark:text-red-300 flex items-center justify-between">
+                        <span x-text="reasonError"></span>
+                        <button type="button" @click="reasonError = null" class="text-red-500 hover:text-red-700">&times;</button>
+                    </div>
+                </template>
+
+                <form @submit.prevent="if (reason && reason.trim()) { reasonError = null; deactivateModal = false; confirmDeactivateModal = true; } else { reasonError = 'Please provide a reason for deactivation.'; }" class="space-y-4">
+                    <div>
+                        <label for="registry-deactivate-reason" class="block text-xs font-semibold uppercase text-neutral-700 dark:text-neutral-300">
+                            Reason for Deactivation <span class="text-red-500">*</span> <span class="font-normal text-neutral-500">(Required for audit trail)</span>
+                        </label>
+                        <textarea
+                            id="registry-deactivate-reason"
+                            name="reason"
+                            rows="2"
+                            x-model="reason"
+                            required
+                            placeholder="e.g. Warehouse under renovation, consolidation to Main Warehouse..."
+                            class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-sm text-neutral-900 dark:text-neutral-100 focus:border-amber-500 focus:ring-amber-500"
+                        ></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            @click="deactivateModal = false"
+                            class="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-2xs hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                        >
+                            <span>Deactivate Location</span>
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {{-- Step 2: Confirmation Modal for Deactivation (with Yes / Cancel) --}}
+        <div
+            x-show="confirmDeactivateModal"
+            x-cloak
+            x-on:keydown.escape.window="confirmDeactivateModal = false"
+            class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reg-confirm-deactivate-title"
+        >
+            <div
+                x-show="confirmDeactivateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                @click="confirmDeactivateModal = false"
+                class="fixed inset-0 bg-neutral-900/60 dark:bg-black/75 backdrop-blur-xs"
+                aria-hidden="true"
+            ></div>
+
+            <div
+                x-show="confirmDeactivateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-95"
+                class="relative w-full max-w-md rounded-xl border border-amber-200 bg-white shadow-xl dark:border-amber-900/50 dark:bg-neutral-900 p-6 z-10 space-y-4"
+            >
+                <div class="flex items-start gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 id="reg-confirm-deactivate-title" class="text-lg font-bold text-neutral-900 dark:text-neutral-100">
+                            Are you sure you want to deactivate this storage location?
+                        </h3>
+                        <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+                            Are you sure you want to deactivate <span class="font-mono font-bold text-neutral-900 dark:text-neutral-100" x-text="targetLocation?.code"></span> (<span x-text="targetLocation?.name"></span>)? Once deactivated, this location cannot receive new inventory or Purchase Orders. Existing stock can still be released or transferred out. The location and its history will remain intact.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/40 p-3 text-xs space-y-1">
+                    <div class="text-neutral-500 dark:text-neutral-400">Recorded Reason:</div>
+                    <div class="font-medium text-neutral-800 dark:text-neutral-200 italic" x-text="reason"></div>
+                </div>
+
+                <form :action="'{{ url('/inventory/storage-locations') }}/' + (targetLocation?.id || '') + '/status'" method="POST" class="space-y-4">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="status" value="inactive">
+                    <input type="hidden" name="reason" :value="reason">
+
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            @click="confirmDeactivateModal = false; deactivateModal = true;"
+                            class="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-2xs hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                        >
+                            Yes, Deactivate Location
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {{-- Step 1: Reactivation Reason Modal (Super Admin only) --}}
+        <div
+            x-show="activateModal"
+            x-cloak
+            x-on:keydown.escape.window="activateModal = false"
+            class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reg-activate-modal-title"
+        >
+            <div
+                x-show="activateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                @click="activateModal = false"
+                class="fixed inset-0 bg-neutral-900/60 dark:bg-black/75 backdrop-blur-xs"
+                aria-hidden="true"
+            ></div>
+
+            <div
+                x-show="activateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-95"
+                class="relative w-full max-w-md rounded-xl border border-emerald-200 bg-white shadow-xl dark:border-emerald-900/50 dark:bg-neutral-900 p-6 z-10 space-y-4"
+            >
+                <div class="flex items-start gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 id="reg-activate-modal-title" class="text-lg font-bold text-neutral-900 dark:text-neutral-100">
+                            Reactivate Storage Location
+                        </h3>
+                        <p class="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+                            Specify the reason for reactivating <span class="font-mono font-bold" x-text="targetLocation?.code"></span> before proceeding to confirmation.
+                        </p>
+                    </div>
+                </div>
+
+                <form @submit.prevent="activateModal = false; confirmActivateModal = true;" class="space-y-4">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="status" value="active">
+
+                    <div>
+                        <label for="registry-activate-reason" class="block text-xs font-semibold uppercase text-neutral-700 dark:text-neutral-300">
+                            Reason for Reactivation <span class="font-normal text-neutral-500">(for audit trail)</span>
+                        </label>
+                        <textarea
+                            id="registry-activate-reason"
+                            name="reason"
+                            rows="2"
+                            x-model="reason"
+                            placeholder="e.g. Facility reopening, maintenance completed..."
+                            class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-sm text-neutral-900 dark:text-neutral-100 focus:border-emerald-500 focus:ring-emerald-500"
+                        ></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            @click="activateModal = false"
+                            class="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-2xs hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                        >
+                            <span>Activate Location</span>
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {{-- Step 2: Confirmation Modal for Reactivation (with Yes / Cancel) --}}
+        <div
+            x-show="confirmActivateModal"
+            x-cloak
+            x-on:keydown.escape.window="confirmActivateModal = false"
+            class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reg-confirm-activate-title"
+        >
+            <div
+                x-show="confirmActivateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                @click="confirmActivateModal = false"
+                class="fixed inset-0 bg-neutral-900/60 dark:bg-black/75 backdrop-blur-xs"
+                aria-hidden="true"
+            ></div>
+
+            <div
+                x-show="confirmActivateModal"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-95"
+                class="relative w-full max-w-md rounded-xl border border-emerald-200 bg-white shadow-xl dark:border-emerald-900/50 dark:bg-neutral-900 p-6 z-10 space-y-4"
+            >
+                <div class="flex items-start gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 id="reg-confirm-activate-title" class="text-lg font-bold text-neutral-900 dark:text-neutral-100">
+                            Are you sure you want to reactivate this storage location?
+                        </h3>
+                        <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+                            Are you sure you want to reactivate <span class="font-mono font-bold text-neutral-900 dark:text-neutral-100" x-text="targetLocation?.code"></span> (<span x-text="targetLocation?.name"></span>)? Once reactivated, this location will be able to receive incoming inventory, purchase orders, and stock transfers normally.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/40 p-3 text-xs space-y-1">
+                    <div class="text-neutral-500 dark:text-neutral-400">Recorded Reason:</div>
+                    <div class="font-medium text-neutral-800 dark:text-neutral-200 italic" x-text="reason || 'Reactivated location'"></div>
+                </div>
+
+                <form :action="'{{ url('/inventory/storage-locations') }}/' + (targetLocation?.id || '') + '/status'" method="POST" class="space-y-4">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="status" value="active">
+                    <input type="hidden" name="reason" :value="reason">
+
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            @click="confirmActivateModal = false; activateModal = true;"
+                            class="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-2xs hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                        >
+                            Yes, Activate Location
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        @endif
+        </div>
 </x-app-layout>

@@ -49,8 +49,8 @@
                             <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700">Source Location (Origin)</label>
                             <select name="source_location_id" x-model="sourceLocationId" @change="onSourceLocationChange()" required class="mt-1 block w-full rounded-lg border-neutral-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                                 <option value="">-- Select Origin Location --</option>
-                                @foreach($locations as $loc)
-                                    <option value="{{ $loc->id }}">{{ $loc->name }} ({{ $loc->code }})</option>
+                                @foreach($sourceLocations ?? $locations as $loc)
+                                    <option value="{{ $loc->id }}">{{ $loc->name }} ({{ $loc->code }})@if($loc->status === 'inactive') [INACTIVE - Outbound Only]@endif</option>
                                 @endforeach
                             </select>
                         </div>
@@ -58,7 +58,7 @@
                             <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700">Destination Location (Target)</label>
                             <select name="destination_location_id" x-model="destinationLocationId" required class="mt-1 block w-full rounded-lg border-neutral-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                                 <option value="">-- Select Target Location --</option>
-                                @foreach($locations as $loc)
+                                @foreach($destinationLocations ?? $locations as $loc)
                                     <option value="{{ $loc->id }}" :disabled="sourceLocationId == '{{ $loc->id }}'">
                                         {{ $loc->name }} ({{ $loc->code }})
                                     </option>

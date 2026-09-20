@@ -106,14 +106,62 @@ class PurchaseOrderController extends Controller implements HasMiddleware
                 ->withErrors(['receive' => 'This purchase order must be approved before stock can be received.']);
         }
 
-        $fallbackLocationId = StorageLocation::query()->orderBy('id')->value('id');
+        $requestedLocId = request('location_id') ?? request('storage_location_id');
+        $fallbackLocationId = StorageLocation::active()->orderBy('id')->value('id');
 
-        if ($fallbackLocationId === null) {
+        // Check if explicit location was passed
+        if ($requestedLocId) {
+            $explicitLoc = StorageLocation::find($requestedLocId);
+            if (! $explicitLoc || $explicitLoc->status !== 'active') {
+                if (request()->expectsJson()) {
+                    return response()->json([
+                        'message' => 'This location is inactive and cannot receive new inventory. Select an active location.',
+                        'errors' => ['receive' => ['This location is inactive and cannot receive new inventory. Select an active location.']],
+                    ], 422);
+                }
+
+                return redirect()->route('inventory.purchases')
+                    ->withErrors(['receive' => 'This location is inactive and cannot receive new inventory. Select an active location.']);
+            }
+        }
+
+        // Validate destinations for line items or single item
+        $checkLocations = collect();
+        if ($purchaseOrder->lines()->exists()) {
+            foreach ($purchaseOrder->lines as $line) {
+                $targetId = $requestedLocId ?? $line->item?->default_location_id ?? $line->item?->stockLevels()->value('storage_location_id') ?? $fallbackLocationId;
+                if ($targetId) {
+                    $checkLocations->push($targetId);
+                }
+            }
+        } else {
+            $targetId = $requestedLocId ?? $purchaseOrder->item?->default_location_id ?? $purchaseOrder->item?->stockLevels()->value('storage_location_id') ?? $fallbackLocationId;
+            if ($targetId) {
+                $checkLocations->push($targetId);
+            }
+        }
+
+        foreach ($checkLocations->unique() as $targetLocId) {
+            $loc = StorageLocation::find($targetLocId);
+            if (! $loc || $loc->status !== 'active') {
+                if (request()->expectsJson()) {
+                    return response()->json([
+                        'message' => 'This location is inactive and cannot receive new inventory. Select an active location.',
+                        'errors' => ['receive' => ['This location is inactive and cannot receive new inventory. Select an active location.']],
+                    ], 422);
+                }
+
+                return redirect()->route('inventory.purchases')
+                    ->withErrors(['receive' => 'This location is inactive and cannot receive new inventory. Select an active location.']);
+            }
+        }
+
+        if ($fallbackLocationId === null && $checkLocations->isEmpty()) {
             return redirect()->route('inventory.purchases')
                 ->withErrors(['receive' => 'No storage location exists to receive this order into.']);
         }
 
-        DB::transaction(function () use ($purchaseOrder, $fallbackLocationId): void {
+        DB::transaction(function () use ($purchaseOrder, $fallbackLocationId, $requestedLocId): void {
             $po = PurchaseOrder::lockForUpdate()->with(['lines.item', 'item'])->findOrFail($purchaseOrder->id);
 
             if ($po->isFullyReceived() || $po->status === 'received' || $po->status === PurchaseOrderStatus::Fulfilled->value) {
@@ -123,7 +171,8 @@ class PurchaseOrderController extends Controller implements HasMiddleware
             if ($po->lines()->exists()) {
                 foreach ($po->lines as $line) {
                     $item = $line->item;
-                    $locId = $item->default_location_id
+                    $locId = $requestedLocId
+                        ?? $item->default_location_id
                         ?? $item->stockLevels()->value('storage_location_id')
                         ?? $fallbackLocationId;
                     $item->ensureStockLevelExists($locId);
@@ -182,7 +231,8 @@ class PurchaseOrderController extends Controller implements HasMiddleware
             } else {
                 // Legacy single-item fallback
                 $item = $po->item;
-                $locId = $item->default_location_id
+                $locId = $requestedLocId
+                    ?? $item->default_location_id
                     ?? $item->stockLevels()->value('storage_location_id')
                     ?? $fallbackLocationId;
                 $item->ensureStockLevelExists($locId);

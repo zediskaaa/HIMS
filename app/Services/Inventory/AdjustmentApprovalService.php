@@ -57,6 +57,12 @@ class AdjustmentApprovalService
                 ]);
             }
 
+            if ($delta > 0 && $location->status !== 'active') {
+                throw ValidationException::withMessages([
+                    'storage_location_id' => ["Location {$location->name} ({$location->code}) is inactive and cannot receive new inventory. Select an active location."]
+                ]);
+            }
+
             if ($delta < 0 && ($currentQty + $delta) < 0) {
                 throw ValidationException::withMessages([
                     'quantity' => ["Cannot adjust balance below zero. Current: {$currentQty}, Adjustment: {$delta}."]

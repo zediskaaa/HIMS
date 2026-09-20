@@ -95,6 +95,35 @@ class StorageLocation extends Model
         return $this->status === 'active';
     }
 
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
+    }
+
+    public function isInactive(): bool
+    {
+        return $this->status === 'inactive';
+    }
+
+    /**
+     * Count of pending inbound transactions destined for this location
+     * (incoming transfers, warehouse put-away tasks, etc.).
+     */
+    public function pendingInboundCount(): int
+    {
+        $pendingTransfers = StockTransfer::query()
+            ->where('destination_location_id', $this->id)
+            ->whereIn('status', ['pending', 'approved', 'in_transit', 'dispatched'])
+            ->count();
+
+        $pendingTasks = WarehouseTask::query()
+            ->where('destination_location_id', $this->id)
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->count();
+
+        return $pendingTransfers + $pendingTasks;
+    }
+
     /**
      * Full location path, e.g. "Zone A / Aisle 3 / Rack 2 / Bin 04".
      */

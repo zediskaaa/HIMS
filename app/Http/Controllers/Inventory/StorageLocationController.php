@@ -36,7 +36,8 @@ class StorageLocationController extends Controller implements HasMiddleware
         return [
             'auth:web,admin,super_admin',
             new Middleware('can:'.Permission::ViewInventory->value, only: ['index']),
-            new Middleware('can:'.Permission::ManageLocations->value, only: ['store', 'updateStatus']),
+            new Middleware('can:'.Permission::ManageLocations->value, only: ['store']),
+            new Middleware('super-admin', only: ['updateStatus']),
             new Middleware('can:'.Permission::PrintWarehouseLabels->value, only: ['printLabel']),
         ];
     }
@@ -109,38 +110,50 @@ class StorageLocationController extends Controller implements HasMiddleware
         return redirect()->route('inventory.storage-locations')->with('success', 'Storage location created successfully.');
     }
 
-    public function updateStatus(Request $request, StorageLocation $storageLocation): RedirectResponse
+    public function updateStatus(Request $request, StorageLocation $storageLocation): RedirectResponse|\Illuminate\Http\JsonResponse
     {
+        abort_unless($request->user()?->isSuperAdministrator(), 403, 'Only Super Administrators can change storage location status.');
+
         $validated = $request->validate([
             'status' => ['required', Rule::in(['active', 'blocked', 'inactive'])],
-            'reason' => ['required', 'string', 'max:1000'],
+            'reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        if ($validated['status'] === 'inactive') {
-            $hasOpenTasks = WarehouseTask::query()
-                ->where(fn ($query) => $query->where('source_location_id', $storageLocation->id)->orWhere('destination_location_id', $storageLocation->id))
-                ->whereNotIn('status', ['completed', 'cancelled'])
-                ->exists();
-            if ($storageLocation->totalQuantity() > 0 || $storageLocation->children()->exists() || $hasOpenTasks) {
-                throw ValidationException::withMessages([
-                    'status' => 'Move all stock, resolve open tasks, and deactivate child locations before deactivating this location.',
-                ]);
-            }
+        $oldStatus = $storageLocation->status;
+        $newStatus = $validated['status'];
+        $reason = $validated['reason'] ?? ($newStatus === 'active' ? 'Reactivated location' : 'Deactivated location');
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($storageLocation, $newStatus, $oldStatus, $reason, $request) {
+            $storageLocation->status = $newStatus;
+            $storageLocation->save();
+
+            $this->auditLogger->record(
+                AuditAction::UpdatedStorageLocationStatus,
+                actor: $request->user(),
+                target: $storageLocation,
+                description: "Changed {$storageLocation->code} from {$oldStatus} to {$storageLocation->status}: {$reason}",
+                targetName: $storageLocation->code,
+                oldValues: ['status' => $oldStatus],
+                newValues: ['status' => $storageLocation->status, 'reason' => $reason],
+            );
+        });
+
+        $message = "Storage location {$storageLocation->code} ({$storageLocation->name}) is now {$storageLocation->status}.";
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'location' => [
+                    'id' => $storageLocation->id,
+                    'code' => $storageLocation->code,
+                    'name' => $storageLocation->name,
+                    'status' => $storageLocation->status,
+                ],
+            ]);
         }
 
-        $oldStatus = $storageLocation->status;
-        $storageLocation->status = $validated['status'];
-        $storageLocation->save();
-        $this->auditLogger->record(
-            AuditAction::UpdatedStorageLocationStatus,
-            actor: $request->user(),
-            target: $storageLocation,
-            description: "Changed {$storageLocation->code} from {$oldStatus} to {$storageLocation->status}: {$validated['reason']}",
-            oldValues: ['status' => $oldStatus],
-            newValues: ['status' => $storageLocation->status, 'reason' => $validated['reason']],
-        );
-
-        return back()->with('success', "Location {$storageLocation->code} is now {$storageLocation->status}.");
+        return back()->with('success', $message);
     }
 
     public function printLabel(Request $request, StorageLocation $storageLocation): View

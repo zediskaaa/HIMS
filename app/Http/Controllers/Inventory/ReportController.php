@@ -110,7 +110,7 @@ class ReportController extends Controller implements HasMiddleware
             'reportTypes' => InventoryReportService::REPORT_TYPES,
             'exportFormats' => InventoryReportService::EXPORT_FORMATS,
             'categories' => ItemCategory::orderBy('name')->get(['id', 'name', 'code']),
-            'locations' => StorageLocation::active()->orderBy('name')->get(['id', 'name', 'code']),
+            'locations' => StorageLocation::orderBy('name')->get(['id', 'name', 'code', 'status']),
             'suppliers' => Supplier::where('status', 'active')->orderBy('name')->get(['id', 'name']),
             'movementTypes' => MovementType::cases(),
             'currentPeriod' => $periodParam ?? ($request->has('days') ? (string) $days : '30'),
