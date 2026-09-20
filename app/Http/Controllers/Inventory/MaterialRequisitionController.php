@@ -8,13 +8,16 @@ use App\Http\Controllers\Controller;
 use App\Models\CostCenter;
 use App\Models\InventoryItem;
 use App\Models\MaterialRequisition;
+use App\Models\User;
 use App\Services\AiDemandForecastService;
 use App\Services\Inventory\IssuanceEngine;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
 
 class MaterialRequisitionController extends Controller implements HasMiddleware
@@ -26,7 +29,7 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
             new Middleware('can:'.Permission::CreateRequisition->value, only: ['store', 'acknowledge']),
             new Middleware('can:'.Permission::ApproveRequisition->value, only: ['approve', 'reject']),
             new Middleware('can:'.Permission::IssueStock->value, only: ['issue']),
-            new Middleware('can:'.Permission::ViewInventory->value, only: ['index', 'show']),
+            new Middleware('can:'.Permission::ViewInventory->value, only: ['index', 'show', 'itemAiRecommendation']),
         ];
     }
 
@@ -84,6 +87,11 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
                 session()->flash('warning', 'The requested inventory item could not be preselected because it does not exist or is inactive.');
             } elseif ($preselectedItem) {
                 $aiRecommendation = $this->aiForecastService->reorderRecommendationForItem($preselectedItem, $request->user());
+                if ($aiRecommendation && ($aiRecommendation['available'] ?? false) && ($aiRecommendation['suggested_quantity'] ?? 0) <= 0) {
+                    $predictedDemand = (int) ($aiRecommendation['predicted_demand'] ?? 0);
+                    $fallback = max(1, (int) ($preselectedItem->economic_order_quantity ?: $preselectedItem->reorder_point ?: $preselectedItem->reorder_level ?: 1));
+                    $aiRecommendation['suggested_quantity'] = $predictedDemand > 0 ? $predictedDemand : $fallback;
+                }
             }
         }
 
@@ -99,6 +107,70 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
         ));
     }
 
+    public function itemAiRecommendation(InventoryItem $item, Request $request): JsonResponse
+    {
+        $recommendation = $this->resolveRequisitionRecommendation($item, $request->user());
+
+        return response()->json([
+            'available' => (bool) ($recommendation['available'] ?? false),
+            'suggested_quantity' => (int) ($recommendation['suggested_quantity'] ?? 1),
+            'unit' => $recommendation['unit'] ?? ($item->unit ?: 'units'),
+            'confidence' => $recommendation['confidence'] ?? 'low',
+            'explanation' => $recommendation['explanation'] ?? '',
+            'reorder_point' => (int) ($item->reorder_point ?: $item->reorder_level ?: 0),
+            'quantity_on_hand' => (int) ($item->quantity_on_hand ?? 0),
+        ]);
+    }
+
+    /**
+     * Resolve AI recommendation tailored for internal department store requisition.
+     * Unlike external procurement POs (where surplus warehouse stock drives suggested reorder to 0),
+     * a store requisition represents departmental replenishment needs, so suggested quantity
+     * must never be 0; it defaults to projected demand, EOQ, or standard reorder deficit.
+     *
+     * @return array<string, mixed>
+     */
+    private function resolveRequisitionRecommendation(InventoryItem $item, ?User $actor = null): array
+    {
+        $recommendation = $this->aiForecastService->reorderRecommendationForItem($item, $actor);
+
+        $rawSuggested = (int) ($recommendation['suggested_quantity'] ?? 0);
+        $predictedDemand = (int) ($recommendation['predicted_demand'] ?? 0);
+        $unitLabel = $recommendation['unit'] ?? ($item->unitAbbreviation() ?: ($item->unit ?: 'units'));
+
+        // Fallback to economic order quantity, reorder point, reorder level, or at least 1
+        $fallback = max(1, (int) ($item->economic_order_quantity ?: $item->reorder_point ?: $item->reorder_level ?: 1));
+
+        if ($rawSuggested > 0) {
+            $suggestedQuantity = $rawSuggested;
+        } elseif ($predictedDemand > 0) {
+            $suggestedQuantity = $predictedDemand;
+            $recommendation['explanation'] = "Based on projected demand of {$predictedDemand} {$unitLabel} over the forecast period.";
+        } else {
+            $suggestedQuantity = $fallback;
+            $recommendation['explanation'] = "Based on standard replenishment level of {$fallback} {$unitLabel}.";
+        }
+
+        $recommendation['available'] = true;
+        $recommendation['suggested_quantity'] = max(1, $suggestedQuantity);
+        $recommendation['unit'] = $unitLabel;
+        if (! isset($recommendation['confidence']) || $recommendation['confidence'] === 'low') {
+            $recommendation['confidence'] = $predictedDemand > 0 ? 'medium' : 'low';
+        }
+
+        if (empty($recommendation['breakdown'])) {
+            $recommendation['breakdown'] = [
+                'forecast_demand' => "{$predictedDemand} {$unitLabel}",
+                'current_stock' => ((int) $item->quantity_on_hand) . " {$unitLabel}",
+                'incoming_stock' => '0 ' . $unitLabel,
+                'safety_stock' => ((int) $item->safety_stock) . " {$unitLabel}",
+                'forecast_period' => '30 days',
+            ];
+        }
+
+        return $recommendation;
+    }
+
     public function show(MaterialRequisition $requisition): View
     {
         $requisition->load(['requestingUser', 'approvedBy', 'issuedBy', 'acknowledgedBy', 'costCenter', 'lines.item', 'lines.batch', 'lines.location']);
@@ -110,7 +182,7 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
 
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'department' => ['required', 'string', 'max:100'],
             'cost_center_id' => ['nullable', 'exists:cost_centers,id'],
             'required_date' => ['nullable', 'date'],
@@ -121,8 +193,36 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
             'lines.*.requested_quantity' => ['required', 'integer', 'min:1'],
             'lines.*.ai_suggested_quantity' => ['nullable', 'integer', 'min:0'],
             'lines.*.allocation_strategy' => ['nullable', 'in:FEFO,FIFO,MANUAL'],
-            'lines.*.notes' => ['nullable', 'string', 'max:255'],
+            'lines.*.clinical_justification' => ['nullable', 'string', 'max:500'],
+            'lines.*.notes' => ['nullable', 'string', 'max:500'],
+        ], [
+            'lines.required' => 'At least one requested item is required.',
+            'lines.min' => 'At least one requested item is required.',
+            'lines.*.item_id.required' => 'An inventory item must be selected for each line.',
+            'lines.*.requested_quantity.required' => 'Requested quantity is required.',
+            'lines.*.requested_quantity.min' => 'Requested quantity must be at least 1.',
         ]);
+
+        $validated = $validator->validate();
+
+        // Ensure lines.*.notes has the item-specific clinical justification
+        foreach ($validated['lines'] as $idx => $line) {
+            $justification = $line['clinical_justification'] ?? $line['notes'] ?? $validated['justification'] ?? null;
+            $validated['lines'][$idx]['notes'] = $justification;
+            $validated['lines'][$idx]['clinical_justification'] = $justification;
+        }
+
+        // If top-level justification is empty, summarize from line justifications
+        if (empty($validated['justification']) && ! empty($validated['lines'])) {
+            $justifications = collect($validated['lines'])
+                ->pluck('clinical_justification')
+                ->filter()
+                ->unique()
+                ->values();
+            if ($justifications->isNotEmpty()) {
+                $validated['justification'] = $justifications->implode('; ');
+            }
+        }
 
         try {
             $req = $this->issuanceEngine->createRequisition($validated, $request->user());

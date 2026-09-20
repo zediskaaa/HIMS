@@ -29,6 +29,20 @@ class MaterialRequisitionLine extends Model
         'issued_quantity' => 'integer',
     ];
 
+    protected $appends = [
+        'clinical_justification',
+    ];
+
+    public function getClinicalJustificationAttribute(): ?string
+    {
+        return $this->notes;
+    }
+
+    public function setClinicalJustificationAttribute(?string $value): void
+    {
+        $this->attributes['notes'] = $value;
+    }
+
     public function requisition(): BelongsTo
     {
         return $this->belongsTo(MaterialRequisition::class, 'material_requisition_id');

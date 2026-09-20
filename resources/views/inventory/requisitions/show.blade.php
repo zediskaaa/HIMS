@@ -318,6 +318,12 @@
                                     <td class="px-6 py-4">
                                         <p class="font-medium text-neutral-900">{{ $line->item->name ?? 'Item #' . $line->inventory_item_id }}</p>
                                         <p class="text-xs text-neutral-500">SKU: {{ $line->item->sku ?? 'N/A' }}</p>
+                                        @if($line->clinical_justification)
+                                            <div class="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-neutral-100 dark:bg-neutral-800 px-2 py-1 text-[11px] text-neutral-700 dark:text-neutral-300">
+                                                <span class="font-semibold text-neutral-900 dark:text-neutral-100">Justification:</span>
+                                                <span>{{ $line->clinical_justification }}</span>
+                                            </div>
+                                        @endif
                                     </td>
                                     <td class="px-6 py-4 text-xs font-semibold text-neutral-700">
                                         {{ $line->allocation_strategy ?? 'FEFO' }}

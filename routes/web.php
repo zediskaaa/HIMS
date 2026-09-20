@@ -169,6 +169,7 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
 
     // Material Store Requisitions & Picking
     Route::get('/inventory/requisitions', [MaterialRequisitionController::class, 'index'])->name('inventory.requisitions.index');
+    Route::get('/inventory/requisitions/ai-recommendation/{item}', [MaterialRequisitionController::class, 'itemAiRecommendation'])->name('inventory.requisitions.item-ai-recommendation');
     Route::post('/inventory/requisitions', [MaterialRequisitionController::class, 'store'])->name('inventory.requisitions.store');
     Route::get('/inventory/requisitions/{requisition}', [MaterialRequisitionController::class, 'show'])->name('inventory.requisitions.show');
     Route::post('/inventory/requisitions/{requisition}/approve', [MaterialRequisitionController::class, 'approve'])->name('inventory.requisitions.approve');
@@ -226,6 +227,8 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::post('/inventory/purchases/approval-chains/{chain}/approve', [ProcurementController::class, 'approveStepWeb'])->name('inventory.purchases.approval-chains.approve');
     Route::post('/inventory/purchases/approval-chains/{chain}/reject', [ProcurementController::class, 'rejectStepWeb'])->name('inventory.purchases.approval-chains.reject');
     Route::post('/inventory/purchases/orders/from-award', [ProcurementController::class, 'generatePoFromAwardWeb'])->name('inventory.purchases.orders.from-award');
+    Route::post('/inventory/purchases/orders/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])->name('inventory.purchases.orders.approve');
+    Route::post('/inventory/purchases/orders/{purchaseOrder}/reject', [PurchaseOrderController::class, 'reject'])->name('inventory.purchases.orders.reject');
     Route::post('/inventory/purchases/orders/{purchaseOrder}/revise', [PurchaseOrderController::class, 'revise'])->name('inventory.purchases.orders.revise');
     Route::get('/inventory/stock', [InventoryController::class, 'stock'])->name('inventory.stock');
     Route::get('/inventory/alerts', [InventoryController::class, 'alerts'])->name('inventory.alerts');

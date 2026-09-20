@@ -66,68 +66,128 @@
                 </div>
             @endif
 
-            {{-- Compact operational status strip --}}
-            <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-neutral-200 bg-neutral-200 lg:grid-cols-4">
-                <div class="bg-white p-3">
-                    <div class="flex items-center justify-between">
-                        <p class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Open purchase orders</p>
-                        <span class="rounded-full bg-emerald-50 p-1.5 text-emerald-600">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            {{-- Operational KPI Metric Cards (Standardized 3-Zone Architecture per hims-ui-ux) --}}
+            <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4 xl:gap-4">
+                {{-- 1. Open Purchase Orders --}}
+                <div class="group rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/95 flex flex-col justify-between hover:border-primary-400 dark:hover:border-primary-600 transition-all duration-150">
+                    {{-- Zone 1: Header --}}
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs sm:text-sm font-bold uppercase tracking-wider text-primary-700 dark:text-primary-300">Open Purchase Orders</p>
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-700 dark:bg-primary-950/80 dark:text-primary-300 ring-1 ring-primary-200 dark:ring-primary-800/50 group-hover:scale-105 transition-transform duration-150">
+                            <x-ui.icon name="shopping-bag" class="h-5 w-5" />
                         </span>
                     </div>
-                    <p class="mt-1 text-xl font-bold tabular-nums text-neutral-900">{{ $poMetrics['open'] }}</p>
-                    <p class="text-xs text-neutral-500">Active commitments</p>
+                    {{-- Zone 2: Value --}}
+                    <div class="mt-3 flex items-baseline justify-between gap-2">
+                        <div class="flex items-baseline gap-1.5">
+                            <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-neutral-950 dark:text-white">{{ number_format($poMetrics['open']) }}</span>
+                            <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">orders</span>
+                        </div>
+                        @if($poMetrics['open'] > 0)
+                            <span class="inline-flex items-center rounded-lg bg-primary-50 dark:bg-primary-950/80 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-primary-700 dark:text-primary-300 ring-1 ring-inset ring-primary-200 dark:ring-primary-800/50">ACTIVE</span>
+                        @endif
+                    </div>
+                    {{-- Zone 3: Footer --}}
+                    <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                        <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">Active commitments</span>
+                        <span class="inline-flex shrink-0 items-center rounded-md bg-primary-50 dark:bg-primary-950/60 px-2 py-0.5 text-xs font-bold text-primary-700 dark:text-primary-300">Pipeline active</span>
+                    </div>
                 </div>
 
-                <div class="bg-white p-3">
-                    <div class="flex items-center justify-between">
-                        <p class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Pending approval</p>
-                        <span class="rounded-full bg-blue-50 p-1.5 text-blue-600">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                {{-- 2. Pending Approval --}}
+                <div class="group rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/95 flex flex-col justify-between {{ $poMetrics['pending_approval'] > 0 ? 'hover:border-amber-400 dark:hover:border-amber-600' : 'hover:border-emerald-400 dark:hover:border-emerald-600' }} transition-all duration-150">
+                    {{-- Zone 1: Header --}}
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs sm:text-sm font-bold uppercase tracking-wider {{ $poMetrics['pending_approval'] > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300' }}">Pending Approval</p>
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {{ $poMetrics['pending_approval'] > 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300 ring-1 ring-amber-200 dark:ring-amber-800/50' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-800/50' }} group-hover:scale-105 transition-transform duration-150">
+                            <x-ui.icon :name="$poMetrics['pending_approval'] > 0 ? 'clipboard-document-check' : 'check-badge'" class="h-5 w-5" />
                         </span>
                     </div>
-                    <p class="mt-1 text-xl font-bold tabular-nums text-neutral-900">{{ $poMetrics['pending_approval'] }}</p>
-                    <p class="text-xs text-neutral-500">Awaiting authorization</p>
+                    {{-- Zone 2: Value --}}
+                    <div class="mt-3 flex items-baseline justify-between gap-2">
+                        <div class="flex items-baseline gap-1.5">
+                            <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums {{ $poMetrics['pending_approval'] > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400' }}">{{ number_format($poMetrics['pending_approval']) }}</span>
+                            <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">orders</span>
+                        </div>
+                        @if($poMetrics['pending_approval'] > 0)
+                            <span class="inline-flex items-center rounded-lg bg-amber-100 dark:bg-amber-950/80 px-2 py-0.5 text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-300 ring-1 ring-inset ring-amber-200 dark:ring-amber-800/50 shadow-2xs">NEEDS REVIEW</span>
+                        @endif
+                    </div>
+                    {{-- Zone 3: Footer --}}
+                    <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                        <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">{{ $poMetrics['pending_approval'] > 0 ? 'Awaiting authorization' : 'All orders authorized' }}</span>
+                        <span class="inline-flex shrink-0 items-center rounded-md {{ $poMetrics['pending_approval'] > 0 ? 'bg-amber-100/80 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300' : 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300' }} px-2 py-0.5 text-xs font-bold">{{ $poMetrics['pending_approval'] > 0 ? 'DOA Queue' : 'Cleared' }}</span>
+                    </div>
                 </div>
 
-                <div class="bg-white p-3">
-                    <div class="flex items-center justify-between">
-                        <p class="text-xs font-semibold uppercase tracking-wider text-neutral-500">In fulfillment</p>
-                        <span class="rounded-full bg-amber-50 p-1.5 text-amber-600">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                {{-- 3. In Fulfillment --}}
+                <div class="group rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/95 flex flex-col justify-between hover:border-sky-400 dark:hover:border-sky-600 transition-all duration-150">
+                    {{-- Zone 1: Header --}}
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs sm:text-sm font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300">In Fulfillment</p>
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-950/80 dark:text-sky-300 ring-1 ring-sky-200 dark:ring-sky-800/50 group-hover:scale-105 transition-transform duration-150">
+                            <x-ui.icon name="truck" class="h-5 w-5" />
                         </span>
                     </div>
-                    <p class="mt-1 text-xl font-bold tabular-nums text-neutral-900">{{ $poMetrics['in_transit'] }}</p>
-                    <p class="text-xs text-neutral-500">Dispatched or partial</p>
+                    {{-- Zone 2: Value --}}
+                    <div class="mt-3 flex items-baseline justify-between gap-2">
+                        <div class="flex items-baseline gap-1.5">
+                            <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-neutral-950 dark:text-white">{{ number_format($poMetrics['in_transit']) }}</span>
+                            <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">orders</span>
+                        </div>
+                        @if($poMetrics['in_transit'] > 0)
+                            <span class="inline-flex items-center rounded-lg bg-sky-50 dark:bg-sky-950/80 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300 ring-1 ring-inset ring-sky-200 dark:ring-sky-800/50">DISPATCHED</span>
+                        @endif
+                    </div>
+                    {{-- Zone 3: Footer --}}
+                    <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                        <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">Dispatched or partial</span>
+                        <span class="inline-flex shrink-0 items-center rounded-md bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5 text-xs font-bold text-sky-700 dark:text-sky-300">In transit</span>
+                    </div>
                 </div>
 
-                <div class="bg-white p-3">
-                    <div class="flex items-center justify-between">
-                        <p class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Overdue delivery</p>
-                        <span class="rounded-full bg-purple-50 p-1.5 text-purple-600">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                {{-- 4. Overdue Delivery --}}
+                <div class="group rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/95 flex flex-col justify-between {{ $poMetrics['overdue'] > 0 ? 'hover:border-rose-400 dark:hover:border-rose-600' : 'hover:border-emerald-400 dark:hover:border-emerald-600' }} transition-all duration-150">
+                    {{-- Zone 1: Header --}}
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs sm:text-sm font-bold uppercase tracking-wider {{ $poMetrics['overdue'] > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300' }}">Overdue Delivery</p>
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {{ $poMetrics['overdue'] > 0 ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 ring-1 ring-rose-200 dark:ring-rose-800/50' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-800/50' }} group-hover:scale-105 transition-transform duration-150">
+                            <x-ui.icon :name="$poMetrics['overdue'] > 0 ? 'exclamation-triangle' : 'check-circle'" class="h-5 w-5" />
                         </span>
                     </div>
-                    <p class="mt-1 text-xl font-bold tabular-nums {{ $poMetrics['overdue'] > 0 ? 'text-danger-700' : 'text-neutral-900' }}">{{ $poMetrics['overdue'] }}</p>
-                    <p class="text-xs text-neutral-500">Past required date</p>
+                    {{-- Zone 2: Value --}}
+                    <div class="mt-3 flex items-baseline justify-between gap-2">
+                        <div class="flex items-baseline gap-1.5">
+                            <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums {{ $poMetrics['overdue'] > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400' }}">{{ number_format($poMetrics['overdue']) }}</span>
+                            <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">orders</span>
+                        </div>
+                        @if($poMetrics['overdue'] > 0)
+                            <span class="inline-flex items-center rounded-lg bg-rose-100 dark:bg-rose-950/80 px-2.5 py-1 text-xs font-black uppercase tracking-wider text-rose-700 dark:text-rose-300 ring-1 ring-inset ring-rose-200 dark:ring-rose-800/50 shadow-2xs animate-pulse">DELAYED</span>
+                        @endif
+                    </div>
+                    {{-- Zone 3: Footer --}}
+                    <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                        <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">{{ $poMetrics['overdue'] > 0 ? 'Past required delivery date' : 'All shipments on schedule' }}</span>
+                        <span class="inline-flex shrink-0 items-center rounded-md {{ $poMetrics['overdue'] > 0 ? 'bg-rose-100/80 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300' : 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300' }} px-2 py-0.5 text-xs font-bold">{{ $poMetrics['overdue'] > 0 ? 'Urgent' : 'On track' }}</span>
+                    </div>
                 </div>
             </div>
 
             {{-- Navigation: Major Dropdown Tabs --}}
             <div
-                class="rounded-xl border border-neutral-200 bg-white p-2.5 shadow-sm"
+                class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-2.5 shadow-sm"
                 x-data="{ openDropdown: null }"
                 @keydown.escape.window="openDropdown = null"
             >
                 {{-- Mobile / Small Screen Quick Selector (< sm) --}}
                 <div class="sm:hidden">
-                    <label for="procurement-mobile-tab-select" class="block text-[11px] font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    <label for="procurement-mobile-tab-select" class="block text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-1.5">
                         Select Procurement Area:
                     </label>
                     <select
                         id="procurement-mobile-tab-select"
                         x-on:change="if ($event.target.value.startsWith('http') || $event.target.value.startsWith('/')) { window.location.href = $event.target.value; } else { activeTab = $event.target.value; }"
-                        class="block w-full rounded-lg border border-neutral-300 py-2.5 pl-3 pr-10 text-xs font-semibold text-neutral-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 shadow-2xs"
+                        class="block w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 py-2.5 pl-3 pr-10 text-xs font-semibold text-neutral-800 dark:text-neutral-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 shadow-2xs"
                     >
                         <optgroup label="Purchasing &amp; Orders">
                             @canany(['view_procurement_sensitive_data', 'create_requisition', 'manage_sourcing', 'issue_purchase_order', 'manage_procurement'])
@@ -175,10 +235,10 @@
                             @click="openDropdown = openDropdown === 'purchasing' ? null : 'purchasing'"
                             class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold transition border shadow-2xs"
                             :class="['enterprise_s2p', 'orders_revisions', 'legacy_canvass'].includes(activeTab)
-                                ? 'bg-primary-50 text-primary-800 border-primary-200 ring-1 ring-primary-500/20'
-                                : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50 hover:text-neutral-900'"
+                                ? 'bg-primary-50 text-primary-800 border-primary-200 ring-1 ring-primary-500/20 dark:bg-primary-950/60 dark:text-primary-300 dark:border-primary-800'
+                                : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50 hover:text-neutral-900 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-100'"
                         >
-                            <x-ui.icon name="shopping-bag" class="h-4 w-4 text-primary-600" />
+                            <x-ui.icon name="shopping-bag" class="h-4 w-4 text-primary-600 dark:text-primary-400" />
                             <span>Purchasing &amp; Orders</span>
                             <span class="text-[10px] font-mono text-neutral-400 font-normal" x-text="activeTab === 'enterprise_s2p' ? '(S2P Workspace)' : (activeTab === 'orders_revisions' ? '(Purchase Orders)' : (activeTab === 'legacy_canvass' ? '(Canvassing)' : ''))"></span>
                             <x-ui.icon name="chevron-down" class="h-3.5 w-3.5 text-neutral-400 transition-transform duration-200" ::class="openDropdown === 'purchasing' ? 'rotate-180' : ''" />
@@ -193,20 +253,20 @@
                             x-transition:leave="transition ease-in duration-100"
                             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                             x-transition:leave-end="opacity-0 -translate-y-1 scale-95"
-                            class="absolute left-0 z-40 mt-1.5 w-64 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl space-y-0.5"
+                            class="absolute left-0 z-40 mt-1.5 w-64 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-1.5 shadow-xl space-y-0.5"
                         >
                             @canany(['view_procurement_sensitive_data', 'create_requisition', 'manage_sourcing', 'issue_purchase_order', 'manage_procurement'])
                                 <button
                                     type="button"
                                     @click="activeTab = 'enterprise_s2p'; openDropdown = null"
                                     class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
-                                    :class="activeTab === 'enterprise_s2p' ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50'"
+                                    :class="activeTab === 'enterprise_s2p' ? 'bg-primary-50 text-primary-800 dark:bg-primary-950/60 dark:text-primary-300 font-semibold' : 'text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700/60'"
                                 >
                                     <span class="flex items-center gap-2">
                                         <x-ui.icon name="building-office-2" class="w-4 h-4 text-neutral-400" />
                                         <span>Enterprise S2P Workspace</span>
                                     </span>
-                                    <span x-show="activeTab === 'enterprise_s2p'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
+                                    <span x-show="activeTab === 'enterprise_s2p'" class="h-1.5 w-1.5 rounded-full bg-primary-600 dark:bg-primary-400"></span>
                                 </button>
                             @endcanany
 
@@ -214,13 +274,13 @@
                                 type="button"
                                 @click="activeTab = 'orders_revisions'; openDropdown = null"
                                 class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
-                                :class="activeTab === 'orders_revisions' ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50'"
+                                :class="activeTab === 'orders_revisions' ? 'bg-primary-50 text-primary-800 dark:bg-primary-950/60 dark:text-primary-300 font-semibold' : 'text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700/60'"
                             >
                                 <span class="flex items-center gap-2">
                                     <x-ui.icon name="clipboard-document-list" class="w-4 h-4 text-neutral-400" />
                                     <span>Purchase Orders &amp; Revisions</span>
                                 </span>
-                                <span x-show="activeTab === 'orders_revisions'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
+                                <span x-show="activeTab === 'orders_revisions'" class="h-1.5 w-1.5 rounded-full bg-primary-600 dark:bg-primary-400"></span>
                             </button>
 
                             @canany(['create_requisition', 'manage_sourcing', 'issue_purchase_order'])
@@ -228,13 +288,13 @@
                                     type="button"
                                     @click="activeTab = 'legacy_canvass'; openDropdown = null"
                                     class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
-                                    :class="activeTab === 'legacy_canvass' ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50'"
+                                    :class="activeTab === 'legacy_canvass' ? 'bg-primary-50 text-primary-800 dark:bg-primary-950/60 dark:text-primary-300 font-semibold' : 'text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700/60'"
                                 >
                                     <span class="flex items-center gap-2">
                                         <x-ui.icon name="magnifying-glass" class="w-4 h-4 text-neutral-400" />
                                         <span>Standard Canvassing</span>
                                     </span>
-                                    <span x-show="activeTab === 'legacy_canvass'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
+                                    <span x-show="activeTab === 'legacy_canvass'" class="h-1.5 w-1.5 rounded-full bg-primary-600 dark:bg-primary-400"></span>
                                 </button>
                             @endcanany
                         </div>
@@ -248,13 +308,13 @@
                                 @click="openDropdown = openDropdown === 'sourcing' ? null : 'sourcing'"
                                 class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold transition border shadow-2xs"
                                 :class="['sourcing_rfqs', 'evaluations'].includes(activeTab)
-                                    ? 'bg-primary-50 text-primary-800 border-primary-200 ring-1 ring-primary-500/20'
-                                    : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50 hover:text-neutral-900'"
+                                    ? 'bg-primary-50 text-primary-800 border-primary-200 ring-1 ring-primary-500/20 dark:bg-primary-950/60 dark:text-primary-300 dark:border-primary-800'
+                                    : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50 hover:text-neutral-900 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-100'"
                             >
-                                <x-ui.icon name="globe-alt" class="h-4 w-4 text-blue-600" />
+                                <x-ui.icon name="globe-alt" class="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                 <span>Strategic Sourcing</span>
                                 @if($rfqs->count() > 0)
-                                    <span class="rounded-full bg-blue-100 px-1.5 py-0.2 text-[10px] font-bold text-blue-800">{{ $rfqs->count() }}</span>
+                                    <span class="rounded-full bg-blue-100 dark:bg-blue-950/70 px-1.5 py-0.2 text-[10px] font-bold text-blue-800 dark:text-blue-300">{{ $rfqs->count() }}</span>
                                 @endif
                                 <span class="text-[10px] font-mono text-neutral-400 font-normal" x-text="activeTab === 'sourcing_rfqs' ? '(RFQs)' : (activeTab === 'evaluations' ? '(Evaluations)' : '')"></span>
                                 <x-ui.icon name="chevron-down" class="h-3.5 w-3.5 text-neutral-400 transition-transform duration-200" ::class="openDropdown === 'sourcing' ? 'rotate-180' : ''" />
@@ -269,20 +329,20 @@
                                 x-transition:leave="transition ease-in duration-100"
                                 x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                                 x-transition:leave-end="opacity-0 -translate-y-1 scale-95"
-                                class="absolute left-0 z-40 mt-1.5 w-72 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl space-y-0.5"
+                                class="absolute left-0 z-40 mt-1.5 w-72 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-1.5 shadow-xl space-y-0.5"
                             >
                                 @canany(['view_procurement_sensitive_data', 'manage_sourcing', 'evaluate_bids'])
                                     <button
                                         type="button"
                                         @click="activeTab = 'sourcing_rfqs'; openDropdown = null"
                                         class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
-                                        :class="activeTab === 'sourcing_rfqs' ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50'"
+                                        :class="activeTab === 'sourcing_rfqs' ? 'bg-primary-50 text-primary-800 dark:bg-primary-950/60 dark:text-primary-300 font-semibold' : 'text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700/60'"
                                     >
                                         <span class="flex items-center gap-2">
                                             <x-ui.icon name="document-duplicate" class="w-4 h-4 text-neutral-400" />
                                             <span>Sourcing Events &amp; RFQs ({{ $rfqs->count() }})</span>
                                         </span>
-                                        <span x-show="activeTab === 'sourcing_rfqs'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
+                                        <span x-show="activeTab === 'sourcing_rfqs'" class="h-1.5 w-1.5 rounded-full bg-primary-600 dark:bg-primary-400"></span>
                                     </button>
                                 @endcanany
 
@@ -291,20 +351,20 @@
                                         type="button"
                                         @click="activeTab = 'evaluations'; openDropdown = null"
                                         class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
-                                        :class="activeTab === 'evaluations' ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50'"
+                                        :class="activeTab === 'evaluations' ? 'bg-primary-50 text-primary-800 dark:bg-primary-950/60 dark:text-primary-300 font-semibold' : 'text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700/60'"
                                     >
                                         <span class="flex items-center gap-2">
                                             <x-ui.icon name="scale" class="w-4 h-4 text-neutral-400" />
                                             <span>Comparative Landed Cost Matrix</span>
                                         </span>
-                                        <span x-show="activeTab === 'evaluations'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
+                                        <span x-show="activeTab === 'evaluations'" class="h-1.5 w-1.5 rounded-full bg-primary-600 dark:bg-primary-400"></span>
                                     </button>
                                 @endcanany
 
                                 @canany([\App\Enums\Permission::GenerateForecasts->value, \App\Enums\Permission::ViewReports->value])
                                     <a
                                         href="{{ route('inventory.demand-forecast') }}"
-                                        class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition text-neutral-700 hover:bg-neutral-50"
+                                        class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700/60"
                                     >
                                         <span class="flex items-center gap-2">
                                             <x-ui.icon name="chart-bar" class="w-4 h-4 text-neutral-400" />
@@ -325,10 +385,10 @@
                                 @click="openDropdown = openDropdown === 'governance' ? null : 'governance'"
                                 class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold transition border shadow-2xs"
                                 :class="['doa_approvals', 'audit_trail'].includes(activeTab)
-                                    ? 'bg-primary-50 text-primary-800 border-primary-200 ring-1 ring-primary-500/20'
-                                    : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50 hover:text-neutral-900'"
+                                    ? 'bg-primary-50 text-primary-800 border-primary-200 ring-1 ring-primary-500/20 dark:bg-primary-950/60 dark:text-primary-300 dark:border-primary-800'
+                                    : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50 hover:text-neutral-900 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-100'"
                             >
-                                <x-ui.icon name="shield-check" class="h-4 w-4 text-purple-600" />
+                                <x-ui.icon name="shield-check" class="h-4 w-4 text-purple-600 dark:text-purple-400" />
                                 <span>Governance &amp; Approvals</span>
                                 <span class="text-[10px] font-mono text-neutral-400 font-normal" x-text="activeTab === 'doa_approvals' ? '(DOA Hub)' : (activeTab === 'audit_trail' ? '(Audit Trail)' : '')"></span>
                                 <x-ui.icon name="chevron-down" class="h-3.5 w-3.5 text-neutral-400 transition-transform duration-200" ::class="openDropdown === 'governance' ? 'rotate-180' : ''" />
@@ -343,20 +403,20 @@
                                 x-transition:leave="transition ease-in duration-100"
                                 x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                                 x-transition:leave-end="opacity-0 -translate-y-1 scale-95"
-                                class="absolute left-0 z-40 mt-1.5 w-64 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl space-y-0.5"
+                                class="absolute left-0 z-40 mt-1.5 w-64 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-1.5 shadow-xl space-y-0.5"
                             >
                                 @can('approve_purchase_order')
                                     <button
                                         type="button"
                                         @click="activeTab = 'doa_approvals'; openDropdown = null"
                                         class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
-                                        :class="activeTab === 'doa_approvals' ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50'"
+                                        :class="activeTab === 'doa_approvals' ? 'bg-primary-50 text-primary-800 dark:bg-primary-950/60 dark:text-primary-300 font-semibold' : 'text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700/60'"
                                     >
                                         <span class="flex items-center gap-2">
                                             <x-ui.icon name="check-badge" class="w-4 h-4 text-neutral-400" />
                                             <span>Delegation of Authority (DOA) Hub</span>
                                         </span>
-                                        <span x-show="activeTab === 'doa_approvals'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
+                                        <span x-show="activeTab === 'doa_approvals'" class="h-1.5 w-1.5 rounded-full bg-primary-600 dark:bg-primary-400"></span>
                                     </button>
                                 @endcan
 
@@ -365,13 +425,13 @@
                                         type="button"
                                         @click="activeTab = 'audit_trail'; openDropdown = null"
                                         class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition flex items-center justify-between"
-                                        :class="activeTab === 'audit_trail' ? 'bg-primary-50 text-primary-800 font-semibold' : 'text-neutral-700 hover:bg-neutral-50'"
+                                        :class="activeTab === 'audit_trail' ? 'bg-primary-50 text-primary-800 dark:bg-primary-950/60 dark:text-primary-300 font-semibold' : 'text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700/60'"
                                     >
                                         <span class="flex items-center gap-2">
                                             <x-ui.icon name="clock" class="w-4 h-4 text-neutral-400" />
                                             <span>Procurement Audit Trail</span>
                                         </span>
-                                        <span x-show="activeTab === 'audit_trail'" class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
+                                        <span x-show="activeTab === 'audit_trail'" class="h-1.5 w-1.5 rounded-full bg-primary-600 dark:bg-primary-400"></span>
                                     </button>
                                 @endcan
                             </div>
@@ -553,16 +613,16 @@
                 @endcan
 
                 {{-- Enterprise Requisitions Table --}}
-                <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-                    <div class="flex items-center justify-between border-b border-neutral-100 pb-4">
+                <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-6 shadow-sm">
+                    <div class="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-4">
                         <div>
-                            <h3 class="text-base font-bold text-neutral-900">Active Purchase Requests ({{ $enterpriseRequests->count() }})</h3>
-                            <p class="text-xs text-neutral-500">Chronological ledger of departmental requisitions and soft encumbrances.</p>
+                            <h3 class="text-base font-bold text-neutral-900 dark:text-neutral-100">Active Purchase Requests ({{ $enterpriseRequests->count() }})</h3>
+                            <p class="text-xs text-neutral-500 dark:text-neutral-400">Chronological ledger of departmental requisitions and soft encumbrances.</p>
                         </div>
                     </div>
                     <div class="mt-4 overflow-x-auto">
-                        <table class="w-full text-left text-sm text-neutral-700">
-                            <thead class="bg-neutral-50 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                        <table class="w-full text-left text-sm text-neutral-700 dark:text-neutral-300">
+                            <thead class="bg-neutral-50 dark:bg-neutral-800/80 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                                 <tr>
                                     <th class="px-3.5 py-3">PR Number</th>
                                     <th class="px-3.5 py-3">Category</th>
@@ -575,30 +635,30 @@
                                     <th class="px-3.5 py-3">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-neutral-200">
+                            <tbody class="divide-y divide-neutral-200 dark:divide-neutral-800">
                                 @forelse($enterpriseRequests as $pr)
-                                    <tr class="hover:bg-neutral-50">
-                                        <td class="px-3.5 py-3 font-semibold text-neutral-900 font-mono text-xs">{{ $pr->pr_number }}</td>
+                                    <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                                        <td class="px-3.5 py-3 font-semibold text-neutral-900 dark:text-neutral-100 font-mono text-xs">{{ $pr->pr_number }}</td>
                                         <td class="px-3.5 py-3">
-                                            <span class="rounded bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-700">
+                                            <span class="rounded bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300">
                                                 {{ $pr->procurementCategory?->code ?? 'GEN' }}
                                             </span>
                                         </td>
                                         <td class="px-3.5 py-3">
-                                            <p class="font-medium text-neutral-900">{{ $pr->title }}</p>
-                                            <p class="text-xs text-neutral-500">{{ $pr->requester?->name }} • {{ $pr->submitted_at?->diffForHumans() }}</p>
+                                            <p class="font-medium text-neutral-900 dark:text-neutral-100">{{ $pr->title }}</p>
+                                            <p class="text-xs text-neutral-500 dark:text-neutral-400">{{ $pr->requester?->name }} • {{ $pr->submitted_at?->diffForHumans() }}</p>
                                         </td>
                                         <td class="px-3.5 py-3">
-                                            <span class="font-medium text-neutral-800">{{ $pr->costCenter?->name }}</span>
-                                            <span class="block text-[11px] text-neutral-400 font-mono">{{ $pr->costCenter?->code }}</span>
+                                            <span class="font-medium text-neutral-800 dark:text-neutral-200">{{ $pr->costCenter?->name }}</span>
+                                            <span class="block text-[11px] text-neutral-400 dark:text-neutral-500 font-mono">{{ $pr->costCenter?->code }}</span>
                                         </td>
                                         <td class="px-3.5 py-3">
                                             @php
                                                 $priorityClasses = match($pr->priority) {
-                                                    'urgent' => 'bg-rose-50 text-rose-700 border-rose-200',
-                                                    'high' => 'bg-amber-50 text-amber-700 border-amber-200',
-                                                    'medium' => 'bg-blue-50 text-blue-700 border-blue-200',
-                                                    default => 'bg-neutral-50 text-neutral-600 border-neutral-200',
+                                                    'urgent' => 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800',
+                                                    'high' => 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
+                                                    'medium' => 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800',
+                                                    default => 'bg-neutral-50 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:border-neutral-700',
                                                 };
                                             @endphp
                                             <span class="rounded border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider {{ $priorityClasses }}">
@@ -607,20 +667,20 @@
                                         </td>
                                         <td class="px-3.5 py-3">
                                             @if($pr->lines->isNotEmpty())
-                                                <p class="text-xs font-medium text-neutral-800">{{ $pr->lines->first()->item_description ?? $pr->lines->first()->item?->name }}</p>
-                                                <p class="text-[11px] text-neutral-500">{{ $pr->lines->sum('quantity') }} total {{ $pr->lines->first()->uom ?: 'units' }} ({{ $pr->lines->count() }} line(s))</p>
+                                                <p class="text-xs font-medium text-neutral-800 dark:text-neutral-200">{{ $pr->lines->first()->item_description ?? $pr->lines->first()->item?->name }}</p>
+                                                <p class="text-[11px] text-neutral-500 dark:text-neutral-400">{{ $pr->lines->sum('quantity') }} total {{ $pr->lines->first()->uom ?: 'units' }} ({{ $pr->lines->count() }} line(s))</p>
                                             @else
-                                                <span class="text-xs text-neutral-400">0 lines</span>
+                                                <span class="text-xs text-neutral-400 dark:text-neutral-500">0 lines</span>
                                             @endif
                                         </td>
-                                        <td class="px-3.5 py-3 font-bold text-neutral-900">₱{{ number_format($pr->total_estimated_amount, 2) }}</td>
+                                        <td class="px-3.5 py-3 font-bold text-neutral-900 dark:text-neutral-100">₱{{ number_format($pr->total_estimated_amount, 2) }}</td>
                                         <td class="px-3.5 py-3">
                                             @php
                                                 $statusClasses = match($pr->status->value ?? $pr->status) {
-                                                    'approved' => 'bg-emerald-50 text-emerald-700',
-                                                    'pending_approval' => 'bg-amber-50 text-amber-700',
-                                                    'rejected' => 'bg-rose-50 text-rose-700',
-                                                    default => 'bg-neutral-100 text-neutral-700',
+                                                    'approved' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+                                                    'pending_approval' => 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+                                                    'rejected' => 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
+                                                    default => 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
                                                 };
                                             @endphp
                                             <span class="rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wider {{ $statusClasses }}">
@@ -630,20 +690,20 @@
                                         <td class="px-3.5 py-3">
                                             @can('manage_sourcing')
                                                 @if(($pr->status->value ?? $pr->status) === 'approved' || ($pr->status->value ?? $pr->status) === 'pending_approval')
-                                                    <button @click="activeTab = 'sourcing_rfqs'" class="text-xs font-semibold text-primary-600 hover:underline inline-flex items-center gap-1">
+                                                    <button @click="activeTab = 'sourcing_rfqs'" class="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline inline-flex items-center gap-1">
                                                         Package into RFQ &rarr;
                                                     </button>
                                                 @else
-                                                    <span class="text-xs text-neutral-400">Processed</span>
+                                                    <span class="text-xs text-neutral-400 dark:text-neutral-500">Processed</span>
                                                 @endif
                                             @else
-                                                <span class="text-xs text-neutral-400">{{ ucfirst(str_replace('_', ' ', $pr->status->value ?? $pr->status)) }}</span>
+                                                <span class="text-xs text-neutral-400 dark:text-neutral-500">{{ ucfirst(str_replace('_', ' ', $pr->status->value ?? $pr->status)) }}</span>
                                             @endcan
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="9" class="px-3.5 py-6 text-center text-sm text-neutral-500">No enterprise purchase requests created yet. Submit one above.</td>
+                                        <td colspan="9" class="px-3.5 py-6 text-center text-sm text-neutral-500 dark:text-neutral-400">No enterprise purchase requests created yet. Submit one above.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -722,11 +782,11 @@
                 @endcan
 
                 {{-- Published RFQs Table --}}
-                <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-                    <h3 class="text-base font-bold text-neutral-900">Sourcing Events ({{ $rfqs->count() }})</h3>
+                <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-6 shadow-sm">
+                    <h3 class="text-base font-bold text-neutral-900 dark:text-neutral-100">Sourcing Events ({{ $rfqs->count() }})</h3>
                     <div class="mt-4 overflow-x-auto">
-                        <table class="w-full text-left text-sm text-neutral-700">
-                            <thead class="bg-neutral-50 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                        <table class="w-full text-left text-sm text-neutral-700 dark:text-neutral-300">
+                            <thead class="bg-neutral-50 dark:bg-neutral-800/80 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                                 <tr>
                                     <th class="px-3.5 py-3">RFQ Number</th>
                                     <th class="px-3.5 py-3">Title &amp; Protocol</th>
@@ -737,18 +797,18 @@
                                     <th class="px-3.5 py-3">Evaluation Action</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-neutral-200">
+                            <tbody class="divide-y divide-neutral-200 dark:divide-neutral-800">
                                 @forelse($rfqs as $rfq)
-                                    <tr class="hover:bg-neutral-50">
-                                        <td class="px-3.5 py-3 font-semibold text-neutral-900">{{ $rfq->rfq_number }}</td>
+                                    <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                                        <td class="px-3.5 py-3 font-semibold text-neutral-900 dark:text-neutral-100">{{ $rfq->rfq_number }}</td>
                                         <td class="px-3.5 py-3">
-                                            <p class="font-medium text-neutral-900">{{ $rfq->title }}</p>
-                                            <span class="inline-flex items-center gap-1 text-xs {{ $rfq->isSealed() ? 'text-amber-600 font-semibold' : 'text-neutral-500' }}">
+                                            <p class="font-medium text-neutral-900 dark:text-neutral-100">{{ $rfq->title }}</p>
+                                            <span class="inline-flex items-center gap-1 text-xs {{ $rfq->isSealed() ? 'text-amber-600 dark:text-amber-400 font-semibold' : 'text-neutral-500 dark:text-neutral-400' }}">
                                                 @if($rfq->isSealed())
                                                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                                                     Sealed Bid (Locked)
                                                 @else
-                                                    <svg class="h-3.5 w-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
+                                                    <svg class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
                                                     Unsealed / Open
                                                 @endif
                                             </span>
@@ -759,24 +819,24 @@
                                             @endforeach
                                         </td>
                                         <td class="px-3.5 py-3">
-                                            <p class="text-xs text-neutral-900 font-medium">{{ $rfq->submission_deadline->format('M d, Y h:i A') }}</p>
-                                            <p class="text-xs {{ $rfq->isDeadlineElapsed() ? 'text-rose-600 font-semibold' : 'text-neutral-500' }}">
+                                            <p class="text-xs text-neutral-900 dark:text-neutral-100 font-medium">{{ $rfq->submission_deadline->format('M d, Y h:i A') }}</p>
+                                            <p class="text-xs {{ $rfq->isDeadlineElapsed() ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-neutral-500 dark:text-neutral-400' }}">
                                                 {{ $rfq->isDeadlineElapsed() ? 'Bidding Window Elapsed' : 'Closes '.$rfq->submission_deadline->diffForHumans() }}
                                             </p>
                                         </td>
                                         <td class="px-3.5 py-3">
-                                            <span class="font-bold text-neutral-900">{{ $rfq->quotes->count() }}</span> / {{ $rfq->invitations->count() }} invited
+                                            <span class="font-bold text-neutral-900 dark:text-neutral-100">{{ $rfq->quotes->count() }}</span> / {{ $rfq->invitations->count() }} invited
                                         </td>
                                         <td class="px-3.5 py-3">
                                             @php
                                                 $effectiveStatus = $rfq->effectiveStatus();
                                                 $statusTone = match($effectiveStatus) {
-                                                    \App\Enums\RfqStatus::Draft => 'bg-neutral-100 text-neutral-600',
-                                                    \App\Enums\RfqStatus::Published => 'bg-blue-50 text-blue-700',
-                                                    \App\Enums\RfqStatus::BiddingClosed => 'bg-amber-50 text-amber-700',
-                                                    \App\Enums\RfqStatus::UnderEvaluation => 'bg-purple-50 text-purple-700',
-                                                    \App\Enums\RfqStatus::Awarded => 'bg-emerald-50 text-emerald-700',
-                                                    \App\Enums\RfqStatus::Cancelled => 'bg-rose-50 text-rose-700',
+                                                    \App\Enums\RfqStatus::Draft => 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
+                                                    \App\Enums\RfqStatus::Published => 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
+                                                    \App\Enums\RfqStatus::BiddingClosed => 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+                                                    \App\Enums\RfqStatus::UnderEvaluation => 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300',
+                                                    \App\Enums\RfqStatus::Awarded => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+                                                    \App\Enums\RfqStatus::Cancelled => 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
                                                 };
                                             @endphp
                                             <span class="rounded-full {{ $statusTone }} px-2.5 py-1 text-xs font-semibold uppercase tracking-wider">
@@ -785,22 +845,22 @@
                                         </td>
                                         <td class="px-3.5 py-3">
                                             @if($rfq->status === \App\Enums\RfqStatus::Awarded)
-                                                <span class="inline-flex items-center gap-1 rounded bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                                <span class="inline-flex items-center gap-1 rounded bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                                                     Awarded
                                                 </span>
                                             @elseif($rfq->status === \App\Enums\RfqStatus::Cancelled)
-                                                <span class="text-xs text-neutral-400">Cancelled</span>
+                                                <span class="text-xs text-neutral-400 dark:text-neutral-500">Cancelled</span>
                                             @elseif($rfq->quotes->isEmpty())
-                                                <span class="text-xs text-neutral-400">Awaiting Quotes</span>
+                                                <span class="text-xs text-neutral-400 dark:text-neutral-500">Awaiting Quotes</span>
                                             @elseif($rfq->isSealed() && ! $rfq->isDeadlineElapsed())
                                                 <div class="space-y-1">
-                                                    <button type="button" disabled title="Sealed bid evaluation locked until submission deadline elapses ({{ $rfq->submission_deadline->format('M d, Y h:i A') }} PHT)" class="inline-flex items-center gap-1.5 rounded bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-400 cursor-not-allowed border border-neutral-200">
-                                                        <svg class="h-3.5 w-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <button type="button" disabled title="Sealed bid evaluation locked until submission deadline elapses ({{ $rfq->submission_deadline->format('M d, Y h:i A') }} PHT)" class="inline-flex items-center gap-1.5 rounded bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 text-xs font-semibold text-neutral-400 dark:text-neutral-500 cursor-not-allowed border border-neutral-200 dark:border-neutral-700">
+                                                        <svg class="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                                                         </svg>
                                                         Sealed • Bidding Open
                                                     </button>
-                                                    <p class="text-[11px] text-amber-700 font-medium">
+                                                    <p class="text-[11px] text-amber-700 dark:text-amber-400 font-medium">
                                                         Unlocks {{ $rfq->submission_deadline->format('M d, h:i A') }}
                                                     </p>
                                                 </div>
@@ -858,13 +918,13 @@
             {{-- ======================================================== TAB 3: Comparative Evaluation & Landed Cost Matrix --}}
             @canany(['view_procurement_sensitive_data', 'evaluate_bids', 'award_procurement'])
             <div x-show="activeTab === 'evaluations'" class="space-y-6">
-                <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-                    <div class="flex items-center justify-between border-b border-neutral-100 pb-4">
+                <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-6 shadow-sm">
+                    <div class="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-4">
                         <div>
-                            <h3 class="text-lg font-bold text-neutral-900">Multi-Attribute Comparative Evaluation Matrix</h3>
-                            <p class="text-sm text-neutral-500">Transparent landed cost calculations (TCO), price normalization, technical quality scoring, and split-award optimization.</p>
+                            <h3 class="text-lg font-bold text-neutral-900 dark:text-neutral-100">Multi-Attribute Comparative Evaluation Matrix</h3>
+                            <p class="text-sm text-neutral-500 dark:text-neutral-400">Transparent landed cost calculations (TCO), price normalization, technical quality scoring, and split-award optimization.</p>
                         </div>
-                        <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">TCO Normalization Formula</span>
+                        <span class="rounded-full bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">TCO Normalization Formula</span>
                     </div>
 
                     @php
@@ -873,19 +933,19 @@
 
                     @if($activeEvaluatedRfq && $activeEvaluatedRfq->evaluations->isNotEmpty())
                         <div class="mt-4">
-                            <div class="flex items-center justify-between bg-neutral-50 p-3 rounded-lg border border-neutral-200">
+                            <div class="flex items-center justify-between bg-neutral-50 dark:bg-neutral-800/60 p-3 rounded-lg border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span class="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Active Event:</span>
-                                    <span class="text-sm font-bold text-neutral-900 ml-1">{{ $activeEvaluatedRfq->rfq_number }} — {{ $activeEvaluatedRfq->title }}</span>
+                                    <span class="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Active Event:</span>
+                                    <span class="text-sm font-bold text-neutral-900 dark:text-neutral-100 ml-1">{{ $activeEvaluatedRfq->rfq_number }} — {{ $activeEvaluatedRfq->title }}</span>
                                 </div>
-                                <div class="text-xs text-neutral-500">
+                                <div class="text-xs text-neutral-500 dark:text-neutral-400">
                                     Weights: Price (40%), Technical (30%), Quality (15%), Lead Time (15%)
                                 </div>
                             </div>
 
                             <div class="mt-4 overflow-x-auto">
-                                <table class="w-full text-left text-sm text-neutral-700">
-                                    <thead class="bg-neutral-100 text-xs font-semibold uppercase tracking-wider text-neutral-600">
+                                <table class="w-full text-left text-sm text-neutral-700 dark:text-neutral-300">
+                                    <thead class="bg-neutral-100 dark:bg-neutral-800/80 text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
                                         <tr>
                                             <th class="px-3.5 py-3">Supplier Candidate</th>
                                             <th class="px-3.5 py-3">Base Quoted Price</th>
@@ -897,22 +957,22 @@
                                             <th class="px-3.5 py-3">Recommendation &amp; Award</th>
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-neutral-200">
+                                    <tbody class="divide-y divide-neutral-200 dark:divide-neutral-800">
                                         @foreach($activeEvaluatedRfq->evaluations->sortByDesc('composite_score') as $index => $eval)
-                                            <tr class="{{ $index === 0 ? 'bg-emerald-50/50 font-medium' : 'hover:bg-neutral-50' }}">
+                                            <tr class="{{ $index === 0 ? 'bg-emerald-50/50 dark:bg-emerald-950/30 font-medium' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50' }}">
                                                 <td class="px-3.5 py-3">
-                                                    <p class="font-bold text-neutral-900">{{ $eval->quote?->supplier?->name }}</p>
-                                                    <p class="text-xs text-neutral-500">{{ $eval->quote?->quote_number }}</p>
+                                                    <p class="font-bold text-neutral-900 dark:text-neutral-100">{{ $eval->quote?->supplier?->name }}</p>
+                                                    <p class="text-xs text-neutral-500 dark:text-neutral-400">{{ $eval->quote?->quote_number }}</p>
                                                 </td>
                                                 <td class="px-3.5 py-3">₱{{ number_format($eval->quote?->quoted_price, 2) }}</td>
-                                                <td class="px-3.5 py-3 font-semibold text-neutral-900">₱{{ number_format($eval->normalized_landed_cost, 2) }}</td>
-                                                <td class="px-3.5 py-3 text-emerald-700 font-bold">{{ $eval->commercial_score }}%</td>
+                                                <td class="px-3.5 py-3 font-semibold text-neutral-900 dark:text-neutral-100">₱{{ number_format($eval->normalized_landed_cost, 2) }}</td>
+                                                <td class="px-3.5 py-3 text-emerald-700 dark:text-emerald-400 font-bold">{{ $eval->commercial_score }}%</td>
                                                 <td class="px-3.5 py-3">{{ $eval->technical_score }}%</td>
                                                 <td class="px-3.5 py-3">{{ $eval->quality_score }}%</td>
-                                                <td class="px-3.5 py-3 text-base font-black text-primary-700">{{ $eval->composite_score }}%</td>
+                                                <td class="px-3.5 py-3 text-base font-black text-primary-700 dark:text-primary-400">{{ $eval->composite_score }}%</td>
                                                 <td class="px-3.5 py-3">
                                                     @if($index === 0)
-                                                        <span class="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
+                                                        <span class="inline-flex items-center gap-1 rounded bg-emerald-100 dark:bg-emerald-950/70 px-2 py-0.5 text-xs font-bold text-emerald-800 dark:text-emerald-300">
                                                             #1 Ranked Winner
                                                         </span>
                                                         @if($activeEvaluatedRfq->status->value !== 'awarded')
@@ -928,13 +988,13 @@
                                                                 </button>
                                                             </form>
                                                             @else
-                                                            <span class="text-xs text-neutral-500 block mt-1">Ready for Award</span>
+                                                            <span class="text-xs text-neutral-500 dark:text-neutral-400 block mt-1">Ready for Award</span>
                                                             @endcan
                                                         @else
-                                                            <span class="text-xs text-neutral-500 block mt-1">Awarded</span>
+                                                            <span class="text-xs text-neutral-500 dark:text-neutral-400 block mt-1">Awarded</span>
                                                         @endif
                                                     @else
-                                                        <span class="text-xs text-neutral-400">Rank #{{ $index + 1 }}</span>
+                                                        <span class="text-xs text-neutral-400 dark:text-neutral-500">Rank #{{ $index + 1 }}</span>
                                                     @endif
                                                 </td>
                                             </tr>
@@ -988,7 +1048,7 @@
                                                     {{ $step->status->label() }}
                                                 </span>
                                             </div>
-                                            <p class="mt-1 text-xs font-medium text-neutral-900">Role: {{ ucwords(str_replace('_', ' ', $step->required_role)) }}</p>
+                                            <p class="mt-1 text-xs font-medium text-neutral-900">Role: {{ $step->required_role === 'inventory_manager' ? 'Inventory Manager (or Super Administrator)' : ucwords(str_replace('_', ' ', $step->required_role)) }}</p>
                                             <p class="text-[11px] text-neutral-500">Threshold: ₱{{ number_format($step->threshold_min, 0) }} @if($step->threshold_max) - ₱{{ number_format($step->threshold_max, 0) }} @else + @endif</p>
                                             @if($step->digital_signature_token)
                                                 <p class="mt-1 text-[10px] font-mono text-neutral-400 truncate" title="{{ $step->digital_signature_token }}">Sig: {{ substr($step->digital_signature_token, 0, 16) }}...</p>
@@ -1002,14 +1062,14 @@
                                     @php
                                         $targetPo = $chain->purchaseOrder;
                                     @endphp
-                                    <div class="mt-4 rounded-lg border border-neutral-200/80 bg-neutral-50/50 p-3">
-                                        <div class="flex items-center justify-between pb-2 border-b border-neutral-200/60 text-xs">
-                                            <span class="font-semibold text-neutral-800">Target Order: PO #{{ $targetPo->po_number }} · {{ $targetPo->supplier?->name ?? 'Supplier' }}</span>
-                                            <span class="text-neutral-500 font-medium">Item Pricing &amp; Commitment Breakdown</span>
+                                    <div class="mt-4 rounded-lg border border-neutral-200/80 bg-neutral-50/50 dark:border-neutral-800 dark:bg-neutral-900/50 p-3">
+                                        <div class="flex items-center justify-between pb-2 border-b border-neutral-200/60 dark:border-neutral-800 text-xs">
+                                            <span class="font-semibold text-neutral-800 dark:text-neutral-200">Target Order: PO #{{ $targetPo->po_number }} · {{ $targetPo->supplier?->name ?? 'Supplier' }}</span>
+                                            <span class="text-neutral-500 dark:text-neutral-400 font-medium">Item Pricing &amp; Commitment Breakdown</span>
                                         </div>
                                         <div class="mt-2 overflow-x-auto">
                                             <table class="min-w-full text-left text-xs">
-                                                <thead class="bg-neutral-100/80 text-[11px] font-semibold text-neutral-600">
+                                                <thead class="bg-neutral-100/80 dark:bg-neutral-800/80 text-[11px] font-semibold text-neutral-600 dark:text-neutral-300">
                                                     <tr>
                                                         <th scope="col" class="px-2.5 py-1.5">Item Name</th>
                                                         <th scope="col" class="px-2.5 py-1.5 text-right">Quantity</th>
@@ -1018,31 +1078,31 @@
                                                         <th scope="col" class="px-2.5 py-1.5 text-right">Total Price</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody class="divide-y divide-neutral-200/50 bg-white">
+                                                <tbody class="divide-y divide-neutral-200/50 bg-white dark:divide-neutral-800 dark:bg-neutral-900/40">
                                                     @forelse($targetPo->lines as $line)
                                                         @php
                                                             $lineUnit = $line->purchase_unit ?: ($line->item?->unit ?: 'unit');
                                                         @endphp
                                                         <tr>
                                                             <td class="px-2.5 py-2">
-                                                                <span class="font-medium text-neutral-900">{{ $line->item?->name ?? 'Item' }}</span>
+                                                                <span class="font-medium text-neutral-900 dark:text-neutral-100">{{ $line->item?->name ?? 'Item' }}</span>
                                                                 @if($line->conversionFactor() > 1)
-                                                                    <span class="ml-1 text-[10px] text-neutral-500 font-mono">({{ $line->conversionDisplay() }})</span>
+                                                                    <span class="ml-1 text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">({{ $line->conversionDisplay() }})</span>
                                                                 @endif
                                                             </td>
-                                                            <td class="px-2.5 py-2 text-right tabular-nums font-semibold text-neutral-900">
+                                                            <td class="px-2.5 py-2 text-right tabular-nums font-semibold text-neutral-900 dark:text-neutral-100">
                                                                 {{ number_format($line->ordered_quantity) }}
                                                                 @if($line->conversionFactor() > 1)
-                                                                    <span class="text-[10px] text-neutral-400 font-normal">({{ number_format($line->orderedBaseQuantity()) }} base)</span>
+                                                                    <span class="text-[10px] text-neutral-400 dark:text-neutral-500 font-normal">({{ number_format($line->orderedBaseQuantity()) }} base)</span>
                                                                 @endif
                                                             </td>
-                                                            <td class="px-2.5 py-2 text-center capitalize text-neutral-700">
+                                                            <td class="px-2.5 py-2 text-center capitalize text-neutral-700 dark:text-neutral-300">
                                                                 {{ $lineUnit }}
                                                             </td>
-                                                            <td class="px-2.5 py-2 text-right font-mono tabular-nums text-neutral-700">
+                                                            <td class="px-2.5 py-2 text-right font-mono tabular-nums text-neutral-700 dark:text-neutral-300">
                                                                 ₱{{ number_format((float) $line->unit_price, 2) }}/{{ $lineUnit }}
                                                             </td>
-                                                            <td class="px-2.5 py-2 text-right font-mono font-semibold tabular-nums text-neutral-900">
+                                                            <td class="px-2.5 py-2 text-right font-mono font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
                                                                 ₱{{ number_format($line->lineTotal(), 2) }}
                                                             </td>
                                                         </tr>
@@ -1053,33 +1113,33 @@
                                                         @endphp
                                                         <tr>
                                                             <td class="px-2.5 py-2">
-                                                                <span class="font-medium text-neutral-900">{{ $targetPo->item?->name ?? 'Direct Item' }}</span>
+                                                                <span class="font-medium text-neutral-900 dark:text-neutral-100">{{ $targetPo->item?->name ?? 'Direct Item' }}</span>
                                                                 @if($targetPo->conversion_factor > 1)
-                                                                    <span class="ml-1 text-[10px] text-neutral-500 font-mono">(1 {{ $singleUnit }} = {{ (int) $targetPo->conversion_factor }} {{ $targetPo->item?->unit }})</span>
+                                                                    <span class="ml-1 text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">(1 {{ $singleUnit }} = {{ (int) $targetPo->conversion_factor }} {{ $targetPo->item?->unit }})</span>
                                                                 @endif
                                                             </td>
-                                                            <td class="px-2.5 py-2 text-right tabular-nums font-semibold text-neutral-900">
+                                                            <td class="px-2.5 py-2 text-right tabular-nums font-semibold text-neutral-900 dark:text-neutral-100">
                                                                 {{ number_format($targetPo->quantity) }}
                                                                 @if($targetPo->conversion_factor > 1)
-                                                                    <span class="text-[10px] text-neutral-400 font-normal">({{ number_format($targetPo->orderedBaseQuantity()) }} base)</span>
+                                                                    <span class="text-[10px] text-neutral-400 dark:text-neutral-500 font-normal">({{ number_format($targetPo->orderedBaseQuantity()) }} base)</span>
                                                                 @endif
                                                             </td>
-                                                            <td class="px-2.5 py-2 text-center capitalize text-neutral-700">
+                                                            <td class="px-2.5 py-2 text-center capitalize text-neutral-700 dark:text-neutral-300">
                                                                 {{ $singleUnit }}
                                                             </td>
-                                                            <td class="px-2.5 py-2 text-right font-mono tabular-nums text-neutral-700">
+                                                            <td class="px-2.5 py-2 text-right font-mono tabular-nums text-neutral-700 dark:text-neutral-300">
                                                                 ₱{{ number_format($singleUnitPrice, 2) }}/{{ $singleUnit }}
                                                             </td>
-                                                            <td class="px-2.5 py-2 text-right font-mono font-semibold tabular-nums text-neutral-900">
+                                                            <td class="px-2.5 py-2 text-right font-mono font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
                                                                 ₱{{ number_format((float) $targetPo->total_amount, 2) }}
                                                             </td>
                                                         </tr>
                                                     @endforelse
                                                 </tbody>
-                                                <tfoot class="border-t border-neutral-200 bg-neutral-50 font-semibold text-neutral-900">
+                                                <tfoot class="border-t border-neutral-200 bg-neutral-50 font-semibold text-neutral-900 dark:border-neutral-800 dark:bg-neutral-800/80 dark:text-neutral-100">
                                                     <tr>
-                                                        <td colspan="4" class="px-2.5 py-1.5 text-right text-xs">Purchase Order Commitment Total:</td>
-                                                        <td class="px-2.5 py-1.5 text-right font-mono tabular-nums text-xs font-bold text-primary-700">
+                                                        <td colspan="4" class="px-2.5 py-1.5 text-right text-xs text-neutral-700 dark:text-neutral-300">Purchase Order Commitment Total:</td>
+                                                        <td class="px-2.5 py-1.5 text-right font-mono tabular-nums text-xs font-bold text-primary-700 dark:text-primary-400">
                                                             ₱{{ number_format($targetPo->grandTotal(), 2) }}
                                                         </td>
                                                     </tr>
@@ -1277,19 +1337,19 @@
                         </section>
                     @endcan
 
-                    <section id="purchase-orders" class="order-1 min-w-0 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm lg:order-2" aria-labelledby="purchase-order-pipeline-heading">
-                        <header class="border-b border-neutral-200 bg-neutral-50/50 px-4 py-3.5">
+                    <section id="purchase-orders" class="order-1 min-w-0 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm lg:order-2 dark:border-neutral-800 dark:bg-neutral-900" aria-labelledby="purchase-order-pipeline-heading">
+                        <header class="border-b border-neutral-200 bg-neutral-50/50 px-4 py-3.5 dark:border-neutral-800 dark:bg-neutral-900/60">
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div class="flex items-center gap-2.5">
-                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200/60">
+                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200/60 dark:bg-blue-950/60 dark:text-blue-300 dark:ring-blue-800/60">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                                     </span>
                                     <div>
-                                        <h3 id="purchase-order-pipeline-heading" class="text-sm font-bold text-neutral-900">
+                                        <h3 id="purchase-order-pipeline-heading" class="text-sm font-bold text-neutral-900 dark:text-neutral-100">
                                             Purchase Order Pipeline
-                                            <span class="ml-1 text-xs font-normal text-neutral-500">({{ $purchaseOrders->total() }})</span>
+                                            <span class="ml-1 text-xs font-normal text-neutral-500 dark:text-neutral-400">({{ $purchaseOrders->total() }})</span>
                                         </h3>
-                                        <p class="text-[11px] text-neutral-500">
+                                        <p class="text-[11px] text-neutral-500 dark:text-neutral-400">
                                             Orders across approval, fulfillment, and receiving
                                             @if($purchaseOrders->total() > 0)
                                                 · Showing {{ $purchaseOrders->firstItem() }}–{{ $purchaseOrders->lastItem() }} of {{ $purchaseOrders->total() }}
@@ -1335,16 +1395,16 @@
                                 </div>
 
                                 {{-- Secondary filters stay collapsed so the toolbar keeps a single line. --}}
-                                <details class="rounded-md border border-neutral-200 bg-neutral-50">
-                                    <summary class="flex cursor-pointer flex-wrap items-center gap-2 px-3 py-2 text-xs font-semibold text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                                <details class="rounded-md border border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800/60">
+                                    <summary class="flex cursor-pointer flex-wrap items-center gap-2 px-3 py-2 text-xs font-semibold text-neutral-700 dark:text-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
                                         More filters
                                         @if($supplierFilter)
-                                            <span class="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-semibold text-primary-800">{{ $supplierFilter->name }}</span>
+                                            <span class="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-semibold text-primary-800 dark:bg-primary-950/60 dark:text-primary-300">{{ $supplierFilter->name }}</span>
                                         @endif
                                     </summary>
-                                    <div class="grid gap-2 border-t border-neutral-200 p-3 sm:grid-cols-2">
+                                    <div class="grid gap-2 border-t border-neutral-200 p-3 sm:grid-cols-2 dark:border-neutral-700">
                                         <div>
-                                            <label for="po-supplier" class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Supplier</label>
+                                            <label for="po-supplier" class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Supplier</label>
                                             <select id="po-supplier" name="supplier_id" class="min-h-9 w-full rounded-md border border-neutral-300 pl-2.5 pr-8 text-xs text-neutral-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
                                                 <option value="">All suppliers</option>
                                                 @foreach($suppliers as $supplier)
@@ -1355,13 +1415,13 @@
                                                 @endif
                                             </select>
                                         </div>
-                                        <p class="self-end text-[11px] text-neutral-500">Combines with the toolbar filters when you press Apply.</p>
+                                        <p class="self-end text-[11px] text-neutral-500 dark:text-neutral-400">Combines with the toolbar filters when you press Apply.</p>
                                     </div>
                                 </details>
                             </form>
                         </header>
 
-                        <div class="divide-y divide-neutral-200">
+                        <div class="divide-y divide-neutral-200 dark:divide-neutral-800">
                             @forelse($purchaseOrders as $po)
                                 @php
                                     $statusEnum = \App\Enums\PurchaseOrderStatus::tryFrom((string) $po->status);
@@ -1382,6 +1442,25 @@
                                     $canReceiveThisPo = $statusEnum?->canReceiveStock()
                                         ?? in_array($po->status, ['approved', 'dispatched', 'acknowledged', 'partially_fulfilled', 'partially_received', 'issued'], true);
                                     
+                                    $currentUser = auth()->user();
+                                    $canApprovePoPermission = $currentUser?->can(\App\Enums\Permission::ApprovePurchaseOrder->value) ?? false;
+                                    $isPoPendingApproval = in_array($po->status, ['submitted', 'pending', 'pending_approval'], true)
+                                        || ($po->approvalChain && $po->approvalChain->status === 'pending');
+
+                                    $canApproveThisPo = false;
+                                    if ($canApprovePoPermission && $isPoPendingApproval) {
+                                        if ($currentUser->isSuperAdministrator()) {
+                                            $canApproveThisPo = true;
+                                        } elseif ($po->created_by_user_id !== $currentUser->id) {
+                                            if ($po->approvalChain && $po->approvalChain->status === 'pending') {
+                                                $pendingStep = $po->approvalChain->currentPendingStep();
+                                                $canApproveThisPo = $pendingStep && $pendingStep->required_role === $currentUser->role->value;
+                                            } else {
+                                                $canApproveThisPo = true;
+                                            }
+                                        }
+                                    }
+
                                     $hasSensitivePermission = auth()->user()?->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ?? false;
                                     $linesData = $poLines->isNotEmpty()
                                         ? $poLines->map(fn ($line) => [
@@ -1446,7 +1525,7 @@
                                         'approval_status' => $po->approvalChain?->status,
                                         'approval_steps' => $po->approvalChain?->steps->map(fn ($step) => [
                                             'number' => $step->step_number,
-                                            'role' => \Illuminate\Support\Str::headline($step->required_role),
+                                            'role' => $step->required_role === 'inventory_manager' ? 'Inventory Manager (or Super Administrator)' : \Illuminate\Support\Str::headline($step->required_role),
                                             'status' => \Illuminate\Support\Str::headline($step->status->value ?? $step->status),
                                             'approver' => $step->approver?->name,
                                         ])->values() ?? [],
@@ -1465,6 +1544,9 @@
                                             'requires_doa' => (bool) $revision->requires_doa_reapproval,
                                         ])->values(),
                                         'cxml' => $hasSensitivePermission ? $po->cxml_payload : null,
+                                        'can_approve' => $canApproveThisPo,
+                                        'approve_url' => route('inventory.purchases.orders.approve', $po),
+                                        'reject_url' => route('inventory.purchases.orders.reject', $po),
                                         'can_receive' => $canReceiveThisPo
                                             && (auth()->user()?->can(\App\Enums\Permission::ReceivePurchaseOrder->value) ?? false),
                                         'receive_url' => route('inventory.purchases.receive', $po),
@@ -1473,58 +1555,58 @@
                                     $isNewPo = session('new_po_id') && (string) session('new_po_id') === (string) $po->id;
                                 @endphp
 
-                                <article class="p-4 transition-colors {{ $isNewPo ? 'bg-emerald-50/60 ring-1 ring-inset ring-emerald-300/80 rounded-lg' : 'hover:bg-neutral-50/80' }}" data-purchase-order-row>
+                                <article class="p-4 transition-colors {{ $isNewPo ? 'bg-emerald-50/60 ring-1 ring-inset ring-emerald-300/80 rounded-lg dark:bg-emerald-950/40 dark:ring-emerald-500/50' : 'hover:bg-neutral-50/80 dark:hover:bg-neutral-800/50' }}" data-purchase-order-row>
                                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                         <div class="min-w-0 space-y-1">
                                             <div class="flex flex-wrap items-center gap-2">
-                                                <button type="button" x-on:click="openPurchaseOrderDetails({{ Js::from($poDetail) }})" class="font-mono text-xs font-bold text-primary-700 hover:text-primary-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 flex items-center gap-1">
-                                                    <svg class="h-3.5 w-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                                                <button type="button" x-on:click="openPurchaseOrderDetails({{ Js::from($poDetail) }})" class="font-mono text-xs font-bold text-primary-700 hover:text-primary-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 flex items-center gap-1 dark:text-primary-400 dark:hover:text-primary-300">
+                                                    <svg class="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                                                     <span>{{ $po->po_number }}</span>
                                                 </button>
                                                 <x-ui.badge :status="$po->status" :variant="$statusVariant" dot>{{ $statusLabel }}</x-ui.badge>
                                                 @if($isNewPo)
-                                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 animate-pulse">
-                                                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-600"></span>
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-950/70 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:text-emerald-300 animate-pulse">
+                                                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400"></span>
                                                         Just Issued
                                                     </span>
                                                 @endif
                                                 @if($isOverdue)
-                                                    <span class="inline-flex items-center rounded-full bg-danger-50 px-2 py-0.5 text-[10px] font-semibold text-danger-700 ring-1 ring-inset ring-danger-600/20">Overdue</span>
+                                                    <span class="inline-flex items-center rounded-full bg-danger-50 dark:bg-danger-950/50 px-2 py-0.5 text-[10px] font-semibold text-danger-700 dark:text-danger-300 ring-1 ring-inset ring-danger-600/20 dark:ring-danger-500/30">Overdue</span>
                                                 @endif
                                                 @if($po->revisions->isNotEmpty())
-                                                    <span class="inline-flex items-center rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-mono text-neutral-600">Rev {{ $po->revision_number }}</span>
+                                                    <span class="inline-flex items-center rounded-full bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[10px] font-mono text-neutral-600 dark:text-neutral-300">Rev {{ $po->revision_number }}</span>
                                                 @endif
                                             </div>
-                                            <p class="truncate text-sm font-semibold text-neutral-900">{{ $primaryItem?->name ?? 'Multiple-item order' }}</p>
-                                            <div class="flex flex-wrap items-center gap-x-2 text-xs text-neutral-500">
-                                                <span class="font-medium text-neutral-700">{{ $po->supplier?->name ?? 'Supplier unavailable' }}</span>
+                                            <p class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ $primaryItem?->name ?? 'Multiple-item order' }}</p>
+                                            <div class="flex flex-wrap items-center gap-x-2 text-xs text-neutral-500 dark:text-neutral-400">
+                                                <span class="font-medium text-neutral-700 dark:text-neutral-200">{{ $po->supplier?->name ?? 'Supplier unavailable' }}</span>
                                                 <span>&bull;</span>
                                                 @php
                                                     $cardUnit = ($poLines->count() === 1 && $poLines->first()->purchase_unit) ? $poLines->first()->purchase_unit : ($primaryItem?->unit ?: 'units');
                                                 @endphp
-                                                <span>{{ number_format($orderedQuantity) }} {{ \Illuminate\Support\Str::plural($cardUnit, $orderedQuantity) }}</span>
+                                                <span class="text-neutral-700 dark:text-neutral-300">{{ number_format($orderedQuantity) }} {{ \Illuminate\Support\Str::plural($cardUnit, $orderedQuantity) }}</span>
                                                 @if($po->orderedBaseQuantity() !== $orderedQuantity)
-                                                    <span class="text-neutral-500 font-medium">(≈ {{ number_format($po->orderedBaseQuantity()) }} base units)</span>
+                                                    <span class="text-neutral-500 dark:text-neutral-400 font-medium">(≈ {{ number_format($po->orderedBaseQuantity()) }} base units)</span>
                                                 @endif
                                                 @if($poLines->count() > 1)
                                                     <span>&bull;</span>
-                                                    <span class="text-neutral-400">{{ $poLines->count() }} items</span>
+                                                    <span class="text-neutral-400 dark:text-neutral-400">{{ $poLines->count() }} items</span>
                                                 @endif
                                             </div>
                                         </div>
 
                                         <div class="grid shrink-0 grid-cols-2 gap-x-6 gap-y-1 text-xs sm:text-right">
                                             @can(\App\Enums\Permission::ViewProcurementSensitiveData->value)
-                                                <div><p class="text-[10px] uppercase tracking-wider text-neutral-400 font-semibold">Total Amount</p><p class="font-bold tabular-nums text-neutral-900">₱{{ number_format((float) $po->total_amount, 2) }}</p></div>
+                                                <div><p class="text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-400 font-semibold">Total Amount</p><p class="font-bold tabular-nums text-neutral-900 dark:text-neutral-100">₱{{ number_format((float) $po->total_amount, 2) }}</p></div>
                                             @endcan
                                             <div>
-                                                <p class="text-[10px] uppercase tracking-wider text-neutral-400 font-semibold">Expected Delivery</p>
-                                                <p class="font-semibold tabular-nums {{ $isOverdue ? 'text-danger-700 font-bold' : 'text-neutral-700' }}">{{ $expectedDelivery?->format('M j, Y') ?? 'Not scheduled' }}</p>
+                                                <p class="text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-400 font-semibold">Expected Delivery</p>
+                                                <p class="font-semibold tabular-nums {{ $isOverdue ? 'text-danger-700 dark:text-danger-400 font-bold' : 'text-neutral-700 dark:text-neutral-300' }}">{{ $expectedDelivery?->format('M j, Y') ?? 'Not scheduled' }}</p>
                                             </div>
-                                            <div><p class="text-[10px] uppercase tracking-wider text-neutral-400 font-semibold">Created Date</p><p class="font-medium tabular-nums text-neutral-600">{{ optional($po->requested_at ?? $po->created_at)->format('M j, Y') }}</p></div>
+                                            <div><p class="text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-400 font-semibold">Created Date</p><p class="font-medium tabular-nums text-neutral-600 dark:text-neutral-300">{{ optional($po->requested_at ?? $po->created_at)->format('M j, Y') }}</p></div>
                                             <div>
-                                                <p class="text-[10px] uppercase tracking-wider text-neutral-400 font-semibold">Fulfillment</p>
-                                                <p class="font-medium tabular-nums {{ $receivedQuantity >= $orderedQuantity && $orderedQuantity > 0 ? 'text-success-700 font-semibold' : 'text-neutral-600' }}">
+                                                <p class="text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-400 font-semibold">Fulfillment</p>
+                                                <p class="font-medium tabular-nums {{ $receivedQuantity >= $orderedQuantity && $orderedQuantity > 0 ? 'text-success-700 dark:text-success-400 font-semibold' : 'text-neutral-600 dark:text-neutral-300' }}">
                                                     {{ number_format($receivedQuantity) }} / {{ number_format($orderedQuantity) }}
                                                 </p>
                                             </div>
@@ -1533,9 +1615,9 @@
 
                                     @can(\App\Enums\Permission::ViewProcurementSensitiveData->value)
                                     {{-- Line Items Price & Total Breakdown --}}
-                                    <div class="mt-3 overflow-hidden rounded-md border border-neutral-200/80 bg-neutral-50/40 text-xs">
+                                    <div class="mt-3 overflow-hidden rounded-md border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/40 dark:bg-neutral-900/60 text-xs">
                                         <table class="w-full text-left">
-                                            <thead class="bg-neutral-100/75 text-[11px] font-semibold text-neutral-600 border-b border-neutral-200/70">
+                                            <thead class="bg-neutral-100/75 dark:bg-neutral-800/80 text-[11px] font-semibold text-neutral-600 dark:text-neutral-300 border-b border-neutral-200/70 dark:border-neutral-700/80">
                                                 <tr>
                                                     <th scope="col" class="px-3 py-1.5">Item Name</th>
                                                     <th scope="col" class="px-3 py-1.5 text-right">Quantity</th>
@@ -1544,33 +1626,33 @@
                                                     <th scope="col" class="px-3 py-1.5 text-right">Total Price</th>
                                                 </tr>
                                             </thead>
-                                            <tbody class="divide-y divide-neutral-200/50 bg-white">
+                                            <tbody class="divide-y divide-neutral-200/50 dark:divide-neutral-800/80 bg-white dark:bg-neutral-900/40">
                                                 @forelse($poLines as $line)
                                                     @php
                                                         $lineUnit = $line->purchase_unit ?: ($line->item?->unit ?: 'unit');
                                                         $lineUnitPrice = (float) $line->unit_price;
                                                         $lineTotal = $line->lineTotal();
                                                     @endphp
-                                                    <tr>
+                                                    <tr class="hover:bg-neutral-50/60 dark:hover:bg-neutral-800/40">
                                                         <td class="px-3 py-2">
-                                                            <span class="font-medium text-neutral-900">{{ $line->item?->name ?? 'Item' }}</span>
+                                                            <span class="font-medium text-neutral-900 dark:text-neutral-100">{{ $line->item?->name ?? 'Item' }}</span>
                                                             @if($line->conversionFactor() > 1)
-                                                                <span class="ml-1 text-[10px] text-neutral-500 font-mono">({{ $line->conversionDisplay() }})</span>
+                                                                <span class="ml-1 text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">({{ $line->conversionDisplay() }})</span>
                                                             @endif
                                                         </td>
-                                                        <td class="px-3 py-2 text-right tabular-nums font-semibold text-neutral-900">
+                                                        <td class="px-3 py-2 text-right tabular-nums font-semibold text-neutral-900 dark:text-neutral-100">
                                                             {{ number_format($line->ordered_quantity) }}
                                                             @if($line->conversionFactor() > 1)
-                                                                <span class="text-[10px] text-neutral-400 font-normal">({{ number_format($line->orderedBaseQuantity()) }} base)</span>
+                                                                <span class="text-[10px] text-neutral-400 dark:text-neutral-400 font-normal">({{ number_format($line->orderedBaseQuantity()) }} base)</span>
                                                             @endif
                                                         </td>
-                                                        <td class="px-3 py-2 text-center capitalize text-neutral-700">
+                                                        <td class="px-3 py-2 text-center capitalize text-neutral-700 dark:text-neutral-300">
                                                             {{ $lineUnit }}
                                                         </td>
-                                                        <td class="px-3 py-2 text-right font-mono tabular-nums text-neutral-700">
+                                                        <td class="px-3 py-2 text-right font-mono tabular-nums text-neutral-700 dark:text-neutral-300">
                                                             ₱{{ number_format($lineUnitPrice, 2) }}/{{ $lineUnit }}
                                                         </td>
-                                                        <td class="px-3 py-2 text-right font-mono font-semibold tabular-nums text-neutral-900">
+                                                        <td class="px-3 py-2 text-right font-mono font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
                                                             ₱{{ number_format($lineTotal, 2) }}
                                                         </td>
                                                     </tr>
@@ -1581,36 +1663,36 @@
                                                             $singleUnitPrice = $po->quantity > 0 ? ($po->unit_cost ?: round($po->total_amount / $po->quantity, 2)) : 0;
                                                             $singleTotal = (float) $po->total_amount;
                                                         @endphp
-                                                        <tr>
+                                                        <tr class="hover:bg-neutral-50/60 dark:hover:bg-neutral-800/40">
                                                             <td class="px-3 py-2">
-                                                                <span class="font-medium text-neutral-900">{{ $po->item->name }}</span>
+                                                                <span class="font-medium text-neutral-900 dark:text-neutral-100">{{ $po->item->name }}</span>
                                                                 @if($po->conversion_factor > 1)
-                                                                    <span class="ml-1 text-[10px] text-neutral-500 font-mono">(1 {{ $singleUnit }} = {{ (int) $po->conversion_factor }} {{ $po->item->unit }})</span>
+                                                                    <span class="ml-1 text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">(1 {{ $singleUnit }} = {{ (int) $po->conversion_factor }} {{ $po->item->unit }})</span>
                                                                 @endif
                                                             </td>
-                                                            <td class="px-3 py-2 text-right tabular-nums font-semibold text-neutral-900">
+                                                            <td class="px-3 py-2 text-right tabular-nums font-semibold text-neutral-900 dark:text-neutral-100">
                                                                 {{ number_format($po->quantity) }}
                                                                 @if($po->conversion_factor > 1)
-                                                                    <span class="text-[10px] text-neutral-400 font-normal">({{ number_format($po->orderedBaseQuantity()) }} base)</span>
+                                                                    <span class="text-[10px] text-neutral-400 dark:text-neutral-400 font-normal">({{ number_format($po->orderedBaseQuantity()) }} base)</span>
                                                                 @endif
                                                             </td>
-                                                            <td class="px-3 py-2 text-center capitalize text-neutral-700">
+                                                            <td class="px-3 py-2 text-center capitalize text-neutral-700 dark:text-neutral-300">
                                                                 {{ $singleUnit }}
                                                             </td>
-                                                            <td class="px-3 py-2 text-right font-mono tabular-nums text-neutral-700">
+                                                            <td class="px-3 py-2 text-right font-mono tabular-nums text-neutral-700 dark:text-neutral-300">
                                                                 ₱{{ number_format($singleUnitPrice, 2) }}/{{ $singleUnit }}
                                                             </td>
-                                                            <td class="px-3 py-2 text-right font-mono font-semibold tabular-nums text-neutral-900">
+                                                            <td class="px-3 py-2 text-right font-mono font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
                                                                 ₱{{ number_format($singleTotal, 2) }}
                                                             </td>
                                                         </tr>
                                                     @endif
                                                 @endforelse
                                             </tbody>
-                                            <tfoot class="border-t border-neutral-200 bg-neutral-50 font-semibold text-neutral-900">
+                                            <tfoot class="border-t border-neutral-200 dark:border-neutral-700/80 bg-neutral-50 dark:bg-neutral-800/80 font-semibold text-neutral-900 dark:text-neutral-100">
                                                 <tr>
-                                                    <td colspan="4" class="px-3 py-1.5 text-right text-xs">Purchase Order Total:</td>
-                                                    <td class="px-3 py-1.5 text-right font-mono tabular-nums text-xs font-bold text-primary-700">
+                                                    <td colspan="4" class="px-3 py-1.5 text-right text-xs text-neutral-600 dark:text-neutral-300">Purchase Order Total:</td>
+                                                    <td class="px-3 py-1.5 text-right font-mono tabular-nums text-xs font-bold text-primary-700 dark:text-primary-400">
                                                         ₱{{ number_format($po->grandTotal(), 2) }}
                                                     </td>
                                                 </tr>
@@ -1619,35 +1701,58 @@
                                     </div>
                                     @endcan
 
-                                    <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-100 pt-2.5">
+                                    <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-100 dark:border-neutral-800 pt-2.5">
                                         <div class="flex items-center gap-2">
                                             <x-ui.button type="button" variant="secondary" size="sm" x-on:click="openPurchaseOrderDetails({{ Js::from($poDetail) }})">View details</x-ui.button>
                                             @if($po->cxml_payload)
                                                 @can(\App\Enums\Permission::ViewProcurementSensitiveData->value)
-                                                    <button type="button" x-on:click="selectedPoCxml = {{ Js::from($po->cxml_payload) }}; selectedPoNumber = '{{ $po->po_number }}'; showCxmlModal = true" class="rounded px-2 py-1 text-[11px] font-mono text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 focus-visible:outline-none">cXML</button>
+                                                    <button type="button" x-on:click="selectedPoCxml = {{ Js::from($po->cxml_payload) }}; selectedPoNumber = '{{ $po->po_number }}'; showCxmlModal = true" class="rounded px-2 py-1 text-[11px] font-mono text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200 focus-visible:outline-none">cXML</button>
                                                 @endcan
                                             @endif
                                         </div>
-                                        @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
-                                            @if($canReceiveThisPo)
-                                                <form method="POST" action="{{ route('inventory.purchases.receive', $po) }}" data-confirm-title="Receive Purchase Order" data-confirm-message="Confirm that this delivery is physically present at the dock before posting into inventory." data-confirm-label="Receive delivery">
+                                        <div class="flex items-center gap-2">
+                                            @if($canApproveThisPo)
+                                                <form method="POST" action="{{ route('inventory.purchases.orders.approve', $po) }}"
+                                                      data-confirm-title="Approve Purchase Order"
+                                                      data-confirm-message="Are you sure you want to approve Purchase Order {{ $po->po_number }} for ₱{{ number_format($po->grandTotal(), 2) }}?"
+                                                      data-confirm-label="Approve Order">
                                                     @csrf
-                                                    <x-ui.button type="submit" size="sm" icon="check-circle">Receive delivery</x-ui.button>
+                                                    <button type="submit" class="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-emerald-600 bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 hover:border-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">
+                                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                        Approve Order
+                                                    </button>
                                                 </form>
-                                            @elseif(in_array($po->status, ['received', 'fulfilled'], true))
-                                                <span class="inline-flex items-center gap-1 text-xs font-semibold text-success-700">
-                                                    <svg class="h-3.5 w-3.5 text-success-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                                    Stock posted
-                                                </span>
+                                                <form method="POST" action="{{ route('inventory.purchases.orders.reject', $po) }}"
+                                                      data-confirm-title="Reject Purchase Order"
+                                                      data-confirm-message="Are you sure you want to reject Purchase Order {{ $po->po_number }}? The procurement commitment will be cancelled."
+                                                      data-confirm-label="Reject Order"
+                                                      data-confirm-variant="danger">
+                                                    @csrf
+                                                    <input type="hidden" name="rejection_reason" value="Rejected during pipeline review">
+                                                    <x-ui.button type="submit" variant="secondary" size="sm" class="text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700 dark:hover:text-rose-300">Reject</x-ui.button>
+                                                </form>
                                             @endif
-                                        @endcan
+                                            @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
+                                                @if($canReceiveThisPo)
+                                                    <form method="POST" action="{{ route('inventory.purchases.receive', $po) }}" data-confirm-title="Receive Purchase Order" data-confirm-message="Confirm that this delivery is physically present at the dock before posting into inventory." data-confirm-label="Receive delivery">
+                                                        @csrf
+                                                        <x-ui.button type="submit" size="sm" icon="check-circle">Receive delivery</x-ui.button>
+                                                    </form>
+                                                @elseif(in_array($po->status, ['received', 'fulfilled'], true))
+                                                    <span class="inline-flex items-center gap-1 text-xs font-semibold text-success-700 dark:text-success-400">
+                                                        <svg class="h-3.5 w-3.5 text-success-600 dark:text-success-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                        Stock posted
+                                                    </span>
+                                                @endif
+                                            @endcan
+                                        </div>
                                     </div>
                                 </article>
                             @empty
                                 <div class="px-5 py-12 text-center">
-                                    <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-500"><x-ui.icon name="document-text" class="h-5 w-5" /></span>
-                                    <p class="mt-3 text-sm font-medium text-neutral-800">No purchase orders found</p>
-                                    <p class="mt-1 text-xs text-neutral-500">{{ collect($poFilters)->filter()->isNotEmpty() || $supplierFilter ? 'Clear the filters to view other orders.' : 'Create the first catalog purchase order when stock needs replenishment.' }}</p>
+                                    <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"><x-ui.icon name="document-text" class="h-5 w-5" /></span>
+                                    <p class="mt-3 text-sm font-medium text-neutral-800 dark:text-neutral-200">No purchase orders found</p>
+                                    <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{{ collect($poFilters)->filter()->isNotEmpty() || $supplierFilter ? 'Clear the filters to view other orders.' : 'Create the first catalog purchase order when stock needs replenishment.' }}</p>
                                 </div>
                             @endforelse
                         </div>
@@ -1668,16 +1773,16 @@
                 @can(\App\Enums\Permission::IssuePurchaseOrder->value)
                     <x-ui.modal name="review-purchase-order" title="Review purchase order" maxWidth="lg">
                         <div class="space-y-4">
-                            <div class="rounded-lg border border-warning-200 bg-warning-50 px-3 py-2.5 text-xs text-warning-800">Confirm the item, supplier, quantity, and delivery timing. Creating this order commits funds but does not change stock.</div>
-                            <dl class="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
-                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500">Item</dt><dd class="text-right text-sm font-medium text-neutral-900" x-text="selectedItem()?.name"></dd></div>
-                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500">Quantity</dt><dd class="text-right text-sm font-medium tabular-nums text-neutral-900"><span x-text="formatNumber(quantity)"></span> <span x-text="selectedItem()?.unit"></span></dd></div>
-                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500">Price per unit</dt><dd class="text-right text-sm font-medium tabular-nums text-neutral-900" x-text="formatCurrency(trustedUnitCost(), selectedTerms()?.currency)"></dd></div>
-                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500">Supplier</dt><dd class="text-right text-sm font-medium text-neutral-900" x-text="selectedSupplier()?.name"></dd></div>
-                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500">Expected delivery</dt><dd class="text-right text-sm font-medium tabular-nums text-neutral-900" x-text="expectedDeliveryLabel()"></dd></div>
-                                <div class="flex justify-between gap-4 bg-neutral-50 px-3 py-3"><dt class="text-xs font-semibold text-neutral-700">Estimated total</dt><dd class="text-right text-base font-semibold tabular-nums text-neutral-900" x-text="formatCurrency(orderTotal(), selectedTerms()?.currency)"></dd></div>
+                            <div class="rounded-lg border border-warning-200 bg-warning-50 px-3 py-2.5 text-xs text-warning-800 dark:border-warning-800 dark:bg-warning-950/40 dark:text-warning-300">Confirm the item, supplier, quantity, and delivery timing. Creating this order commits funds but does not change stock.</div>
+                            <dl class="divide-y divide-neutral-100 dark:divide-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-800">
+                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500 dark:text-neutral-400">Item</dt><dd class="text-right text-sm font-medium text-neutral-900 dark:text-neutral-100" x-text="selectedItem()?.name"></dd></div>
+                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500 dark:text-neutral-400">Quantity</dt><dd class="text-right text-sm font-medium tabular-nums text-neutral-900 dark:text-neutral-100"><span x-text="formatNumber(quantity)"></span> <span x-text="selectedItem()?.unit"></span></dd></div>
+                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500 dark:text-neutral-400">Price per unit</dt><dd class="text-right text-sm font-medium tabular-nums text-neutral-900 dark:text-neutral-100" x-text="formatCurrency(trustedUnitCost(), selectedTerms()?.currency)"></dd></div>
+                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500 dark:text-neutral-400">Supplier</dt><dd class="text-right text-sm font-medium text-neutral-900 dark:text-neutral-100" x-text="selectedSupplier()?.name"></dd></div>
+                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500 dark:text-neutral-400">Expected delivery</dt><dd class="text-right text-sm font-medium tabular-nums text-neutral-900 dark:text-neutral-100" x-text="expectedDeliveryLabel()"></dd></div>
+                                <div class="flex justify-between gap-4 bg-neutral-50 dark:bg-neutral-800/60 px-3 py-3"><dt class="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Estimated total</dt><dd class="text-right text-base font-semibold tabular-nums text-neutral-900 dark:text-neutral-100" x-text="formatCurrency(orderTotal(), selectedTerms()?.currency)"></dd></div>
                             </dl>
-                            <p class="text-xs text-neutral-500">The server will re-check supplier compliance, minimum quantity, catalog pricing, and authorization before saving.</p>
+                            <p class="text-xs text-neutral-500 dark:text-neutral-400">The server will re-check supplier compliance, minimum quantity, catalog pricing, and authorization before saving.</p>
                             <div class="flex justify-end gap-2">
                                 <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'review-purchase-order')">Back</x-ui.button>
                                 <x-ui.button type="submit" form="direct-po-form" data-loading-text="Creating purchase order...">Confirm &amp; create PO</x-ui.button>
@@ -1689,53 +1794,53 @@
                 <x-ui.modal name="purchase-order-details" title="Purchase order details" maxWidth="3xl">
                     <template x-if="selectedPo">
                         <div class="space-y-4">
-                            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-neutral-100 pb-3">
+                            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-neutral-100 dark:border-neutral-800 pb-3">
                                 <div class="min-w-0">
-                                    <p class="font-mono text-base font-bold text-primary-700" x-text="selectedPo.number"></p>
-                                    <p class="mt-0.5 text-xs text-neutral-500">
+                                    <p class="font-mono text-base font-bold text-primary-700 dark:text-primary-400" x-text="selectedPo.number"></p>
+                                    <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                                         <span x-text="selectedPo.version || 'Original issue'"></span> · <span x-text="selectedPo.status"></span>
                                         <template x-if="selectedPo.approval_status"><span> · Approval <span x-text="selectedPo.approval_status"></span></span></template>
                                     </p>
                                 </div>
                                 <div class="text-right">
-                                    <p class="text-xs text-neutral-500">Supplier</p>
-                                    <p class="text-sm font-semibold text-neutral-900" x-text="selectedPo.supplier"></p>
+                                    <p class="text-xs text-neutral-500 dark:text-neutral-400">Supplier</p>
+                                    <p class="text-sm font-semibold text-neutral-900 dark:text-neutral-100" x-text="selectedPo.supplier"></p>
                                 </div>
                             </div>
 
-                            <div class="grid gap-px overflow-hidden rounded-lg border border-neutral-200 bg-neutral-200 sm:grid-cols-3">
-                                <div class="bg-neutral-50 p-3">
-                                    <p class="text-[10px] uppercase tracking-wide text-neutral-500">Ordered Quantity</p>
-                                    <p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900">
+                            <div class="grid gap-px overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-200 dark:bg-neutral-800 sm:grid-cols-3">
+                                <div class="bg-neutral-50 dark:bg-neutral-900 p-3">
+                                    <p class="text-[10px] uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Ordered Quantity</p>
+                                    <p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
                                         <span x-text="formatNumber(selectedPo.quantity)"></span> <span x-text="selectedPo.unit"></span>
                                     </p>
                                     <template x-if="selectedPo.ordered_base_quantity && selectedPo.ordered_base_quantity !== selectedPo.quantity">
-                                        <p class="text-[11px] text-neutral-500 tabular-nums">≈ <span x-text="formatNumber(selectedPo.ordered_base_quantity)"></span> base units</p>
+                                        <p class="text-[11px] text-neutral-500 dark:text-neutral-400 tabular-nums">≈ <span x-text="formatNumber(selectedPo.ordered_base_quantity)"></span> base units</p>
                                     </template>
                                 </div>
-                                <div class="bg-neutral-50 p-3">
-                                    <p class="text-[10px] uppercase tracking-wide text-neutral-500">Received Stock</p>
-                                    <p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900" x-text="`${formatNumber(selectedPo.received_quantity)} / ${formatNumber(selectedPo.quantity)}`"></p>
+                                <div class="bg-neutral-50 dark:bg-neutral-900 p-3">
+                                    <p class="text-[10px] uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Received Stock</p>
+                                    <p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900 dark:text-neutral-100" x-text="`${formatNumber(selectedPo.received_quantity)} / ${formatNumber(selectedPo.quantity)}`"></p>
                                     <template x-if="selectedPo.received_base_quantity && selectedPo.received_base_quantity !== selectedPo.received_quantity">
-                                        <p class="text-[11px] text-neutral-500 tabular-nums">≈ <span x-text="formatNumber(selectedPo.received_base_quantity)"></span> base units</p>
+                                        <p class="text-[11px] text-neutral-500 dark:text-neutral-400 tabular-nums">≈ <span x-text="formatNumber(selectedPo.received_base_quantity)"></span> base units</p>
                                     </template>
                                 </div>
-                                <div class="bg-neutral-50 p-3">
-                                    <p class="text-[10px] uppercase tracking-wide text-neutral-500">Expected Delivery</p>
-                                    <p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900" x-text="formatDate(selectedPo.delivery_date)"></p>
+                                <div class="bg-neutral-50 dark:bg-neutral-900 p-3">
+                                    <p class="text-[10px] uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Expected Delivery</p>
+                                    <p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900 dark:text-neutral-100" x-text="formatDate(selectedPo.delivery_date)"></p>
                                 </div>
                             </div>
 
                             {{-- Complete Item Cost Details & Summary Table --}}
                             <div>
                                 <div class="flex items-center justify-between mb-2">
-                                    <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-600">Order Lines &amp; Cost Breakdown</h4>
-                                    <span class="text-xs text-neutral-500" x-text="`${selectedPo.lines.length} item${selectedPo.lines.length === 1 ? '' : 's'}`"></span>
+                                    <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">Order Lines &amp; Cost Breakdown</h4>
+                                    <span class="text-xs text-neutral-500 dark:text-neutral-400" x-text="`${selectedPo.lines.length} item${selectedPo.lines.length === 1 ? '' : 's'}`"></span>
                                 </div>
-                                <div class="overflow-hidden rounded-lg border border-neutral-200">
+                                <div class="overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800">
                                     <div class="overflow-x-auto">
-                                        <table class="min-w-full divide-y divide-neutral-200 text-left text-xs">
-                                            <thead class="bg-neutral-50 text-neutral-600">
+                                        <table class="min-w-full divide-y divide-neutral-200 dark:divide-neutral-800 text-left text-xs">
+                                            <thead class="bg-neutral-50 dark:bg-neutral-800/80 text-neutral-600 dark:text-neutral-300">
                                                 <tr>
                                                     <th scope="col" class="px-3 py-2 font-semibold">Item &amp; Details</th>
                                                     <th scope="col" class="px-3 py-2 font-semibold text-right">Ordered Qty</th>
@@ -1744,54 +1849,54 @@
                                                     <th x-show="selectedPo.amount !== null" scope="col" class="px-3 py-2 font-semibold text-right">Total</th>
                                                 </tr>
                                             </thead>
-                                            <tbody class="divide-y divide-neutral-100 bg-white">
+                                            <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800 bg-white dark:bg-neutral-900/40">
                                                 <template x-for="(line, index) in selectedPo.lines" x-bind:key="index">
-                                                    <tr class="hover:bg-neutral-50/50">
+                                                    <tr class="hover:bg-neutral-50/50 dark:hover:bg-neutral-800/40">
                                                         <td class="px-3 py-2.5">
-                                                            <p class="font-medium text-neutral-900" x-text="line.item"></p>
+                                                            <p class="font-medium text-neutral-900 dark:text-neutral-100" x-text="line.item"></p>
                                                             <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
-                                                                <span class="font-mono text-[11px] text-neutral-500" x-text="`SKU: ${line.sku}`"></span>
+                                                                <span class="font-mono text-[11px] text-neutral-500 dark:text-neutral-400" x-text="`SKU: ${line.sku}`"></span>
                                                                 <template x-if="line.conversion_display">
-                                                                    <span class="inline-flex items-center rounded bg-primary-50 px-1.5 py-0.5 text-[10px] font-medium text-primary-700 ring-1 ring-inset ring-primary-600/20" x-text="line.conversion_display"></span>
+                                                                    <span class="inline-flex items-center rounded bg-primary-50 dark:bg-primary-950/60 px-1.5 py-0.5 text-[10px] font-medium text-primary-700 dark:text-primary-300 ring-1 ring-inset ring-primary-600/20 dark:ring-primary-500/30" x-text="line.conversion_display"></span>
                                                                 </template>
                                                             </div>
-                                                            <p class="mt-1 text-[11px] text-neutral-500" x-text="`${formatNumber(line.received)} of ${formatNumber(line.ordered)} ${line.purchase_unit} received`"></p>
+                                                            <p class="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400" x-text="`${formatNumber(line.received)} of ${formatNumber(line.ordered)} ${line.purchase_unit} received`"></p>
                                                         </td>
                                                         <td class="px-3 py-2.5 text-right tabular-nums">
-                                                            <span class="font-semibold text-neutral-900" x-text="formatNumber(line.ordered)"></span>
+                                                            <span class="font-semibold text-neutral-900 dark:text-neutral-100" x-text="formatNumber(line.ordered)"></span>
                                                             <template x-if="line.conversion_factor > 1">
-                                                                <p class="text-[11px] text-neutral-500 tabular-nums" x-text="`≈ ${formatNumber(line.equivalent_base_quantity)} ${line.base_unit}`"></p>
+                                                                <p class="text-[11px] text-neutral-500 dark:text-neutral-400 tabular-nums" x-text="`≈ ${formatNumber(line.equivalent_base_quantity)} ${line.base_unit}`"></p>
                                                             </template>
                                                         </td>
-                                                        <td class="px-3 py-2.5 text-center capitalize text-neutral-700" x-text="line.purchase_unit"></td>
-                                                        <td x-show="selectedPo.amount !== null" class="px-3 py-2.5 text-right font-mono tabular-nums text-neutral-700" x-text="formatCurrency(line.unit_price, selectedPo.currency)"></td>
-                                                        <td x-show="selectedPo.amount !== null" class="px-3 py-2.5 text-right font-semibold font-mono tabular-nums text-neutral-900" x-text="formatCurrency(line.amount, selectedPo.currency)"></td>
+                                                        <td class="px-3 py-2.5 text-center capitalize text-neutral-700 dark:text-neutral-300" x-text="line.purchase_unit"></td>
+                                                        <td x-show="selectedPo.amount !== null" class="px-3 py-2.5 text-right font-mono tabular-nums text-neutral-700 dark:text-neutral-300" x-text="formatCurrency(line.unit_price, selectedPo.currency)"></td>
+                                                        <td x-show="selectedPo.amount !== null" class="px-3 py-2.5 text-right font-semibold font-mono tabular-nums text-neutral-900 dark:text-neutral-100" x-text="formatCurrency(line.amount, selectedPo.currency)"></td>
                                                     </tr>
                                                 </template>
                                                 <tr x-show="selectedPo.lines.length === 0">
-                                                    <td :colspan="selectedPo.amount !== null ? 5 : 3" class="px-3 py-4 text-center text-neutral-500" x-text="selectedPo.item"></td>
+                                                    <td :colspan="selectedPo.amount !== null ? 5 : 3" class="px-3 py-4 text-center text-neutral-500 dark:text-neutral-400" x-text="selectedPo.item"></td>
                                                 </tr>
                                             </tbody>
-                                            <tfoot x-show="selectedPo.amount !== null" class="border-t border-neutral-200 bg-neutral-50/70 text-xs">
+                                            <tfoot x-show="selectedPo.amount !== null" class="border-t border-neutral-200 dark:border-neutral-700/80 bg-neutral-50/70 dark:bg-neutral-800/80 text-xs">
                                                 <tr>
-                                                    <td colspan="4" class="px-3 py-2 text-right font-medium text-neutral-600">Subtotal:</td>
-                                                    <td class="px-3 py-2 text-right font-semibold font-mono tabular-nums text-neutral-900" x-text="formatCurrency(selectedPo.subtotal ?? selectedPo.amount, selectedPo.currency)"></td>
+                                                    <td colspan="4" class="px-3 py-2 text-right font-medium text-neutral-600 dark:text-neutral-300">Subtotal:</td>
+                                                    <td class="px-3 py-2 text-right font-semibold font-mono tabular-nums text-neutral-900 dark:text-neutral-100" x-text="formatCurrency(selectedPo.subtotal ?? selectedPo.amount, selectedPo.currency)"></td>
                                                 </tr>
                                                 <template x-if="selectedPo.additional_charges && selectedPo.additional_charges > 0">
                                                     <tr>
-                                                        <td colspan="4" class="px-3 py-1.5 text-right font-medium text-neutral-600">Additional Charges:</td>
-                                                        <td class="px-3 py-1.5 text-right font-mono tabular-nums text-neutral-800" x-text="formatCurrency(selectedPo.additional_charges, selectedPo.currency)"></td>
+                                                        <td colspan="4" class="px-3 py-1.5 text-right font-medium text-neutral-600 dark:text-neutral-300">Additional Charges:</td>
+                                                        <td class="px-3 py-1.5 text-right font-mono tabular-nums text-neutral-800 dark:text-neutral-200" x-text="formatCurrency(selectedPo.additional_charges, selectedPo.currency)"></td>
                                                     </tr>
                                                 </template>
                                                 <template x-if="selectedPo.discounts && selectedPo.discounts > 0">
                                                     <tr>
-                                                        <td colspan="4" class="px-3 py-1.5 text-right font-medium text-neutral-600">Discounts:</td>
-                                                        <td class="px-3 py-1.5 text-right font-mono tabular-nums text-emerald-700" x-text="`-${formatCurrency(selectedPo.discounts, selectedPo.currency)}`"></td>
+                                                        <td colspan="4" class="px-3 py-1.5 text-right font-medium text-neutral-600 dark:text-neutral-300">Discounts:</td>
+                                                        <td class="px-3 py-1.5 text-right font-mono tabular-nums text-emerald-700 dark:text-emerald-400" x-text="`-${formatCurrency(selectedPo.discounts, selectedPo.currency)}`"></td>
                                                     </tr>
                                                 </template>
-                                                <tr class="border-t border-neutral-200 font-semibold">
-                                                    <td colspan="4" class="px-3 py-2.5 text-right text-sm text-neutral-900">Grand Total:</td>
-                                                    <td class="px-3 py-2.5 text-right text-sm font-bold font-mono tabular-nums text-primary-700" x-text="formatCurrency(selectedPo.grand_total ?? selectedPo.amount, selectedPo.currency)"></td>
+                                                <tr class="border-t border-neutral-200 dark:border-neutral-700 font-semibold">
+                                                    <td colspan="4" class="px-3 py-2.5 text-right text-sm text-neutral-900 dark:text-neutral-100">Grand Total:</td>
+                                                    <td class="px-3 py-2.5 text-right text-sm font-bold font-mono tabular-nums text-primary-700 dark:text-primary-400" x-text="formatCurrency(selectedPo.grand_total ?? selectedPo.amount, selectedPo.currency)"></td>
                                                 </tr>
                                             </tfoot>
                                         </table>
@@ -1800,47 +1905,47 @@
                             </div>
 
                             <div>
-                                <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Delivery &amp; receiving</h4>
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Delivery &amp; receiving</h4>
                                 <dl class="mt-2 grid gap-3 text-sm sm:grid-cols-2">
-                                    <div><dt class="text-xs text-neutral-500">Raised</dt><dd class="mt-0.5 font-medium text-neutral-900" x-text="formatDate(selectedPo.created_at)"></dd></div>
-                                    <div><dt class="text-xs text-neutral-500">Stock posted</dt><dd class="mt-0.5 font-medium text-neutral-900" x-text="selectedPo.received_at ? formatDate(selectedPo.received_at) : 'Not yet received'"></dd></div>
+                                    <div><dt class="text-xs text-neutral-500 dark:text-neutral-400">Raised</dt><dd class="mt-0.5 font-medium text-neutral-900 dark:text-neutral-100" x-text="formatDate(selectedPo.created_at)"></dd></div>
+                                    <div><dt class="text-xs text-neutral-500 dark:text-neutral-400">Stock posted</dt><dd class="mt-0.5 font-medium text-neutral-900 dark:text-neutral-100" x-text="selectedPo.received_at ? formatDate(selectedPo.received_at) : 'Not yet received'"></dd></div>
                                 </dl>
                                 <template x-if="selectedPo.shipments.length > 0">
-                                    <ul class="mt-2 divide-y divide-neutral-100 rounded-lg border border-neutral-200">
+                                    <ul class="mt-2 divide-y divide-neutral-100 dark:divide-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-800">
                                         <template x-for="shipment in selectedPo.shipments" x-bind:key="shipment.number">
                                             <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
-                                                <span class="font-mono font-medium text-neutral-800" x-text="shipment.number"></span>
-                                                <span class="text-neutral-500" x-text="shipment.status"></span>
-                                                <span class="tabular-nums text-neutral-700" x-text="shipment.delivered ? 'Delivered ' + formatDate(shipment.delivered) : 'ETA ' + formatDate(shipment.eta)"></span>
+                                                <span class="font-mono font-medium text-neutral-800 dark:text-neutral-200" x-text="shipment.number"></span>
+                                                <span class="text-neutral-500 dark:text-neutral-400" x-text="shipment.status"></span>
+                                                <span class="tabular-nums text-neutral-700 dark:text-neutral-300" x-text="shipment.delivered ? 'Delivered ' + formatDate(shipment.delivered) : 'ETA ' + formatDate(shipment.eta)"></span>
                                             </li>
                                         </template>
                                     </ul>
                                 </template>
                             </div>
                             <dl class="grid gap-3 text-sm sm:grid-cols-2">
-                                <div x-show="selectedPo.purchase_request"><dt class="text-xs text-neutral-500">Purchase request</dt><dd class="mt-0.5 font-medium text-neutral-900" x-text="selectedPo.purchase_request"></dd></div>
-                                <div x-show="selectedPo.cost_center"><dt class="text-xs text-neutral-500">Cost center</dt><dd class="mt-0.5 font-medium text-neutral-900" x-text="selectedPo.cost_center"></dd></div>
-                                <div x-show="selectedPo.payment_terms"><dt class="text-xs text-neutral-500">Commercial terms</dt><dd class="mt-0.5 font-medium text-neutral-900" x-text="`${selectedPo.payment_terms || ''} · ${selectedPo.incoterms || ''}`"></dd></div>
-                                <div x-show="selectedPo.created_by"><dt class="text-xs text-neutral-500">Raised by</dt><dd class="mt-0.5 font-medium text-neutral-900" x-text="selectedPo.created_by"></dd></div>
-                                <div x-show="selectedPo.amount !== null"><dt class="text-xs text-neutral-500">Total commitment</dt><dd class="mt-0.5 font-semibold tabular-nums text-neutral-900" x-text="formatCurrency(selectedPo.amount, selectedPo.currency)"></dd></div>
+                                <div x-show="selectedPo.purchase_request"><dt class="text-xs text-neutral-500 dark:text-neutral-400">Purchase request</dt><dd class="mt-0.5 font-medium text-neutral-900 dark:text-neutral-100" x-text="selectedPo.purchase_request"></dd></div>
+                                <div x-show="selectedPo.cost_center"><dt class="text-xs text-neutral-500 dark:text-neutral-400">Cost center</dt><dd class="mt-0.5 font-medium text-neutral-900 dark:text-neutral-100" x-text="selectedPo.cost_center"></dd></div>
+                                <div x-show="selectedPo.payment_terms"><dt class="text-xs text-neutral-500 dark:text-neutral-400">Commercial terms</dt><dd class="mt-0.5 font-medium text-neutral-900 dark:text-neutral-100" x-text="`${selectedPo.payment_terms || ''} · ${selectedPo.incoterms || ''}`"></dd></div>
+                                <div x-show="selectedPo.created_by"><dt class="text-xs text-neutral-500 dark:text-neutral-400">Raised by</dt><dd class="mt-0.5 font-medium text-neutral-900 dark:text-neutral-100" x-text="selectedPo.created_by"></dd></div>
+                                <div x-show="selectedPo.amount !== null"><dt class="text-xs text-neutral-500 dark:text-neutral-400">Total commitment</dt><dd class="mt-0.5 font-semibold tabular-nums text-neutral-900 dark:text-neutral-100" x-text="formatCurrency(selectedPo.amount, selectedPo.currency)"></dd></div>
                             </dl>
                             <div x-show="selectedPo.approval_steps.length > 0">
-                                <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Approval history</h4>
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Approval history</h4>
                                 <div class="mt-2 space-y-2">
                                     <template x-for="step in selectedPo.approval_steps" x-bind:key="step.number">
-                                        <div class="flex items-center justify-between rounded-md border border-neutral-200 px-3 py-2 text-xs"><span x-text="`Step ${step.number} · ${step.role}`"></span><span class="font-medium text-neutral-700" x-text="`${step.status}${step.approver ? ` · ${step.approver}` : ''}`"></span></div>
+                                        <div class="flex items-center justify-between rounded-md border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-xs bg-neutral-50/50 dark:bg-neutral-800/40"><span class="text-neutral-700 dark:text-neutral-300" x-text="`Step ${step.number} · ${step.role}`"></span><span class="font-medium text-neutral-900 dark:text-neutral-100" x-text="`${step.status}${step.approver ? ` · ${step.approver}` : ''}`"></span></div>
                                     </template>
                                 </div>
                             </div>
                             <div x-show="selectedPo.revisions.length > 0">
-                                <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Change orders</h4>
-                                <div class="mt-2 divide-y divide-neutral-100 rounded-lg border border-neutral-200">
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Change orders</h4>
+                                <div class="mt-2 divide-y divide-neutral-100 dark:divide-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-800">
                                     <template x-for="revision in selectedPo.revisions" x-bind:key="revision.code">
                                         <div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
-                                            <span class="font-mono font-medium text-neutral-800" x-text="revision.code"></span>
-                                            <span class="text-neutral-500" x-text="revision.status"></span>
-                                            <span class="tabular-nums text-neutral-700" x-text="formatCurrency(revision.delta, selectedPo.currency) + ' (' + formatNumber(revision.variance, 2) + '%)'"></span>
-                                            <span x-show="revision.requires_doa" class="rounded-full bg-warning-50 px-2 py-0.5 text-[10px] font-semibold text-warning-700">Re-approval required</span>
+                                            <span class="font-mono font-medium text-neutral-800 dark:text-neutral-200" x-text="revision.code"></span>
+                                            <span class="text-neutral-500 dark:text-neutral-400" x-text="revision.status"></span>
+                                            <span class="tabular-nums text-neutral-700 dark:text-neutral-300" x-text="formatCurrency(revision.delta, selectedPo.currency) + ' (' + formatNumber(revision.variance, 2) + '%)'"></span>
+                                            <span x-show="revision.requires_doa" class="rounded-full bg-warning-50 dark:bg-warning-950/60 px-2 py-0.5 text-[10px] font-semibold text-warning-700 dark:text-warning-300">Re-approval required</span>
                                         </div>
                                     </template>
                                 </div>
@@ -1852,10 +1957,28 @@
                         <template x-if="selectedPo">
                             <div class="flex w-full flex-wrap items-center justify-end gap-2">
                                 <template x-if="selectedPo.cxml">
-                                    <button type="button" x-on:click="selectedPoCxml = selectedPo.cxml; selectedPoNumber = selectedPo.number; showCxmlModal = true" class="mr-auto rounded-md px-2 py-1 font-mono text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">cXML payload</button>
+                                    <button type="button" x-on:click="selectedPoCxml = selectedPo.cxml; selectedPoNumber = selectedPo.number; showCxmlModal = true" class="mr-auto rounded-md px-2 py-1 font-mono text-xs text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-800 dark:hover:text-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">cXML payload</button>
                                 </template>
+                                @can(\App\Enums\Permission::ApprovePurchaseOrder->value)
+                                <template x-if="selectedPo.can_approve">
+                                    <div class="flex items-center gap-2">
+                                        <form method="POST" x-bind:action="selectedPo.approve_url" data-confirm-title="Approve Purchase Order" data-confirm-message="Are you sure you want to approve this purchase order?" data-confirm-label="Approve Order">
+                                            @csrf
+                                            <button type="submit" class="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-emerald-600 bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 hover:border-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+                                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                Approve Order
+                                            </button>
+                                        </form>
+                                        <form method="POST" x-bind:action="selectedPo.reject_url" data-confirm-title="Reject Purchase Order" data-confirm-message="Are you sure you want to reject this purchase order? The commitment will be cancelled." data-confirm-label="Reject Order" data-confirm-variant="danger">
+                                            @csrf
+                                            <input type="hidden" name="rejection_reason" value="Rejected during order details review">
+                                            <x-ui.button type="submit" variant="secondary" size="sm" class="text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700 dark:hover:text-rose-300">Reject Order</x-ui.button>
+                                        </form>
+                                    </div>
+                                </template>
+                                @endcan
                                 @can(\App\Enums\Permission::ViewInventory->value)
-                                    <a x-bind:href="selectedPo.receiving_url" class="inline-flex min-h-9 items-center gap-2 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">View receiving</a>
+                                    <a x-bind:href="selectedPo.receiving_url" class="inline-flex min-h-9 items-center gap-2 rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-200 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">View receiving</a>
                                 @endcan
                                 @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
                                     <template x-if="selectedPo.can_receive">
@@ -2363,13 +2486,13 @@
             {{-- ======================================================== TAB 7: Procurement Audit Trail --}}
             @can('view_audit_trail')
             <div x-show="activeTab === 'audit_trail'" class="space-y-6">
-                <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-                    <h3 class="text-lg font-bold text-neutral-900">Append-Only Procurement Audit Ledger</h3>
-                    <p class="text-sm text-neutral-500">Immutable chronological record of procurement events, state transitions, and user attribution.</p>
+                <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-6 shadow-sm">
+                    <h3 class="text-lg font-bold text-neutral-900 dark:text-neutral-100">Append-Only Procurement Audit Ledger</h3>
+                    <p class="text-sm text-neutral-500 dark:text-neutral-400">Immutable chronological record of procurement events, state transitions, and user attribution.</p>
 
                     <div class="mt-4 overflow-x-auto">
-                        <table class="w-full text-left text-sm text-neutral-700">
-                            <thead class="bg-neutral-50 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                        <table class="w-full text-left text-sm text-neutral-700 dark:text-neutral-300">
+                            <thead class="bg-neutral-50 dark:bg-neutral-800/80 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                                 <tr>
                                     <th class="px-3.5 py-3">Timestamp (PHT)</th>
                                     <th class="px-3.5 py-3">Actor</th>
@@ -2378,24 +2501,24 @@
                                     <th class="px-3.5 py-3">Serialized State Delta</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-neutral-200">
+                            <tbody class="divide-y divide-neutral-200 dark:divide-neutral-800">
                                 @forelse($procurementAuditLogs as $log)
-                                    <tr class="hover:bg-neutral-50 font-mono text-xs">
-                                        <td class="px-3.5 py-3 text-neutral-500">{{ $log->created_at?->format('Y-m-d H:i:s') }}</td>
-                                        <td class="px-3.5 py-3 font-sans font-medium text-neutral-900">{{ $log->user?->name ?? 'System' }}</td>
+                                    <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50 font-mono text-xs">
+                                        <td class="px-3.5 py-3 text-neutral-500 dark:text-neutral-400">{{ $log->created_at?->format('Y-m-d H:i:s') }}</td>
+                                        <td class="px-3.5 py-3 font-sans font-medium text-neutral-900 dark:text-neutral-100">{{ $log->user?->name ?? 'System' }}</td>
                                         <td class="px-3.5 py-3">
-                                            <span class="rounded bg-neutral-100 px-2 py-0.5 font-sans font-semibold text-neutral-800">
+                                            <span class="rounded bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 font-sans font-semibold text-neutral-800 dark:text-neutral-200">
                                                 {{ $log->action_type }}
                                             </span>
                                         </td>
                                         <td class="px-3.5 py-3 font-sans">{{ $log->entity_name }} #{{ $log->entity_id }}</td>
-                                        <td class="px-3.5 py-3 max-w-xs truncate text-neutral-600" title="{{ json_encode($log->new_values) }}">
+                                        <td class="px-3.5 py-3 max-w-xs truncate text-neutral-600 dark:text-neutral-400" title="{{ json_encode($log->new_values) }}">
                                             {{ json_encode($log->new_values) }}
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="px-3.5 py-6 text-center text-sm text-neutral-500">No procurement audit records captured yet.</td>
+                                        <td colspan="5" class="px-3.5 py-6 text-center text-sm text-neutral-500 dark:text-neutral-400">No procurement audit records captured yet.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -2409,21 +2532,21 @@
             <div x-show="showCxmlModal" x-cloak class="fixed inset-0 z-[60] overflow-y-auto" style="display: none;">
                 <div class="flex min-h-screen items-center justify-center p-4">
                     <div class="fixed inset-0 bg-neutral-900/60 transition-opacity" @click="showCxmlModal = false"></div>
-                    <div class="relative w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl transition-all">
-                        <div class="flex items-center justify-between border-b border-neutral-200 pb-3">
+                    <div class="relative w-full max-w-3xl rounded-2xl bg-white dark:bg-neutral-900 border border-transparent dark:border-neutral-800 p-6 shadow-2xl transition-all">
+                        <div class="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3">
                             <div class="flex items-center gap-2">
-                                <span class="rounded bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-800">B2B cXML Document</span>
-                                <h3 class="text-base font-bold text-neutral-900">OrderRequest: <span x-text="selectedPoNumber" class="font-mono text-primary-700"></span></h3>
+                                <span class="rounded bg-blue-100 dark:bg-blue-950/70 px-2.5 py-0.5 text-xs font-bold text-blue-800 dark:text-blue-300">B2B cXML Document</span>
+                                <h3 class="text-base font-bold text-neutral-900 dark:text-neutral-100">OrderRequest: <span x-text="selectedPoNumber" class="font-mono text-primary-700 dark:text-primary-400"></span></h3>
                             </div>
-                            <button @click="showCxmlModal = false" class="rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600">
+                            <button @click="showCxmlModal = false" class="rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-600 dark:hover:text-neutral-200">
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
-                        <div class="mt-4 max-h-96 overflow-y-auto rounded-lg bg-neutral-900 p-4 font-mono text-xs text-emerald-400 select-all">
+                        <div class="mt-4 max-h-96 overflow-y-auto rounded-lg bg-neutral-900 border border-neutral-800 p-4 font-mono text-xs text-emerald-400 select-all">
                             <pre><code x-text="selectedPoCxml || 'No cXML payload generated.'"></code></pre>
                         </div>
                         <div class="mt-4 flex justify-end">
-                            <button @click="showCxmlModal = false" class="rounded-lg bg-neutral-100 px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-200">Close</button>
+                            <button @click="showCxmlModal = false" class="rounded-lg bg-neutral-100 dark:bg-neutral-800 px-4 py-2 text-xs font-semibold text-neutral-700 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-700">Close</button>
                         </div>
                     </div>
                 </div>

@@ -339,4 +339,152 @@ class PurchaseOrderWorkspaceTest extends TestCase
             'action_type' => 'rejected_purchase_order',
         ]);
     }
+
+    public function test_super_administrator_and_inventory_manager_can_approve_purchase_order_directly_in_pipeline(): void
+    {
+        $issuer = User::factory()->inventoryManager()->create();
+        $managerApprover = User::factory()->inventoryManager()->create();
+        $superAdmin = User::factory()->superAdministrator()->create();
+        $item = $this->item();
+        $supplier = $this->supplier();
+        $costCenter = $this->costCenter();
+
+        $payload = [
+            'supplier_id' => $supplier->id,
+            'item_id' => $item->id,
+            'cost_center_id' => $costCenter->id,
+            'quantity' => 2,
+        ];
+
+        // 1. Issuer creates PO
+        $this->actingAs($issuer)->post('/inventory/purchases/orders', $payload)->assertSessionHas('success');
+        $po1 = PurchaseOrder::firstOrFail();
+
+        // 2. Issuer cannot approve their own PO directly in the pipeline (Segregation of Duties)
+        $this->actingAs($issuer)
+            ->post(route('inventory.purchases.orders.approve', $po1))
+            ->assertSessionHasErrors('approval');
+        $this->assertSame('pending_approval', $po1->fresh()->status);
+
+        // 3. Another Inventory Manager can approve in the pipeline
+        $this->actingAs($managerApprover)
+            ->post(route('inventory.purchases.orders.approve', $po1))
+            ->assertSessionHas('success');
+        $this->assertSame('approved', $po1->fresh()->status);
+        $this->assertDatabaseHas('procurement_audit_logs', [
+            'entity_name' => 'PurchaseOrder',
+            'entity_id' => $po1->id,
+            'action_type' => 'approved_purchase_order',
+        ]);
+
+        // 4. Create second PO and assert Super Administrator can approve in the pipeline
+        $this->actingAs($issuer)->post('/inventory/purchases/orders', $payload)->assertSessionHas('success');
+        $po2 = PurchaseOrder::latest('id')->firstOrFail();
+
+        $this->actingAs($superAdmin)
+            ->post(route('inventory.purchases.orders.approve', $po2))
+            ->assertSessionHas('success');
+        $this->assertSame('approved', $po2->fresh()->status);
+        $this->assertDatabaseHas('procurement_audit_logs', [
+            'entity_name' => 'PurchaseOrder',
+            'entity_id' => $po2->id,
+            'action_type' => 'approved_purchase_order',
+        ]);
+
+        // 5. Assert Super Administrator can approve even if they were the creator (executive override)
+        $this->actingAs($superAdmin)->post('/inventory/purchases/orders', $payload)->assertSessionHas('success');
+        $po3 = PurchaseOrder::latest('id')->firstOrFail();
+        $this->assertSame($superAdmin->id, $po3->created_by_user_id);
+
+        $this->actingAs($superAdmin)
+            ->post(route('inventory.purchases.orders.approve', $po3))
+            ->assertSessionHas('success');
+        $this->assertSame('approved', $po3->fresh()->status);
+    }
+
+    public function test_pipeline_rejection_releases_hard_encumbrance_and_records_audit(): void
+    {
+        $issuer = User::factory()->inventoryManager()->create();
+        $superAdmin = User::factory()->superAdministrator()->create();
+        $item = $this->item();
+        $supplier = $this->supplier();
+        $costCenter = $this->costCenter();
+
+        $payload = [
+            'supplier_id' => $supplier->id,
+            'item_id' => $item->id,
+            'cost_center_id' => $costCenter->id,
+            'quantity' => 2,
+        ];
+
+        $this->actingAs($issuer)->post('/inventory/purchases/orders', $payload)->assertSessionHas('success');
+        $po = PurchaseOrder::latest('id')->firstOrFail();
+        $this->assertGreaterThan(0, (float) $po->total_encumbered_amount);
+
+        $this->actingAs($superAdmin)
+            ->post(route('inventory.purchases.orders.reject', $po), [
+                'rejection_reason' => 'Duplicate order submitted.',
+            ])
+            ->assertSessionHas('info');
+
+        $this->assertSame('cancelled', $po->fresh()->status);
+        $this->assertSame(0.0, (float) $po->fresh()->total_encumbered_amount);
+        $this->assertDatabaseHas('procurement_audit_logs', [
+            'entity_name' => 'PurchaseOrder',
+            'entity_id' => $po->id,
+            'action_type' => 'rejected_purchase_order',
+        ]);
+    }
+
+    public function test_pipeline_ui_renders_approval_buttons_for_eligible_roles(): void
+    {
+        $issuer = User::factory()->inventoryManager()->create();
+        $otherManager = User::factory()->inventoryManager()->create();
+        $superAdmin = User::factory()->superAdministrator()->create();
+        $warehouseStaff = User::factory()->warehouseStaff()->create();
+
+        $item = $this->item();
+        $supplier = $this->supplier();
+        $costCenter = $this->costCenter();
+
+        $this->actingAs($issuer)->post('/inventory/purchases/orders', [
+            'supplier_id' => $supplier->id,
+            'item_id' => $item->id,
+            'cost_center_id' => $costCenter->id,
+            'quantity' => 2,
+        ])->assertSessionHas('success');
+        $po = PurchaseOrder::latest('id')->firstOrFail();
+
+        // 1. Super Admin sees Approve Order and Reject buttons
+        $this->actingAs($superAdmin)
+            ->get('/inventory/purchases')
+            ->assertOk()
+            ->assertSee('Approve Order')
+            ->assertSee('Reject')
+            ->assertSee(route('inventory.purchases.orders.approve', $po), false)
+            ->assertSee(route('inventory.purchases.orders.reject', $po), false);
+
+        // 2. Non-creator Inventory Manager sees Approve Order and Reject buttons
+        $this->actingAs($otherManager)
+            ->get('/inventory/purchases')
+            ->assertOk()
+            ->assertSee('Approve Order')
+            ->assertSee('Reject');
+
+        // 3. Creator Inventory Manager cannot see Approve Order (SoD)
+        $this->actingAs($issuer)
+            ->get('/inventory/purchases')
+            ->assertOk()
+            ->assertDontSee(route('inventory.purchases.orders.approve', $po), false);
+
+        // 4. Warehouse Staff can view workspace but cannot see or execute Approve Order
+        $this->actingAs($warehouseStaff)
+            ->get('/inventory/purchases')
+            ->assertOk()
+            ->assertDontSee('Approve Order');
+
+        $this->actingAs($warehouseStaff)
+            ->post(route('inventory.purchases.orders.approve', $po))
+            ->assertForbidden();
+    }
 }

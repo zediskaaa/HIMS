@@ -568,4 +568,152 @@ class MaterialRequisitionWorkflowTest extends TestCase
         $this->assertTrue($requisition->issuedBy->is($warehouseStaff));
         $this->assertNotNull($requisition->issued_at);
     }
+
+    public function test_item_ai_recommendation_endpoint_returns_json_recommendation(): void
+    {
+        $user = $this->createPharmacyUser();
+        $item = $this->createItem(['quantity_on_hand' => 5, 'reorder_level' => 20]);
+
+        $response = $this->actingAs($user)->getJson(route('inventory.requisitions.item-ai-recommendation', $item));
+
+        $response->assertOk()
+            ->assertJsonStructure([
+                'available',
+                'suggested_quantity',
+                'unit',
+                'confidence',
+                'explanation',
+                'reorder_point',
+                'quantity_on_hand',
+            ]);
+    }
+
+    public function test_requisition_stores_ai_suggested_quantity_for_multiple_lines(): void
+    {
+        $requester = $this->createPharmacyUser();
+        $item1 = $this->createItem(['sku' => 'MED-SKU-001', 'quantity_on_hand' => 10, 'reorder_level' => 30]);
+        $item2 = $this->createItem(['sku' => 'MED-SKU-002', 'quantity_on_hand' => 5, 'reorder_level' => 25]);
+
+        $response = $this->actingAs($requester)->post(route('inventory.requisitions.store'), [
+            'department' => 'Emergency Department',
+            'urgency' => 'routine',
+            'justification' => 'Multi-item replenishment with AI suggestions',
+            'lines' => [
+                [
+                    'item_id' => $item1->id,
+                    'requested_quantity' => 20,
+                    'ai_suggested_quantity' => 20,
+                    'allocation_strategy' => 'FEFO',
+                ],
+                [
+                    'item_id' => $item2->id,
+                    'requested_quantity' => 15,
+                    'ai_suggested_quantity' => 15,
+                    'allocation_strategy' => 'FEFO',
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect(route('inventory.requisitions.index'));
+        $requisition = MaterialRequisition::with('lines')->latest('id')->first();
+
+        $this->assertNotNull($requisition);
+        $this->assertCount(2, $requisition->lines);
+        $this->assertSame(20, (int) $requisition->lines[0]->requested_quantity);
+        $this->assertSame(15, (int) $requisition->lines[1]->requested_quantity);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => AuditAction::CreatedMaterialRequisition->value,
+            'target_id' => $requisition->id,
+        ]);
+    }
+
+    public function test_item_ai_recommendation_never_suggests_zero_even_when_warehouse_has_surplus_stock(): void
+    {
+        $user = $this->createPharmacyUser();
+        // Item with high on-hand stock where procurement reorder would normally calculate 0
+        $item = $this->createItem([
+            'quantity_on_hand' => 500,
+            'reorder_level' => 10,
+            'reorder_point' => 10,
+            'safety_stock' => 5,
+            'economic_order_quantity' => 25,
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('inventory.requisitions.item-ai-recommendation', $item));
+
+        $response->assertOk();
+        $suggestedQuantity = $response->json('suggested_quantity');
+        $this->assertIsInt($suggestedQuantity);
+        $this->assertGreaterThanOrEqual(1, $suggestedQuantity, 'Requisition AI recommendation must never be 0');
+    }
+
+    public function test_multi_item_requisition_stores_independent_clinical_justifications_for_each_item(): void
+    {
+        $requester = $this->createPharmacyUser();
+        $item1 = $this->createItem([
+            'name' => 'Blood Glucose Test Strips',
+            'sku' => 'SUP-BGS-001',
+            'quantity_on_hand' => 100,
+        ]);
+        $item2 = $this->createItem([
+            'name' => 'Xience Sierra Everolimus-Eluting Coronary Stent',
+            'sku' => 'DEV-STENT-002',
+            'quantity_on_hand' => 20,
+        ]);
+
+        $justification1 = 'Required for routine blood glucose monitoring of diabetic patients.';
+        $justification2 = 'Required for scheduled coronary intervention.';
+
+        $response = $this->actingAs($requester)->post(route('inventory.requisitions.store'), [
+            'department' => 'Cardiology & Endocrinology Clinic',
+            'urgency' => 'routine',
+            'lines' => [
+                [
+                    'item_id' => $item1->id,
+                    'requested_quantity' => 10,
+                    'allocation_strategy' => 'FEFO',
+                    'clinical_justification' => $justification1,
+                ],
+                [
+                    'item_id' => $item2->id,
+                    'requested_quantity' => 2,
+                    'allocation_strategy' => 'FEFO',
+                    'clinical_justification' => $justification2,
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect(route('inventory.requisitions.index'));
+        $requisition = MaterialRequisition::with('lines.item')->latest('id')->first();
+
+        $this->assertNotNull($requisition);
+        $this->assertCount(2, $requisition->lines);
+
+        $line1 = $requisition->lines->firstWhere('item_id', $item1->id);
+        $line2 = $requisition->lines->firstWhere('item_id', $item2->id);
+
+        $this->assertNotNull($line1);
+        $this->assertNotNull($line2);
+
+        // Check line 1 specific justification
+        $this->assertSame($justification1, $line1->clinical_justification);
+        $this->assertSame($justification1, $line1->notes);
+
+        // Check line 2 specific justification
+        $this->assertSame($justification2, $line2->clinical_justification);
+        $this->assertSame($justification2, $line2->notes);
+
+        // Requisition overall justification should summarize both
+        $this->assertStringContainsString($justification1, $requisition->justification);
+        $this->assertStringContainsString($justification2, $requisition->justification);
+
+        // Verify detail view renders both independent justifications
+        $showResponse = $this->actingAs($requester)->get(route('inventory.requisitions.show', $requisition));
+        $showResponse->assertOk();
+        $showResponse->assertSeeText($justification1);
+        $showResponse->assertSeeText($justification2);
+    }
 }
+
+

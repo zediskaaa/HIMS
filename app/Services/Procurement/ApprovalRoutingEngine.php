@@ -268,7 +268,7 @@ class ApprovalRoutingEngine
             }
         } elseif ($chain->chain_type === ApprovalChainType::PurchaseOrder) {
             $po = PurchaseOrder::find($chain->target_id);
-            if ($po && $po->created_by_user_id === $approver->id) {
+            if ($po && $po->created_by_user_id === $approver->id && ! $approver->isSuperAdministrator()) {
                 throw new DomainException("Segregation of Duties Violation: Issuer cannot approve their own Purchase Order #{$po->po_number}.");
             }
         }

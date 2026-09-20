@@ -82,7 +82,7 @@ class IssuanceEngine
                     'issued_quantity' => 0,
                     'allocation_strategy' => $lineData['allocation_strategy'] ?? ($item->is_batch_tracked ? 'FEFO' : 'FIFO'),
                     'line_status' => 'pending',
-                    'notes' => $lineData['notes'] ?? null,
+                    'notes' => $lineData['clinical_justification'] ?? $lineData['notes'] ?? null,
                 ]);
             }
 
