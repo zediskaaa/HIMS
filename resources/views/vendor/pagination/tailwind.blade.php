@@ -34,7 +34,8 @@
                     </a>
                 @endif
 
-                {{-- Pagination Page Elements --}}
+                {{-- Pagination Page Elements (Capped at maximum 20 buttons) --}}
+                @php $renderedButtons = 0; @endphp
                 <div class="hidden sm:flex sm:items-center sm:gap-1">
                     @foreach ($elements as $element)
                         {{-- "Three Dots" Separator --}}
@@ -47,6 +48,11 @@
                         {{-- Array Of Links --}}
                         @if (is_array($element))
                             @foreach ($element as $page => $url)
+                                @php
+                                    if (++$renderedButtons > 20) {
+                                        break 2;
+                                    }
+                                @endphp
                                 @if ($page == $paginator->currentPage())
                                     <span aria-current="page"
                                           class="inline-flex min-w-[2rem] items-center justify-center rounded-lg bg-neutral-900 px-2.5 py-1.5 text-xs font-semibold text-white shadow-2xs dark:bg-primary-600 dark:text-white">

@@ -1,4 +1,4 @@
-<x-app-layout>
+<x-app-layout :full-width="true">
     <x-slot name="header">
         <div>
             <span class="rounded-md bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700 ring-1 ring-inset ring-primary-200">Operational workspace</span>
@@ -442,7 +442,7 @@
                         {{-- Cost Center Dropdown --}}
                         <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Cost Center (Department Budget)</label>
-                            <select name="cost_center_id" @change="prCostCenterChanged($event)" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
+                            <select name="cost_center_id" @change="prCostCenterChanged($event)" class="w-full rounded-lg border border-neutral-300 pl-3 pr-10 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
                                 <option value="">Select Cost Center</option>
                                 @foreach($costCenters as $cc)
                                     @php $avail = $cc->currentBudget()?->availableBudget() ?? 1000000; @endphp
@@ -456,7 +456,7 @@
                         {{-- Procurement Category Dropdown --}}
                         <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Procurement Category</label>
-                            <select name="procurement_category_id" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
+                            <select name="procurement_category_id" class="w-full rounded-lg border border-neutral-300 pl-3 pr-10 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
                                 <option value="">Select Category</option>
                                 @foreach($categories as $cat)
                                     <option value="{{ $cat->id }}">{{ $cat->name }} ({{ $cat->code }})</option>
@@ -467,7 +467,7 @@
                         {{-- Procurement Method Dropdown --}}
                         <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Procurement Method</label>
-                            <select name="procurement_method" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
+                            <select name="procurement_method" class="w-full rounded-lg border border-neutral-300 pl-3 pr-10 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
                                 <option value="Request for Quotation" selected>Request for Quotation (Competitive Canvass)</option>
                                 <option value="Direct Contracting">Direct Contracting (Single Source Authorized)</option>
                                 <option value="Emergency Procurement">Emergency Procurement (Stat Patient Care)</option>
@@ -479,7 +479,7 @@
                         {{-- Priority Level Dropdown --}}
                         <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Priority Level</label>
-                            <select name="priority" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500">
+                            <select name="priority" class="w-full rounded-lg border border-neutral-300 pl-3 pr-10 py-2 text-sm focus:border-primary-500 focus:ring-primary-500">
                                 <option value="low">Low (Routine Stock Replenishment)</option>
                                 <option value="medium" selected>Medium (Standard 14-Day Cycle)</option>
                                 <option value="high">High (Department Critical)</option>
@@ -490,7 +490,7 @@
                         {{-- Item Master Dropdown --}}
                         <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Item Master Code</label>
-                            <select name="item_id" @change="prItemChanged($event)" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
+                            <select name="item_id" @change="prItemChanged($event)" class="w-full rounded-lg border border-neutral-300 pl-3 pr-10 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
                                 <option value="">Select Item from Catalog</option>
                                 @foreach($items as $item)
                                     <option value="{{ $item->id }}" data-cost="{{ $item->unit_cost }}" data-uom="{{ $item->unit }}" data-sku="{{ $item->sku }}">
@@ -678,7 +678,7 @@
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Bidding Protocol</label>
-                            <select name="bidding_type" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500">
+                            <select name="bidding_type" class="w-full rounded-lg border border-neutral-300 pl-3 pr-10 py-2 text-sm focus:border-primary-500">
                                 <option value="sealed" selected>Sealed Bid (Commercial prices masked until close)</option>
                                 <option value="open">Open Canvass / Quotation</option>
                             </select>
@@ -690,7 +690,7 @@
 
                         <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-600">Item to Sourcing</label>
-                            <select name="item_id" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500" required>
+                            <select name="item_id" class="w-full rounded-lg border border-neutral-300 pl-3 pr-10 py-2 text-sm focus:border-primary-500" required>
                                 <option value="">Select Item</option>
                                 @foreach($items as $item)
                                     <option value="{{ $item->id }}">{{ $item->name }} ({{ $item->sku }})</option>
@@ -1305,14 +1305,14 @@
                             <form method="GET" action="{{ route('inventory.purchases') }}#purchase-orders" class="mt-3 space-y-2">
                                 <div class="grid gap-2 sm:grid-cols-[minmax(10rem,1fr)_auto_auto_auto_auto]">
                                     <label class="sr-only" for="po-search">Search purchase orders</label>
-                                    <input id="po-search" name="po_search" type="search" value="{{ $poFilters['poSearch'] }}" placeholder="Search PO, item, supplier..." class="min-h-9 min-w-0 rounded-md border border-neutral-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30">
+                                    <input id="po-search" name="po_search" type="search" value="{{ $poFilters['poSearch'] }}" placeholder="Search PO, item, supplier..." class="min-h-9 min-w-0 rounded-md border border-neutral-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100">
                                     <label class="sr-only" for="po-status">Status</label>
-                                    <select id="po-status" name="po_status" class="min-h-9 rounded-md border border-neutral-300 px-2 text-xs text-neutral-700 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                                    <select id="po-status" name="po_status" class="min-h-9 rounded-md border border-neutral-300 pl-2.5 pr-8 text-xs text-neutral-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
                                         <option value="">All statuses</option>
                                         @foreach($poStatusOptions as $value => $label)<option value="{{ $value }}" @selected($poFilters['poStatus'] === $value)>{{ $label }}</option>@endforeach
                                     </select>
                                     <label class="sr-only" for="po-date">Created date</label>
-                                    <select id="po-date" name="po_date" class="min-h-9 rounded-md border border-neutral-300 px-2 text-xs text-neutral-700 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                                    <select id="po-date" name="po_date" class="min-h-9 rounded-md border border-neutral-300 pl-2.5 pr-8 text-xs text-neutral-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
                                         <option value="">Any date</option>
                                         <option value="7" @selected($poFilters['poDate'] === '7')>Last 7 days</option>
                                         <option value="30" @selected($poFilters['poDate'] === '30')>Last 30 days</option>
@@ -1320,7 +1320,7 @@
                                         <option value="overdue" @selected($poFilters['poDate'] === 'overdue')>Overdue delivery</option>
                                     </select>
                                     <label class="sr-only" for="po-per-page">Per page</label>
-                                    <select id="po-per-page" name="po_per_page" class="min-h-9 rounded-md border border-neutral-300 px-2 text-xs text-neutral-700 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                                    <select id="po-per-page" name="po_per_page" class="min-h-9 rounded-md border border-neutral-300 pl-2.5 pr-8 text-xs text-neutral-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
                                         <option value="3" @selected($poPerPage === 3)>3 per page</option>
                                         <option value="5" @selected($poPerPage === 5)>5 per page</option>
                                         <option value="10" @selected($poPerPage === 10)>10 per page</option>
@@ -1345,7 +1345,7 @@
                                     <div class="grid gap-2 border-t border-neutral-200 p-3 sm:grid-cols-2">
                                         <div>
                                             <label for="po-supplier" class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Supplier</label>
-                                            <select id="po-supplier" name="supplier_id" class="min-h-9 w-full rounded-md border border-neutral-300 px-2 text-xs text-neutral-700 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                                            <select id="po-supplier" name="supplier_id" class="min-h-9 w-full rounded-md border border-neutral-300 pl-2.5 pr-8 text-xs text-neutral-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
                                                 <option value="">All suppliers</option>
                                                 @foreach($suppliers as $supplier)
                                                     <option value="{{ $supplier->id }}" @selected($supplierFilter?->id === $supplier->id)>{{ $supplier->name }}</option>
@@ -2129,7 +2129,7 @@
                                 </div>
                                 <div class="col-span-12 sm:col-span-4">
                                     <label class="mb-1 block text-xs font-semibold text-neutral-700">Priority</label>
-                                    <select name="priority" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors">
+                                    <select name="priority" class="block w-full rounded-lg border border-neutral-300 bg-white pl-3 pr-8 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors">
                                         <option value="low">Low</option>
                                         <option value="medium" selected>Medium</option>
                                         <option value="high">High</option>
@@ -2141,7 +2141,7 @@
                                     <label class="mb-1 block text-xs font-semibold text-neutral-700">
                                         Item <span class="text-danger-600">*</span>
                                     </label>
-                                    <select id="request-item-select" name="item_id" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors" required>
+                                    <select id="request-item-select" name="item_id" class="block w-full rounded-lg border border-neutral-300 bg-white pl-3 pr-8 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors" required>
                                         <option value="">Select item</option>
                                         @foreach($items as $item)
                                             <option value="{{ $item->id }}">{{ $item->name }} ({{ $item->sku }})</option>
@@ -2164,7 +2164,7 @@
                                 {{-- Row 4: Preferred supplier (7 cols) & Evaluation status (5 cols) --}}
                                 <div class="col-span-12 sm:col-span-7">
                                     <label class="mb-1 block text-xs font-semibold text-neutral-700">Preferred supplier</label>
-                                    <select id="request-supplier-select" name="supplier_id" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors">
+                                    <select id="request-supplier-select" name="supplier_id" class="block w-full rounded-lg border border-neutral-300 bg-white pl-3 pr-8 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors">
                                         <option value="">Select supplier (optional)</option>
                                         @foreach($suppliers as $supplier)
                                             <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
@@ -2173,7 +2173,7 @@
                                 </div>
                                 <div class="col-span-12 sm:col-span-5">
                                     <label class="mb-1 block text-xs font-semibold text-neutral-700">Evaluation status</label>
-                                    <select name="evaluation_status" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors">
+                                    <select name="evaluation_status" class="block w-full rounded-lg border border-neutral-300 bg-white pl-3 pr-8 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors">
                                         <option value="pending">Pending</option>
                                         <option value="approved">Approved</option>
                                         <option value="rejected">Rejected</option>
@@ -2284,7 +2284,7 @@
                                             <label for="quote-request" class="mb-1 block text-xs font-semibold text-neutral-700">
                                                 Procurement request <span class="text-danger-600">*</span>
                                             </label>
-                                            <select id="quote-request" name="procurement_request_id" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors" required>
+                                            <select id="quote-request" name="procurement_request_id" class="block w-full rounded-lg border border-neutral-300 bg-white pl-3 pr-8 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors" required>
                                                 <option value="">Select request</option>
                                                 @foreach ($requests as $procurementRequest)
                                                     <option value="{{ $procurementRequest->id }}" @selected(old('procurement_request_id') == $procurementRequest->id)>
@@ -2299,7 +2299,7 @@
                                             <label for="quote-supplier" class="mb-1 block text-xs font-semibold text-neutral-700">
                                                 Supplier <span class="text-danger-600">*</span>
                                             </label>
-                                            <select id="quote-supplier" name="supplier_id" class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors" required>
+                                            <select id="quote-supplier" name="supplier_id" class="block w-full rounded-lg border border-neutral-300 bg-white pl-3 pr-8 py-1.5 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors" required>
                                                 <option value="">Select supplier</option>
                                                 @foreach ($suppliers as $supplier)
                                                     <option value="{{ $supplier->id }}" @selected(old('supplier_id') == $supplier->id)>
