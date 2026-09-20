@@ -913,5 +913,28 @@ class UserManagementTest extends TestCase
             ->assertSee('Super Administrator')
             ->assertSee('Runs the storeroom: items, procurement, forecasts.');
     }
+
+    public function test_user_create_and_edit_forms_render_password_visibility_toggles(): void
+    {
+        $admin = $this->admin();
+        $staff = User::factory()->create();
+
+        $createResponse = $this->actingAs($admin)->get('/admin/users/create');
+        $createResponse->assertStatus(200)
+            ->assertSee('name="password"', false)
+            ->assertSee('name="password_confirmation"', false)
+            ->assertSee('showPassword = !showPassword', false)
+            ->assertSee("showPassword ? 'Hide password' : 'Show password'", false)
+            ->assertSee(':type="showPassword ? \'text\' : \'password\'"', false);
+
+        $editResponse = $this->actingAs($admin)->get("/admin/users/{$staff->id}/edit");
+        $editResponse->assertStatus(200)
+            ->assertSee('name="password"', false)
+            ->assertSee('name="password_confirmation"', false)
+            ->assertSee('showPassword = !showPassword', false)
+            ->assertSee("showPassword ? 'Hide password' : 'Show password'", false)
+            ->assertSee(':type="showPassword ? \'text\' : \'password\'"', false);
+    }
 }
+
 

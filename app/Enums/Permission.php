@@ -134,6 +134,7 @@ enum Permission: string
             self::ManageUsers => 'Manage users',
             self::ViewAuditTrail => 'View audit trail',
             self::ManageSystemRecovery => 'Manage system recovery and diagnostics',
+            self::ManagePrivacyCompliance => 'Manage privacy and security governance',
             self::ViewProcessReviews => 'View evidence-based process reviews',
             self::CreateProcessReview => 'Draft evidence-based process reviews',
             self::ApproveProcessReview => 'Approve or reject process reviews (Maker-Checker)',

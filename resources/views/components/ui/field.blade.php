@@ -9,6 +9,7 @@
     'placeholder' => null,
     'options' => null,
     'rows' => 3,
+    'toggleable' => true,
 ])
 
 @php
@@ -67,6 +68,24 @@
     @elseif ($type === 'textarea')
         <textarea {{ $shared }} rows="{{ $rows }}" placeholder="{{ $placeholder }}"
                   @required($required) @disabled($disabled)>{{ old($name, $value) }}</textarea>
+    @elseif ($type === 'password' && $toggleable)
+        <div class="relative min-w-0 max-w-full w-full" x-data="{ showPassword: false }">
+            <input type="password" :type="showPassword ? 'text' : 'password'" value="{{ old($name, $value) }}" placeholder="{{ $placeholder }}"
+                   {{ $shared->merge(['class' => 'pr-10']) }} @required($required) @disabled($disabled) />
+            <button
+                type="button"
+                class="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors focus-visible:outline-none focus:text-neutral-700 dark:focus:text-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                x-on:click="showPassword = !showPassword"
+                x-bind:aria-label="showPassword ? 'Hide password' : 'Show password'"
+                x-bind:aria-pressed="showPassword.toString()"
+                aria-controls="{{ $id }}"
+                tabindex="-1"
+                @disabled($disabled)
+            >
+                <x-ui.icon name="eye" class="w-4 h-4" x-show="!showPassword" />
+                <x-ui.icon name="eye-slash" class="w-4 h-4" x-show="showPassword" x-cloak />
+            </button>
+        </div>
     @else
         <input type="{{ $type }}" value="{{ old($name, $value) }}" placeholder="{{ $placeholder }}"
                {{ $shared }} @required($required) @disabled($disabled) />
