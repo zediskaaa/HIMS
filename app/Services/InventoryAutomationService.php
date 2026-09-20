@@ -146,12 +146,14 @@ class InventoryAutomationService
     }
 
     /**
-     * Split a requested quantity across batches at a location, earliest
-     * expiry first. Batches without an expiry date are consumed last.
+     * Split a requested quantity across batches at a location using FIFO (First In, First Out).
+     * Oldest received stock is consumed first.
+     * Batches without an expiry date or with valid expiry dates are sorted chronologically by received_at / created_at.
+     * Expired batches are never allocated.
      *
      * @return array<int, array{batch_id: int|null, quantity: int}>
      */
-    public function allocateFefo(int $itemId, int $locationId, int $quantity, ?int $batchId = null): array
+    public function allocateFifo(int $itemId, int $locationId, int $quantity, ?int $batchId = null): array
     {
         $levels = ItemStockLevel::query()
             ->where('item_stock_levels.item_id', $itemId)
@@ -159,9 +161,9 @@ class InventoryAutomationService
             ->where('item_stock_levels.quantity', '>', 0)
             ->when($batchId !== null, fn ($q) => $q->where('item_stock_levels.item_batch_id', $batchId))
             ->leftJoin('item_batches', 'item_stock_levels.item_batch_id', '=', 'item_batches.id')
-            ->orderByRaw('item_batches.expiry_date is null')
-            ->orderBy('item_batches.expiry_date')
-            ->orderBy('item_stock_levels.id')
+            ->orderByRaw('COALESCE(item_batches.received_at, item_batches.created_at, item_stock_levels.created_at) ASC')
+            ->orderBy('item_batches.id', 'asc')
+            ->orderBy('item_stock_levels.id', 'asc')
             ->select('item_stock_levels.*')
             ->get();
 
@@ -173,9 +175,68 @@ class InventoryAutomationService
                 break;
             }
 
+            // Expiry protection: Never allocate expired batches
+            if ($level->batch && $level->batch->isExpired()) {
+                continue;
+            }
+
             $take = min($remaining, (int) $level->quantity);
-            $allocation[] = ['batch_id' => $level->item_batch_id, 'quantity' => $take];
-            $remaining -= $take;
+            if ($take > 0) {
+                $allocation[] = ['batch_id' => $level->item_batch_id, 'quantity' => $take];
+                $remaining -= $take;
+            }
+        }
+
+        if ($remaining > 0) {
+            throw ValidationException::withMessages([
+                'quantity' => ['Insufficient eligible stock at the selected location. Short by '.$remaining.'.'],
+            ]);
+        }
+
+        return $allocation;
+    }
+
+    /**
+     * Split a requested quantity across batches at a location, earliest
+     * expiry first (FEFO). Ties and non-dated stock fall back to chronological FIFO order.
+     * Expired batches are never allocated.
+     *
+     * @return array<int, array{batch_id: int|null, quantity: int}>
+     */
+    public function allocateFefo(int $itemId, int $locationId, int $quantity, ?int $batchId = null): array
+    {
+        $levels = ItemStockLevel::query()
+            ->where('item_stock_levels.item_id', $itemId)
+            ->where('item_stock_levels.storage_location_id', $locationId)
+            ->where('item_stock_levels.quantity', '>', 0)
+            ->when($batchId !== null, fn ($q) => $q->where('item_stock_levels.item_batch_id', $batchId))
+            ->leftJoin('item_batches', 'item_stock_levels.item_batch_id', '=', 'item_batches.id')
+            ->orderByRaw('item_batches.expiry_date IS NULL ASC')
+            ->orderBy('item_batches.expiry_date', 'asc')
+            ->orderByRaw('COALESCE(item_batches.received_at, item_batches.created_at, item_stock_levels.created_at) ASC')
+            ->orderBy('item_batches.id', 'asc')
+            ->orderBy('item_stock_levels.id', 'asc')
+            ->select('item_stock_levels.*')
+            ->get();
+
+        $allocation = [];
+        $remaining = $quantity;
+
+        foreach ($levels as $level) {
+            if ($remaining <= 0) {
+                break;
+            }
+
+            // Expiry protection: Never allocate expired batches
+            if ($level->batch && $level->batch->isExpired()) {
+                continue;
+            }
+
+            $take = min($remaining, (int) $level->quantity);
+            if ($take > 0) {
+                $allocation[] = ['batch_id' => $level->item_batch_id, 'quantity' => $take];
+                $remaining -= $take;
+            }
         }
 
         if ($remaining > 0) {
@@ -185,6 +246,18 @@ class InventoryAutomationService
         }
 
         return $allocation;
+    }
+
+    /**
+     * Allocate stock across batches based on the requested strategy (FIFO or FEFO).
+     *
+     * @return array<int, array{batch_id: int|null, quantity: int}>
+     */
+    public function allocateStock(int $itemId, int $locationId, int $quantity, ?int $batchId = null, string $strategy = 'FIFO'): array
+    {
+        return strtoupper($strategy) === 'FEFO'
+            ? $this->allocateFefo($itemId, $locationId, $quantity, $batchId)
+            : $this->allocateFifo($itemId, $locationId, $quantity, $batchId);
     }
 
     /**
@@ -362,7 +435,8 @@ class InventoryAutomationService
         ?int $userId,
         ?Model $reference
     ): array {
-        $allocation = $this->allocateFefo($item->id, $fromLocationId, $quantity, $batchId);
+        $strategy = $validated['allocation_strategy'] ?? ($item->is_expiry_tracked ? 'FEFO' : 'FIFO');
+        $allocation = $this->allocateStock($item->id, $fromLocationId, $quantity, $batchId, $strategy);
         $movements = [];
 
         foreach ($allocation as $slice) {

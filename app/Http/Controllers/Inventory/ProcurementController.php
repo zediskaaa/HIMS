@@ -124,7 +124,7 @@ class ProcurementController extends Controller implements HasMiddleware
         $categories = ProcurementCategory::where('is_active', true)->orderBy('name')->get();
 
         // Pending & Active Approval Chains
-        $approvalChains = ApprovalChain::with(['steps.approver'])->latest('id')->get();
+        $approvalChains = ApprovalChain::with(['steps.approver', 'purchaseOrder.lines.item', 'purchaseOrder.supplier'])->latest('id')->get();
 
         $closedStatuses = ['received', 'fulfilled', 'cancelled', 'rejected', 'amended'];
         $poMetrics = [

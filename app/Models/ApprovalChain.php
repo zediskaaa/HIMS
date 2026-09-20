@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ApprovalChainType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ApprovalChain extends Model
@@ -36,5 +37,10 @@ class ApprovalChain extends Model
     public function isFullyApproved(): bool
     {
         return ! $this->steps()->where('status', '!=', 'approved')->where('status', '!=', 'skipped')->exists();
+    }
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrder::class, 'target_id');
     }
 }

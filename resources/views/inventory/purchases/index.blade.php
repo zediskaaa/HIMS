@@ -997,6 +997,98 @@
                                     @endforeach
                                 </div>
 
+                                {{-- Target Purchase Order Line Items Cost Breakdown --}}
+                                @if($chain->chain_type === \App\Enums\ApprovalChainType::PurchaseOrder && $chain->purchaseOrder)
+                                    @php
+                                        $targetPo = $chain->purchaseOrder;
+                                    @endphp
+                                    <div class="mt-4 rounded-lg border border-neutral-200/80 bg-neutral-50/50 p-3">
+                                        <div class="flex items-center justify-between pb-2 border-b border-neutral-200/60 text-xs">
+                                            <span class="font-semibold text-neutral-800">Target Order: PO #{{ $targetPo->po_number }} · {{ $targetPo->supplier?->name ?? 'Supplier' }}</span>
+                                            <span class="text-neutral-500 font-medium">Item Pricing &amp; Commitment Breakdown</span>
+                                        </div>
+                                        <div class="mt-2 overflow-x-auto">
+                                            <table class="min-w-full text-left text-xs">
+                                                <thead class="bg-neutral-100/80 text-[11px] font-semibold text-neutral-600">
+                                                    <tr>
+                                                        <th scope="col" class="px-2.5 py-1.5">Item Name</th>
+                                                        <th scope="col" class="px-2.5 py-1.5 text-right">Quantity</th>
+                                                        <th scope="col" class="px-2.5 py-1.5 text-center">Unit</th>
+                                                        <th scope="col" class="px-2.5 py-1.5 text-right">Price per Unit</th>
+                                                        <th scope="col" class="px-2.5 py-1.5 text-right">Total Price</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y divide-neutral-200/50 bg-white">
+                                                    @forelse($targetPo->lines as $line)
+                                                        @php
+                                                            $lineUnit = $line->purchase_unit ?: ($line->item?->unit ?: 'unit');
+                                                        @endphp
+                                                        <tr>
+                                                            <td class="px-2.5 py-2">
+                                                                <span class="font-medium text-neutral-900">{{ $line->item?->name ?? 'Item' }}</span>
+                                                                @if($line->conversionFactor() > 1)
+                                                                    <span class="ml-1 text-[10px] text-neutral-500 font-mono">({{ $line->conversionDisplay() }})</span>
+                                                                @endif
+                                                            </td>
+                                                            <td class="px-2.5 py-2 text-right tabular-nums font-semibold text-neutral-900">
+                                                                {{ number_format($line->ordered_quantity) }}
+                                                                @if($line->conversionFactor() > 1)
+                                                                    <span class="text-[10px] text-neutral-400 font-normal">({{ number_format($line->orderedBaseQuantity()) }} base)</span>
+                                                                @endif
+                                                            </td>
+                                                            <td class="px-2.5 py-2 text-center capitalize text-neutral-700">
+                                                                {{ $lineUnit }}
+                                                            </td>
+                                                            <td class="px-2.5 py-2 text-right font-mono tabular-nums text-neutral-700">
+                                                                ₱{{ number_format((float) $line->unit_price, 2) }}/{{ $lineUnit }}
+                                                            </td>
+                                                            <td class="px-2.5 py-2 text-right font-mono font-semibold tabular-nums text-neutral-900">
+                                                                ₱{{ number_format($line->lineTotal(), 2) }}
+                                                            </td>
+                                                        </tr>
+                                                    @empty
+                                                        @php
+                                                            $singleUnit = $targetPo->purchase_unit ?: ($targetPo->item?->unit ?: 'unit');
+                                                            $singleUnitPrice = $targetPo->quantity > 0 ? ($targetPo->unit_cost ?: round($targetPo->total_amount / $targetPo->quantity, 2)) : 0;
+                                                        @endphp
+                                                        <tr>
+                                                            <td class="px-2.5 py-2">
+                                                                <span class="font-medium text-neutral-900">{{ $targetPo->item?->name ?? 'Direct Item' }}</span>
+                                                                @if($targetPo->conversion_factor > 1)
+                                                                    <span class="ml-1 text-[10px] text-neutral-500 font-mono">(1 {{ $singleUnit }} = {{ (int) $targetPo->conversion_factor }} {{ $targetPo->item?->unit }})</span>
+                                                                @endif
+                                                            </td>
+                                                            <td class="px-2.5 py-2 text-right tabular-nums font-semibold text-neutral-900">
+                                                                {{ number_format($targetPo->quantity) }}
+                                                                @if($targetPo->conversion_factor > 1)
+                                                                    <span class="text-[10px] text-neutral-400 font-normal">({{ number_format($targetPo->orderedBaseQuantity()) }} base)</span>
+                                                                @endif
+                                                            </td>
+                                                            <td class="px-2.5 py-2 text-center capitalize text-neutral-700">
+                                                                {{ $singleUnit }}
+                                                            </td>
+                                                            <td class="px-2.5 py-2 text-right font-mono tabular-nums text-neutral-700">
+                                                                ₱{{ number_format($singleUnitPrice, 2) }}/{{ $singleUnit }}
+                                                            </td>
+                                                            <td class="px-2.5 py-2 text-right font-mono font-semibold tabular-nums text-neutral-900">
+                                                                ₱{{ number_format((float) $targetPo->total_amount, 2) }}
+                                                            </td>
+                                                        </tr>
+                                                    @endforelse
+                                                </tbody>
+                                                <tfoot class="border-t border-neutral-200 bg-neutral-50 font-semibold text-neutral-900">
+                                                    <tr>
+                                                        <td colspan="4" class="px-2.5 py-1.5 text-right text-xs">Purchase Order Commitment Total:</td>
+                                                        <td class="px-2.5 py-1.5 text-right font-mono tabular-nums text-xs font-bold text-primary-700">
+                                                            ₱{{ number_format($targetPo->grandTotal(), 2) }}
+                                                        </td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+                                @endif
+
                                 @if($chain->status === 'pending')
                                     @can('approve_purchase_order')
                                     <div class="mt-4 flex items-center justify-end gap-2 border-t border-neutral-100 pt-3">
@@ -1277,6 +1369,42 @@
                                     $isOverdue = $expectedDelivery && $expectedDelivery->lt(today()) && !in_array($po->status, ['received', 'fulfilled', 'cancelled', 'rejected'], true);
                                     $canReceiveThisPo = $statusEnum?->canReceiveStock()
                                         ?? in_array($po->status, ['approved', 'dispatched', 'acknowledged', 'partially_fulfilled', 'partially_received', 'issued'], true);
+                                    
+                                    $hasSensitivePermission = auth()->user()?->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ?? false;
+                                    $linesData = $poLines->isNotEmpty()
+                                        ? $poLines->map(fn ($line) => [
+                                            'item' => $line->item?->name ?? 'Unavailable item',
+                                            'sku' => $line->item?->sku ?: $line->item?->code ?: '—',
+                                            'ordered' => (int) $line->ordered_quantity,
+                                            'purchase_unit' => $line->purchase_unit ?: $line->item?->unit ?: 'units',
+                                            'conversion_factor' => $line->conversionFactor(),
+                                            'conversion_display' => $line->conversionDisplay(),
+                                            'equivalent_base_quantity' => $line->orderedBaseQuantity(),
+                                            'base_unit' => $line->item?->unit ?: 'units',
+                                            'received' => (int) $line->received_quantity,
+                                            'received_base' => $line->receivedBaseQuantity(),
+                                            'remaining' => $line->remainingQuantity(),
+                                            'remaining_base' => $line->remainingBaseQuantity(),
+                                            'unit_price' => $hasSensitivePermission ? (float) $line->unit_price : null,
+                                            'amount' => $hasSensitivePermission ? $line->lineTotal() : null,
+                                        ])->values()
+                                        : ($po->item ? collect([[
+                                            'item' => $po->item->name,
+                                            'sku' => $po->item->sku ?: $po->item->code ?: '—',
+                                            'ordered' => (int) $po->quantity,
+                                            'purchase_unit' => $po->purchase_unit ?: $po->item->unit ?: 'units',
+                                            'conversion_factor' => $po->conversionFactor(),
+                                            'conversion_display' => $po->conversion_factor > 1 ? "1 {$po->purchase_unit} = " . (int) $po->conversion_factor . " {$po->item->unit}" : '',
+                                            'equivalent_base_quantity' => $po->orderedBaseQuantity(),
+                                            'base_unit' => $po->item->unit ?: 'units',
+                                            'received' => $po->received_at ? (int) $po->quantity : 0,
+                                            'received_base' => $po->receivedBaseQuantity(),
+                                            'remaining' => $po->received_at ? 0 : (int) $po->quantity,
+                                            'remaining_base' => $po->remainingBaseQuantity(),
+                                            'unit_price' => $hasSensitivePermission ? (float) ($po->quantity > 0 ? ($po->unit_cost ?: round($po->total_amount / $po->quantity, 2)) : 0) : null,
+                                            'amount' => $hasSensitivePermission ? (float) $po->total_amount : null,
+                                        ]]) : collect());
+
                                     $poDetail = [
                                         'number' => $po->po_number,
                                         'version' => $po->version,
@@ -1285,15 +1413,22 @@
                                         'item' => $primaryItem?->name ?? 'Multiple items',
                                         'quantity' => $orderedQuantity,
                                         'received_quantity' => $receivedQuantity,
+                                        'ordered_base_quantity' => $po->orderedBaseQuantity(),
+                                        'received_base_quantity' => $po->receivedBaseQuantity(),
+                                        'remaining_base_quantity' => $po->remainingBaseQuantity(),
                                         'unit' => $primaryItem?->unit ?: 'units',
-                                        'amount' => auth()->user()?->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ? (float) $po->total_amount : null,
+                                        'amount' => $hasSensitivePermission ? (float) $po->total_amount : null,
+                                        'subtotal' => $hasSensitivePermission ? $po->subtotal() : null,
+                                        'additional_charges' => $hasSensitivePermission ? $po->additionalCharges() : null,
+                                        'discounts' => $hasSensitivePermission ? $po->discounts() : null,
+                                        'grand_total' => $hasSensitivePermission ? $po->grandTotal() : null,
                                         'currency' => $po->currency ?: 'PHP',
-                                        'payment_terms' => auth()->user()?->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ? $po->payment_terms : null,
-                                        'incoterms' => auth()->user()?->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ? $po->incoterms : null,
+                                        'payment_terms' => $hasSensitivePermission ? $po->payment_terms : null,
+                                        'incoterms' => $hasSensitivePermission ? $po->incoterms : null,
                                         'created_at' => optional($po->requested_at ?? $po->created_at)->toDateString(),
                                         'delivery_date' => $expectedDelivery?->toDateString(),
                                         'received_at' => $po->received_at?->toDateString(),
-                                        'cost_center' => auth()->user()?->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ? $po->costCenter?->name : null,
+                                        'cost_center' => $hasSensitivePermission ? $po->costCenter?->name : null,
                                         'purchase_request' => $po->purchaseRequest?->pr_number,
                                         'created_by' => $po->createdBy?->name,
                                         'approval_status' => $po->approvalChain?->status,
@@ -1303,13 +1438,7 @@
                                             'status' => \Illuminate\Support\Str::headline($step->status->value ?? $step->status),
                                             'approver' => $step->approver?->name,
                                         ])->values() ?? [],
-                                        'lines' => $poLines->map(fn ($line) => [
-                                            'item' => $line->item?->name ?? 'Unavailable item',
-                                            'ordered' => (int) $line->ordered_quantity,
-                                            'received' => (int) $line->received_quantity,
-                                            'unit' => $line->item?->unit ?: 'units',
-                                            'amount' => auth()->user()?->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ? (float) $line->total_line_amount : null,
-                                        ])->values(),
+                                        'lines' => $linesData,
                                         'shipments' => $po->shipments->sortByDesc('id')->map(fn ($shipment) => [
                                             'number' => $shipment->shipment_number,
                                             'status' => \Illuminate\Support\Str::headline((string) $shipment->status),
@@ -1323,7 +1452,7 @@
                                             'variance' => (float) $revision->variance_percentage,
                                             'requires_doa' => (bool) $revision->requires_doa_reapproval,
                                         ])->values(),
-                                        'cxml' => auth()->user()?->can(\App\Enums\Permission::ViewProcurementSensitiveData->value) ? $po->cxml_payload : null,
+                                        'cxml' => $hasSensitivePermission ? $po->cxml_payload : null,
                                         'can_receive' => $canReceiveThisPo
                                             && (auth()->user()?->can(\App\Enums\Permission::ReceivePurchaseOrder->value) ?? false),
                                         'receive_url' => route('inventory.purchases.receive', $po),
@@ -1358,7 +1487,13 @@
                                             <div class="flex flex-wrap items-center gap-x-2 text-xs text-neutral-500">
                                                 <span class="font-medium text-neutral-700">{{ $po->supplier?->name ?? 'Supplier unavailable' }}</span>
                                                 <span>&bull;</span>
-                                                <span>{{ number_format($orderedQuantity) }} {{ $primaryItem?->unit ?: 'units' }}</span>
+                                                @php
+                                                    $cardUnit = ($poLines->count() === 1 && $poLines->first()->purchase_unit) ? $poLines->first()->purchase_unit : ($primaryItem?->unit ?: 'units');
+                                                @endphp
+                                                <span>{{ number_format($orderedQuantity) }} {{ \Illuminate\Support\Str::plural($cardUnit, $orderedQuantity) }}</span>
+                                                @if($po->orderedBaseQuantity() !== $orderedQuantity)
+                                                    <span class="text-neutral-500 font-medium">(≈ {{ number_format($po->orderedBaseQuantity()) }} base units)</span>
+                                                @endif
                                                 @if($poLines->count() > 1)
                                                     <span>&bull;</span>
                                                     <span class="text-neutral-400">{{ $poLines->count() }} items</span>
@@ -1383,6 +1518,94 @@
                                             </div>
                                         </div>
                                     </div>
+
+                                    @can(\App\Enums\Permission::ViewProcurementSensitiveData->value)
+                                    {{-- Line Items Price & Total Breakdown --}}
+                                    <div class="mt-3 overflow-hidden rounded-md border border-neutral-200/80 bg-neutral-50/40 text-xs">
+                                        <table class="w-full text-left">
+                                            <thead class="bg-neutral-100/75 text-[11px] font-semibold text-neutral-600 border-b border-neutral-200/70">
+                                                <tr>
+                                                    <th scope="col" class="px-3 py-1.5">Item Name</th>
+                                                    <th scope="col" class="px-3 py-1.5 text-right">Quantity</th>
+                                                    <th scope="col" class="px-3 py-1.5 text-center">Unit</th>
+                                                    <th scope="col" class="px-3 py-1.5 text-right">Price per Unit</th>
+                                                    <th scope="col" class="px-3 py-1.5 text-right">Total Price</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-neutral-200/50 bg-white">
+                                                @forelse($poLines as $line)
+                                                    @php
+                                                        $lineUnit = $line->purchase_unit ?: ($line->item?->unit ?: 'unit');
+                                                        $lineUnitPrice = (float) $line->unit_price;
+                                                        $lineTotal = $line->lineTotal();
+                                                    @endphp
+                                                    <tr>
+                                                        <td class="px-3 py-2">
+                                                            <span class="font-medium text-neutral-900">{{ $line->item?->name ?? 'Item' }}</span>
+                                                            @if($line->conversionFactor() > 1)
+                                                                <span class="ml-1 text-[10px] text-neutral-500 font-mono">({{ $line->conversionDisplay() }})</span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="px-3 py-2 text-right tabular-nums font-semibold text-neutral-900">
+                                                            {{ number_format($line->ordered_quantity) }}
+                                                            @if($line->conversionFactor() > 1)
+                                                                <span class="text-[10px] text-neutral-400 font-normal">({{ number_format($line->orderedBaseQuantity()) }} base)</span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="px-3 py-2 text-center capitalize text-neutral-700">
+                                                            {{ $lineUnit }}
+                                                        </td>
+                                                        <td class="px-3 py-2 text-right font-mono tabular-nums text-neutral-700">
+                                                            ₱{{ number_format($lineUnitPrice, 2) }}/{{ $lineUnit }}
+                                                        </td>
+                                                        <td class="px-3 py-2 text-right font-mono font-semibold tabular-nums text-neutral-900">
+                                                            ₱{{ number_format($lineTotal, 2) }}
+                                                        </td>
+                                                    </tr>
+                                                @empty
+                                                    @if($po->item)
+                                                        @php
+                                                            $singleUnit = $po->purchase_unit ?: ($po->item->unit ?: 'unit');
+                                                            $singleUnitPrice = $po->quantity > 0 ? ($po->unit_cost ?: round($po->total_amount / $po->quantity, 2)) : 0;
+                                                            $singleTotal = (float) $po->total_amount;
+                                                        @endphp
+                                                        <tr>
+                                                            <td class="px-3 py-2">
+                                                                <span class="font-medium text-neutral-900">{{ $po->item->name }}</span>
+                                                                @if($po->conversion_factor > 1)
+                                                                    <span class="ml-1 text-[10px] text-neutral-500 font-mono">(1 {{ $singleUnit }} = {{ (int) $po->conversion_factor }} {{ $po->item->unit }})</span>
+                                                                @endif
+                                                            </td>
+                                                            <td class="px-3 py-2 text-right tabular-nums font-semibold text-neutral-900">
+                                                                {{ number_format($po->quantity) }}
+                                                                @if($po->conversion_factor > 1)
+                                                                    <span class="text-[10px] text-neutral-400 font-normal">({{ number_format($po->orderedBaseQuantity()) }} base)</span>
+                                                                @endif
+                                                            </td>
+                                                            <td class="px-3 py-2 text-center capitalize text-neutral-700">
+                                                                {{ $singleUnit }}
+                                                            </td>
+                                                            <td class="px-3 py-2 text-right font-mono tabular-nums text-neutral-700">
+                                                                ₱{{ number_format($singleUnitPrice, 2) }}/{{ $singleUnit }}
+                                                            </td>
+                                                            <td class="px-3 py-2 text-right font-mono font-semibold tabular-nums text-neutral-900">
+                                                                ₱{{ number_format($singleTotal, 2) }}
+                                                            </td>
+                                                        </tr>
+                                                    @endif
+                                                @endforelse
+                                            </tbody>
+                                            <tfoot class="border-t border-neutral-200 bg-neutral-50 font-semibold text-neutral-900">
+                                                <tr>
+                                                    <td colspan="4" class="px-3 py-1.5 text-right text-xs">Purchase Order Total:</td>
+                                                    <td class="px-3 py-1.5 text-right font-mono tabular-nums text-xs font-bold text-primary-700">
+                                                        ₱{{ number_format($po->grandTotal(), 2) }}
+                                                    </td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                    @endcan
 
                                     <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-100 pt-2.5">
                                         <div class="flex items-center gap-2">
@@ -1428,6 +1651,7 @@
                             <dl class="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
                                 <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500">Item</dt><dd class="text-right text-sm font-medium text-neutral-900" x-text="selectedItem()?.name"></dd></div>
                                 <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500">Quantity</dt><dd class="text-right text-sm font-medium tabular-nums text-neutral-900"><span x-text="formatNumber(quantity)"></span> <span x-text="selectedItem()?.unit"></span></dd></div>
+                                <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500">Price per unit</dt><dd class="text-right text-sm font-medium tabular-nums text-neutral-900" x-text="formatCurrency(trustedUnitCost(), selectedTerms()?.currency)"></dd></div>
                                 <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500">Supplier</dt><dd class="text-right text-sm font-medium text-neutral-900" x-text="selectedSupplier()?.name"></dd></div>
                                 <div class="flex justify-between gap-4 px-3 py-2.5"><dt class="text-xs text-neutral-500">Expected delivery</dt><dd class="text-right text-sm font-medium tabular-nums text-neutral-900" x-text="expectedDeliveryLabel()"></dd></div>
                                 <div class="flex justify-between gap-4 bg-neutral-50 px-3 py-3"><dt class="text-xs font-semibold text-neutral-700">Estimated total</dt><dd class="text-right text-base font-semibold tabular-nums text-neutral-900" x-text="formatCurrency(orderTotal(), selectedTerms()?.currency)"></dd></div>
@@ -1441,30 +1665,119 @@
                     </x-ui.modal>
                 @endcan
 
-                <x-ui.modal name="purchase-order-details" title="Purchase order details" maxWidth="2xl">
+                <x-ui.modal name="purchase-order-details" title="Purchase order details" maxWidth="3xl">
                     <template x-if="selectedPo">
                         <div class="space-y-4">
-                            <div class="flex flex-wrap items-start justify-between gap-3">
-                                <div class="min-w-0"><p class="font-mono text-sm font-bold text-primary-700" x-text="selectedPo.number"></p><p class="mt-0.5 text-xs text-neutral-500"><span x-text="selectedPo.version || 'Original issue'"></span> · <span x-text="selectedPo.status"></span><template x-if="selectedPo.approval_status"><span> · Approval <span x-text="selectedPo.approval_status"></span></span></template></p></div>
-                                <div class="text-right"><p class="text-xs text-neutral-500">Supplier</p><p class="text-sm font-semibold text-neutral-900" x-text="selectedPo.supplier"></p></div>
-                            </div>
-                            <div class="grid gap-px overflow-hidden rounded-lg border border-neutral-200 bg-neutral-200 sm:grid-cols-3">
-                                <div class="bg-neutral-50 p-3"><p class="text-[10px] uppercase tracking-wide text-neutral-500">Ordered</p><p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900"><span x-text="formatNumber(selectedPo.quantity)"></span> <span x-text="selectedPo.unit"></span></p></div>
-                                <div class="bg-neutral-50 p-3"><p class="text-[10px] uppercase tracking-wide text-neutral-500">Received</p><p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900" x-text="`${formatNumber(selectedPo.received_quantity)} / ${formatNumber(selectedPo.quantity)}`"></p></div>
-                                <div class="bg-neutral-50 p-3"><p class="text-[10px] uppercase tracking-wide text-neutral-500">Expected delivery</p><p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900" x-text="formatDate(selectedPo.delivery_date)"></p></div>
-                            </div>
-                            <div>
-                                <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Order lines</h4>
-                                <div class="mt-2 divide-y divide-neutral-100 rounded-lg border border-neutral-200">
-                                    <template x-for="(line, index) in selectedPo.lines" x-bind:key="index">
-                                        <div class="flex items-center justify-between gap-4 px-3 py-2.5 text-sm">
-                                            <div class="min-w-0"><p class="truncate font-medium text-neutral-900" x-text="line.item"></p><p class="text-xs text-neutral-500" x-text="`${formatNumber(line.received)} of ${formatNumber(line.ordered)} ${line.unit} received`"></p></div>
-                                            <span x-show="line.amount !== null" class="shrink-0 font-semibold tabular-nums text-neutral-800" x-text="formatCurrency(line.amount, selectedPo.currency)"></span>
-                                        </div>
-                                    </template>
-                                    <div x-show="selectedPo.lines.length === 0" class="px-3 py-3 text-sm text-neutral-500"><span x-text="selectedPo.item"></span></div>
+                            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-neutral-100 pb-3">
+                                <div class="min-w-0">
+                                    <p class="font-mono text-base font-bold text-primary-700" x-text="selectedPo.number"></p>
+                                    <p class="mt-0.5 text-xs text-neutral-500">
+                                        <span x-text="selectedPo.version || 'Original issue'"></span> · <span x-text="selectedPo.status"></span>
+                                        <template x-if="selectedPo.approval_status"><span> · Approval <span x-text="selectedPo.approval_status"></span></span></template>
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-xs text-neutral-500">Supplier</p>
+                                    <p class="text-sm font-semibold text-neutral-900" x-text="selectedPo.supplier"></p>
                                 </div>
                             </div>
+
+                            <div class="grid gap-px overflow-hidden rounded-lg border border-neutral-200 bg-neutral-200 sm:grid-cols-3">
+                                <div class="bg-neutral-50 p-3">
+                                    <p class="text-[10px] uppercase tracking-wide text-neutral-500">Ordered Quantity</p>
+                                    <p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900">
+                                        <span x-text="formatNumber(selectedPo.quantity)"></span> <span x-text="selectedPo.unit"></span>
+                                    </p>
+                                    <template x-if="selectedPo.ordered_base_quantity && selectedPo.ordered_base_quantity !== selectedPo.quantity">
+                                        <p class="text-[11px] text-neutral-500 tabular-nums">≈ <span x-text="formatNumber(selectedPo.ordered_base_quantity)"></span> base units</p>
+                                    </template>
+                                </div>
+                                <div class="bg-neutral-50 p-3">
+                                    <p class="text-[10px] uppercase tracking-wide text-neutral-500">Received Stock</p>
+                                    <p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900" x-text="`${formatNumber(selectedPo.received_quantity)} / ${formatNumber(selectedPo.quantity)}`"></p>
+                                    <template x-if="selectedPo.received_base_quantity && selectedPo.received_base_quantity !== selectedPo.received_quantity">
+                                        <p class="text-[11px] text-neutral-500 tabular-nums">≈ <span x-text="formatNumber(selectedPo.received_base_quantity)"></span> base units</p>
+                                    </template>
+                                </div>
+                                <div class="bg-neutral-50 p-3">
+                                    <p class="text-[10px] uppercase tracking-wide text-neutral-500">Expected Delivery</p>
+                                    <p class="mt-1 text-sm font-semibold tabular-nums text-neutral-900" x-text="formatDate(selectedPo.delivery_date)"></p>
+                                </div>
+                            </div>
+
+                            {{-- Complete Item Cost Details & Summary Table --}}
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-600">Order Lines &amp; Cost Breakdown</h4>
+                                    <span class="text-xs text-neutral-500" x-text="`${selectedPo.lines.length} item${selectedPo.lines.length === 1 ? '' : 's'}`"></span>
+                                </div>
+                                <div class="overflow-hidden rounded-lg border border-neutral-200">
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full divide-y divide-neutral-200 text-left text-xs">
+                                            <thead class="bg-neutral-50 text-neutral-600">
+                                                <tr>
+                                                    <th scope="col" class="px-3 py-2 font-semibold">Item &amp; Details</th>
+                                                    <th scope="col" class="px-3 py-2 font-semibold text-right">Ordered Qty</th>
+                                                    <th scope="col" class="px-3 py-2 font-semibold text-center">Unit</th>
+                                                    <th x-show="selectedPo.amount !== null" scope="col" class="px-3 py-2 font-semibold text-right">Price / Unit</th>
+                                                    <th x-show="selectedPo.amount !== null" scope="col" class="px-3 py-2 font-semibold text-right">Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-neutral-100 bg-white">
+                                                <template x-for="(line, index) in selectedPo.lines" x-bind:key="index">
+                                                    <tr class="hover:bg-neutral-50/50">
+                                                        <td class="px-3 py-2.5">
+                                                            <p class="font-medium text-neutral-900" x-text="line.item"></p>
+                                                            <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                                                <span class="font-mono text-[11px] text-neutral-500" x-text="`SKU: ${line.sku}`"></span>
+                                                                <template x-if="line.conversion_display">
+                                                                    <span class="inline-flex items-center rounded bg-primary-50 px-1.5 py-0.5 text-[10px] font-medium text-primary-700 ring-1 ring-inset ring-primary-600/20" x-text="line.conversion_display"></span>
+                                                                </template>
+                                                            </div>
+                                                            <p class="mt-1 text-[11px] text-neutral-500" x-text="`${formatNumber(line.received)} of ${formatNumber(line.ordered)} ${line.purchase_unit} received`"></p>
+                                                        </td>
+                                                        <td class="px-3 py-2.5 text-right tabular-nums">
+                                                            <span class="font-semibold text-neutral-900" x-text="formatNumber(line.ordered)"></span>
+                                                            <template x-if="line.conversion_factor > 1">
+                                                                <p class="text-[11px] text-neutral-500 tabular-nums" x-text="`≈ ${formatNumber(line.equivalent_base_quantity)} ${line.base_unit}`"></p>
+                                                            </template>
+                                                        </td>
+                                                        <td class="px-3 py-2.5 text-center capitalize text-neutral-700" x-text="line.purchase_unit"></td>
+                                                        <td x-show="selectedPo.amount !== null" class="px-3 py-2.5 text-right font-mono tabular-nums text-neutral-700" x-text="formatCurrency(line.unit_price, selectedPo.currency)"></td>
+                                                        <td x-show="selectedPo.amount !== null" class="px-3 py-2.5 text-right font-semibold font-mono tabular-nums text-neutral-900" x-text="formatCurrency(line.amount, selectedPo.currency)"></td>
+                                                    </tr>
+                                                </template>
+                                                <tr x-show="selectedPo.lines.length === 0">
+                                                    <td :colspan="selectedPo.amount !== null ? 5 : 3" class="px-3 py-4 text-center text-neutral-500" x-text="selectedPo.item"></td>
+                                                </tr>
+                                            </tbody>
+                                            <tfoot x-show="selectedPo.amount !== null" class="border-t border-neutral-200 bg-neutral-50/70 text-xs">
+                                                <tr>
+                                                    <td colspan="4" class="px-3 py-2 text-right font-medium text-neutral-600">Subtotal:</td>
+                                                    <td class="px-3 py-2 text-right font-semibold font-mono tabular-nums text-neutral-900" x-text="formatCurrency(selectedPo.subtotal ?? selectedPo.amount, selectedPo.currency)"></td>
+                                                </tr>
+                                                <template x-if="selectedPo.additional_charges && selectedPo.additional_charges > 0">
+                                                    <tr>
+                                                        <td colspan="4" class="px-3 py-1.5 text-right font-medium text-neutral-600">Additional Charges:</td>
+                                                        <td class="px-3 py-1.5 text-right font-mono tabular-nums text-neutral-800" x-text="formatCurrency(selectedPo.additional_charges, selectedPo.currency)"></td>
+                                                    </tr>
+                                                </template>
+                                                <template x-if="selectedPo.discounts && selectedPo.discounts > 0">
+                                                    <tr>
+                                                        <td colspan="4" class="px-3 py-1.5 text-right font-medium text-neutral-600">Discounts:</td>
+                                                        <td class="px-3 py-1.5 text-right font-mono tabular-nums text-emerald-700" x-text="`-${formatCurrency(selectedPo.discounts, selectedPo.currency)}`"></td>
+                                                    </tr>
+                                                </template>
+                                                <tr class="border-t border-neutral-200 font-semibold">
+                                                    <td colspan="4" class="px-3 py-2.5 text-right text-sm text-neutral-900">Grand Total:</td>
+                                                    <td class="px-3 py-2.5 text-right text-sm font-bold font-mono tabular-nums text-primary-700" x-text="formatCurrency(selectedPo.grand_total ?? selectedPo.amount, selectedPo.currency)"></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div>
                                 <h4 class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Delivery &amp; receiving</h4>
                                 <dl class="mt-2 grid gap-3 text-sm sm:grid-cols-2">

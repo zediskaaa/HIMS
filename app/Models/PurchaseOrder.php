@@ -149,6 +149,51 @@ class PurchaseOrder extends Model
 
     public function orderedBaseQuantity(): int
     {
+        $hasLines = $this->relationLoaded('lines') ? $this->lines->isNotEmpty() : $this->lines()->exists();
+        if ($hasLines) {
+            return (int) $this->lines->sum(fn ($line) => $line->orderedBaseQuantity());
+        }
+
         return (int) round($this->quantity * $this->conversionFactor());
+    }
+
+    public function receivedBaseQuantity(): int
+    {
+        $hasLines = $this->relationLoaded('lines') ? $this->lines->isNotEmpty() : $this->lines()->exists();
+        if ($hasLines) {
+            return (int) $this->lines->sum(fn ($line) => $line->receivedBaseQuantity());
+        }
+
+        return $this->received_at ? $this->orderedBaseQuantity() : 0;
+    }
+
+    public function remainingBaseQuantity(): int
+    {
+        return max(0, $this->orderedBaseQuantity() - $this->receivedBaseQuantity());
+    }
+
+    public function subtotal(): float
+    {
+        $hasLines = $this->relationLoaded('lines') ? $this->lines->isNotEmpty() : $this->lines()->exists();
+        if ($hasLines) {
+            return round((float) $this->lines->sum(fn ($line) => $line->lineTotal()), 2);
+        }
+
+        return round((float) $this->total_amount, 2);
+    }
+
+    public function additionalCharges(): float
+    {
+        return 0.00;
+    }
+
+    public function discounts(): float
+    {
+        return 0.00;
+    }
+
+    public function grandTotal(): float
+    {
+        return round($this->subtotal() + $this->additionalCharges() - $this->discounts(), 2);
     }
 }

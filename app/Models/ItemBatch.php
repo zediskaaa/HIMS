@@ -87,12 +87,23 @@ class ItemBatch extends Model
     }
 
     /**
-     * First-Expired-First-Out ordering. Batches with no expiry date sort
-     * last so dated stock is always consumed first.
+     * First-Expired-First-Out ordering. Batches with earliest expiry sort first;
+     * ties and non-dated stock fall back to chronological FIFO order.
      */
     public function scopeFefo($query)
     {
-        return $query->orderByRaw('expiry_date is null')->orderBy('expiry_date')->orderBy('id');
+        return $query->orderByRaw('expiry_date IS NULL ASC')
+            ->orderBy('expiry_date', 'asc')
+            ->orderByRaw('COALESCE(received_at, created_at) ASC')
+            ->orderBy('id', 'asc');
+    }
+
+    /**
+     * First-In-First-Out ordering. Oldest received stock is consumed first.
+     */
+    public function scopeFifo($query)
+    {
+        return $query->orderByRaw('COALESCE(received_at, created_at) ASC')->orderBy('id', 'asc');
     }
 
     public function scopeExpiringBefore($query, $date)

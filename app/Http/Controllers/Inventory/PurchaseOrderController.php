@@ -8,9 +8,11 @@ use App\Enums\PurchaseOrderStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePurchaseOrderRequest;
 use App\Models\InventoryItem;
+use App\Models\ItemBatch;
 use App\Models\PurchaseOrder;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
+use Carbon\Carbon;
 use App\Services\InventoryAutomationService;
 use App\Services\Procurement\BudgetEncumbranceService;
 use App\Services\Procurement\POConversionService;
@@ -121,7 +123,9 @@ class PurchaseOrderController extends Controller implements HasMiddleware
             if ($po->lines()->exists()) {
                 foreach ($po->lines as $line) {
                     $item = $line->item;
-                    $locId = $item->default_location_id ?? $fallbackLocationId;
+                    $locId = $item->default_location_id
+                        ?? $item->stockLevels()->value('storage_location_id')
+                        ?? $fallbackLocationId;
                     $item->ensureStockLevelExists($locId);
 
                     $qtyToReceive = $line->remainingQuantity() > 0 ? $line->remainingQuantity() : $line->ordered_quantity;
@@ -141,11 +145,32 @@ class PurchaseOrderController extends Controller implements HasMiddleware
                         ? "{$qtyToReceive} {$pUnit} ({$baseQtyToReceive} {$bUnit})"
                         : "{$baseQtyToReceive} {$bUnit}";
 
+                    $batch = null;
+                    $batchNumber = request('batch_number');
+                    if (empty($batchNumber) && ($item->is_batch_tracked || request()->has('batch_number'))) {
+                        $batchNumber = 'LOT-'.$po->po_number.($po->lines()->count() > 1 ? '-L'.$line->line_number : '');
+                    }
+
+                    if ($batchNumber) {
+                        $receivedDate = request('received_at') ? Carbon::parse(request('received_at'))->toDateString() : now()->toDateString();
+                        $batch = ItemBatch::firstOrCreate(
+                            ['item_id' => $item->id, 'batch_number' => $batchNumber],
+                            [
+                                'received_at' => $receivedDate,
+                                'expiry_date' => request('expiry_date') ? Carbon::parse(request('expiry_date')) : null,
+                                'unit_cost' => ($line->unit_price && $conversionFactor > 0) ? round($line->unit_price / $conversionFactor, 4) : $item->unit_cost,
+                                'initial_quantity' => $baseQtyToReceive,
+                                'status' => 'active',
+                            ]
+                        );
+                    }
+
                     $this->automationService->recordMovement([
                         'item_id' => $item->id,
                         'movement_type' => MovementType::StockIn,
                         'quantity' => $baseQtyToReceive,
                         'to_location_id' => $locId,
+                        'item_batch_id' => $batch?->id,
                         'unit_cost' => ($line->unit_price && $conversionFactor > 0) ? round($line->unit_price / $conversionFactor, 4) : $item->unit_cost,
                         'remarks' => "Received {$unitDisplay} against {$po->po_number} Line #{$line->line_number}",
                     ], auth()->id(), $po);
@@ -157,7 +182,9 @@ class PurchaseOrderController extends Controller implements HasMiddleware
             } else {
                 // Legacy single-item fallback
                 $item = $po->item;
-                $locId = $item->default_location_id ?? $fallbackLocationId;
+                $locId = $item->default_location_id
+                    ?? $item->stockLevels()->value('storage_location_id')
+                    ?? $fallbackLocationId;
                 $item->ensureStockLevelExists($locId);
 
                 $qtyToReceive = (int) $po->quantity;
@@ -173,11 +200,28 @@ class PurchaseOrderController extends Controller implements HasMiddleware
                     ? "{$qtyToReceive} {$pUnit} ({$baseQtyToReceive} {$bUnit})"
                     : "{$baseQtyToReceive} {$bUnit}";
 
+                $batch = null;
+                if (request()->filled('batch_number')) {
+                    $batchNumber = (string) request('batch_number');
+                    $receivedDate = request('received_at') ? Carbon::parse(request('received_at'))->toDateString() : now()->toDateString();
+                    $batch = ItemBatch::firstOrCreate(
+                        ['item_id' => $item->id, 'batch_number' => $batchNumber],
+                        [
+                            'received_at' => $receivedDate,
+                            'expiry_date' => request('expiry_date') ? Carbon::parse(request('expiry_date')) : null,
+                            'unit_cost' => ($po->unit_cost && $conversionFactor > 0) ? round($po->unit_cost / $conversionFactor, 4) : $item->unit_cost,
+                            'initial_quantity' => $baseQtyToReceive,
+                            'status' => 'active',
+                        ]
+                    );
+                }
+
                 $this->automationService->recordMovement([
                     'item_id' => $item->id,
                     'movement_type' => MovementType::StockIn,
                     'quantity' => $baseQtyToReceive,
                     'to_location_id' => $locId,
+                    'item_batch_id' => $batch?->id,
                     'unit_cost' => ($po->unit_cost && $conversionFactor > 0) ? round($po->unit_cost / $conversionFactor, 4) : $item->unit_cost,
                     'remarks' => "Received {$unitDisplay} against {$po->po_number}",
                 ], auth()->id(), $po);

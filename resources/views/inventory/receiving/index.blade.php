@@ -101,9 +101,41 @@
                                         {{ $po->supplier?->name ?? 'N/A' }}
                                     </td>
                                     <td class="px-6 py-4 text-xs">
-                                        @foreach($po->lines as $l)
-                                            <div>{{ $l->item?->name ?? 'Item' }} ({{ $l->remainingQuantity() }} open / {{ $l->ordered_quantity }} ord)</div>
-                                        @endforeach
+                                        <div class="space-y-1.5">
+                                            @forelse($po->lines as $l)
+                                                @php
+                                                    $lineUnit = $l->purchase_unit ?: ($l->item?->unit ?: 'unit');
+                                                @endphp
+                                                <div class="rounded border border-neutral-100 bg-neutral-50/70 p-2">
+                                                    <div class="font-medium text-neutral-900">{{ $l->item?->name ?? 'Item' }}</div>
+                                                    <div class="flex flex-wrap items-center gap-x-2 text-[11px] text-neutral-600 mt-1">
+                                                        <span>Qty: <strong class="text-neutral-800">{{ $l->ordered_quantity }} {{ \Illuminate\Support\Str::plural($lineUnit, $l->ordered_quantity) }}</strong></span>
+                                                        <span>&bull;</span>
+                                                        <span>Price: <strong class="font-mono text-neutral-800">₱{{ number_format((float) $l->unit_price, 2) }}/{{ $lineUnit }}</strong></span>
+                                                        <span>&bull;</span>
+                                                        <span>Total: <strong class="font-mono text-primary-700">₱{{ number_format($l->lineTotal(), 2) }}</strong></span>
+                                                    </div>
+                                                    @if($l->conversionFactor() > 1)
+                                                        <div class="text-[10px] text-neutral-500 font-mono mt-0.5">({{ $l->conversionDisplay() }} · ≈ {{ number_format($l->orderedBaseQuantity()) }} base units)</div>
+                                                    @endif
+                                                </div>
+                                            @empty
+                                                @php
+                                                    $singleUnit = $po->purchase_unit ?: ($po->item?->unit ?: 'unit');
+                                                    $singleUnitPrice = $po->quantity > 0 ? ($po->unit_cost ?: round($po->total_amount / $po->quantity, 2)) : 0;
+                                                @endphp
+                                                <div class="rounded border border-neutral-100 bg-neutral-50/70 p-2">
+                                                    <div class="font-medium text-neutral-900">{{ $po->item?->name ?? 'Item' }}</div>
+                                                    <div class="flex flex-wrap items-center gap-x-2 text-[11px] text-neutral-600 mt-1">
+                                                        <span>Qty: <strong class="text-neutral-800">{{ $po->quantity }} {{ \Illuminate\Support\Str::plural($singleUnit, $po->quantity) }}</strong></span>
+                                                        <span>&bull;</span>
+                                                        <span>Price: <strong class="font-mono text-neutral-800">₱{{ number_format($singleUnitPrice, 2) }}/{{ $singleUnit }}</strong></span>
+                                                        <span>&bull;</span>
+                                                        <span>Total: <strong class="font-mono text-primary-700">₱{{ number_format((float) $po->total_amount, 2) }}</strong></span>
+                                                    </div>
+                                                </div>
+                                            @endforelse
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 font-mono font-medium text-neutral-900">
                                         ₱{{ number_format((float) $po->total_amount, 2) }}
@@ -254,12 +286,10 @@
                                 <label class="text-xs font-semibold text-neutral-500">Authorized Supplier</label>
                                 <p class="text-sm font-semibold text-neutral-800" x-text="selectedPo && selectedPo.supplier ? selectedPo.supplier.name : ''"></p>
                             </div>
-                            @can(\App\Enums\Permission::ViewProcurementSensitiveData->value)
                             <div>
                                 <label class="text-xs font-semibold text-neutral-500">Total Commitment Value</label>
-                                <p class="text-sm font-mono font-semibold text-neutral-800" x-text="selectedPo ? '₱' + Number(selectedPo.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2}) : ''"></p>
+                                <p class="text-sm font-mono font-semibold text-neutral-800" x-text="selectedPo ? '₱' + Number(selectedPo.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''"></p>
                             </div>
-                            @endcan
                         </div>
 
                         {{-- Carrier & Logistics Inputs --}}
@@ -280,29 +310,42 @@
 
                         {{-- Line Items Table --}}
                         <div class="max-w-full overflow-x-auto rounded-xl border border-neutral-200">
-                            <table class="min-w-[48rem] w-full text-left text-xs text-neutral-600">
+                            <table class="min-w-[54rem] w-full text-left text-xs text-neutral-600">
                                 <thead class="bg-neutral-100 uppercase text-neutral-600 font-semibold border-b">
                                     <tr>
-                                        <th class="px-4 py-2.5">Item Description</th>
-                                        <th class="px-4 py-2.5">Ordered / Open</th>
-                                        <th class="px-4 py-2.5">Receiving Qty</th>
-                                        <th class="px-4 py-2.5">Batch / Lot No.</th>
-                                        <th class="px-4 py-2.5">Expiry Date</th>
+                                        <th class="px-3 py-2.5">Item Description</th>
+                                        <th class="px-3 py-2.5">Ordered / Unit</th>
+                                        <th class="px-3 py-2.5 text-right">Price / Unit</th>
+                                        <th class="px-3 py-2.5 text-right">Total Price</th>
+                                        <th class="px-3 py-2.5">Receiving Qty</th>
+                                        <th class="px-3 py-2.5">Batch / Lot No.</th>
+                                        <th class="px-3 py-2.5">Expiry Date</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-neutral-200">
                                     <template x-for="(line, index) in poLines" :key="line.id">
                                         <tr class="hover:bg-neutral-50">
-                                            <td class="px-4 py-3">
+                                            <td class="px-3 py-3">
                                                 <input type="hidden" :name="`lines[${index}][po_line_id]`" :value="line.id">
                                                 <p class="font-semibold text-neutral-900" x-text="line.item ? line.item.name : 'Item'"></p>
                                                 <p class="text-[11px] font-mono text-neutral-500" x-text="line.item ? line.item.sku : ''"></p>
+                                                <template x-if="line.conversion_factor && Number(line.conversion_factor) > 1">
+                                                    <span class="inline-block mt-0.5 rounded bg-primary-50 px-1.5 py-0.5 text-[10px] font-mono font-medium text-primary-700" x-text="`1 ${line.purchase_unit || (line.item ? line.item.unit : 'unit')} = ${Number(line.conversion_factor)} ${line.item ? line.item.unit : 'units'}`"></span>
+                                                </template>
                                             </td>
-                                            <td class="px-4 py-3 font-mono">
-                                                <span x-text="line.ordered_quantity"></span> /
-                                                <span class="font-semibold text-primary-700" x-text="Math.max(0, line.ordered_quantity - line.received_quantity)"></span>
+                                            <td class="px-3 py-3 font-mono">
+                                                <span class="font-semibold text-neutral-900" x-text="line.ordered_quantity"></span>
+                                                <span class="capitalize text-neutral-600" x-text="line.purchase_unit || (line.item ? line.item.unit : 'units')"></span>
+                                                <p class="text-[11px] text-neutral-500 mt-0.5" x-text="`Open: ${Math.max(0, line.ordered_quantity - line.received_quantity)}`"></p>
                                             </td>
-                                            <td class="px-4 py-3">
+                                            <td class="px-3 py-3 text-right font-mono text-neutral-700">
+                                                <span x-text="'₱' + Number(line.unit_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                                                <span class="block text-[10px] text-neutral-400" x-text="`/${line.purchase_unit || (line.item ? line.item.unit : 'unit')}`"></span>
+                                            </td>
+                                            <td class="px-3 py-3 text-right font-mono font-semibold text-neutral-900">
+                                                <span x-text="'₱' + Number(line.total_line_amount || ((line.ordered_quantity || 0) * (line.unit_price || 0))).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                                            </td>
+                                            <td class="px-3 py-3">
                                                 <input
                                                     type="number"
                                                     :name="`lines[${index}][received_quantity]`"
@@ -315,7 +358,7 @@
                                                 >
                                                 <span class="block text-[10px] text-neutral-400 mt-0.5">Max +5%: <span x-text="Math.ceil(Math.max(1, line.ordered_quantity - line.received_quantity) * 1.05)"></span></span>
                                             </td>
-                                            <td class="px-4 py-3">
+                                            <td class="px-3 py-3">
                                                 <input
                                                     type="text"
                                                     :name="`lines[${index}][batch_number]`"
@@ -324,7 +367,7 @@
                                                     :required="line.item && line.item.is_batch_tracked"
                                                 >
                                             </td>
-                                            <td class="px-4 py-3">
+                                            <td class="px-3 py-3">
                                                 <input
                                                     type="date"
                                                     :name="`lines[${index}][expiry_date]`"
@@ -336,6 +379,13 @@
                                         </tr>
                                     </template>
                                 </tbody>
+                                <tfoot class="border-t border-neutral-200 bg-neutral-50 font-semibold text-neutral-900">
+                                    <tr>
+                                        <td colspan="3" class="px-3 py-2 text-right text-xs">Total Purchase Order Commitment:</td>
+                                        <td class="px-3 py-2 text-right font-mono font-bold text-xs text-primary-700" x-text="selectedPo ? '₱' + Number(selectedPo.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '₱0.00'"></td>
+                                        <td colspan="3"></td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
 

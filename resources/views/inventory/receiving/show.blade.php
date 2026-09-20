@@ -101,11 +101,16 @@
                                 <th class="px-6 py-3 font-medium">Expiration</th>
                                 <th class="px-6 py-3 font-medium text-right">Received Qty</th>
                                 <th class="px-6 py-3 font-medium text-right">Unit Cost</th>
+                                <th class="px-6 py-3 font-medium text-right">Total Price</th>
                                 <th class="px-6 py-3 font-medium">QC Status</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-neutral-200">
                             @forelse($goodsReceiptNote->lines as $line)
+                                @php
+                                    $lineUnit = $line->purchase_unit ?: ($line->item?->unit ?: 'unit');
+                                    $lineTotal = (float) ($line->received_quantity * $line->unit_cost);
+                                @endphp
                                 <tr class="hover:bg-neutral-50">
                                     <td class="px-6 py-4">
                                         <p class="font-medium text-neutral-900">{{ $line->item->name ?? 'Item #' . $line->inventory_item_id }}</p>
@@ -137,10 +142,13 @@
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-right font-semibold text-neutral-900">
-                                        {{ number_format($line->received_quantity) }}
+                                        {{ number_format($line->received_quantity) }} {{ \Illuminate\Support\Str::plural($lineUnit, $line->received_quantity) }}
                                     </td>
-                                    <td class="px-6 py-4 text-right text-neutral-700">
-                                        ₱{{ number_format($line->unit_cost, 2) }}
+                                    <td class="px-6 py-4 text-right font-mono text-neutral-700">
+                                        ₱{{ number_format($line->unit_cost, 2) }}/{{ $lineUnit }}
+                                    </td>
+                                    <td class="px-6 py-4 text-right font-mono font-semibold text-neutral-900">
+                                        ₱{{ number_format($lineTotal, 2) }}
                                     </td>
                                     <td class="px-6 py-4">
                                         @php
@@ -167,12 +175,30 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="px-6 py-8 text-center text-sm text-neutral-500">
+                                    <td colspan="7" class="px-6 py-8 text-center text-sm text-neutral-500">
                                         No line items associated with this Goods Receipt Note.
                                     </td>
                                 </tr>
                             @endforelse
                         </tbody>
+                        <tfoot class="border-t border-neutral-200 bg-neutral-50 font-semibold text-neutral-900 text-xs">
+                            <tr>
+                                <td colspan="4" class="px-6 py-3 text-right">Total Received Goods Value:</td>
+                                <td class="px-6 py-3 text-right font-mono font-bold text-primary-700" colspan="2">
+                                    ₱{{ number_format($goodsReceiptNote->lines->sum(fn ($l) => $l->received_quantity * $l->unit_cost), 2) }}
+                                </td>
+                                <td></td>
+                            </tr>
+                            @if($goodsReceiptNote->purchaseOrder)
+                                <tr class="text-neutral-500 font-normal">
+                                    <td colspan="4" class="px-6 py-2 text-right">Original Purchase Order Total:</td>
+                                    <td class="px-6 py-2 text-right font-mono" colspan="2">
+                                        ₱{{ number_format((float) $goodsReceiptNote->purchaseOrder->total_amount, 2) }}
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            @endif
+                        </tfoot>
                     </table>
                 </div>
             </div>

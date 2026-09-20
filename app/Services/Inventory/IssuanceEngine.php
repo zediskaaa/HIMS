@@ -150,7 +150,8 @@ class IssuanceEngine
                     ]);
                 }
 
-                $allocations = $this->allocateAcrossLocations($item, $requestedQty);
+                $strategy = $line->allocation_strategy ?? ($item->is_expiry_tracked ? 'FEFO' : 'FIFO');
+                $allocations = $this->allocateAcrossLocations($item, $requestedQty, $strategy);
                 foreach ($allocations as $allocation) {
                     $this->automationService->reserveStock($item->id, $allocation['location_id'], $allocation['batch_id'], $allocation['quantity']);
 
@@ -212,18 +213,28 @@ class IssuanceEngine
     }
 
     /** @return array<int, array{location_id:int,batch_id:int|null,quantity:int}> */
-    private function allocateAcrossLocations(InventoryItem $item, int $quantity): array
+    private function allocateAcrossLocations(InventoryItem $item, int $quantity, string $strategy = 'FIFO'): array
     {
-        $levels = ItemStockLevel::query()
+        $query = ItemStockLevel::query()
             ->where('item_stock_levels.item_id', $item->id)
             ->whereRaw('item_stock_levels.quantity > item_stock_levels.reserved_quantity')
             ->whereHas('location', fn ($query) => $query->active()->where('is_dispatch_staging', false))
             ->with(['location', 'batch'])
-            ->leftJoin('item_batches', 'item_stock_levels.item_batch_id', '=', 'item_batches.id')
-            ->orderByRaw('item_batches.expiry_date is null')
-            ->orderBy('item_batches.expiry_date')
-            ->orderBy('item_stock_levels.id')
-            ->select('item_stock_levels.*')
+            ->leftJoin('item_batches', 'item_stock_levels.item_batch_id', '=', 'item_batches.id');
+
+        if (strtoupper($strategy) === 'FEFO') {
+            $query->orderByRaw('item_batches.expiry_date IS NULL ASC')
+                ->orderBy('item_batches.expiry_date', 'asc')
+                ->orderByRaw('COALESCE(item_batches.received_at, item_batches.created_at, item_stock_levels.created_at) ASC')
+                ->orderBy('item_batches.id', 'asc')
+                ->orderBy('item_stock_levels.id', 'asc');
+        } else {
+            $query->orderByRaw('COALESCE(item_batches.received_at, item_batches.created_at, item_stock_levels.created_at) ASC')
+                ->orderBy('item_batches.id', 'asc')
+                ->orderBy('item_stock_levels.id', 'asc');
+        }
+
+        $levels = $query->select('item_stock_levels.*')
             ->lockForUpdate()
             ->get();
 
@@ -371,17 +382,27 @@ class IssuanceEngine
                 continue;
             }
 
-            // Find stock levels ordered by FEFO (earliest expiry first, null last)
-            $stockLevels = ItemStockLevel::query()
+            // Find stock levels ordered by strategy (FEFO if expiring, FIFO by default)
+            $strategy = $line->allocation_strategy ?? ($item->is_expiry_tracked ? 'FEFO' : 'FIFO');
+            $query = ItemStockLevel::query()
                 ->where('item_stock_levels.item_id', $item->id)
                 ->where('item_stock_levels.quantity', '>', 0)
                 ->with(['batch', 'location'])
-                ->leftJoin('item_batches', 'item_stock_levels.item_batch_id', '=', 'item_batches.id')
-                ->orderByRaw('item_batches.expiry_date is null')
-                ->orderBy('item_batches.expiry_date')
-                ->orderBy('item_stock_levels.id')
-                ->select('item_stock_levels.*')
-                ->get();
+                ->leftJoin('item_batches', 'item_stock_levels.item_batch_id', '=', 'item_batches.id');
+
+            if (strtoupper($strategy) === 'FEFO') {
+                $query->orderByRaw('item_batches.expiry_date IS NULL ASC')
+                    ->orderBy('item_batches.expiry_date', 'asc')
+                    ->orderByRaw('COALESCE(item_batches.received_at, item_batches.created_at, item_stock_levels.created_at) ASC')
+                    ->orderBy('item_batches.id', 'asc')
+                    ->orderBy('item_stock_levels.id', 'asc');
+            } else {
+                $query->orderByRaw('COALESCE(item_batches.received_at, item_batches.created_at, item_stock_levels.created_at) ASC')
+                    ->orderBy('item_batches.id', 'asc')
+                    ->orderBy('item_stock_levels.id', 'asc');
+            }
+
+            $stockLevels = $query->select('item_stock_levels.*')->get();
 
             $allocatedForLine = [];
             foreach ($stockLevels as $level) {
@@ -475,6 +496,7 @@ class IssuanceEngine
                     'quantity' => $issueQty,
                     'from_location_id' => $locId,
                     'item_batch_id' => $batchId,
+                    'allocation_strategy' => $line->allocation_strategy ?? ($item->is_expiry_tracked ? 'FEFO' : 'FIFO'),
                     'remarks' => "Store Issuance for Requisition {$req->requisition_number} to {$req->department}",
                 ], $picker->id, $req);
 

@@ -208,7 +208,7 @@
                                                     class="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded"
                                                     :class="{
                                                         'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300': item.badge_variant === 'success',
-                                                        'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300': item.badge_variant === 'warning',
+                                                        'text-amber-800 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300': item.badge_variant === 'warning',
                                                         'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300': item.badge_variant === 'danger',
                                                         'bg-primary-100 text-primary-800 dark:bg-primary-950/60 dark:text-primary-300': item.badge_variant === 'primary',
                                                         'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300': !item.badge_variant || item.badge_variant === 'neutral'

@@ -84,4 +84,22 @@ class PurchaseOrderLine extends Model
     {
         return max(0, $this->orderedBaseQuantity() - $this->receivedBaseQuantity());
     }
+
+    public function lineTotal(): float
+    {
+        return round((float) ($this->total_line_amount ?: ($this->ordered_quantity * $this->unit_price)), 2);
+    }
+
+    public function conversionDisplay(): string
+    {
+        $factor = $this->conversionFactor();
+        if ($factor <= 1.0) {
+            return '';
+        }
+
+        $pUnit = $this->purchase_unit ?: $this->item?->unit ?: 'unit';
+        $bUnit = $this->item?->unit ?: 'unit';
+
+        return "1 {$pUnit} = {$factor} {$bUnit}";
+    }
 }
