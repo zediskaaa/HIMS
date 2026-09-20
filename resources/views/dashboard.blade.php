@@ -60,76 +60,136 @@
         @endphp
     @endcan
 
-    {{-- Key figures --}}
+    {{-- Key figures: Standardized 3-Zone Operational KPI Cards --}}
     <div @class([
-        'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:gap-4',
+        'grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4 xl:gap-4',
         'xl:grid-cols-5' => $pendingRecoveryCount > 0,
     ])>
-        <x-ui.stat
-            label="Tracked items"
-            icon="cube"
-            tone="primary"
-            :href="route('inventory.items')"
-            :compact="true"
-            x-ref="trackedItemsTile"
-        >
-            <x-slot:value><span data-stat-value>{{ number_format($totalItems) }}</span></x-slot:value>
-            <x-slot:hint><span data-stat-hint>{{ number_format($totalOnHand) }} units on hand</span></x-slot:hint>
-        </x-ui.stat>
+        {{-- 1. Tracked items --}}
+        <a href="{{ route('inventory.items') }}" x-ref="trackedItemsTile"
+           class="group rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/95 flex flex-col justify-between hover:border-primary-400 dark:hover:border-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-all duration-150">
+            {{-- Zone 1: Header --}}
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-xs sm:text-sm font-bold uppercase tracking-wider text-primary-700 dark:text-primary-300">Tracked items</p>
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-700 dark:bg-primary-950/80 dark:text-primary-300 ring-1 ring-primary-200 dark:ring-primary-800/50 group-hover:scale-105 transition-transform duration-150">
+                    <x-ui.icon name="cube" class="h-5 w-5" />
+                </span>
+            </div>
+            {{-- Zone 2: Value --}}
+            <div class="mt-3 flex items-baseline gap-1.5">
+                <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-neutral-950 dark:text-white" data-stat-value>{{ number_format($totalItems) }}</span>
+                <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">items</span>
+            </div>
+            {{-- Zone 3: Footer --}}
+            <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate" data-stat-hint>{{ number_format($totalOnHand) }} units on hand</span>
+                <span class="inline-flex shrink-0 items-center rounded-md bg-primary-50 dark:bg-primary-950/60 px-2 py-0.5 text-xs font-bold text-primary-700 dark:text-primary-300">Catalog active</span>
+            </div>
+        </a>
 
-        <x-ui.stat
-            label="Needs reorder"
-            icon="exclamation-triangle"
-            :tone="$lowStockItems > 0 ? 'warning' : 'success'"
-            :href="route('inventory.alerts')"
-            :compact="true"
-            x-ref="lowStockTile"
-        >
-            <x-slot:value><span data-stat-value>{{ number_format($lowStockItems) }}</span></x-slot:value>
-            <x-slot:hint><span data-stat-hint>{{ $outOfStockItems > 0
-                ? number_format($outOfStockItems).' fully out of stock'
-                : 'No items out of stock' }}</span></x-slot:hint>
-        </x-ui.stat>
+        {{-- 2. Needs reorder --}}
+        <a href="{{ route('inventory.alerts') }}" x-ref="lowStockTile"
+           class="group rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/95 flex flex-col justify-between hover:border-amber-400 dark:hover:border-amber-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 transition-all duration-150">
+            {{-- Zone 1: Header --}}
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-xs sm:text-sm font-bold uppercase tracking-wider {{ $lowStockItems > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300' }}">Needs reorder</p>
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {{ $lowStockItems > 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300 ring-1 ring-amber-200 dark:ring-amber-800/50' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-800/50' }} group-hover:scale-105 transition-transform duration-150">
+                    <x-ui.icon :name="$lowStockItems > 0 ? 'exclamation-triangle' : 'check-circle'" class="h-5 w-5" />
+                </span>
+            </div>
+            {{-- Zone 2: Value --}}
+            <div class="mt-3 flex items-baseline justify-between gap-2">
+                <div class="flex items-baseline gap-1.5">
+                    <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums {{ $lowStockItems > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400' }}" data-stat-value>{{ number_format($lowStockItems) }}</span>
+                    <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">items</span>
+                </div>
+                @if($outOfStockItems > 0)
+                    <span class="inline-flex items-center rounded-lg bg-rose-100 dark:bg-rose-950/80 px-2.5 py-1 text-xs font-black uppercase tracking-wider text-rose-700 dark:text-rose-300 ring-1 ring-inset ring-rose-200 dark:ring-rose-800/50 shadow-2xs">OUT OF STOCK</span>
+                @endif
+            </div>
+            {{-- Zone 3: Footer --}}
+            <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate" data-stat-hint>{{ $outOfStockItems > 0 ? number_format($outOfStockItems).' fully out of stock' : 'No items out of stock' }}</span>
+                <span class="inline-flex shrink-0 items-center rounded-md {{ $lowStockItems > 0 ? 'bg-amber-100/80 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300' : 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300' }} px-2 py-0.5 text-xs font-bold">{{ $lowStockItems > 0 ? 'Replenish' : 'Sufficient' }}</span>
+            </div>
+        </a>
 
-        <x-ui.stat
-            label="Open alerts"
-            icon="bell-alert"
-            :tone="$openAlertCount > 0 ? 'danger' : 'success'"
-            :href="route('inventory.alerts')"
-            :compact="true"
-            x-ref="openAlertTile"
-        >
-            <x-slot:value><span data-stat-value>{{ number_format($openAlertCount) }}</span></x-slot:value>
-            <x-slot:hint><span data-stat-hint>{{ $openAlertCount > 0 ? 'Awaiting acknowledgement' : 'Nothing outstanding' }}</span></x-slot:hint>
-        </x-ui.stat>
+        {{-- 3. Open alerts --}}
+        <a href="{{ route('inventory.alerts') }}" x-ref="openAlertTile"
+           class="group rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/95 flex flex-col justify-between hover:border-rose-400 dark:hover:border-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 transition-all duration-150">
+            {{-- Zone 1: Header --}}
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-xs sm:text-sm font-bold uppercase tracking-wider {{ $openAlertCount > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300' }}">Open alerts</p>
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {{ $openAlertCount > 0 ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 ring-1 ring-rose-200 dark:ring-rose-800/50' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-800/50' }} group-hover:scale-105 transition-transform duration-150">
+                    <x-ui.icon :name="$openAlertCount > 0 ? 'bell-alert' : 'check-circle'" class="h-5 w-5" />
+                </span>
+            </div>
+            {{-- Zone 2: Value --}}
+            <div class="mt-3 flex items-baseline justify-between gap-2">
+                <div class="flex items-baseline gap-1.5">
+                    <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums {{ $openAlertCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400' }}" data-stat-value>{{ number_format($openAlertCount) }}</span>
+                    <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">active</span>
+                </div>
+                @if($openAlertCount > 0)
+                    <span class="inline-flex items-center rounded-lg bg-rose-100 dark:bg-rose-950/80 px-2.5 py-1 text-xs font-black uppercase tracking-wider text-rose-700 dark:text-rose-300 ring-1 ring-inset ring-rose-200 dark:ring-rose-800/50 shadow-2xs">ACTIVE</span>
+                @endif
+            </div>
+            {{-- Zone 3: Footer --}}
+            <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate" data-stat-hint>{{ $openAlertCount > 0 ? 'Awaiting acknowledgement' : 'Nothing outstanding' }}</span>
+                <span class="inline-flex shrink-0 items-center rounded-md {{ $openAlertCount > 0 ? 'bg-rose-100/80 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300' : 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300' }} px-2 py-0.5 text-xs font-bold">{{ $openAlertCount > 0 ? 'Action required' : 'Optimal' }}</span>
+            </div>
+        </a>
 
+        {{-- 4. Inventory value --}}
         @can(\App\Enums\Permission::ViewProcurementSensitiveData->value)
-        <x-ui.stat
-            label="Inventory value"
-            icon="chart-bar"
-            tone="neutral"
-            :hint="number_format($storageLocations).' storage locations'"
-            :href="route('inventory.reports')"
-            :compact="true"
-            x-ref="inventoryValueTile"
-        >
-            <x-slot:value><span data-stat-value>₱{{ number_format($totalInventoryValue, 2) }}</span></x-slot:value>
-        </x-ui.stat>
+        <a href="{{ route('inventory.reports') }}" x-ref="inventoryValueTile"
+           class="group rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/95 flex flex-col justify-between hover:border-emerald-400 dark:hover:border-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 transition-all duration-150">
+            {{-- Zone 1: Header --}}
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Inventory value</p>
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-800/50 group-hover:scale-105 transition-transform duration-150">
+                    <x-ui.icon name="chart-bar" class="h-5 w-5" />
+                </span>
+            </div>
+            {{-- Zone 2: Value --}}
+            <div class="mt-3 flex items-baseline gap-1.5">
+                <span class="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight tabular-nums text-neutral-950 dark:text-white truncate" data-stat-value>₱{{ number_format($totalInventoryValue, 2) }}</span>
+            </div>
+            {{-- Zone 3: Footer --}}
+            <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate" data-stat-hint>{{ number_format($storageLocations) }} storage locations</span>
+                <span class="inline-flex shrink-0 items-center rounded-md bg-emerald-100/80 dark:bg-emerald-900/60 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">Asset valuation</span>
+            </div>
+        </a>
         @endcan
 
+        {{-- 5. System incidents --}}
         @can(\App\Enums\Permission::ManageSystemRecovery->value)
             @if ($pendingRecoveryCount > 0)
-                <x-ui.stat
-                    label="System incidents"
-                    icon="exclamation-triangle"
-                    tone="warning"
-                    hint="Recovery review required"
-                    :href="route('super-admin.recovery.index')"
-                    :compact="true"
-                    data-recovery-incident-card
-                >
-                    <x-slot:value>{{ number_format($pendingRecoveryCount) }}</x-slot:value>
-                </x-ui.stat>
+                <a href="{{ route('super-admin.recovery.index') }}" data-recovery-incident-card
+                   class="group rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/95 flex flex-col justify-between hover:border-amber-400 dark:hover:border-amber-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 transition-all duration-150 col-span-1 sm:col-span-2 lg:col-span-1">
+                    {{-- Zone 1: Header --}}
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">System incidents</p>
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300 ring-1 ring-amber-200 dark:ring-amber-800/50 group-hover:scale-105 transition-transform duration-150">
+                            <x-ui.icon name="exclamation-triangle" class="h-5 w-5" />
+                        </span>
+                    </div>
+                    {{-- Zone 2: Value --}}
+                    <div class="mt-3 flex items-baseline justify-between gap-2">
+                        <div class="flex items-baseline gap-1.5">
+                            <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-amber-600 dark:text-amber-400" data-stat-value>{{ number_format($pendingRecoveryCount) }}</span>
+                            <span class="text-sm sm:text-base font-bold text-amber-600/80 dark:text-amber-400/80">pending</span>
+                        </div>
+                        <span class="inline-flex items-center rounded-lg bg-amber-100 dark:bg-amber-950/80 px-2.5 py-1 text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-300 ring-1 ring-inset ring-amber-200 dark:ring-amber-800/50 shadow-2xs">OPEN</span>
+                    </div>
+                    {{-- Zone 3: Footer --}}
+                    <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                        <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate" data-stat-hint>Recovery review required</span>
+                        <span class="inline-flex shrink-0 items-center rounded-md bg-amber-100/80 dark:bg-amber-900/60 px-2 py-0.5 text-xs font-bold text-amber-700 dark:text-amber-300">Investigate</span>
+                    </div>
+                </a>
             @endif
         @endcan
     </div>
