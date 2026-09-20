@@ -130,7 +130,12 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-neutral-700">Unit of Measure <span class="text-rose-500">*</span></label>
-                                <input type="text" name="unit_of_measure" required placeholder="e.g. capsule" class="mt-1 w-full rounded-lg border-neutral-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                <select name="unit_of_measure" required class="mt-1 w-full rounded-lg border-neutral-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                    <option value="">Select unit</option>
+                                    @foreach (\App\Enums\UnitOfMeasure::options() as $val => $lbl)
+                                        <option value="{{ $val }}" @selected(old('unit_of_measure') === $val)>{{ $lbl }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                         </div>
                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">

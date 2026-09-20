@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Inventory;
 use App\Enums\AuditAction;
 use App\Enums\MovementType;
 use App\Enums\Permission;
+use App\Enums\UnitOfMeasure;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
 use App\Models\ItemBatch;
@@ -120,13 +121,8 @@ class InventoryItemController extends Controller implements HasMiddleware
                 ->mapWithKeys(fn (StorageLocation $location) => [$location->id => $location->fullPath()])
             : collect();
         $unitOptions = $canManageItems
-            ? InventoryItem::query()
-                ->whereNotNull('unit')
-                ->where('unit', '!=', '')
-                ->distinct()
-                ->orderBy('unit')
-                ->pluck('unit')
-            : collect();
+            ? UnitOfMeasure::optionsWithLegacy()
+            : [];
 
         return view('inventory.items.index', [
             'categories' => $categories,
@@ -148,7 +144,7 @@ class InventoryItemController extends Controller implements HasMiddleware
             'barcode_value' => ['nullable', 'string', 'max:100', 'unique:inventory_items,barcode_value'],
             'gtin' => ['nullable', 'digits_between:8,14', 'unique:inventory_items,gtin'],
             'category_id' => ['nullable', 'integer', Rule::exists('item_categories', 'id')->where('is_active', true)],
-            'unit' => ['nullable', 'string', 'max:50'],
+            'unit' => ['required', 'string', Rule::in(UnitOfMeasure::allowedValuesWithLegacy())],
             'is_batch_tracked' => ['sometimes', 'boolean'],
             'is_serial_tracked' => ['sometimes', 'boolean'],
             'is_expiry_tracked' => ['sometimes', 'boolean'],
@@ -174,6 +170,9 @@ class InventoryItemController extends Controller implements HasMiddleware
                 'max:255',
             ],
             'expiry_date' => ['nullable', 'date', 'after_or_equal:today'],
+        ], [
+            'unit.required' => 'The unit of measure field is required.',
+            'unit.in' => 'The selected unit of measure is invalid. Please choose from the allowed units.',
         ]);
 
         if (! $request->boolean('is_batch_tracked') && ($request->boolean('is_expiry_tracked') || filled($validated['expiry_date'] ?? null))) {

@@ -138,8 +138,8 @@
                             @enderror
                         </div>
 
-                        {{-- Category (4 cols) --}}
-                        <div class="col-span-12 sm:col-span-4">
+                        {{-- Category (3 cols) --}}
+                        <div class="col-span-12 sm:col-span-3">
                             <label for="field-category_id" class="block text-[11px] font-semibold text-neutral-700 mb-1">
                                 Category
                             </label>
@@ -158,26 +158,24 @@
                             @enderror
                         </div>
 
-                        {{-- Unit of Measure (2 cols) --}}
-                        <div class="col-span-12 sm:col-span-2">
-                            <label for="field-unit" class="block text-[11px] font-semibold text-neutral-700 mb-1">
-                                Unit of measure
+                        {{-- Unit of Measure (3 cols) --}}
+                        <div class="col-span-12 sm:col-span-3">
+                            <label for="field-unit" class="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                                Unit of measure <span class="text-rose-500">*</span>
                             </label>
-                            <input type="text"
-                                   name="unit"
-                                   id="field-unit"
-                                   list="inventory-unit-options"
-                                   value="{{ old('unit') }}"
-                                   placeholder="e.g. box, vial"
-                                   maxlength="50"
-                                   class="block w-full h-8.5 rounded-lg border-neutral-300 shadow-2xs text-xs font-medium py-1.5 px-2.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 {{ $errors->has('unit') ? 'border-rose-500 ring-1 ring-rose-500' : '' }}" />
-                            <datalist id="inventory-unit-options">
-                                @foreach ($unitOptions as $unit)
-                                    <option value="{{ $unit }}"></option>
+                            <select name="unit"
+                                    id="field-unit"
+                                    required
+                                    class="block w-full h-8.5 rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs text-xs font-medium py-1 px-2.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 {{ $errors->has('unit') ? 'border-rose-500 ring-1 ring-rose-500' : '' }}">
+                                <option value="">Select unit</option>
+                                @foreach ($unitOptions as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('unit') === (string) $value)>
+                                        {{ $label }}
+                                    </option>
                                 @endforeach
-                            </datalist>
+                            </select>
                             @error('unit')
-                                <p class="mt-0.5 text-[11px] text-rose-600 font-medium">{{ $message }}</p>
+                                <p class="mt-0.5 text-[11px] text-rose-600 dark:text-rose-400 font-medium">{{ $message }}</p>
                             @enderror
                         </div>
 

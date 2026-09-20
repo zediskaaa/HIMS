@@ -14,8 +14,10 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use App\Enums\UnitOfMeasure;
 
 class ProcessReviewController extends Controller implements HasMiddleware
 {
@@ -228,7 +230,7 @@ class ProcessReviewController extends Controller implements HasMiddleware
             'pndf_code' => ['required', 'string', 'max:64'],
             'drug_name' => ['required', 'string', 'max:255'],
             'dosage_form_strength' => ['nullable', 'string', 'max:255'],
-            'unit_of_measure' => ['required', 'string', 'max:64'],
+            'unit_of_measure' => ['required', 'string', Rule::in(UnitOfMeasure::allowedValuesWithLegacy())],
             'ceiling_price' => ['required', 'numeric', 'min:0'],
             'edition_year' => ['required', 'integer', 'min:2020', 'max:2035'],
             'notes' => ['nullable', 'string'],

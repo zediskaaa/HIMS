@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\UnitOfMeasure;
 use App\Rules\ProcurementEligibleSupplier;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -21,7 +22,7 @@ class StoreInventoryItemRequest extends FormRequest
             'gtin' => 'nullable|digits_between:8,14|unique:inventory_items,gtin',
             'name' => 'required|string|max:255',
             'category_id' => ['nullable', 'integer', Rule::exists('item_categories', 'id')->where('is_active', true)],
-            'unit' => 'nullable|string|max:50',
+            'unit' => ['nullable', 'string', Rule::in(UnitOfMeasure::allowedValuesWithLegacy())],
             'is_batch_tracked' => 'sometimes|boolean',
             'is_serial_tracked' => 'sometimes|boolean',
             'is_expiry_tracked' => 'sometimes|boolean',

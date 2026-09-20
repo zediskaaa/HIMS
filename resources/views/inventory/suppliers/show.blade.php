@@ -586,7 +586,7 @@
                     <x-ui.field name="supplier_sku" label="Supplier SKU / catalog no." />
                     <x-ui.field name="supplier_product_name" label="Supplier product name" />
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2"><x-ui.field name="brand" label="Brand" /><x-ui.field name="manufacturer" label="Manufacturer" /></div>
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2"><x-ui.field name="pack_size" label="Pack size" /><x-ui.field name="unit" label="Supplier unit" /></div>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2"><x-ui.field name="pack_size" label="Pack size" /><x-ui.field name="unit" label="Supplier unit" type="select" :options="\App\Enums\UnitOfMeasure::options()" placeholder="Select unit" /></div>
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2"><x-ui.field name="minimum_order_quantity" label="MOQ" type="number" min="1" /><x-ui.field name="lead_time_days" label="Lead days" type="number" min="0" /></div>
                     <label class="flex gap-2 text-sm"><input type="checkbox" name="is_preferred" value="1" @checked(old('is_preferred')) class="rounded border-neutral-300 text-primary-600"> Preferred source for this item</label>
                     <div class="flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4">

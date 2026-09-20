@@ -7,6 +7,7 @@ use App\Enums\AuditAction;
 use App\Enums\Permission;
 use App\Enums\SupplierAccreditationStatus;
 use App\Enums\SupplierStatus;
+use App\Enums\UnitOfMeasure;
 use App\Http\Requests\StoreSupplierRequest;
 use App\Http\Requests\UpdateSupplierRequest;
 use App\Models\AuditLog;
@@ -619,7 +620,7 @@ class SupplierController extends Controller implements HasMiddleware
             'manufacturer' => ['nullable', 'string', 'max:255'],
             'brand' => ['nullable', 'string', 'max:255'],
             'pack_size' => ['nullable', 'string', 'max:100'],
-            'unit' => ['nullable', 'string', 'max:100'],
+            'unit' => ['nullable', 'string', Rule::in(UnitOfMeasure::allowedValuesWithLegacy())],
             'minimum_order_quantity' => ['nullable', 'integer', 'min:1'],
             'lead_time_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
             'is_preferred' => ['sometimes', 'boolean'],

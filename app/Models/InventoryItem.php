@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\UnitOfMeasure;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -426,5 +427,20 @@ class InventoryItem extends Model
     {
         return $this->belongsTo(DpriReferencePrice::class, 'pndf_code', 'pndf_code')
             ->where('is_active', true);
+    }
+
+    public function unitOfMeasure(): ?UnitOfMeasure
+    {
+        return UnitOfMeasure::tryFromNormalized($this->unit);
+    }
+
+    public function unitLabel(): string
+    {
+        return UnitOfMeasure::labelFor($this->unit);
+    }
+
+    public function unitAbbreviation(): string
+    {
+        return $this->unitOfMeasure()?->abbreviation() ?? ($this->unit ?: 'unit');
     }
 }

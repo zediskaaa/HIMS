@@ -76,8 +76,13 @@ class InventoryItemModalUxTest extends TestCase
         $response->assertSee('name="expiry_date"', false);
         $response->assertSee('name="supplier_id"', false);
 
-        // Check unit datalist integration
-        $response->assertSee('id="inventory-unit-options"', false);
+        // Check unit dropdown integration
+        $response->assertSee('id="field-unit"', false);
+        $response->assertSee('Select unit');
+        $response->assertSee('Piece (pc)');
+        $response->assertSee('Box (box)');
+        $response->assertSee('Vial (vial)');
+        $response->assertDontSee('id="inventory-unit-options"', false);
     }
 
     public function test_modal_and_trigger_are_hidden_from_unauthorized_users(): void
