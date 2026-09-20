@@ -88,6 +88,33 @@
                   data-confirm-message="Are you sure you want to apply this stock adjustment?"
                   data-confirm-label="Apply Adjustment">
                 @csrf
+
+                @if ($preselectedItem)
+                    <div class="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 p-3 text-xs text-amber-950 dark:text-amber-200 flex items-center justify-between shadow-2xs">
+                        <div class="flex items-center gap-2.5">
+                            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 shrink-0">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                                </svg>
+                            </span>
+                            <div>
+                                <p class="font-bold text-amber-950 dark:text-amber-100">Contextual Item: <span class="font-extrabold underline decoration-amber-300 dark:decoration-amber-600 underline-offset-2">{{ $preselectedItem->name }}</span></p>
+                                <p class="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5">
+                                    SKU: <strong class="font-mono text-amber-900 dark:text-amber-200">{{ $preselectedItem->sku }}</strong> &bull; 
+                                    On Hand: <strong class="tabular-nums text-amber-900 dark:text-amber-100">{{ $preselectedItem->quantity_on_hand }} {{ $preselectedItem->unit }}</strong> &bull; 
+                                    Unit Cost: <strong class="tabular-nums text-amber-900 dark:text-amber-100">₱{{ number_format($preselectedItem->unit_cost ?? 0, 2) }}</strong>
+                                    @if ($preselectedItem->defaultLocation)
+                                        &bull; Default Location: <strong class="text-amber-900 dark:text-amber-200">{{ $preselectedItem->defaultLocation->name }}</strong>
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-amber-200/90 dark:bg-amber-900/80 px-2.5 py-0.5 text-[10px] font-bold text-amber-900 dark:text-amber-200">
+                            Auto-Carried Forward
+                        </span>
+                    </div>
+                @endif
+
                 <div class="grid gap-3.5 md:grid-cols-2">
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">
@@ -95,7 +122,7 @@
                         </label>
                         <select name="item_id" required class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 shadow-2xs focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-xs font-medium">
                             @foreach ($items as $item)
-                                <option value="{{ $item->id }}" @selected(old('item_id') == $item->id)>
+                                <option value="{{ $item->id }}" @selected(old('item_id', $preselectedItem?->id) == $item->id)>
                                     {{ $item->name }} ({{ $item->sku ?? 'No SKU' }}) &bull; {{ number_format((int) $item->quantity_on_hand) }} on hand &bull; ₱{{ number_format($item->unit_cost ?? 0, 2) }}
                                 </option>
                             @endforeach
@@ -108,7 +135,7 @@
                         </label>
                         <select name="location_id" required class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 shadow-2xs focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-xs font-medium">
                             @foreach ($locations as $location)
-                                <option value="{{ $location->id }}" @selected(old('location_id') == $location->id)>
+                                <option value="{{ $location->id }}" @selected(old('location_id', $preselectedItem?->default_location_id) == $location->id)>
                                     {{ $location->name }}{{ $location->code ? ' ('.$location->code.')' : '' }} &bull; {{ $location->zone ?? 'Unrestricted' }}
                                 </option>
                             @endforeach
@@ -120,12 +147,12 @@
                             Adjustment Type <span class="text-rose-500">*</span>
                         </label>
                         <select name="adjustment_type" class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 shadow-2xs focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-xs font-medium">
-                            <option value="increase" @selected(old('adjustment_type') === 'increase')>Increase (+)</option>
-                            <option value="decrease" @selected(old('adjustment_type') === 'decrease')>Decrease (-)</option>
-                            <option value="correction" @selected(old('adjustment_type') === 'correction')>Count Reconciliation / Set Exact</option>
-                            <option value="damage" @selected(old('adjustment_type') === 'damage')>Damage Write-off (-)</option>
-                            <option value="loss" @selected(old('adjustment_type') === 'loss')>Loss / Theft (-)</option>
-                            <option value="expiry" @selected(old('adjustment_type') === 'expiry')>Expired Stock Disposal (-)</option>
+                            <option value="increase" @selected(old('adjustment_type', $preselectedType ?? '') === 'increase')>Increase (+)</option>
+                            <option value="decrease" @selected(old('adjustment_type', $preselectedType ?? '') === 'decrease')>Decrease (-)</option>
+                            <option value="correction" @selected(old('adjustment_type', $preselectedType ?? 'correction') === 'correction')>Count Reconciliation / Set Exact</option>
+                            <option value="damage" @selected(old('adjustment_type', $preselectedType ?? '') === 'damage')>Damage Write-off (-)</option>
+                            <option value="loss" @selected(old('adjustment_type', $preselectedType ?? '') === 'loss')>Loss / Theft (-)</option>
+                            <option value="expiry" @selected(old('adjustment_type', $preselectedType ?? '') === 'expiry')>Expired Stock Disposal (-)</option>
                         </select>
                     </div>
 
@@ -141,7 +168,7 @@
                         <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">
                             Detailed Reason &amp; Clinical Justification <span class="text-rose-500">*</span>
                         </label>
-                        <input type="text" name="reason" value="{{ old('reason') }}" required placeholder="e.g. Annual physical count variance, cold chain excursion write-off, bottle breakage in Ward 2"
+                        <input type="text" name="reason" value="{{ old('reason', $preselectedItem ? 'Reconciliation adjustment for ' . $preselectedItem->name . ' (' . ($preselectedItem->quantity_on_hand <= 0 ? 'depleted stock' : 'low stock') . ')' : '') }}" required placeholder="e.g. Annual physical count variance, cold chain excursion write-off, bottle breakage in Ward 2"
                                class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 shadow-2xs focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-xs py-2 px-3" />
                     </div>
                 </div>
@@ -157,7 +184,7 @@
             </form>
         </x-ui.modal>
 
-        @if ($errors->any())
+        @if ($errors->any() || $preselectedItem)
             <div x-data x-init="$nextTick(() => $dispatch('open-modal', 'request-stock-adjustment'))"></div>
         @endif
         @endcan

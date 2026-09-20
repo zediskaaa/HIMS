@@ -95,6 +95,7 @@
                             @can(\App\Enums\Permission::ViewSuppliers->value)
                                 <th scope="col" class="w-56 min-w-[180px] px-3.5 py-2.5 text-left font-semibold text-neutral-600 dark:text-neutral-300 whitespace-nowrap">Supplier</th>
                             @endcan
+                            <th scope="col" class="w-44 min-w-[140px] px-3.5 py-2.5 text-right font-semibold text-neutral-600 dark:text-neutral-300 whitespace-nowrap hims-sticky-actions">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="inventory-items-table-body" class="divide-y divide-neutral-200 dark:divide-neutral-800">
@@ -131,10 +132,31 @@
                                         {{ $item->supplier?->name ?? '—' }}
                                     </td>
                                 @endcan
+                                <td class="px-3.5 py-2.5 text-right whitespace-nowrap hims-sticky-actions">
+                                    <div class="inline-flex items-center justify-end gap-1.5">
+                                        @can(\App\Enums\Permission::CreateRequisition->value)
+                                            <a href="{{ route('inventory.requisitions.index', ['item_id' => $item->id]) }}"
+                                               class="inline-flex items-center gap-1 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] font-semibold text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/30 transition shadow-2xs"
+                                               title="Create store requisition for {{ $item->name }}">
+                                                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                Requisition
+                                            </a>
+                                        @endcan
+                                        @can(\App\Enums\Permission::AdjustStock->value)
+                                            <a href="{{ route('inventory.adjustments', ['item_id' => $item->id]) }}"
+                                               class="inline-flex items-center gap-1 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition shadow-2xs"
+                                               title="Adjust stock balance for {{ $item->name }}">
+                                                Adjust
+                                            </a>
+                                        @endcan
+                                    </div>
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ auth()->user()->can(\App\Enums\Permission::ViewSuppliers->value) ? 6 : 5 }}" class="px-3 py-8 text-center text-xs text-neutral-500 dark:text-neutral-400">
+                                <td colspan="{{ auth()->user()->can(\App\Enums\Permission::ViewSuppliers->value) ? 7 : 6 }}" class="px-3 py-8 text-center text-xs text-neutral-500 dark:text-neutral-400">
                                     {{ $activeFilterCount > 0 ? 'No items match these filters.' : 'No inventory items yet.' }}
                                 </td>
                             </tr>

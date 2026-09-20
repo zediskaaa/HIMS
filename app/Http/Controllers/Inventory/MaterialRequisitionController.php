@@ -71,7 +71,16 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
         ];
         $approverRoleLabels = $this->approverRoleLabels();
 
-        return view('inventory.requisitions.index', compact('requisitions', 'items', 'costCenters', 'departments', 'requisitionMetrics', 'approverRoleLabels'));
+        $itemId = $request->input('item_id') ?? old('context_item_id') ?? old('lines.0.item_id');
+        $preselectedItem = null;
+        if ($itemId) {
+            $preselectedItem = InventoryItem::active()->with(['defaultLocation', 'category'])->find((int) $itemId);
+            if (! $preselectedItem && $request->filled('item_id')) {
+                session()->flash('warning', 'The requested inventory item could not be preselected because it does not exist or is inactive.');
+            }
+        }
+
+        return view('inventory.requisitions.index', compact('requisitions', 'items', 'costCenters', 'departments', 'requisitionMetrics', 'approverRoleLabels', 'preselectedItem'));
     }
 
     public function show(MaterialRequisition $requisition): View

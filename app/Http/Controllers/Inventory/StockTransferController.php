@@ -35,7 +35,7 @@ class StockTransferController extends Controller implements HasMiddleware
         private readonly InventoryAutomationService $automationService
     ) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $transfers = StockTransfer::with(['sourceLocation', 'destinationLocation', 'dispatchedBy', 'receivedBy', 'lines.item'])
             ->latest()
@@ -76,7 +76,58 @@ class StockTransferController extends Controller implements HasMiddleware
             $locationStockMap[$sl->storage_location_id][$sl->item_id] = (int) $sl->available_qty;
         }
 
-        return view('inventory.transfers.index', compact('transfers', 'locations', 'sourceLocations', 'destinationLocations', 'items', 'locationStockMap'));
+        $preselectedItem = null;
+        $preselectedSourceLocationId = null;
+        $preselectedLines = [['item_id' => '', 'quantity' => 1]];
+
+        if ($request->filled('item_id')) {
+            $preselectedItem = InventoryItem::active()
+                ->with(['defaultLocation', 'category'])
+                ->find($request->integer('item_id'));
+
+            if (! $preselectedItem) {
+                session()->flash('warning', 'The requested inventory item could not be preselected because it does not exist or is inactive.');
+            } else {
+                if (! $items->contains('id', $preselectedItem->id)) {
+                    $items->push($preselectedItem);
+                }
+
+                // Determine default source location with available stock
+                if ($preselectedItem->default_location_id && isset($locationStockMap[$preselectedItem->default_location_id][$preselectedItem->id]) && $locationStockMap[$preselectedItem->default_location_id][$preselectedItem->id] > 0) {
+                    $preselectedSourceLocationId = (string) $preselectedItem->default_location_id;
+                } else {
+                    foreach ($locationStockMap as $locId => $itemQuantities) {
+                        if (isset($itemQuantities[$preselectedItem->id]) && $itemQuantities[$preselectedItem->id] > 0) {
+                            $preselectedSourceLocationId = (string) $locId;
+                            break;
+                        }
+                    }
+                }
+
+                $availableQtyAtSource = $preselectedSourceLocationId && isset($locationStockMap[$preselectedSourceLocationId][$preselectedItem->id])
+                    ? $locationStockMap[$preselectedSourceLocationId][$preselectedItem->id]
+                    : 1;
+
+                $preselectedLines = [
+                    [
+                        'item_id' => (string) $preselectedItem->id,
+                        'quantity' => max(1, min(1, $availableQtyAtSource)),
+                    ],
+                ];
+            }
+        }
+
+        return view('inventory.transfers.index', compact(
+            'transfers',
+            'locations',
+            'sourceLocations',
+            'destinationLocations',
+            'items',
+            'locationStockMap',
+            'preselectedItem',
+            'preselectedSourceLocationId',
+            'preselectedLines'
+        ));
     }
 
     public function show(StockTransfer $stockTransfer): View

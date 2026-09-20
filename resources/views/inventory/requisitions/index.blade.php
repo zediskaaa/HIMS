@@ -1,17 +1,34 @@
 <x-app-layout>
     <div class="space-y-6" x-data="{
-        newRequisitionModal: {{ $errors->any() ? 'true' : 'false' }},
+        newRequisitionModal: {{ ($errors->any() || $preselectedItem) ? 'true' : 'false' }},
         itemsList: {{ Js::from($items) }},
-        lines: [
-            { item_id: '', quantity: 1, allocation_strategy: 'FEFO', notes: '', max_atp: 0 }
-        ],
+        preselectedItem: {{ Js::from($preselectedItem) }},
+        isContextLocked: {{ ($preselectedItem && (!old('lines') || old('context_item_id') || old('lines.0.item_id') == $preselectedItem?->id)) ? 'true' : 'false' }},
+        lines: {{ Js::from(old('lines', [
+            $preselectedItem ? [
+                'item_id' => (string) $preselectedItem->id,
+                'requested_quantity' => max(1, (int) ($preselectedItem->reorder_level - $preselectedItem->quantity_on_hand)),
+                'allocation_strategy' => 'FEFO',
+                'notes' => 'Restock replenishment for ' . $preselectedItem->name,
+                'max_atp' => (int) ($preselectedItem->quantity_on_hand ?? 0)
+            ] : [
+                'item_id' => '',
+                'requested_quantity' => 1,
+                'allocation_strategy' => 'FEFO',
+                'notes' => '',
+                'max_atp' => 0
+            ]
+        ])) }},
         addLine() {
-            this.lines.push({ item_id: '', quantity: 1, allocation_strategy: 'FEFO', notes: '', max_atp: 0 });
+            this.lines.push({ item_id: '', requested_quantity: 1, allocation_strategy: 'FEFO', notes: '', max_atp: 0 });
         },
         removeLine(index) {
             if (this.lines.length > 1) {
                 this.lines.splice(index, 1);
             }
+        },
+        unlockContext() {
+            this.isContextLocked = false;
         },
         updateItemAtp(line, itemId) {
             const item = this.itemsList.find(i => i.id == itemId);
@@ -279,8 +296,6 @@
                 @endif
             </div>
 
-        </div>
-
         {{-- NEW STORE REQUISITION MODAL --}}
         @can(\App\Enums\Permission::CreateRequisition->value)
         <div x-show="newRequisitionModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" style="display: none;"
@@ -290,32 +305,68 @@
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0">
-            <div class="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity" @click="newRequisitionModal = false"></div>
+            <div class="flex min-h-screen items-center justify-center p-4 sm:p-6 text-center">
+                <div class="fixed inset-0 bg-neutral-900/60 dark:bg-black/70 backdrop-blur-xs transition-opacity" @click="newRequisitionModal = false"></div>
 
-                <div class="inline-block w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:align-middle">
+                <div class="relative my-auto z-10 w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white dark:bg-neutral-900 text-left shadow-2xl transition-all border border-neutral-200 dark:border-neutral-800">
                     <form action="{{ route('inventory.requisitions.store') }}" method="POST"
                           data-confirm-title="Submit store requisition"
                           data-confirm-message="Are you sure you want to submit this store requisition for approval?"
                           data-confirm-label="Submit Requisition">
                         @csrf
-                        <div class="bg-white px-6 pt-6 pb-4">
-                            <div class="flex items-center gap-3">
-                                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-100 text-primary-600">
-                                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        @if($preselectedItem)
+                            <input type="hidden" name="context_item_id" value="{{ $preselectedItem->id }}">
+                        @endif
+                        <div class="bg-white dark:bg-neutral-900 px-6 pt-6 pb-4 border-b border-neutral-100 dark:border-neutral-800">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400">
+                                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-lg font-bold text-neutral-900 dark:text-neutral-100">Create Material Store Requisition</h3>
+                                        <p class="text-xs text-neutral-500 dark:text-neutral-400">Request clinical and medical supplies from central inventory storage.</p>
+                                    </div>
+                                </div>
+                                <button type="button" @click="newRequisitionModal = false" class="rounded-lg p-1.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Close modal">
+                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
-                                </div>
-                                <div>
-                                    <h3 class="text-lg font-bold text-neutral-900">Create Material Store Requisition</h3>
-                                    <p class="text-xs text-neutral-500">Request clinical and medical supplies from central inventory storage.</p>
-                                </div>
+                                </button>
                             </div>
 
-                            <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            @if($preselectedItem)
+                                <div class="mt-4 rounded-xl border border-primary-200 dark:border-primary-900/60 bg-primary-50/80 dark:bg-primary-950/30 p-3 text-xs text-primary-950 dark:text-primary-200 flex items-center justify-between shadow-2xs">
+                                    <div class="flex items-center gap-2.5">
+                                        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-100 dark:bg-primary-900/60 text-primary-700 dark:text-primary-300 shrink-0">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                            </svg>
+                                        </span>
+                                        <div>
+                                            <p class="font-bold text-primary-950 dark:text-primary-100">Contextual Item: <span class="font-extrabold underline decoration-primary-300 dark:decoration-primary-600 underline-offset-2">{{ $preselectedItem->name }}</span></p>
+                                            <p class="text-[11px] text-primary-700 dark:text-primary-300 mt-0.5">
+                                                SKU: <strong class="font-mono text-primary-900 dark:text-primary-200">{{ $preselectedItem->sku }}</strong> &bull; 
+                                                On Hand: <strong class="tabular-nums text-primary-900 dark:text-primary-200">{{ $preselectedItem->quantity_on_hand }} {{ $preselectedItem->unit }}</strong> &bull; 
+                                                Reorder Level: <strong class="tabular-nums text-primary-900 dark:text-primary-200">{{ $preselectedItem->reorder_level }} {{ $preselectedItem->unit }}</strong>
+                                                @if ($preselectedItem->defaultLocation)
+                                                    &bull; Storage: <strong class="text-primary-900 dark:text-primary-200">{{ $preselectedItem->defaultLocation->name }}</strong>
+                                                @endif
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span class="inline-flex items-center rounded-full bg-primary-200/90 dark:bg-primary-900/80 px-2.5 py-0.5 text-[10px] font-bold text-primary-900 dark:text-primary-200">
+                                        Auto-Carried Forward
+                                    </span>
+                                </div>
+                            @endif
+
+                            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3.5">
                                 <div>
-                                    <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700">Requesting Department</label>
-                                    <select name="department" required class="mt-1 block w-full rounded-lg border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+                                    <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Requesting Department <span class="text-rose-500">*</span></label>
+                                    <select name="department" required class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs font-medium">
                                         <option value="">-- Select Department --</option>
                                         @foreach($departments as $dept)
                                             <option value="{{ $dept }}" {{ (auth()->user()->department === $dept) ? 'selected' : '' }}>{{ $dept }}</option>
@@ -323,8 +374,8 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700">Cost Center</label>
-                                    <select name="cost_center_id" class="mt-1 block w-full rounded-lg border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+                                    <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Cost Center</label>
+                                    <select name="cost_center_id" class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs font-medium">
                                         <option value="">-- Optional Cost Center --</option>
                                         @foreach($costCenters as $cc)
                                             <option value="{{ $cc->id }}">{{ $cc->code }} &bull; {{ $cc->name }}</option>
@@ -332,56 +383,76 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700">Urgency Level</label>
-                                    <select name="urgency" class="mt-1 block w-full rounded-lg border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+                                    <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Urgency Level</label>
+                                    <select name="urgency" class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs font-medium">
                                         <option value="routine">Routine</option>
-                                        <option value="urgent">Urgent</option>
+                                        <option value="urgent" {{ ($preselectedItem && (int) $preselectedItem->quantity_on_hand <= 0) ? 'selected' : '' }}>Urgent</option>
                                         <option value="stat_emergency">STAT Emergency</option>
                                     </select>
                                 </div>
                             </div>
 
-                            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="mt-3.5 grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                 <div>
-                                    <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700">Required Date</label>
-                                    <input type="date" name="required_date" class="mt-1 block w-full rounded-lg border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+                                    <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Required Date</label>
+                                    <input type="date" name="required_date" class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs font-medium">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700">Clinical Justification</label>
-                                    <input type="text" name="justification" placeholder="Scheduled surgeries / ward restock"
-                                           class="mt-1 block w-full rounded-lg border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+                                    <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Clinical Justification</label>
+                                    <input type="text" name="justification" value="{{ old('justification', $preselectedItem ? 'Restock replenishment for ' . $preselectedItem->name : '') }}" placeholder="Scheduled surgeries / ward restock"
+                                           class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs font-medium">
                                 </div>
                             </div>
 
                             {{-- Line Items --}}
-                            <div class="mt-6 border-t border-neutral-200 pt-4">
+                            <div class="mt-5 border-t border-neutral-200 dark:border-neutral-800 pt-3.5">
                                 <div class="flex items-center justify-between mb-2">
-                                    <h4 class="text-xs font-bold uppercase tracking-wider text-neutral-800">Requested Items</h4>
-                                    <button type="button" @click="addLine" class="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:text-primary-800">
+                                    <h4 class="text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-200">Requested Items</h4>
+                                    <button type="button" @click="addLine" class="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                                         Add Another Item
                                     </button>
                                 </div>
 
-                                <div class="space-y-3 max-h-60 overflow-y-auto p-1">
+                                <div class="space-y-2.5 max-h-60 overflow-y-auto p-0.5">
                                     <template x-for="(line, idx) in lines" :key="idx">
-                                        <div class="flex items-center gap-3 rounded-lg bg-neutral-50 p-2.5 border border-neutral-200">
+                                        <div class="flex items-center gap-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-800/40 p-2.5 border border-neutral-200 dark:border-neutral-700">
                                             <div class="flex-1">
-                                                <select :name="'lines[' + idx + '][item_id]'" x-model="line.item_id" @change="updateItemAtp(line, line.item_id)" required
-                                                        class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-xs">
-                                                    <option value="">-- Select Item to Requisition --</option>
-                                                    <template x-for="itm in itemsList" :key="itm.id">
-                                                        <option :value="itm.id" x-text="itm.name + ' (ATP: ' + itm.quantity_on_hand + ')'"></option>
-                                                    </template>
-                                                </select>
+                                                <template x-if="idx === 0 && isContextLocked && preselectedItem">
+                                                    <div class="flex items-center justify-between rounded-md bg-primary-50/90 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800/60 px-2.5 py-1.5 text-xs">
+                                                        <div class="flex items-center gap-2 min-w-0">
+                                                            <span class="inline-flex items-center justify-center rounded bg-primary-200 dark:bg-primary-900/80 px-1.5 py-0.5 text-[10px] font-bold text-primary-800 dark:text-primary-200 shrink-0">
+                                                                Preselected
+                                                            </span>
+                                                            <div class="truncate">
+                                                                <span class="font-bold text-neutral-900 dark:text-neutral-100" x-text="preselectedItem.name"></span>
+                                                                <span class="text-neutral-600 dark:text-neutral-300 font-mono text-[11px]" x-text="' (' + (preselectedItem.sku || 'No SKU') + ')'"></span>
+                                                                <span class="text-neutral-600 dark:text-neutral-300 text-[10px] ml-1" x-text="'· On Hand: ' + (preselectedItem.quantity_on_hand ?? 0) + ' ' + (preselectedItem.unit || 'units')"></span>
+                                                            </div>
+                                                            <input type="hidden" :name="'lines[' + idx + '][item_id]'" :value="preselectedItem.id">
+                                                        </div>
+                                                        <button type="button" @click="unlockContext()" class="text-[11px] font-semibold text-primary-700 dark:text-primary-300 hover:underline shrink-0 ml-2" title="Unlock item selector">
+                                                            Change Item
+                                                        </button>
+                                                    </div>
+                                                </template>
+                                                <template x-if="!(idx === 0 && isContextLocked && preselectedItem)">
+                                                    <select :name="'lines[' + idx + '][item_id]'" x-model="line.item_id" @change="updateItemAtp(line, line.item_id)" required
+                                                            class="block w-full rounded-md border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs font-medium">
+                                                        <option value="">-- Select Item to Requisition --</option>
+                                                        <template x-for="itm in itemsList" :key="itm.id">
+                                                            <option :value="itm.id" x-text="itm.name + ' (ATP: ' + itm.quantity_on_hand + ')'" :selected="itm.id == line.item_id"></option>
+                                                        </template>
+                                                    </select>
+                                                </template>
                                             </div>
                                             <div class="w-24">
-                                                <input type="number" :name="'lines[' + idx + '][requested_quantity]'" x-model="line.quantity" min="1" required placeholder="Qty"
-                                                       class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-xs text-right">
+                                                <input type="number" :name="'lines[' + idx + '][requested_quantity]'" x-model="line.requested_quantity" min="1" required placeholder="Qty"
+                                                       class="block w-full rounded-md border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs text-right font-medium">
                                             </div>
-                                            <div class="w-28">
+                                            <div class="w-32">
                                                 <select :name="'lines[' + idx + '][allocation_strategy]'" x-model="line.allocation_strategy"
-                                                        class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-xs">
+                                                        class="block w-full rounded-md border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs font-medium">
                                                     <option value="FEFO">FEFO (Earliest Expiry)</option>
                                                     <option value="FIFO">FIFO (Oldest In)</option>
                                                     <option value="MANUAL">Manual Pick</option>
@@ -399,11 +470,11 @@
                             </div>
                         </div>
 
-                        <div class="bg-neutral-50 px-6 py-3 flex items-center justify-end gap-3 border-t border-neutral-200">
-                            <button type="button" @click="newRequisitionModal = false" class="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
+                        <div class="bg-neutral-50 dark:bg-neutral-800/60 px-6 py-3.5 flex items-center justify-end gap-3 border-t border-neutral-200 dark:border-neutral-800">
+                            <button type="button" @click="newRequisitionModal = false" class="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition">
                                 Cancel
                             </button>
-                            <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700">
+                            <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 transition">
                                 Submit Store Requisition
                             </button>
                         </div>
@@ -412,4 +483,5 @@
             </div>
         </div>
         @endcan
+    </div>
 </x-app-layout>

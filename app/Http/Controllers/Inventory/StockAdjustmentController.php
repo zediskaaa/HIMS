@@ -36,7 +36,7 @@ class StockAdjustmentController extends Controller implements HasMiddleware
         private readonly AuditLogger $auditLogger,
     ) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $items = InventoryItem::active()->orderBy('name')->get();
         $locations = StorageLocation::where('status', 'active')->orderBy('name')->get();
@@ -45,7 +45,17 @@ class StockAdjustmentController extends Controller implements HasMiddleware
             ->paginate(15)
             ->withQueryString();
 
-        return view('inventory.adjustments.index', compact('items', 'locations', 'adjustments'));
+        $preselectedItem = null;
+        if ($request->filled('item_id')) {
+            $preselectedItem = InventoryItem::active()->with(['defaultLocation', 'category'])->find($request->integer('item_id'));
+            if (! $preselectedItem) {
+                session()->flash('warning', 'The requested inventory item could not be preselected because it does not exist or is inactive.');
+            }
+        }
+
+        $preselectedType = $request->query('adjustment_type', 'correction');
+
+        return view('inventory.adjustments.index', compact('items', 'locations', 'adjustments', 'preselectedItem', 'preselectedType'));
     }
 
     public function store(Request $request): RedirectResponse
