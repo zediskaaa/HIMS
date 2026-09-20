@@ -3,24 +3,30 @@
         newRequisitionModal: {{ ($errors->any() || $preselectedItem) ? 'true' : 'false' }},
         itemsList: {{ Js::from($items) }},
         preselectedItem: {{ Js::from($preselectedItem) }},
+        aiRecommendation: {{ Js::from($aiRecommendation) }},
+        aiSuggestedQuantity: {{ Js::from(($aiRecommendation['available'] ?? false) ? $aiRecommendation['suggested_quantity'] : null) }},
         isContextLocked: {{ ($preselectedItem && (!old('lines') || old('context_item_id') || old('lines.0.item_id') == $preselectedItem?->id)) ? 'true' : 'false' }},
         lines: {{ Js::from(old('lines', [
             $preselectedItem ? [
                 'item_id' => (string) $preselectedItem->id,
-                'requested_quantity' => max(1, (int) ($preselectedItem->reorder_level - $preselectedItem->quantity_on_hand)),
+                'requested_quantity' => ($aiRecommendation['available'] ?? false && $aiRecommendation['suggested_quantity'] !== null)
+                    ? (int) $aiRecommendation['suggested_quantity']
+                    : max(1, (int) ($preselectedItem->reorder_level - $preselectedItem->quantity_on_hand)),
+                'ai_suggested_quantity' => ($aiRecommendation['available'] ?? false) ? $aiRecommendation['suggested_quantity'] : null,
                 'allocation_strategy' => 'FEFO',
                 'notes' => 'Restock replenishment for ' . $preselectedItem->name,
                 'max_atp' => (int) ($preselectedItem->quantity_on_hand ?? 0)
             ] : [
                 'item_id' => '',
                 'requested_quantity' => 1,
+                'ai_suggested_quantity' => null,
                 'allocation_strategy' => 'FEFO',
                 'notes' => '',
                 'max_atp' => 0
             ]
         ])) }},
         addLine() {
-            this.lines.push({ item_id: '', requested_quantity: 1, allocation_strategy: 'FEFO', notes: '', max_atp: 0 });
+            this.lines.push({ item_id: '', requested_quantity: 1, ai_suggested_quantity: null, allocation_strategy: 'FEFO', notes: '', max_atp: 0 });
         },
         removeLine(index) {
             if (this.lines.length > 1) {
@@ -361,6 +367,84 @@
                                         Auto-Carried Forward
                                     </span>
                                 </div>
+
+                                @if($aiRecommendation)
+                                    @if($aiRecommendation['available'])
+                                        <div class="mt-3 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/70 dark:bg-indigo-950/30 p-3.5 text-xs text-neutral-800 dark:text-neutral-200 shadow-2xs">
+                                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2.5 border-b border-indigo-100 dark:border-indigo-900/40">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-2xs shrink-0">
+                                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                                        </svg>
+                                                    </span>
+                                                    <div>
+                                                        <span class="font-bold text-neutral-900 dark:text-neutral-100 text-xs">AI-Suggested Reorder:</span>
+                                                        <span class="ml-1 text-sm font-extrabold text-indigo-700 dark:text-indigo-300">
+                                                            {{ $aiRecommendation['suggested_quantity'] }} {{ $aiRecommendation['unit'] }}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center gap-2 text-[10px]">
+                                                    <span class="rounded-full bg-indigo-100 dark:bg-indigo-900/70 px-2 py-0.5 font-semibold text-indigo-800 dark:text-indigo-200">
+                                                        {{ $aiRecommendation['source_label'] }} ({{ $aiRecommendation['forecast_period'] }})
+                                                    </span>
+                                                    @if($aiRecommendation['confidence'] === 'high')
+                                                        <span class="rounded-full bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 font-semibold text-emerald-800 dark:text-emerald-300">
+                                                            High Confidence
+                                                        </span>
+                                                    @elseif($aiRecommendation['confidence'] === 'medium')
+                                                        <span class="rounded-full bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 font-semibold text-amber-800 dark:text-amber-300">
+                                                            Medium Confidence
+                                                        </span>
+                                                    @else
+                                                        <span class="rounded-full bg-neutral-200 dark:bg-neutral-800 px-2 py-0.5 font-semibold text-neutral-700 dark:text-neutral-300">
+                                                            Low Confidence
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            </div>
+
+                                            {{-- Data Breakdown --}}
+                                            <div class="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                                                <div class="rounded-lg bg-white/80 dark:bg-neutral-900/60 p-2 border border-indigo-100/80 dark:border-indigo-900/30">
+                                                    <span class="text-neutral-500 dark:text-neutral-400 block text-[10px]">Forecast Demand</span>
+                                                    <span class="font-bold text-neutral-900 dark:text-neutral-100">{{ $aiRecommendation['breakdown']['forecast_demand'] }}</span>
+                                                </div>
+                                                <div class="rounded-lg bg-white/80 dark:bg-neutral-900/60 p-2 border border-indigo-100/80 dark:border-indigo-900/30">
+                                                    <span class="text-neutral-500 dark:text-neutral-400 block text-[10px]">Available Stock</span>
+                                                    <span class="font-bold text-neutral-900 dark:text-neutral-100">{{ $aiRecommendation['breakdown']['current_stock'] }}</span>
+                                                </div>
+                                                <div class="rounded-lg bg-white/80 dark:bg-neutral-900/60 p-2 border border-indigo-100/80 dark:border-indigo-900/30">
+                                                    <span class="text-neutral-500 dark:text-neutral-400 block text-[10px]">Incoming PO Supply</span>
+                                                    <span class="font-bold text-neutral-900 dark:text-neutral-100">{{ $aiRecommendation['breakdown']['incoming_stock'] }}</span>
+                                                </div>
+                                                <div class="rounded-lg bg-white/80 dark:bg-neutral-900/60 p-2 border border-indigo-100/80 dark:border-indigo-900/30">
+                                                    <span class="text-neutral-500 dark:text-neutral-400 block text-[10px]">Safety Buffer</span>
+                                                    <span class="font-bold text-neutral-900 dark:text-neutral-100">{{ $aiRecommendation['breakdown']['safety_stock'] }}</span>
+                                                </div>
+                                            </div>
+
+                                            <p class="mt-2 text-[11px] text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                                                <strong class="text-neutral-700 dark:text-neutral-200">Analysis:</strong> {{ $aiRecommendation['explanation'] }}
+                                            </p>
+                                        </div>
+                                    @else
+                                        <div class="mt-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/80 dark:bg-neutral-800/40 p-3 text-xs text-neutral-700 dark:text-neutral-300 flex items-center gap-2.5">
+                                            <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 shrink-0">
+                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </span>
+                                            <div>
+                                                <span class="font-bold text-neutral-900 dark:text-neutral-100">AI Forecast: Insufficient Data</span>
+                                                <p class="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                                                    {{ $aiRecommendation['explanation'] }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    @endif
+                                @endif
                             @endif
 
                             <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3.5">
@@ -416,54 +500,73 @@
 
                                 <div class="space-y-2.5 max-h-60 overflow-y-auto p-0.5">
                                     <template x-for="(line, idx) in lines" :key="idx">
-                                        <div class="flex items-center gap-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-800/40 p-2.5 border border-neutral-200 dark:border-neutral-700">
-                                            <div class="flex-1">
-                                                <template x-if="idx === 0 && isContextLocked && preselectedItem">
-                                                    <div class="flex items-center justify-between rounded-md bg-primary-50/90 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800/60 px-2.5 py-1.5 text-xs">
-                                                        <div class="flex items-center gap-2 min-w-0">
-                                                            <span class="inline-flex items-center justify-center rounded bg-primary-200 dark:bg-primary-900/80 px-1.5 py-0.5 text-[10px] font-bold text-primary-800 dark:text-primary-200 shrink-0">
-                                                                Preselected
-                                                            </span>
-                                                            <div class="truncate">
-                                                                <span class="font-bold text-neutral-900 dark:text-neutral-100" x-text="preselectedItem.name"></span>
-                                                                <span class="text-neutral-600 dark:text-neutral-300 font-mono text-[11px]" x-text="' (' + (preselectedItem.sku || 'No SKU') + ')'"></span>
-                                                                <span class="text-neutral-600 dark:text-neutral-300 text-[10px] ml-1" x-text="'· On Hand: ' + (preselectedItem.quantity_on_hand ?? 0) + ' ' + (preselectedItem.unit || 'units')"></span>
+                                        <div class="flex flex-col gap-1.5 rounded-lg bg-neutral-50 dark:bg-neutral-800/40 p-2.5 border border-neutral-200 dark:border-neutral-700">
+                                            <div class="flex items-center gap-2.5">
+                                                <div class="flex-1">
+                                                    <template x-if="idx === 0 && isContextLocked && preselectedItem">
+                                                        <div class="flex items-center justify-between rounded-md bg-primary-50/90 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800/60 px-2.5 py-1.5 text-xs">
+                                                            <div class="flex items-center gap-2 min-w-0">
+                                                                <span class="inline-flex items-center justify-center rounded bg-primary-200 dark:bg-primary-900/80 px-1.5 py-0.5 text-[10px] font-bold text-primary-800 dark:text-primary-200 shrink-0">
+                                                                    Preselected
+                                                                </span>
+                                                                <div class="truncate">
+                                                                    <span class="font-bold text-neutral-900 dark:text-neutral-100" x-text="preselectedItem.name"></span>
+                                                                    <span class="text-neutral-600 dark:text-neutral-300 font-mono text-[11px]" x-text="' (' + (preselectedItem.sku || 'No SKU') + ')'"></span>
+                                                                    <span class="text-neutral-600 dark:text-neutral-300 text-[10px] ml-1" x-text="'· On Hand: ' + (preselectedItem.quantity_on_hand ?? 0) + ' ' + (preselectedItem.unit || 'units')"></span>
+                                                                </div>
+                                                                <input type="hidden" :name="'lines[' + idx + '][item_id]'" :value="preselectedItem.id">
                                                             </div>
-                                                            <input type="hidden" :name="'lines[' + idx + '][item_id]'" :value="preselectedItem.id">
+                                                            <button type="button" @click="unlockContext()" class="text-[11px] font-semibold text-primary-700 dark:text-primary-300 hover:underline shrink-0 ml-2" title="Unlock item selector">
+                                                                Change Item
+                                                            </button>
                                                         </div>
-                                                        <button type="button" @click="unlockContext()" class="text-[11px] font-semibold text-primary-700 dark:text-primary-300 hover:underline shrink-0 ml-2" title="Unlock item selector">
-                                                            Change Item
-                                                        </button>
-                                                    </div>
-                                                </template>
-                                                <template x-if="!(idx === 0 && isContextLocked && preselectedItem)">
-                                                    <select :name="'lines[' + idx + '][item_id]'" x-model="line.item_id" @change="updateItemAtp(line, line.item_id)" required
+                                                    </template>
+                                                    <template x-if="!(idx === 0 && isContextLocked && preselectedItem)">
+                                                        <select :name="'lines[' + idx + '][item_id]'" x-model="line.item_id" @change="updateItemAtp(line, line.item_id)" required
+                                                                class="block w-full rounded-md border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs font-medium">
+                                                            <option value="">-- Select Item to Requisition --</option>
+                                                            <template x-for="itm in itemsList" :key="itm.id">
+                                                                <option :value="itm.id" x-text="itm.name + ' (ATP: ' + itm.quantity_on_hand + ')'" :selected="itm.id == line.item_id"></option>
+                                                            </template>
+                                                        </select>
+                                                    </template>
+                                                </div>
+                                                <div class="w-24">
+                                                    <input type="number" :name="'lines[' + idx + '][requested_quantity]'" x-model="line.requested_quantity" min="1" required placeholder="Qty"
+                                                           class="block w-full rounded-md border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs text-right font-medium">
+                                                    <input type="hidden" :name="'lines[' + idx + '][ai_suggested_quantity]'" :value="idx === 0 ? aiSuggestedQuantity : null">
+                                                </div>
+                                                <div class="w-32">
+                                                    <select :name="'lines[' + idx + '][allocation_strategy]'" x-model="line.allocation_strategy"
                                                             class="block w-full rounded-md border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs font-medium">
-                                                        <option value="">-- Select Item to Requisition --</option>
-                                                        <template x-for="itm in itemsList" :key="itm.id">
-                                                            <option :value="itm.id" x-text="itm.name + ' (ATP: ' + itm.quantity_on_hand + ')'" :selected="itm.id == line.item_id"></option>
-                                                        </template>
+                                                        <option value="FEFO">FEFO (Earliest Expiry)</option>
+                                                        <option value="FIFO">FIFO (Oldest In)</option>
+                                                        <option value="MANUAL">Manual Pick</option>
                                                     </select>
-                                                </template>
+                                                </div>
+                                                <button type="button" @click="removeLine(idx)" :disabled="lines.length === 1"
+                                                        class="rounded p-1 text-neutral-400 hover:text-rose-600 disabled:opacity-30">
+                                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
                                             </div>
-                                            <div class="w-24">
-                                                <input type="number" :name="'lines[' + idx + '][requested_quantity]'" x-model="line.requested_quantity" min="1" required placeholder="Qty"
-                                                       class="block w-full rounded-md border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs text-right font-medium">
+
+                                            {{-- Line 0 AI Suggestion Status / Quick Restore Button --}}
+                                            <div x-show="idx === 0 && aiSuggestedQuantity !== null" class="flex items-center justify-between text-[11px] pt-1 border-t border-neutral-200/60 dark:border-neutral-700/60 text-neutral-500 dark:text-neutral-400">
+                                                <div class="flex items-center gap-1.5">
+                                                    <span class="inline-flex items-center gap-1 rounded bg-indigo-100/90 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/60 px-1.5 py-0.5 text-[10px] font-bold text-indigo-800 dark:text-indigo-300">
+                                                        <svg class="h-3 w-3 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                                        AI Suggested: <span x-text="aiSuggestedQuantity + ' ' + (preselectedItem?.unit || 'units')"></span>
+                                                    </span>
+                                                </div>
+                                                <button type="button"
+                                                        x-show="line.requested_quantity != aiSuggestedQuantity"
+                                                        @click="line.requested_quantity = aiSuggestedQuantity"
+                                                        class="text-[10px] font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 hover:underline">
+                                                    Reset to AI Qty (<span x-text="aiSuggestedQuantity"></span>)
+                                                </button>
                                             </div>
-                                            <div class="w-32">
-                                                <select :name="'lines[' + idx + '][allocation_strategy]'" x-model="line.allocation_strategy"
-                                                        class="block w-full rounded-md border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs font-medium">
-                                                    <option value="FEFO">FEFO (Earliest Expiry)</option>
-                                                    <option value="FIFO">FIFO (Oldest In)</option>
-                                                    <option value="MANUAL">Manual Pick</option>
-                                                </select>
-                                            </div>
-                                            <button type="button" @click="removeLine(idx)" :disabled="lines.length === 1"
-                                                    class="rounded p-1 text-neutral-400 hover:text-rose-600 disabled:opacity-30">
-                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
                                         </div>
                                     </template>
                                 </div>

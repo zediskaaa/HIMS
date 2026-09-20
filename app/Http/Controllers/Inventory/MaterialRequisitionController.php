@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CostCenter;
 use App\Models\InventoryItem;
 use App\Models\MaterialRequisition;
+use App\Services\AiDemandForecastService;
 use App\Services\Inventory\IssuanceEngine;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
@@ -29,7 +30,10 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
         ];
     }
 
-    public function __construct(private readonly IssuanceEngine $issuanceEngine) {}
+    public function __construct(
+        private readonly IssuanceEngine $issuanceEngine,
+        private readonly AiDemandForecastService $aiForecastService,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -73,14 +77,26 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
 
         $itemId = $request->input('item_id') ?? old('context_item_id') ?? old('lines.0.item_id');
         $preselectedItem = null;
+        $aiRecommendation = null;
         if ($itemId) {
-            $preselectedItem = InventoryItem::active()->with(['defaultLocation', 'category'])->find((int) $itemId);
+            $preselectedItem = InventoryItem::active()->with(['defaultLocation', 'category', 'supplierProducts'])->find((int) $itemId);
             if (! $preselectedItem && $request->filled('item_id')) {
                 session()->flash('warning', 'The requested inventory item could not be preselected because it does not exist or is inactive.');
+            } elseif ($preselectedItem) {
+                $aiRecommendation = $this->aiForecastService->reorderRecommendationForItem($preselectedItem, $request->user());
             }
         }
 
-        return view('inventory.requisitions.index', compact('requisitions', 'items', 'costCenters', 'departments', 'requisitionMetrics', 'approverRoleLabels', 'preselectedItem'));
+        return view('inventory.requisitions.index', compact(
+            'requisitions',
+            'items',
+            'costCenters',
+            'departments',
+            'requisitionMetrics',
+            'approverRoleLabels',
+            'preselectedItem',
+            'aiRecommendation',
+        ));
     }
 
     public function show(MaterialRequisition $requisition): View
@@ -103,6 +119,7 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.item_id' => ['required', 'exists:inventory_items,id'],
             'lines.*.requested_quantity' => ['required', 'integer', 'min:1'],
+            'lines.*.ai_suggested_quantity' => ['nullable', 'integer', 'min:0'],
             'lines.*.allocation_strategy' => ['nullable', 'in:FEFO,FIFO,MANUAL'],
             'lines.*.notes' => ['nullable', 'string', 'max:255'],
         ]);

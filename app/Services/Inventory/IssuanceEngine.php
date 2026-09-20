@@ -86,15 +86,22 @@ class IssuanceEngine
                 ]);
             }
 
+            $hasAiSuggestion = collect($lines)->contains(fn ($l) => isset($l['ai_suggested_quantity']) && $l['ai_suggested_quantity'] !== null && $l['ai_suggested_quantity'] !== '');
+            $auditNewValues = [
+                'requisition_number' => $requisition->requisition_number,
+                'line_count' => count($lines),
+            ];
+            if ($hasAiSuggestion) {
+                $auditNewValues['ai_suggested_quantity'] = (int) ($lines[0]['ai_suggested_quantity'] ?? 0);
+                $auditNewValues['final_requested_quantity'] = (int) ($lines[0]['requested_quantity'] ?? 0);
+            }
+
             $this->auditLogger->record(
                 AuditAction::CreatedMaterialRequisition,
                 actor: $requester,
                 target: $requisition,
-                description: "Submitted Store Requisition {$requisition->requisition_number} for {$requisition->department}",
-                newValues: [
-                    'requisition_number' => $requisition->requisition_number,
-                    'line_count' => count($lines),
-                ]
+                description: "Submitted Store Requisition {$requisition->requisition_number} for {$requisition->department}".($hasAiSuggestion ? " (AI Suggested: {$auditNewValues['ai_suggested_quantity']}, Requested: {$auditNewValues['final_requested_quantity']})" : ''),
+                newValues: $auditNewValues
             );
 
             return $requisition;

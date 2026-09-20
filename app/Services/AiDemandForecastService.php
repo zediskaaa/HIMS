@@ -99,6 +99,179 @@ class AiDemandForecastService
     }
 
     /**
+     * Compute a data-driven AI/statistical reorder recommendation for a single item.
+     *
+     * Consults active AI demand forecast envelopes or calculates through the core
+     * DemandForecastService moving average, factoring in available stock, reserved
+     * stock, incoming PO procurement, and supplier order/pack constraints.
+     *
+     * @return array<string, mixed>
+     */
+    public function reorderRecommendationForItem(
+        InventoryItem $item,
+        ?User $actor = null,
+        int $analysisDays = DemandForecastService::DEFAULT_ANALYSIS_DAYS,
+        int $forecastDays = DemandForecastService::DEFAULT_FORECAST_DAYS,
+    ): array {
+        $analysisDays = max(7, min(365, $analysisDays));
+        $forecastDays = max(7, min(180, $forecastDays));
+
+        // 1. Inspect existing cached AI envelope if available
+        $cachedEnvelope = $this->cached($analysisDays, $forecastDays);
+        $cachedItem = null;
+        if ($cachedEnvelope !== null && ! empty($cachedEnvelope['items'])) {
+            $cachedItem = collect($cachedEnvelope['items'])->firstWhere('item_id', $item->id);
+        }
+
+        // 2. Tally incoming procurement from pending purchase orders
+        $pendingStatuses = ['draft', 'submitted', 'pending', 'pending_approval', 'approved', 'dispatched', 'acknowledged', 'partially_fulfilled'];
+        $pendingPoLines = (int) PurchaseOrderLine::query()
+            ->where('item_id', $item->id)
+            ->whereHas('purchaseOrder', fn ($q) => $q->whereIn('status', $pendingStatuses))
+            ->get(['ordered_quantity', 'received_quantity'])
+            ->sum(fn ($line) => max(0, (int) $line->ordered_quantity - (int) $line->received_quantity));
+
+        $pendingLegacyPos = (int) PurchaseOrder::query()
+            ->where('item_id', $item->id)
+            ->whereIn('status', $pendingStatuses)
+            ->whereDoesntHave('lines')
+            ->sum('quantity');
+
+        $pendingProcurement = $pendingPoLines + $pendingLegacyPos;
+
+        // 3. Stock position
+        $onHand = (int) $item->quantity_on_hand;
+        $reserved = (int) ($item->reserved_quantity ?? 0);
+        $availableStock = max(0, $onHand - $reserved);
+
+        // 4. Core statistical forecast calculation
+        $leadTimeDays = max(0, (int) ($item->lead_time_days ?: DemandForecastService::DEFAULT_LEAD_TIME_DAYS));
+        $statForecast = $this->statisticalForecasts->forecast($item, $analysisDays, $forecastDays, $leadTimeDays);
+
+        $movementCount = (int) ($statForecast['movement_count'] ?? 0);
+        $historicalUsage = (int) ($statForecast['historical_usage'] ?? 0);
+        $isDataLimited = ($movementCount < 1 || $historicalUsage <= 0);
+
+        $unitLabel = $item->unitAbbreviation() ?: ($item->unit ?: 'units');
+
+        // 5. If insufficient historical consumption data exists, return clear unavailable state
+        if ($isDataLimited) {
+            return [
+                'available' => false,
+                'source' => null,
+                'source_label' => 'AI Demand Forecast',
+                'suggested_quantity' => null,
+                'predicted_demand' => 0,
+                'current_stock' => $availableStock,
+                'physical_stock' => $onHand,
+                'reserved_stock' => $reserved,
+                'incoming_procurement' => $pendingProcurement,
+                'reorder_point' => (int) ($item->reorder_point ?: $item->reorder_level ?: 0),
+                'safety_stock' => (int) $item->safety_stock,
+                'forecast_days' => $forecastDays,
+                'forecast_period' => "Next {$forecastDays} Days",
+                'analysis_days' => $analysisDays,
+                'unit' => $unitLabel,
+                'confidence' => 'low',
+                'risk_level' => 'unknown',
+                'reason' => 'Insufficient forecast data for this item.',
+                'explanation' => 'Insufficient historical consumption data in the analysis period. Please enter the requested quantity manually.',
+                'breakdown' => [
+                    'forecast_demand' => "0 {$unitLabel}",
+                    'current_stock' => "{$availableStock} {$unitLabel}",
+                    'incoming_stock' => "{$pendingProcurement} {$unitLabel}",
+                    'forecast_period' => "{$forecastDays} days",
+                ],
+            ];
+        }
+
+        // 6. Data is sufficient - calculate recommendation
+        $source = ($cachedItem && ($cachedEnvelope['source'] ?? '') === 'ai') ? 'ai' : 'statistical';
+        $sourceLabel = $source === 'ai' ? 'AI Demand Forecast' : 'Statistical Demand Model';
+
+        $predictedDemand = $cachedItem
+            ? (int) $cachedItem['predicted_demand']
+            : (int) $statForecast['upcoming_need'];
+
+        $safetyStock = max((int) $item->safety_stock, (int) $statForecast['safety_stock']);
+        $reorderPoint = max((int) $item->reorder_point, (int) $item->reorder_level, (int) $statForecast['reorder_point']);
+
+        // Suggested reorder = (Forecast demand + safety buffer) - (available stock + incoming supply)
+        $rawSuggested = max(0, $predictedDemand + $safetyStock - $availableStock - $pendingProcurement);
+
+        // If stock is below reorder point and rawSuggested is 0, ensure safety deficit is covered
+        if ($rawSuggested <= 0 && $availableStock <= $reorderPoint && ($reorderPoint - $availableStock - $pendingProcurement) > 0) {
+            $rawSuggested = max(0, $reorderPoint - $availableStock - $pendingProcurement);
+        }
+
+        // 7. Apply supplier packaging / MOQ rules if configured
+        $finalSuggested = $rawSuggested;
+        $packNote = null;
+
+        $supplierProduct = $item->relationLoaded('supplierProducts')
+            ? $item->supplierProducts->firstWhere('is_active', true)
+            : $item->supplierProducts()->where('is_active', true)->first();
+
+        if ($supplierProduct) {
+            $moq = (int) $supplierProduct->minimum_order_quantity;
+            if ($moq > 0 && $finalSuggested > 0 && $finalSuggested < $moq) {
+                $finalSuggested = $moq;
+                $packNote = "Adjusted to supplier minimum order quantity ({$moq} {$unitLabel}).";
+            }
+
+            if (filled($supplierProduct->pack_size)) {
+                $multiplier = $item->extractPackagingMultiplier($supplierProduct->pack_size);
+                if ($multiplier && $multiplier > 1.0 && $finalSuggested > 0) {
+                    $packSize = (int) $multiplier;
+                    $remainder = $finalSuggested % $packSize;
+                    if ($remainder > 0) {
+                        $finalSuggested += ($packSize - $remainder);
+                        $packNote = ($packNote ? $packNote.' ' : '')."Rounded up to nearest pack size of {$packSize} {$unitLabel}s.";
+                    }
+                }
+            }
+        }
+
+        // 8. Build clear explanations
+        $explanation = $cachedItem && filled($cachedItem['explanation'])
+            ? (string) $cachedItem['explanation']
+            : ($statForecast['trigger_reason'] ?? "Based on projected demand of {$predictedDemand} {$unitLabel} over the next {$forecastDays} days with {$safetyStock} {$unitLabel} safety stock.");
+
+        if ($packNote) {
+            $explanation .= " ({$packNote})";
+        }
+
+        return [
+            'available' => true,
+            'source' => $source,
+            'source_label' => $sourceLabel,
+            'suggested_quantity' => $finalSuggested,
+            'raw_suggested_quantity' => $rawSuggested,
+            'predicted_demand' => $predictedDemand,
+            'current_stock' => $availableStock,
+            'physical_stock' => $onHand,
+            'reserved_stock' => $reserved,
+            'incoming_procurement' => $pendingProcurement,
+            'reorder_point' => $reorderPoint,
+            'safety_stock' => $safetyStock,
+            'forecast_days' => $forecastDays,
+            'forecast_period' => "Next {$forecastDays} Days",
+            'analysis_days' => $analysisDays,
+            'unit' => $unitLabel,
+            'confidence' => $cachedItem['confidence'] ?? ($movementCount >= 5 ? 'high' : 'medium'),
+            'risk_level' => $cachedItem['risk_level'] ?? ($onHand <= 0 ? 'high' : ($onHand <= $reorderPoint ? 'medium' : 'low')),
+            'explanation' => $explanation,
+            'breakdown' => [
+                'forecast_demand' => "{$predictedDemand} {$unitLabel}",
+                'current_stock' => "{$availableStock} {$unitLabel}",
+                'incoming_stock' => "{$pendingProcurement} {$unitLabel}",
+                'forecast_period' => "{$forecastDays} days",
+                'safety_stock' => "{$safetyStock} {$unitLabel}",
+            ],
+        ];
+    }
+
+    /**
      * Queue the Gemini pass for after the response has been sent.
      *
      * The lock is what keeps a burst of page views on an empty cache down to a

@@ -2,10 +2,18 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AuditAction;
+use App\Enums\MovementType;
+use App\Enums\PurchaseOrderStatus;
+use App\Models\AuditLog;
 use App\Models\CostCenter;
 use App\Models\InventoryItem;
 use App\Models\ItemStockLevel;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderLine;
+use App\Models\StockMovement;
 use App\Models\StorageLocation;
+use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -25,7 +33,7 @@ class ContextualItemActionWorkflowTest extends TestCase
             'name' => 'Latex Gloves XL',
             'sku' => 'PPE-GLV-XL',
             'description' => 'Powder-free surgical gloves',
-            'unit_of_measure' => 'box',
+            'unit' => 'box',
             'unit_cost' => 250.00,
             'quantity_on_hand' => 15,
             'reorder_level' => 50,
@@ -207,4 +215,176 @@ class ContextualItemActionWorkflowTest extends TestCase
         $followUp->assertSee('Gloves XL');
         $followUp->assertSee('PPE-GOWN-XL');
     }
+
+    public function test_material_requisitions_index_calculates_ai_reorder_recommendation_when_item_preselected(): void
+    {
+        $user = $this->createInventoryManager();
+        $item = $this->createItem([
+            'name' => 'Blood Glucose Test Strips',
+            'sku' => 'MED-GLU-STRIP',
+            'unit' => 'box',
+            'quantity_on_hand' => 50,
+            'reorder_level' => 70,
+            'reorder_point' => 70,
+            'safety_stock' => 20,
+            'lead_time_days' => 7,
+        ]);
+
+        // Create 6 stock movements over the past 60 days (e.g., 25 boxes consumed each time = 150 boxes total)
+        foreach (range(1, 6) as $i) {
+            StockMovement::create([
+                'item_id' => $item->id,
+                'movement_type' => MovementType::StockOut,
+                'quantity' => 25,
+                'moved_at' => now()->subDays($i * 10),
+            ]);
+        }
+
+        $response = $this->actingAs($user)->get(route('inventory.requisitions.index', ['item_id' => $item->id]));
+
+        $response->assertOk();
+        $response->assertViewHas('preselectedItem', fn ($p) => $p && $p->id === $item->id);
+        $response->assertViewHas('aiRecommendation', function ($rec) {
+            return $rec !== null
+                && ($rec['available'] ?? false) === true
+                && isset($rec['suggested_quantity'])
+                && $rec['suggested_quantity'] > 0
+                && isset($rec['breakdown']['forecast_demand'])
+                && isset($rec['breakdown']['current_stock']);
+        });
+
+        $response->assertSee('AI-Suggested Reorder:');
+        $response->assertSee('Forecast Demand');
+        $response->assertSee('Available Stock');
+        $response->assertSee('Safety Buffer');
+        $response->assertSee('AI Suggested:');
+    }
+
+    public function test_material_requisitions_accounts_for_pending_purchase_orders_to_avoid_duplicate_ordering(): void
+    {
+        $user = $this->createInventoryManager();
+        $item = $this->createItem([
+            'name' => 'Surgical Mask 3-Ply',
+            'sku' => 'PPE-MASK-3P',
+            'unit' => 'box',
+            'quantity_on_hand' => 20,
+            'reorder_level' => 80,
+            'safety_stock' => 20,
+        ]);
+
+        // Add consumption history
+        foreach (range(1, 4) as $i) {
+            StockMovement::create([
+                'item_id' => $item->id,
+                'movement_type' => MovementType::StockOut,
+                'quantity' => 20,
+                'moved_at' => now()->subDays($i * 14),
+            ]);
+        }
+
+        $supplier = Supplier::create([
+            'name' => 'Apex Medical Supplies',
+            'contact_person' => 'John Doe',
+            'email' => 'sales@apexmed.test',
+            'phone' => '09171234567',
+            'address' => '123 Health Ave, Manila',
+            'status' => 'active',
+        ]);
+
+        $po = PurchaseOrder::create([
+            'po_number' => 'PO-2026-TEST-001',
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseOrderStatus::Approved->value,
+            'currency' => 'PHP',
+            'subtotal' => 5000.00,
+            'total_amount' => 5000.00,
+            'created_by' => $user->id,
+        ]);
+
+        PurchaseOrderLine::create([
+            'purchase_order_id' => $po->id,
+            'item_id' => $item->id,
+            'line_number' => 1,
+            'purchase_unit' => 'box',
+            'conversion_factor' => 1,
+            'ordered_quantity' => 30,
+            'received_quantity' => 0,
+            'unit_price' => 150.00,
+            'total_line_amount' => 4500.00,
+            'line_status' => 'ordered',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('inventory.requisitions.index', ['item_id' => $item->id]));
+
+        $response->assertOk();
+        $response->assertViewHas('aiRecommendation', function ($rec) {
+            return $rec !== null
+                && $rec['incoming_procurement'] === 30
+                && str_contains($rec['breakdown']['incoming_stock'], '30');
+        });
+        $response->assertSee('30 box');
+    }
+
+    public function test_material_requisitions_handles_insufficient_forecast_data_gracefully(): void
+    {
+        $user = $this->createInventoryManager();
+        // Brand new item without any consumption movements
+        $item = $this->createItem([
+            'name' => 'Novel Diagnostic Reagent',
+            'sku' => 'LAB-NEW-001',
+            'quantity_on_hand' => 5,
+            'reorder_level' => 20,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('inventory.requisitions.index', ['item_id' => $item->id]));
+
+        $response->assertOk();
+        $response->assertViewHas('aiRecommendation', function ($rec) {
+            return $rec !== null
+                && $rec['available'] === false
+                && $rec['suggested_quantity'] === null;
+        });
+
+        $response->assertSee('AI Forecast: Insufficient Data');
+        $response->assertSee('Insufficient historical consumption data');
+    }
+
+    public function test_material_requisitions_store_records_ai_suggestion_and_user_quantity_in_audit_log(): void
+    {
+        $user = $this->createInventoryManager();
+        $item = $this->createItem([
+            'name' => 'Hypodermic Syringe 5ml',
+            'sku' => 'SYR-5ML',
+            'quantity_on_hand' => 10,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('inventory.requisitions.store'), [
+            'department' => 'Emergency Department',
+            'urgency' => 'routine',
+            'justification' => 'Ward replenishments',
+            'lines' => [
+                [
+                    'item_id' => $item->id,
+                    'requested_quantity' => 150, // User edited quantity
+                    'ai_suggested_quantity' => 120, // AI suggested quantity
+                    'allocation_strategy' => 'FEFO',
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect(route('inventory.requisitions.index'));
+
+        // Check audit log for CreatedMaterialRequisition
+        $audit = AuditLog::query()
+            ->where('action', AuditAction::CreatedMaterialRequisition->value)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($audit);
+        $this->assertEquals(120, $audit->new_values['ai_suggested_quantity'] ?? null);
+        $this->assertEquals(150, $audit->new_values['final_requested_quantity'] ?? null);
+        $this->assertStringContainsString('AI Suggested: 120', $audit->description);
+        $this->assertStringContainsString('Requested: 150', $audit->description);
+    }
 }
+
