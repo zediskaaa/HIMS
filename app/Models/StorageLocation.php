@@ -122,6 +122,14 @@ class StorageLocation extends Model
      */
     public function totalQuantity(): int
     {
+        if (array_key_exists('total_stock_quantity', $this->attributes)) {
+            return (int) $this->attributes['total_stock_quantity'];
+        }
+
+        if ($this->relationLoaded('stockLevels')) {
+            return (int) $this->stockLevels->sum('quantity');
+        }
+
         return (int) $this->stockLevels()->sum('quantity');
     }
 

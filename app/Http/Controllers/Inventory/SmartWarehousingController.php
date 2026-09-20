@@ -20,6 +20,7 @@ use App\Services\Warehouse\BarcodeService;
 use App\Services\Warehouse\TelemetryService;
 use App\Services\Warehouse\WarehouseTaskService;
 use DomainException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -39,7 +40,7 @@ class SmartWarehousingController extends Controller implements HasMiddleware
     {
         return [
             'auth:web,admin,super_admin',
-            new Middleware('can:'.Permission::ViewWarehouseTasks->value, only: ['dashboard', 'locations']),
+            new Middleware('can:'.Permission::ViewWarehouseTasks->value, only: ['dashboard', 'locations', 'locationItems']),
             new Middleware('can:'.Permission::ExecuteWarehouseTasks->value, only: ['scanStation']),
             new Middleware('can:'.Permission::ManageWarehouseTopology->value, only: ['storeLocation']),
         ];
@@ -91,7 +92,9 @@ class SmartWarehousingController extends Controller implements HasMiddleware
 
     public function locations(Request $request): View
     {
-        $query = StorageLocation::with(['parent', 'children', 'stockLevels.item'])
+        $query = StorageLocation::with(['parent', 'children'])
+            ->withCount(['stockLevels as active_items_count' => fn ($q) => $q->where('quantity', '>', 0)])
+            ->withSum(['stockLevels as total_stock_quantity' => fn ($q) => $q->where('quantity', '>', 0)], 'quantity')
             ->orderBy('code');
 
         if ($request->filled('type')) {
@@ -113,6 +116,92 @@ class SmartWarehousingController extends Controller implements HasMiddleware
         $parentLocations = StorageLocation::whereIn('type', ['warehouse', 'zone', 'aisle', 'rack'])->orderBy('name')->get();
 
         return view('inventory.warehousing.locations', compact('locations', 'parentLocations'));
+    }
+
+    public function locationItems(Request $request, StorageLocation $storageLocation): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless(
+            $user && ($user->can(Permission::ViewWarehouseTasks->value) || $user->can(Permission::ViewInventory->value)),
+            403,
+            'Unauthorized to view storage location items.'
+        );
+
+        $query = ItemStockLevel::where('storage_location_id', $storageLocation->id)
+            ->where('quantity', '>', 0)
+            ->with(['item.category', 'batch']);
+
+        if ($request->filled('search')) {
+            $search = trim((string) $request->search);
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('item', function ($iq) use ($search) {
+                    $iq->where('name', 'like', "%{$search}%")
+                        ->orWhere('sku', 'like', "%{$search}%")
+                        ->orWhere('barcode_value', 'like', "%{$search}%");
+                })->orWhereHas('batch', function ($bq) use ($search) {
+                    $bq->where('batch_number', 'like', "%{$search}%")
+                        ->orWhere('lot_number', 'like', "%{$search}%");
+                });
+            });
+        }
+
+        $perPage = min(100, max(5, (int) $request->input('per_page', 15)));
+        $paginated = $query->paginate($perPage);
+
+        $items = $paginated->getCollection()->map(function (ItemStockLevel $stockLevel) {
+            $item = $stockLevel->item;
+            $batch = $stockLevel->batch;
+
+            $status = $item ? $item->stockStatus() : 'in_stock';
+            $statusLabel = match ($status) {
+                'out_of_stock' => 'Out of Stock',
+                'low_stock' => 'Low Stock',
+                default => 'In Stock',
+            };
+
+            return [
+                'id' => $stockLevel->id,
+                'item_id' => $item?->id,
+                'name' => $item?->name ?? 'Unknown Item',
+                'sku' => $item?->sku ?? '—',
+                'barcode' => $item?->barcode_value,
+                'category' => $item?->category?->name ?? 'General',
+                'quantity' => (int) $stockLevel->quantity,
+                'reserved_quantity' => (int) $stockLevel->reserved_quantity,
+                'available_quantity' => (int) $stockLevel->availableQuantity(),
+                'unit' => $item?->unit ?? 'units',
+                'batch_number' => $batch?->batch_number,
+                'lot_number' => $batch?->lot_number,
+                'expiry_date' => $batch?->expiry_date?->toDateString(),
+                'expiry_formatted' => $batch?->expiry_date?->format('M Y'),
+                'days_until_expiry' => $batch?->daysUntilExpiry(),
+                'is_expired' => $batch ? $batch->isExpired() : false,
+                'is_expiring_soon' => $batch ? $batch->isExpiringSoon() : false,
+                'stock_status' => $status,
+                'status_label' => $statusLabel,
+            ];
+        });
+
+        return response()->json([
+            'location' => [
+                'id' => $storageLocation->id,
+                'code' => $storageLocation->code,
+                'name' => $storageLocation->name,
+                'type' => str_replace('_', ' ', $storageLocation->type),
+                'full_path' => $storageLocation->fullPath(),
+                'total_quantity' => $storageLocation->totalQuantity(),
+                'active_items_count' => (int) $storageLocation->stockLevels()->where('quantity', '>', 0)->count(),
+            ],
+            'items' => $items,
+            'pagination' => [
+                'current_page' => $paginated->currentPage(),
+                'last_page' => $paginated->lastPage(),
+                'per_page' => $paginated->perPage(),
+                'total' => $paginated->total(),
+                'from' => $paginated->firstItem(),
+                'to' => $paginated->lastItem(),
+            ],
+        ]);
     }
 
     public function storeLocation(Request $request): RedirectResponse

@@ -135,6 +135,7 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     // Smart Warehousing Suite
     Route::get('/inventory/warehousing', [SmartWarehousingController::class, 'dashboard'])->name('inventory.warehousing.dashboard');
     Route::get('/inventory/warehousing/locations', [SmartWarehousingController::class, 'locations'])->name('inventory.warehousing.locations');
+    Route::get('/inventory/warehousing/locations/{storageLocation}/items', [SmartWarehousingController::class, 'locationItems'])->name('inventory.warehousing.locations.items');
     Route::post('/inventory/warehousing/locations', [SmartWarehousingController::class, 'storeLocation'])->name('inventory.warehousing.locations.store');
     Route::get('/inventory/warehousing/scan-station', [SmartWarehousingController::class, 'scanStation'])->name('inventory.warehousing.scan-station');
 
