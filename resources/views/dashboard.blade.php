@@ -334,11 +334,11 @@
                         >
                         {{-- Item category --}}
                         <div class="min-w-0 space-y-1.5">
-                            <label for="dashboard-forecast-category" class="block text-xs font-medium text-neutral-700">Item category</label>
+                            <label for="dashboard-forecast-category" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Item category</label>
                             <select
                                 id="dashboard-forecast-category"
                                 x-model="category"
-                                class="block min-h-10 w-full rounded-md border-neutral-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500/30"
+                                class="block min-h-10 w-full rounded-md border-neutral-300 pl-3 pr-10 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500/30 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
                             >
                                 <option value="">All categories</option>
                                 @foreach ($forecastCategories as $category)
@@ -349,11 +349,11 @@
 
                         {{-- Risk level --}}
                         <div class="min-w-0 space-y-1.5">
-                            <label for="dashboard-forecast-risk" class="block text-xs font-medium text-neutral-700">Risk level</label>
+                            <label for="dashboard-forecast-risk" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Risk level</label>
                             <select
                                 id="dashboard-forecast-risk"
                                 x-model="risk"
-                                class="block min-h-10 w-full rounded-md border-neutral-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500/30"
+                                class="block min-h-10 w-full rounded-md border-neutral-300 pl-3 pr-10 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500/30 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
                             >
                                 <option value="">All risk levels</option>
                                 <option value="high">High risk</option>
@@ -865,59 +865,191 @@
 
             <x-ui.modal name="dashboard-demand-forecast" title="Full Demand Forecast" maxWidth="6xl">
                 <div class="space-y-4">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span
-                                    class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset"
-                                    x-bind:class="sourceClasses()"
-                                    x-text="forecast?.source_label"
-                                ></span>
-                                <span class="text-xs text-neutral-500" x-text="forecast?.forecast_period"></span>
-                            </div>
-                            <p class="mt-1 text-xs text-neutral-500">Dashboard category, risk, and search filters apply to these results.</p>
+                    {{-- Modal Header Bar: Context badges, live item counter, and conditional clear action --}}
+                    <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span
+                                class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset"
+                                x-bind:class="sourceClasses()"
+                                x-text="forecast?.source_label"
+                            ></span>
+                            <span class="inline-flex items-center rounded-md bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300" x-text="forecast?.forecast_period"></span>
+                            <span class="text-xs text-neutral-500 dark:text-neutral-400">
+                                Showing <strong class="font-bold tabular-nums text-neutral-900 dark:text-neutral-100" x-text="filteredItems().length"></strong> of <strong class="font-semibold tabular-nums text-neutral-700 dark:text-neutral-300" x-text="allItems().length"></strong> items
+                            </span>
                         </div>
-                        <x-ui.button type="button" variant="secondary" size="sm" x-on:click="clearFilters()">Clear Filters</x-ui.button>
+
+                        {{-- Active Filter Action: Only shows when filters are actually active --}}
+                        <div class="flex items-center gap-2">
+                            <button
+                                type="button"
+                                x-show="activeFilterCount() > 0"
+                                x-cloak
+                                x-on:click="clearFilters()"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-primary-300 bg-primary-50/90 px-2.5 py-1.5 text-xs font-semibold text-primary-700 shadow-2xs hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-primary-800 dark:bg-primary-950/60 dark:text-primary-300 dark:hover:bg-primary-900/60 transition"
+                            >
+                                <x-ui.icon name="arrow-path" class="h-3.5 w-3.5" />
+                                <span>Clear Filters</span>
+                                <span
+                                    class="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-200/80 px-1 text-[10px] font-bold text-primary-800 dark:bg-primary-800/80 dark:text-primary-200"
+                                    x-text="activeFilterCount()"
+                                ></span>
+                            </button>
+                        </div>
                     </div>
 
-                    <div x-show="filteredItems().length === 0" class="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-4 py-8 text-center">
-                        <p class="text-sm font-medium text-neutral-800">No matching forecast items</p>
-                        <p class="mt-1 text-xs text-neutral-500">Clear or adjust the dashboard filters to see more results.</p>
+                    {{-- Live Filter Toolbar: Search, Category, and Risk filters right inside the modal --}}
+                    <div class="rounded-xl border border-neutral-200/90 bg-neutral-50/70 p-3 dark:border-neutral-800 dark:bg-neutral-800/40">
+                        <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-12">
+                            {{-- Search Input (lg:col-span-5) --}}
+                            <div class="relative lg:col-span-5">
+                                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400 dark:text-neutral-500">
+                                    <x-ui.icon name="magnifying-glass" class="h-4 w-4" />
+                                </div>
+                                <input
+                                    id="dashboard-forecast-modal-search"
+                                    type="search"
+                                    x-model.debounce.150ms="search"
+                                    placeholder="Search medicine, supply name, SKU..."
+                                    autocomplete="off"
+                                    class="block w-full min-h-9 rounded-lg border border-neutral-300 bg-white pl-9 pr-8 text-xs text-neutral-900 shadow-2xs placeholder:text-neutral-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:placeholder:text-neutral-500"
+                                >
+                                <button
+                                    type="button"
+                                    x-show="search.trim().length > 0"
+                                    x-cloak
+                                    x-on:click="search = ''"
+                                    class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                                    aria-label="Clear search text"
+                                >
+                                    <x-ui.icon name="x-mark" class="h-3.5 w-3.5" />
+                                </button>
+                            </div>
+
+                            {{-- Category Select (lg:col-span-4) - Mandatory pl-2.5 pr-8 clearance --}}
+                            <div class="min-w-0 lg:col-span-4">
+                                <select
+                                    id="dashboard-forecast-modal-category"
+                                    x-model="category"
+                                    class="block w-full min-h-9 rounded-lg border border-neutral-300 bg-white pl-2.5 pr-8 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"
+                                    aria-label="Filter by item category"
+                                >
+                                    <option value="">All item categories</option>
+                                    @foreach ($forecastCategories as $category)
+                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            {{-- Risk Level Select (lg:col-span-3) - Mandatory pl-2.5 pr-8 clearance --}}
+                            <div class="min-w-0 lg:col-span-3">
+                                <select
+                                    id="dashboard-forecast-modal-risk"
+                                    x-model="risk"
+                                    class="block w-full min-h-9 rounded-lg border border-neutral-300 bg-white pl-2.5 pr-8 text-xs text-neutral-800 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"
+                                    aria-label="Filter by risk level"
+                                >
+                                    <option value="">All risk levels</option>
+                                    <option value="high">High risk only</option>
+                                    <option value="medium">Medium risk only</option>
+                                    <option value="low">Low risk only</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {{-- Active Filter Chips Row (renders dynamically when activeFilterCount() > 0) --}}
+                        <div
+                            x-show="activeFilterCount() > 0"
+                            x-cloak
+                            class="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-neutral-200/80 pt-2 text-xs dark:border-neutral-700/60"
+                        >
+                            <span class="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mr-1">Active:</span>
+
+                            {{-- Search Chip --}}
+                            <template x-if="search.trim().length > 0">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-white px-2 py-0.5 text-xs font-medium text-neutral-700 shadow-2xs ring-1 ring-inset ring-neutral-300 dark:bg-neutral-900 dark:text-neutral-200 dark:ring-neutral-700">
+                                    <span>Keyword: <strong class="text-neutral-900 dark:text-white" x-text="search.trim()"></strong></span>
+                                    <button type="button" x-on:click="search = ''" class="text-neutral-400 hover:text-neutral-700 dark:hover:text-white" aria-label="Clear keyword filter">
+                                        <x-ui.icon name="x-mark" class="h-3 w-3" />
+                                    </button>
+                                </span>
+                            </template>
+
+                            {{-- Category Chip --}}
+                            <template x-if="category !== ''">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-white px-2 py-0.5 text-xs font-medium text-neutral-700 shadow-2xs ring-1 ring-inset ring-neutral-300 dark:bg-neutral-900 dark:text-neutral-200 dark:ring-neutral-700">
+                                    <span>Category: <strong class="text-neutral-900 dark:text-white" x-text="activeCategoryName()"></strong></span>
+                                    <button type="button" x-on:click="category = ''" class="text-neutral-400 hover:text-neutral-700 dark:hover:text-white" aria-label="Clear category filter">
+                                        <x-ui.icon name="x-mark" class="h-3 w-3" />
+                                    </button>
+                                </span>
+                            </template>
+
+                            {{-- Risk Chip --}}
+                            <template x-if="risk !== ''">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-white px-2 py-0.5 text-xs font-medium text-neutral-700 shadow-2xs ring-1 ring-inset ring-neutral-300 dark:bg-neutral-900 dark:text-neutral-200 dark:ring-neutral-700">
+                                    <span>Risk: <strong class="capitalize text-neutral-900 dark:text-white" x-text="risk"></strong></span>
+                                    <button type="button" x-on:click="risk = ''" class="text-neutral-400 hover:text-neutral-700 dark:hover:text-white" aria-label="Clear risk filter">
+                                        <x-ui.icon name="x-mark" class="h-3 w-3" />
+                                    </button>
+                                </span>
+                            </template>
+
+                            <button
+                                type="button"
+                                x-on:click="clearFilters()"
+                                class="ml-1 text-[11px] font-semibold text-primary-700 hover:text-primary-800 hover:underline dark:text-primary-400 dark:hover:text-primary-300"
+                            >
+                                Reset all
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Empty Filter Results State --}}
+                    <div x-show="filteredItems().length === 0" class="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-8 text-center dark:border-neutral-700 dark:bg-neutral-900/50">
+                        <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-neutral-200/70 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+                            <x-ui.icon name="funnel" class="h-5 w-5" />
+                        </span>
+                        <p class="mt-2.5 text-sm font-semibold text-neutral-900 dark:text-neutral-100">No matching forecast items</p>
+                        <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto">None of the forecast items match your current filter criteria.</p>
+                        <div class="mt-3.5">
+                            <x-ui.button type="button" variant="secondary" size="sm" icon="arrow-path" x-on:click="clearFilters()">Reset All Filters</x-ui.button>
+                        </div>
                     </div>
 
                     {{-- Desktop & Tablet Table (100% width, no horizontal scrollbar, clear column proportions) --}}
-                    <div x-show="filteredItems().length > 0" class="hidden md:block rounded-lg border border-neutral-200 overflow-hidden bg-white">
+                    <div x-show="filteredItems().length > 0" class="hidden md:block rounded-lg border border-neutral-200 overflow-hidden bg-white dark:border-neutral-800 dark:bg-neutral-900">
                         <table class="w-full text-left text-xs">
-                            <thead class="sticky top-0 bg-neutral-50 text-neutral-500 border-b border-neutral-200">
+                            <thead class="sticky top-0 bg-neutral-50 text-neutral-500 border-b border-neutral-200 dark:bg-neutral-800/80 dark:text-neutral-400 dark:border-neutral-700">
                                 <tr>
-                                    <th scope="col" class="w-[34%] px-3.5 py-2.5 font-semibold text-neutral-700">Item & Explanation</th>
-                                    <th scope="col" class="w-[9%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Current</th>
-                                    <th scope="col" class="w-[10%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Historical</th>
-                                    <th scope="col" class="w-[11%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Forecast</th>
-                                    <th scope="col" class="w-[11%] px-2.5 py-2.5 text-center font-semibold text-neutral-700">Risk</th>
-                                    <th scope="col" class="w-[11%] px-2.5 py-2.5 text-right font-semibold text-neutral-700">Reorder</th>
-                                    <th scope="col" class="w-[14%] px-3 py-2.5 font-semibold text-neutral-700">Confidence</th>
+                                    <th scope="col" class="w-[34%] px-3.5 py-2.5 font-semibold text-neutral-700 dark:text-neutral-300">Item & Explanation</th>
+                                    <th scope="col" class="w-[9%] px-2.5 py-2.5 text-right font-semibold text-neutral-700 dark:text-neutral-300">Current</th>
+                                    <th scope="col" class="w-[10%] px-2.5 py-2.5 text-right font-semibold text-neutral-700 dark:text-neutral-300">Historical</th>
+                                    <th scope="col" class="w-[11%] px-2.5 py-2.5 text-right font-semibold text-neutral-700 dark:text-neutral-300">Forecast</th>
+                                    <th scope="col" class="w-[11%] px-2.5 py-2.5 text-center font-semibold text-neutral-700 dark:text-neutral-300">Risk</th>
+                                    <th scope="col" class="w-[11%] px-2.5 py-2.5 text-right font-semibold text-neutral-700 dark:text-neutral-300">Reorder</th>
+                                    <th scope="col" class="w-[14%] px-3 py-2.5 font-semibold text-neutral-700 dark:text-neutral-300">Confidence</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-neutral-100">
+                            <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
                                 <template x-for="item in filteredItems()" x-bind:key="item.item_id">
-                                    <tr class="align-top transition-colors hover:bg-neutral-50/80">
+                                    <tr class="align-top transition-colors hover:bg-neutral-50/80 dark:hover:bg-neutral-800/50">
                                         <td class="px-3.5 py-3">
-                                            <p class="font-semibold text-neutral-900" x-text="item.item_name"></p>
-                                            <p class="text-[11px] text-neutral-500 mt-0.5" x-text="`${item.sku}${item.category ? ` · ${item.category}` : ''}`"></p>
-                                            <p x-show="item.explanation" class="mt-1.5 text-[11px] leading-relaxed text-neutral-600" x-text="item.explanation"></p>
-                                            <p x-show="item.limited_data" class="mt-1 font-medium text-[10px] text-warning-700">Limited movement history</p>
+                                            <p class="font-semibold text-neutral-900 dark:text-neutral-100" x-text="item.item_name"></p>
+                                            <p class="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5" x-text="`${item.sku}${item.category ? ` · ${item.category}` : ''}`"></p>
+                                            <p x-show="item.explanation" class="mt-1.5 text-[11px] leading-relaxed text-neutral-600 dark:text-neutral-300" x-text="item.explanation"></p>
+                                            <p x-show="item.limited_data" class="mt-1 font-medium text-[10px] text-warning-700 dark:text-warning-400">Limited movement history</p>
                                         </td>
-                                        <td class="px-2.5 py-3 text-right tabular-nums text-neutral-700" x-text="formatNumber(item.current_stock)"></td>
-                                        <td class="px-2.5 py-3 text-right tabular-nums text-neutral-600" x-text="item.historical_consumption == null ? '—' : formatNumber(item.historical_consumption)"></td>
-                                        <td class="px-2.5 py-3 text-right font-bold tabular-nums text-neutral-900" x-text="formatNumber(item.predicted_demand)"></td>
+                                        <td class="px-2.5 py-3 text-right tabular-nums text-neutral-700 dark:text-neutral-300" x-text="formatNumber(item.current_stock)"></td>
+                                        <td class="px-2.5 py-3 text-right tabular-nums text-neutral-600 dark:text-neutral-400" x-text="item.historical_consumption == null ? '—' : formatNumber(item.historical_consumption)"></td>
+                                        <td class="px-2.5 py-3 text-right font-bold tabular-nums text-neutral-900 dark:text-neutral-100" x-text="formatNumber(item.predicted_demand)"></td>
                                         <td class="px-2.5 py-3 text-center">
                                             <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset whitespace-nowrap" x-bind:class="riskClasses(item.risk_level)" x-text="`${item.risk_level} risk`"></span>
                                         </td>
-                                        <td class="px-2.5 py-3 text-right font-bold tabular-nums text-primary-700" x-text="formatNumber(item.recommended_reorder_quantity)"></td>
-                                        <td class="px-3 py-3 text-neutral-700">
-                                            <span class="font-medium capitalize text-neutral-900 block" x-text="item.confidence"></span>
-                                            <span class="text-[10px] text-neutral-500 block leading-tight" x-text="`${item.demand_trend} trend`"></span>
+                                        <td class="px-2.5 py-3 text-right font-bold tabular-nums text-primary-700 dark:text-primary-400" x-text="formatNumber(item.recommended_reorder_quantity)"></td>
+                                        <td class="px-3 py-3 text-neutral-700 dark:text-neutral-300">
+                                            <span class="font-medium capitalize text-neutral-900 dark:text-neutral-100 block" x-text="item.confidence"></span>
+                                            <span class="text-[10px] text-neutral-500 dark:text-neutral-400 block leading-tight" x-text="`${item.demand_trend} trend`"></span>
                                         </td>
                                     </tr>
                                 </template>
@@ -928,42 +1060,42 @@
                     {{-- Mobile Card List (Zero horizontal scrolling on smartphones) --}}
                     <div x-show="filteredItems().length > 0" class="space-y-3 md:hidden">
                         <template x-for="item in filteredItems()" x-bind:key="item.item_id">
-                            <div class="rounded-xl border border-neutral-200 bg-white p-3.5 shadow-2xs space-y-2.5">
+                            <div class="rounded-xl border border-neutral-200 bg-white p-3.5 shadow-2xs space-y-2.5 dark:border-neutral-800 dark:bg-neutral-900">
                                 <div class="flex items-start justify-between gap-2">
                                     <div class="min-w-0 flex-1">
-                                        <p class="font-semibold text-neutral-900 text-xs leading-snug" x-text="item.item_name"></p>
-                                        <p class="text-[11px] text-neutral-500 mt-0.5" x-text="`${item.sku}${item.category ? ` · ${item.category}` : ''}`"></p>
+                                        <p class="font-semibold text-neutral-900 dark:text-neutral-100 text-xs leading-snug" x-text="item.item_name"></p>
+                                        <p class="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5" x-text="`${item.sku}${item.category ? ` · ${item.category}` : ''}`"></p>
                                     </div>
                                     <span class="inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset whitespace-nowrap" x-bind:class="riskClasses(item.risk_level)" x-text="`${item.risk_level} risk`"></span>
                                 </div>
 
-                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-lg bg-neutral-50 p-2 text-center text-[11px]">
-                                    <div class="rounded bg-white/80 py-1 border border-neutral-100">
-                                        <span class="block text-[10px] text-neutral-500">Current</span>
-                                        <span class="font-semibold text-neutral-800 tabular-nums" x-text="formatNumber(item.current_stock)"></span>
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-lg bg-neutral-50 dark:bg-neutral-800/60 p-2 text-center text-[11px]">
+                                    <div class="rounded bg-white/80 dark:bg-neutral-800 py-1 border border-neutral-100 dark:border-neutral-700/60">
+                                        <span class="block text-[10px] text-neutral-500 dark:text-neutral-400">Current</span>
+                                        <span class="font-semibold text-neutral-800 dark:text-neutral-200 tabular-nums" x-text="formatNumber(item.current_stock)"></span>
                                     </div>
-                                    <div class="rounded bg-white/80 py-1 border border-neutral-100">
-                                        <span class="block text-[10px] text-neutral-500">Historical</span>
-                                        <span class="font-medium text-neutral-600 tabular-nums" x-text="item.historical_consumption == null ? '—' : formatNumber(item.historical_consumption)"></span>
+                                    <div class="rounded bg-white/80 dark:bg-neutral-800 py-1 border border-neutral-100 dark:border-neutral-700/60">
+                                        <span class="block text-[10px] text-neutral-500 dark:text-neutral-400">Historical</span>
+                                        <span class="font-medium text-neutral-600 dark:text-neutral-400 tabular-nums" x-text="item.historical_consumption == null ? '—' : formatNumber(item.historical_consumption)"></span>
                                     </div>
-                                    <div class="rounded bg-white/80 py-1 border border-neutral-100">
-                                        <span class="block text-[10px] text-neutral-500">Forecast</span>
-                                        <span class="font-bold text-neutral-900 tabular-nums" x-text="formatNumber(item.predicted_demand)"></span>
+                                    <div class="rounded bg-white/80 dark:bg-neutral-800 py-1 border border-neutral-100 dark:border-neutral-700/60">
+                                        <span class="block text-[10px] text-neutral-500 dark:text-neutral-400">Forecast</span>
+                                        <span class="font-bold text-neutral-900 dark:text-neutral-100 tabular-nums" x-text="formatNumber(item.predicted_demand)"></span>
                                     </div>
-                                    <div class="rounded bg-white/80 py-1 border border-neutral-100">
-                                        <span class="block text-[10px] text-primary-700">Reorder</span>
-                                        <span class="font-bold text-primary-700 tabular-nums" x-text="formatNumber(item.recommended_reorder_quantity)"></span>
+                                    <div class="rounded bg-white/80 dark:bg-neutral-800 py-1 border border-neutral-100 dark:border-neutral-700/60">
+                                        <span class="block text-[10px] text-primary-700 dark:text-primary-400">Reorder</span>
+                                        <span class="font-bold text-primary-700 dark:text-primary-400 tabular-nums" x-text="formatNumber(item.recommended_reorder_quantity)"></span>
                                     </div>
                                 </div>
 
-                                <div class="flex items-center justify-between text-[11px] text-neutral-500">
-                                    <span>Confidence: <strong class="font-semibold capitalize text-neutral-800" x-text="item.confidence"></strong></span>
+                                <div class="flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+                                    <span>Confidence: <strong class="font-semibold capitalize text-neutral-800 dark:text-neutral-200" x-text="item.confidence"></strong></span>
                                     <span class="capitalize" x-text="`${item.demand_trend} trend`"></span>
                                 </div>
 
                                 <template x-if="item.explanation">
-                                    <div class="text-[11px] text-neutral-600 bg-neutral-50/80 rounded-lg p-2.5 border border-neutral-100 leading-relaxed">
-                                        <span class="font-semibold text-neutral-700">Explanation:</span>
+                                    <div class="text-[11px] text-neutral-600 dark:text-neutral-300 bg-neutral-50/80 dark:bg-neutral-800/60 rounded-lg p-2.5 border border-neutral-100 dark:border-neutral-700/60 leading-relaxed">
+                                        <span class="font-semibold text-neutral-700 dark:text-neutral-200">Explanation:</span>
                                         <span x-text="item.explanation"></span>
                                     </div>
                                 </template>

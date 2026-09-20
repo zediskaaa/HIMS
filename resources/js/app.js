@@ -1566,6 +1566,18 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         return [this.category, this.risk, this.search.trim()].filter(Boolean).length;
     },
 
+    activeCategoryName() {
+        if (!this.category) return '';
+        const match = this.allItems().find((item) => String(item.category_id) === String(this.category));
+        if (match?.category) return match.category;
+        const select = document.getElementById('dashboard-forecast-modal-category')
+            || document.getElementById('dashboard-forecast-category');
+        if (select && select.selectedOptions && select.selectedOptions[0]) {
+            return select.selectedOptions[0].text;
+        }
+        return 'Category';
+    },
+
     clearFilters() {
         this.selectedItemId = '';
         this.category = '';
