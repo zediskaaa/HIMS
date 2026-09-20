@@ -163,9 +163,14 @@ class ProcurementController extends Controller implements HasMiddleware
                 ->whereNotNull('delivery_date')
                 ->whereDate('delivery_date', '<', today()));
 
+        $poPerPage = $request->integer('po_per_page', 5);
+        if (! in_array($poPerPage, [3, 5, 10, 25, 50], true)) {
+            $poPerPage = 5;
+        }
+
         $purchaseOrders = $purchaseOrderQuery
             ->latest('requested_at')
-            ->paginate(10, ['*'], 'po_page')
+            ->paginate($poPerPage, ['*'], 'po_page')
             ->withQueryString();
         $poStatusOptions = PurchaseOrder::query()
             ->select('status')
@@ -174,7 +179,7 @@ class ProcurementController extends Controller implements HasMiddleware
             ->pluck('status')
             ->filter()
             ->mapWithKeys(fn (string $status): array => [$status => Str::headline($status)]);
-        $poFilters = compact('poSearch', 'poStatus', 'poDate');
+        $poFilters = compact('poSearch', 'poStatus', 'poDate', 'poPerPage');
 
         // Procurement Audit Logs
         $procurementAuditLogs = ProcurementAuditLog::with('user')
@@ -197,6 +202,7 @@ class ProcurementController extends Controller implements HasMiddleware
             'poMetrics',
             'poStatusOptions',
             'poFilters',
+            'poPerPage',
             'procurementAuditLogs',
             'supplierFilter'
         ));

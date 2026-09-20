@@ -1289,7 +1289,12 @@
                                             Purchase Order Pipeline
                                             <span class="ml-1 text-xs font-normal text-neutral-500">({{ $purchaseOrders->total() }})</span>
                                         </h3>
-                                        <p class="text-[11px] text-neutral-500">Orders across approval, fulfillment, and receiving</p>
+                                        <p class="text-[11px] text-neutral-500">
+                                            Orders across approval, fulfillment, and receiving
+                                            @if($purchaseOrders->total() > 0)
+                                                · Showing {{ $purchaseOrders->firstItem() }}–{{ $purchaseOrders->lastItem() }} of {{ $purchaseOrders->total() }}
+                                            @endif
+                                        </p>
                                     </div>
                                 </div>
                                 @can(\App\Enums\Permission::ViewInventory->value)
@@ -1298,7 +1303,7 @@
                             </div>
 
                             <form method="GET" action="{{ route('inventory.purchases') }}#purchase-orders" class="mt-3 space-y-2">
-                                <div class="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_auto_auto_auto]">
+                                <div class="grid gap-2 sm:grid-cols-[minmax(10rem,1fr)_auto_auto_auto_auto]">
                                     <label class="sr-only" for="po-search">Search purchase orders</label>
                                     <input id="po-search" name="po_search" type="search" value="{{ $poFilters['poSearch'] }}" placeholder="Search PO, item, supplier..." class="min-h-9 min-w-0 rounded-md border border-neutral-300 px-3 text-sm shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30">
                                     <label class="sr-only" for="po-status">Status</label>
@@ -1314,9 +1319,16 @@
                                         <option value="90" @selected($poFilters['poDate'] === '90')>Last 90 days</option>
                                         <option value="overdue" @selected($poFilters['poDate'] === 'overdue')>Overdue delivery</option>
                                     </select>
+                                    <label class="sr-only" for="po-per-page">Per page</label>
+                                    <select id="po-per-page" name="po_per_page" class="min-h-9 rounded-md border border-neutral-300 px-2 text-xs text-neutral-700 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                                        <option value="3" @selected($poPerPage === 3)>3 per page</option>
+                                        <option value="5" @selected($poPerPage === 5)>5 per page</option>
+                                        <option value="10" @selected($poPerPage === 10)>10 per page</option>
+                                        <option value="25" @selected($poPerPage === 25)>25 per page</option>
+                                    </select>
                                     <div class="flex gap-1.5">
                                         <x-ui.button type="submit" size="sm">Apply</x-ui.button>
-                                        @if($poFilters['poSearch'] !== '' || $poFilters['poStatus'] !== '' || $poFilters['poDate'] !== '' || $supplierFilter)
+                                        @if($poFilters['poSearch'] !== '' || $poFilters['poStatus'] !== '' || $poFilters['poDate'] !== '' || $supplierFilter || $poPerPage !== 5)
                                             <x-ui.button variant="ghost" size="sm" :href="route('inventory.purchases').'#purchase-orders'">Clear</x-ui.button>
                                         @endif
                                     </div>
@@ -1640,7 +1652,16 @@
                             @endforelse
                         </div>
 
-                        @if($purchaseOrders->hasPages())<footer class="border-t border-neutral-200 bg-neutral-50 px-4 py-3 sm:px-5 dark:border-neutral-800 dark:bg-neutral-800/60">{{ $purchaseOrders->onEachSide(1)->links() }}</footer>@endif
+                        <footer class="border-t border-neutral-200 bg-neutral-50 px-4 py-3 sm:px-5 dark:border-neutral-800 dark:bg-neutral-800/60">
+                            @if($purchaseOrders->hasPages())
+                                {{ $purchaseOrders->fragment('purchase-orders')->onEachSide(1)->links() }}
+                            @else
+                                <div class="flex items-center justify-between text-xs text-neutral-500">
+                                    <span>Showing all {{ $purchaseOrders->total() }} {{ \Illuminate\Support\Str::plural('order', $purchaseOrders->total()) }}</span>
+                                    <span class="font-medium text-neutral-400">Page 1 of 1</span>
+                                </div>
+                            @endif
+                        </footer>
                     </section>
                 </div>
 

@@ -1547,4 +1547,82 @@ class PurchaseOrderFifoWorkflowTest extends TestCase
         $response->assertSee('Total Received Goods Value:');
         $response->assertSee('Original Purchase Order Total:');
     }
+
+    /**
+     * 25. Purchase Order Pipeline Pagination & Height Limitation
+     */
+    public function test_purchase_order_pipeline_is_paginated_and_limits_vertical_height(): void
+    {
+        $supplier = Supplier::create([
+            'name' => 'Metro Pagination Med Supply',
+            'status' => 'active',
+            'accreditation_status' => \App\Enums\SupplierAccreditationStatus::Approved,
+        ]);
+
+        $item = InventoryItem::create([
+            'name' => 'Gauze Sponge Pack',
+            'sku' => 'GZ-PAG-01',
+            'quantity_on_hand' => 50,
+            'unit' => 'piece',
+            'status' => 'active',
+        ]);
+
+        // Create 8 purchase orders (matching user scenario)
+        for ($i = 1; $i <= 8; $i++) {
+            $poNum = sprintf('PO-PAGINATED-%03d', $i);
+            $po = PurchaseOrder::create([
+                'po_number' => $poNum,
+                'supplier_id' => $supplier->id,
+                'status' => 'approved',
+                'requested_at' => Carbon::now()->subMinutes(10 - $i),
+                'total_amount' => 1000 * $i,
+            ]);
+
+            PurchaseOrderLine::create([
+                'purchase_order_id' => $po->id,
+                'item_id' => $item->id,
+                'line_number' => 1,
+                'purchase_unit' => 'pack',
+                'conversion_factor' => 100,
+                'ordered_quantity' => 2,
+                'received_quantity' => 0,
+                'unit_price' => 500.00,
+                'total_line_amount' => 1000.00,
+                'line_status' => 'ordered',
+            ]);
+        }
+
+        // Page 1 with default 5 per page
+        $resPage1 = $this->actingAs($this->manager)
+            ->get(route('inventory.purchases'));
+
+        $resPage1->assertOk();
+        $resPage1->assertSee('Purchase Order Pipeline');
+        $resPage1->assertSee('(8)');
+        $resPage1->assertSee('Showing 1–5 of 8');
+
+        // Verify latest 5 orders are visible on page 1 (PO-008 down to PO-004)
+        $resPage1->assertSee('PO-PAGINATED-008');
+        $resPage1->assertSee('PO-PAGINATED-004');
+        // Older orders are paginated to page 2
+        $resPage1->assertDontSee('PO-PAGINATED-001');
+
+        // Page 2
+        $resPage2 = $this->actingAs($this->manager)
+            ->get(route('inventory.purchases', ['po_page' => 2]));
+
+        $resPage2->assertOk();
+        $resPage2->assertSee('Showing 6–8 of 8');
+        $resPage2->assertSee('PO-PAGINATED-001');
+        $resPage2->assertDontSee('PO-PAGINATED-008');
+
+        // Custom per_page = 10 displays all 8 on single page
+        $resAll = $this->actingAs($this->manager)
+            ->get(route('inventory.purchases', ['po_per_page' => 10]));
+
+        $resAll->assertOk();
+        $resAll->assertSee('PO-PAGINATED-008');
+        $resAll->assertSee('PO-PAGINATED-001');
+    }
 }
+
