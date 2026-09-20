@@ -226,38 +226,46 @@ class InspectionAcceptanceService
                     continue;
                 }
 
-                // 1. Decrement quarantined stock
-                $this->automationService->adjustQuarantinedStock($line->item_id, $quarantineLoc->id, $line->item_batch_id, -$qty);
+                $baseQty = $line->calculatedReceivedBaseQuantity();
 
-                // 2. Increment active receiving staging
-                $this->automationService->adjustStockLevel($line->item_id, $stagingLoc->id, $line->item_batch_id, $qty);
+                // 1. Decrement quarantined stock by base quantity
+                $this->automationService->adjustQuarantinedStock($line->item_id, $quarantineLoc->id, $line->item_batch_id, -$baseQty);
+
+                // 2. Increment active receiving staging by base quantity
+                $this->automationService->adjustStockLevel($line->item_id, $stagingLoc->id, $line->item_batch_id, $baseQty);
 
                 // 3. Mark batch active if present
                 if ($line->item_batch_id) {
                     ItemBatch::where('id', $line->item_batch_id)->update(['status' => 'active']);
                 }
 
-                // 4. Update PO line received quantity
+                // 4. Ensure PO line reflects received quantity without double counting
                 if ($line->po_line_id) {
                     $poLine = $line->purchaseOrderLine;
-                    if ($poLine) {
-                        $poLine->received_quantity = (int) $poLine->received_quantity + $qty;
+                    if ($poLine && (int) $poLine->received_quantity < $qty) {
+                        $poLine->received_quantity = $qty;
                         $poLine->save();
                     }
                 }
 
                 // 5. Post immutable StockMovement
+                $pUnit = $line->purchase_unit ?: $line->item->unit ?: 'unit';
+                $bUnit = $line->item->unit ?: 'unit';
+                $unitDisplay = $baseQty !== $qty
+                    ? "{$qty} {$pUnit} ({$baseQty} {$bUnit})"
+                    : "{$baseQty} {$bUnit}";
+
                 StockMovement::create([
                     'item_id' => $line->item_id,
                     'item_batch_id' => $line->item_batch_id,
                     'movement_type' => MovementType::StockIn,
-                    'quantity' => $qty,
+                    'quantity' => $baseQty,
                     'unit_cost' => $line->unit_cost ?? $line->item->unit_cost,
                     'from_location_id' => $quarantineLoc->id,
                     'to_location_id' => $stagingLoc->id,
                     'reference_type' => InspectionAcceptanceReport::class,
                     'reference_id' => $locked->id,
-                    'remarks' => "IAR Acceptance {$locked->iar_number} signed by Property Custodian {$custodian->name}",
+                    'remarks' => "IAR Acceptance {$locked->iar_number} signed by Property Custodian {$custodian->name}: {$unitDisplay}",
                     'moved_at' => now(),
                     'user_id' => $custodian->id,
                 ]);
@@ -265,6 +273,9 @@ class InspectionAcceptanceService
                 $line->accepted_quantity = $qty;
                 $line->status = 'accepted';
                 $line->save();
+
+                // 6. Synchronize cached item totals
+                $this->automationService->syncItemTotals($line->item);
             }
 
             // Update PO status if fully fulfilled

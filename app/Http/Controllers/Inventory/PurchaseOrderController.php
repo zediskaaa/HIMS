@@ -112,54 +112,91 @@ class PurchaseOrderController extends Controller implements HasMiddleware
         }
 
         DB::transaction(function () use ($purchaseOrder, $fallbackLocationId): void {
-            if ($purchaseOrder->lines()->exists()) {
-                foreach ($purchaseOrder->lines as $line) {
+            $po = PurchaseOrder::lockForUpdate()->with(['lines.item', 'item'])->findOrFail($purchaseOrder->id);
+
+            if ($po->isFullyReceived() || $po->status === 'received' || $po->status === PurchaseOrderStatus::Fulfilled->value) {
+                return;
+            }
+
+            if ($po->lines()->exists()) {
+                foreach ($po->lines as $line) {
                     $item = $line->item;
                     $locId = $item->default_location_id ?? $fallbackLocationId;
+                    $item->ensureStockLevelExists($locId);
+
                     $qtyToReceive = $line->remainingQuantity() > 0 ? $line->remainingQuantity() : $line->ordered_quantity;
+                    if ($qtyToReceive <= 0) {
+                        continue;
+                    }
+
+                    $conversionFactor = $line->conversionFactor();
+                    if ($conversionFactor <= 1.0 && filled($line->purchase_unit)) {
+                        $conversionFactor = $item->conversionFactorFor($line->purchase_unit);
+                    }
+                    $baseQtyToReceive = (int) round($qtyToReceive * $conversionFactor);
+
+                    $pUnit = $line->purchase_unit ?: $item->unit ?: 'unit';
+                    $bUnit = $item->unit ?: 'unit';
+                    $unitDisplay = $conversionFactor > 1.0
+                        ? "{$qtyToReceive} {$pUnit} ({$baseQtyToReceive} {$bUnit})"
+                        : "{$baseQtyToReceive} {$bUnit}";
 
                     $this->automationService->recordMovement([
                         'item_id' => $item->id,
                         'movement_type' => MovementType::StockIn,
-                        'quantity' => $qtyToReceive,
+                        'quantity' => $baseQtyToReceive,
                         'to_location_id' => $locId,
-                        'unit_cost' => $line->unit_price ?? $item->unit_cost,
-                        'remarks' => "Received against {$purchaseOrder->po_number} Line #{$line->line_number}",
-                    ], auth()->id(), $purchaseOrder);
+                        'unit_cost' => ($line->unit_price && $conversionFactor > 0) ? round($line->unit_price / $conversionFactor, 4) : $item->unit_cost,
+                        'remarks' => "Received {$unitDisplay} against {$po->po_number} Line #{$line->line_number}",
+                    ], auth()->id(), $po);
 
                     $line->received_quantity += $qtyToReceive;
-                    $line->line_status = 'received';
+                    $line->line_status = $line->remainingQuantity() === 0 ? 'received' : 'partially_received';
                     $line->save();
                 }
             } else {
                 // Legacy single-item fallback
-                $item = $purchaseOrder->item;
+                $item = $po->item;
                 $locId = $item->default_location_id ?? $fallbackLocationId;
+                $item->ensureStockLevelExists($locId);
+
+                $qtyToReceive = (int) $po->quantity;
+                $conversionFactor = $po->conversionFactor();
+                if ($conversionFactor <= 1.0 && filled($po->purchase_unit)) {
+                    $conversionFactor = $item->conversionFactorFor($po->purchase_unit);
+                }
+                $baseQtyToReceive = (int) round($qtyToReceive * $conversionFactor);
+
+                $pUnit = $po->purchase_unit ?: $item->unit ?: 'unit';
+                $bUnit = $item->unit ?: 'unit';
+                $unitDisplay = $conversionFactor > 1.0
+                    ? "{$qtyToReceive} {$pUnit} ({$baseQtyToReceive} {$bUnit})"
+                    : "{$baseQtyToReceive} {$bUnit}";
 
                 $this->automationService->recordMovement([
                     'item_id' => $item->id,
                     'movement_type' => MovementType::StockIn,
-                    'quantity' => (int) $purchaseOrder->quantity,
+                    'quantity' => $baseQtyToReceive,
                     'to_location_id' => $locId,
-                    'unit_cost' => $purchaseOrder->unit_cost ?? $item->unit_cost,
-                    'remarks' => 'Received against '.$purchaseOrder->po_number,
-                ], auth()->id(), $purchaseOrder);
+                    'unit_cost' => ($po->unit_cost && $conversionFactor > 0) ? round($po->unit_cost / $conversionFactor, 4) : $item->unit_cost,
+                    'remarks' => "Received {$unitDisplay} against {$po->po_number}",
+                ], auth()->id(), $po);
             }
 
-            $purchaseOrder->status = PurchaseOrderStatus::Received->value;
-            $purchaseOrder->received_at = now();
-            $purchaseOrder->save();
+            $po->status = PurchaseOrderStatus::Received->value;
+            $po->received_at = now();
+            $po->save();
 
             // Record fulfillment in budget
-            $this->budgetService->recordFulfillmentSpent($purchaseOrder, (float) $purchaseOrder->total_amount);
+            $this->budgetService->recordFulfillmentSpent($po, (float) $po->total_amount);
 
             $this->auditService->record(
                 auth()->user(),
                 'PurchaseOrder',
-                $purchaseOrder->id,
+                $po->id,
                 'received_purchase_order',
                 null,
-                ['po_number' => $purchaseOrder->po_number, 'received_at' => now()->toIso8601String()]
+                ['po_number' => $po->po_number, 'received_at' => now()->toIso8601String()]
             );
         });
 

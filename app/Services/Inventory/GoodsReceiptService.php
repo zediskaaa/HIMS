@@ -150,6 +150,12 @@ class GoodsReceiptService
                     ]);
                 }
 
+                $conversionFactor = $poLine->conversionFactor();
+                if ($conversionFactor <= 1.0 && filled($poLine->purchase_unit)) {
+                    $conversionFactor = $item->conversionFactorFor($poLine->purchase_unit);
+                }
+                $receivedBaseQty = (int) round($receivedQty * $conversionFactor);
+
                 $batch = null;
                 if ($batchNumber) {
                     $batch = ItemBatch::firstOrCreate(
@@ -159,8 +165,8 @@ class GoodsReceiptService
                             'manufactured_date' => $manufacturedDate,
                             'expiry_date' => $expiryDate,
                             'received_at' => now()->toDateString(),
-                            'unit_cost' => $poLine->unit_price ?? $item->unit_cost,
-                            'initial_quantity' => $receivedQty,
+                            'unit_cost' => ($poLine->unit_price && $conversionFactor > 0) ? round($poLine->unit_price / $conversionFactor, 4) : $item->unit_cost,
+                            'initial_quantity' => $receivedBaseQty,
                             'status' => 'quarantine',
                         ]
                     );
@@ -171,9 +177,12 @@ class GoodsReceiptService
                     'po_line_id' => $poLine->id,
                     'item_id' => $item->id,
                     'item_batch_id' => $batch?->id,
+                    'purchase_unit' => $poLine->purchase_unit,
+                    'conversion_factor' => $conversionFactor,
                     'ordered_quantity' => $poLine->ordered_quantity,
                     'shipped_quantity' => $receivedQty,
                     'received_quantity' => $receivedQty,
+                    'received_base_quantity' => $receivedBaseQty,
                     'quarantined_quantity' => $receivedQty,
                     'accepted_quantity' => 0,
                     'rejected_quantity' => 0,
@@ -200,21 +209,27 @@ class GoodsReceiptService
                     ]);
                 }
 
-                // Place into quarantine stock balance
-                $this->automationService->adjustQuarantinedStock($item->id, $quarantineLocation->id, $batch?->id, $receivedQty);
+                // Place into quarantine stock balance using base units
+                $this->automationService->adjustQuarantinedStock($item->id, $quarantineLocation->id, $batch?->id, $receivedBaseQty);
+
+                $pUnit = $poLine->purchase_unit ?: $item->unit ?: 'unit';
+                $bUnit = $item->unit ?: 'unit';
+                $unitDisplay = $conversionFactor > 1.0
+                    ? "{$receivedQty} {$pUnit} ({$receivedBaseQty} {$bUnit})"
+                    : "{$receivedBaseQty} {$bUnit}";
 
                 // Record movement to immutable ledger
                 StockMovement::create([
                     'item_id' => $item->id,
                     'item_batch_id' => $batch?->id,
                     'movement_type' => MovementType::Quarantine,
-                    'quantity' => $receivedQty,
-                    'unit_cost' => $poLine->unit_price ?? $item->unit_cost,
+                    'quantity' => $receivedBaseQty,
+                    'unit_cost' => ($poLine->unit_price && $conversionFactor > 0) ? round($poLine->unit_price / $conversionFactor, 4) : $item->unit_cost,
                     'from_location_id' => null,
                     'to_location_id' => $quarantineLocation->id,
                     'reference_type' => GoodsReceiptNote::class,
                     'reference_id' => $grn->id,
-                    'remarks' => "Inbound Dock Receipt {$grn->grn_number} against PO {$po->po_number} Line #{$poLine->line_number}",
+                    'remarks' => "Inbound Dock Receipt {$grn->grn_number} against PO {$po->po_number} Line #{$poLine->line_number}: {$unitDisplay}",
                     'moved_at' => now(),
                     'user_id' => $actor->id,
                 ]);

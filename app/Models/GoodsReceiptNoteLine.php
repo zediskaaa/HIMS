@@ -18,9 +18,12 @@ class GoodsReceiptNoteLine extends Model
         'po_line_id',
         'item_id',
         'item_batch_id',
+        'purchase_unit',
+        'conversion_factor',
         'ordered_quantity',
         'shipped_quantity',
         'received_quantity',
+        'received_base_quantity',
         'accepted_quantity',
         'rejected_quantity',
         'quarantined_quantity',
@@ -36,9 +39,11 @@ class GoodsReceiptNoteLine extends Model
     ];
 
     protected $casts = [
+        'conversion_factor' => 'decimal:4',
         'ordered_quantity' => 'integer',
         'shipped_quantity' => 'integer',
         'received_quantity' => 'integer',
+        'received_base_quantity' => 'integer',
         'accepted_quantity' => 'integer',
         'rejected_quantity' => 'integer',
         'quarantined_quantity' => 'integer',
@@ -46,6 +51,22 @@ class GoodsReceiptNoteLine extends Model
         'expiry_date' => 'date',
         'manufactured_date' => 'date',
     ];
+
+    public function conversionFactor(): float
+    {
+        $factor = (float) ($this->conversion_factor ?? 1);
+
+        return $factor > 0 ? $factor : 1.0;
+    }
+
+    public function calculatedReceivedBaseQuantity(): int
+    {
+        if ($this->received_base_quantity > 0) {
+            return (int) $this->received_base_quantity;
+        }
+
+        return (int) round($this->received_quantity * $this->conversionFactor());
+    }
 
     public function goodsReceiptNote(): BelongsTo
     {

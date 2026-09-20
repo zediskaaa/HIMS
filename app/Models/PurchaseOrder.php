@@ -21,6 +21,8 @@ class PurchaseOrder extends Model
         'cost_center_id',
         'item_id',
         'quantity',
+        'purchase_unit',
+        'conversion_factor',
         'unit_cost',
         'total_amount',
         'currency',
@@ -49,6 +51,7 @@ class PurchaseOrder extends Model
 
     protected $casts = [
         'total_amount' => 'decimal:2',
+        'conversion_factor' => 'decimal:4',
         'total_encumbered_amount' => 'decimal:2',
         'exchange_rate' => 'decimal:4',
         'penalty_clause_rate' => 'decimal:4',
@@ -135,5 +138,17 @@ class PurchaseOrder extends Model
         }
 
         return $this->status === 'received' || $this->status === PurchaseOrderStatus::Fulfilled->value;
+    }
+
+    public function conversionFactor(): float
+    {
+        $factor = (float) ($this->conversion_factor ?? 1);
+
+        return $factor > 0 ? $factor : 1.0;
+    }
+
+    public function orderedBaseQuantity(): int
+    {
+        return (int) round($this->quantity * $this->conversionFactor());
     }
 }

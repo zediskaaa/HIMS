@@ -63,12 +63,15 @@ class QualityControlService
                 ->where('is_receiving_staging', true)
                 ->first() ?? $targetLocation;
 
+            $conversionFactor = $grnLine->conversionFactor();
+            $acceptedBaseQuantity = (int) round($acceptedQuantity * $conversionFactor);
+
             // 1. Decrement quarantined balance
-            $this->automationService->adjustQuarantinedStock($item->id, $quarantineLocId, $qi->item_batch_id, -$acceptedQuantity);
+            $this->automationService->adjustQuarantinedStock($item->id, $quarantineLocId, $qi->item_batch_id, -$acceptedBaseQuantity);
 
             // 2. Release into receiving staging. Physical put-away happens only
             // after the generated task is scan-validated and completed.
-            $this->automationService->adjustStockLevel($item->id, $receivingStaging->id, $qi->item_batch_id, $acceptedQuantity);
+            $this->automationService->adjustStockLevel($item->id, $receivingStaging->id, $qi->item_batch_id, $acceptedBaseQuantity);
 
             // 3. Flip batch to active if batch exists
             if ($qi->item_batch_id) {
@@ -80,17 +83,23 @@ class QualityControlService
             }
 
             // 4. Record QualityRelease movement in immutable ledger
+            $pUnit = $grnLine->purchase_unit ?: $item->unit ?: 'unit';
+            $bUnit = $item->unit ?: 'unit';
+            $unitDisplay = $acceptedBaseQuantity !== $acceptedQuantity
+                ? "{$acceptedQuantity} {$pUnit} ({$acceptedBaseQuantity} {$bUnit})"
+                : "{$acceptedBaseQuantity} {$bUnit}";
+
             StockMovement::create([
                 'item_id' => $item->id,
                 'item_batch_id' => $qi->item_batch_id,
                 'movement_type' => MovementType::QualityRelease,
-                'quantity' => $acceptedQuantity,
-                'unit_cost' => $grnLine->unit_cost ?? $item->unit_cost,
+                'quantity' => $acceptedBaseQuantity,
+                'unit_cost' => ($grnLine->unit_cost && $conversionFactor > 0) ? round($grnLine->unit_cost / $conversionFactor, 4) : $item->unit_cost,
                 'from_location_id' => $quarantineLocId,
                 'to_location_id' => $receivingStaging->id,
                 'reference_type' => QualityInspection::class,
                 'reference_id' => $qi->id,
-                'remarks' => "QC Release by {$inspector->name}. Findings: " . ($findings ?? 'Conforms to standards'),
+                'remarks' => "QC Release by {$inspector->name}: {$unitDisplay}. Findings: " . ($findings ?? 'Conforms to standards'),
                 'moved_at' => now(),
                 'user_id' => $inspector->id,
             ]);
@@ -180,11 +189,14 @@ class QualityControlService
                 ]);
             }
 
+            $conversionFactor = $grnLine->conversionFactor();
+            $rejectedBaseQuantity = (int) round($rejectedQuantity * $conversionFactor);
+
             // 1. Decrement quarantined balance
-            $this->automationService->adjustQuarantinedStock($item->id, $quarantineLocId, $qi->item_batch_id, -$rejectedQuantity);
+            $this->automationService->adjustQuarantinedStock($item->id, $quarantineLocId, $qi->item_batch_id, -$rejectedBaseQuantity);
 
             // 2. Increment blocked balance
-            $this->automationService->adjustBlockedStock($item->id, $quarantineLocId, $qi->item_batch_id, $rejectedQuantity);
+            $this->automationService->adjustBlockedStock($item->id, $quarantineLocId, $qi->item_batch_id, $rejectedBaseQuantity);
 
             // 3. Mark batch as rejected if batch exists
             if ($qi->item_batch_id) {
@@ -197,17 +209,23 @@ class QualityControlService
             }
 
             // 4. Record QualityReject movement in ledger
+            $pUnit = $grnLine->purchase_unit ?: $item->unit ?: 'unit';
+            $bUnit = $item->unit ?: 'unit';
+            $unitDisplay = $rejectedBaseQuantity !== $rejectedQuantity
+                ? "{$rejectedQuantity} {$pUnit} ({$rejectedBaseQuantity} {$bUnit})"
+                : "{$rejectedBaseQuantity} {$bUnit}";
+
             StockMovement::create([
                 'item_id' => $item->id,
                 'item_batch_id' => $qi->item_batch_id,
                 'movement_type' => MovementType::QualityReject,
-                'quantity' => $rejectedQuantity,
-                'unit_cost' => $grnLine->unit_cost ?? $item->unit_cost,
+                'quantity' => $rejectedBaseQuantity,
+                'unit_cost' => ($grnLine->unit_cost && $conversionFactor > 0) ? round($grnLine->unit_cost / $conversionFactor, 4) : $item->unit_cost,
                 'from_location_id' => $quarantineLocId,
                 'to_location_id' => null,
                 'reference_type' => QualityInspection::class,
                 'reference_id' => $qi->id,
-                'remarks' => "QC Rejection: {$rejectionReason}",
+                'remarks' => "QC Rejection: {$unitDisplay}. Reason: {$rejectionReason}",
                 'moved_at' => now(),
                 'user_id' => $inspector->id,
             ]);

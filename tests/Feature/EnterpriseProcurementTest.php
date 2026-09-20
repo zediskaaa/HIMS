@@ -106,14 +106,14 @@ class EnterpriseProcurementTest extends TestCase
         return [$costCenter, $budget, $manager];
     }
 
-    private function createItem(string $name = 'Surgical Scalpel #10', string $sku = 'MED-SCALP-01'): InventoryItem
+    private function createItem(string $name = 'Surgical Scalpel #10', string $sku = 'MED-SCALP-01', int $initialStock = 50): InventoryItem
     {
         return InventoryItem::create([
             'name' => $name,
             'sku' => $sku,
             'unit' => 'box',
             'unit_cost' => 150.00,
-            'quantity_on_hand' => 50,
+            'quantity_on_hand' => $initialStock,
             'reorder_point' => 10,
             'status' => 'active',
         ]);
@@ -736,8 +736,8 @@ class EnterpriseProcurementTest extends TestCase
         $location = $this->createStorageLocation();
         $supplier = $this->createEligibleSupplier();
 
-        $itemA = $this->createItem('Item Alpha', 'SKU-ALPHA-01');
-        $itemB = $this->createItem('Item Beta', 'SKU-BETA-01');
+        $itemA = $this->createItem('Item Alpha', 'SKU-ALPHA-01', 0);
+        $itemB = $this->createItem('Item Beta', 'SKU-BETA-01', 0);
 
         $initialStockA = $itemA->quantity_on_hand;
         $initialStockB = $itemB->quantity_on_hand;

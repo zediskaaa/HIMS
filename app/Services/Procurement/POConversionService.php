@@ -50,6 +50,11 @@ class POConversionService
 
             $unitCost = $terms['unit_cost'];
             $totalAmount = round($quantity * $unitCost, 2);
+            $purchaseUnit = $data['purchase_unit'] ?? $terms['unit'] ?? $item->unit ?? 'unit';
+            $conversionFactor = (float) ($data['conversion_factor'] ?? $item->conversionFactorFor($purchaseUnit));
+            if ($conversionFactor <= 0) {
+                $conversionFactor = 1.0;
+            }
 
             $po = PurchaseOrder::create([
                 'po_number' => $this->nextPurchaseOrderNumber(),
@@ -57,6 +62,8 @@ class POConversionService
                 'cost_center_id' => $data['cost_center_id'],
                 'item_id' => $item->id,
                 'quantity' => $quantity,
+                'purchase_unit' => $purchaseUnit,
+                'conversion_factor' => $conversionFactor,
                 'unit_cost' => $unitCost,
                 'total_amount' => $totalAmount,
                 'currency' => $terms['currency'],
@@ -77,6 +84,8 @@ class POConversionService
             $po->lines()->create([
                 'item_id' => $item->id,
                 'line_number' => 1,
+                'purchase_unit' => $purchaseUnit,
+                'conversion_factor' => $conversionFactor,
                 'ordered_quantity' => $quantity,
                 'received_quantity' => 0,
                 'invoiced_quantity' => 0,
@@ -146,6 +155,7 @@ class POConversionService
 
         return [
             'unit_cost' => $unitCost,
+            'unit' => (string) ($supplierProduct?->unit ?? $item->unit ?? 'unit'),
             'currency' => (string) ($currentPrice?->currency ?? 'PHP'),
             'minimum_order_quantity' => max(
                 1,
@@ -208,11 +218,17 @@ class POConversionService
             $lineNumber = 1;
             if ($awardedQuote->lines()->exists()) {
                 foreach ($awardedQuote->lines as $qLine) {
+                    $itemObj = $qLine->rfqLineItem?->item ?? $po->item;
+                    $pUnit = $qLine->rfqLineItem?->uom ?: $itemObj?->unit ?: 'unit';
+                    $cFactor = $itemObj?->conversionFactorFor($pUnit) ?? 1.0;
+
                     $po->lines()->create([
                         'pr_line_id' => $qLine->rfqLineItem?->pr_line_id,
                         'quote_line_id' => $qLine->id,
-                        'item_id' => $qLine->rfqLineItem?->item_id ?? $po->item_id,
+                        'item_id' => $itemObj?->id ?? $po->item_id,
                         'line_number' => $lineNumber++,
+                        'purchase_unit' => $pUnit,
+                        'conversion_factor' => $cFactor,
                         'ordered_quantity' => (int) $qLine->offered_quantity,
                         'received_quantity' => 0,
                         'invoiced_quantity' => 0,
@@ -226,6 +242,8 @@ class POConversionService
                 $po->lines()->create([
                     'item_id' => $po->item_id,
                     'line_number' => 1,
+                    'purchase_unit' => $po->purchase_unit ?? $po->item?->unit ?? 'unit',
+                    'conversion_factor' => $po->conversion_factor ?? 1.0,
                     'ordered_quantity' => $po->quantity,
                     'received_quantity' => 0,
                     'invoiced_quantity' => 0,
@@ -295,10 +313,15 @@ class POConversionService
 
             $lineNumber = 1;
             foreach ($pr->lines as $prLine) {
+                $pUnit = $prLine->uom ?: $prLine->item?->unit ?: 'unit';
+                $cFactor = $prLine->item?->conversionFactorFor($pUnit) ?? 1.0;
+
                 $po->lines()->create([
                     'pr_line_id' => $prLine->id,
                     'item_id' => $prLine->item_id,
                     'line_number' => $lineNumber++,
+                    'purchase_unit' => $pUnit,
+                    'conversion_factor' => $cFactor,
                     'ordered_quantity' => $prLine->quantity,
                     'received_quantity' => 0,
                     'invoiced_quantity' => 0,

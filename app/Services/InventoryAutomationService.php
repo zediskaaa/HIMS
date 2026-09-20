@@ -47,13 +47,15 @@ class InventoryAutomationService
     {
         return DB::transaction(function () use ($validated, $userId, $reference): Collection {
             $item = InventoryItem::lockForUpdate()->findOrFail($validated['item_id']);
+            $fromLocationId = $validated['from_location_id'] ?? null;
+            $toLocationId = $validated['to_location_id'] ?? null;
+            $item->ensureStockLevelExists($toLocationId ?? $fromLocationId);
+
             $type = $validated['movement_type'] instanceof MovementType
                 ? $validated['movement_type']
                 : MovementType::from($validated['movement_type']);
 
             $quantity = (int) $validated['quantity'];
-            $fromLocationId = $validated['from_location_id'] ?? null;
-            $toLocationId = $validated['to_location_id'] ?? null;
             $batchId = $validated['item_batch_id'] ?? null;
 
             $this->assertLocationsPresent($type, $fromLocationId, $toLocationId);
@@ -190,7 +192,7 @@ class InventoryAutomationService
      */
     public function adjustStockLevel(int $itemId, int $locationId, ?int $batchId, int $delta): ItemStockLevel
     {
-        $level = ItemStockLevel::firstOrCreate(
+        $level = ItemStockLevel::lockForUpdate()->firstOrCreate(
             [
                 'item_id' => $itemId,
                 'storage_location_id' => $locationId,
@@ -207,7 +209,7 @@ class InventoryAutomationService
 
     public function adjustQuarantinedStock(int $itemId, int $locationId, ?int $batchId, int $delta): ItemStockLevel
     {
-        $level = ItemStockLevel::firstOrCreate(
+        $level = ItemStockLevel::lockForUpdate()->firstOrCreate(
             [
                 'item_id' => $itemId,
                 'storage_location_id' => $locationId,
@@ -224,7 +226,7 @@ class InventoryAutomationService
 
     public function adjustBlockedStock(int $itemId, int $locationId, ?int $batchId, int $delta): ItemStockLevel
     {
-        $level = ItemStockLevel::firstOrCreate(
+        $level = ItemStockLevel::lockForUpdate()->firstOrCreate(
             [
                 'item_id' => $itemId,
                 'storage_location_id' => $locationId,

@@ -165,6 +165,122 @@ class InventoryItem extends Model
         return $this->hasMany(WarehouseTask::class, 'item_id');
     }
 
+    public function unitConversions(): HasMany
+    {
+        return $this->hasMany(ItemUnitConversion::class, 'item_id');
+    }
+
+    /**
+     * Resolve the conversion multiplier (base units per purchase unit).
+     *
+     * Example: If 1 pack = 100 pieces, conversionFactorFor('pack') returns 100.0.
+     */
+    public function conversionFactorFor(?string $purchaseUnit): float
+    {
+        if (blank($purchaseUnit)) {
+            return 1.0;
+        }
+
+        $cleanUnit = strtolower(trim($purchaseUnit));
+        $baseUnit = strtolower(trim($this->unit ?? 'unit'));
+
+        // Direct identity check (or standard piece/unit identity)
+        if ($cleanUnit === $baseUnit) {
+            return 1.0;
+        }
+
+        $pieceSynonyms = ['unit', 'units', 'piece', 'pieces', 'pc', 'pcs', 'each'];
+        if (in_array($cleanUnit, $pieceSynonyms, true) && in_array($baseUnit, $pieceSynonyms, true)) {
+            return 1.0;
+        }
+
+        // 1. Explicit item unit conversion records
+        if ($this->relationLoaded('unitConversions')) {
+            $conv = $this->unitConversions->first(fn ($c) => strtolower(trim($c->purchase_unit)) === $cleanUnit);
+            if ($conv && (float) $conv->conversion_factor > 0) {
+                return (float) $conv->conversion_factor;
+            }
+        } else {
+            $conv = $this->unitConversions()
+                ->whereRaw('LOWER(purchase_unit) = ?', [$cleanUnit])
+                ->value('conversion_factor');
+            if ($conv && (float) $conv > 0) {
+                return (float) $conv;
+            }
+        }
+
+        // 2. Check associated supplier product pack size/unit
+        $supplierProducts = $this->relationLoaded('supplierProducts')
+            ? $this->supplierProducts
+            : $this->supplierProducts()->get();
+
+        foreach ($supplierProducts as $sp) {
+            if (strtolower(trim((string) $sp->unit)) === $cleanUnit && filled($sp->pack_size)) {
+                $mult = $this->extractPackagingMultiplier($sp->pack_size);
+                if ($mult && $mult > 0) {
+                    return $mult;
+                }
+            }
+        }
+
+        // 3. Fallback: parse item name or packaging pattern (e.g. "Pack of 100", "Box of 50")
+        $nameMultiplier = $this->extractPackagingMultiplier($this->name);
+        if ($nameMultiplier && $nameMultiplier > 0) {
+            if (in_array($cleanUnit, ['pack', 'packs', 'box', 'boxes', 'bottle', 'bottles', 'case', 'cases', 'carton', 'cartons', 'set', 'sets', 'vial', 'vials'], true)) {
+                return $nameMultiplier;
+            }
+        }
+
+        return 1.0;
+    }
+
+    /**
+     * Extract numeric multiplier from packaging strings like "Pack of 100", "Box of 50", "(Pack of 100)", "100/box".
+     */
+    public function extractPackagingMultiplier(?string $text): ?float
+    {
+        if (blank($text)) {
+            return null;
+        }
+
+        if (preg_match('/(?:pack|box|case|carton|tray|bottle|set|vial|bag)\s+(?:of\s+)?(\d+(?:\.\d+)?)/i', $text, $matches)) {
+            return (float) $matches[1];
+        }
+
+        if (preg_match('/(\d+(?:\.\d+)?)\s*(?:pcs|units?|pieces?|tablets?|capsules?)?\s*\/\s*(?:pack|box|case|carton|pk|bx)/i', $text, $matches)) {
+            return (float) $matches[1];
+        }
+
+        if (preg_match('/^\s*(\d+(?:\.\d+)?)\s*$/', $text, $matches)) {
+            return (float) $matches[1];
+        }
+
+        return null;
+    }
+
+    /**
+     * Safeguard existing stock balance into an ItemStockLevel row if not already present.
+     */
+    public function ensureStockLevelExists(?int $locationId = null): void
+    {
+        $levelsSum = (int) $this->stockLevels()->sum('quantity');
+        if ($levelsSum === 0 && (int) $this->quantity_on_hand > 0) {
+            $locId = $locationId ?? $this->default_location_id ?? StorageLocation::query()->orderBy('id')->value('id');
+            if ($locId) {
+                $level = ItemStockLevel::firstOrCreate(
+                    [
+                        'item_id' => $this->id,
+                        'storage_location_id' => $locId,
+                        'item_batch_id' => null,
+                    ],
+                    ['quantity' => 0, 'reserved_quantity' => 0]
+                );
+                $level->quantity = (int) $this->quantity_on_hand;
+                $level->save();
+            }
+        }
+    }
+
     /**
      * Live total across every location. `quantity_on_hand` caches this value;
      * use this when you need the authoritative number.

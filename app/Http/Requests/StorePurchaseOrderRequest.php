@@ -29,6 +29,8 @@ class StorePurchaseOrderRequest extends FormRequest
                 Rule::exists('cost_centers', 'id')->where(fn ($query) => $query->where('is_active', true)),
             ],
             'quantity' => ['required', 'integer', 'min:1', 'max:1000000'],
+            'purchase_unit' => ['nullable', 'string', 'max:50'],
+            'conversion_factor' => ['nullable', 'numeric', 'min:0.0001'],
             'delivery_date' => ['nullable', 'date', 'after_or_equal:today'],
             'payment_terms' => ['nullable', Rule::in(['Net 15', 'Net 30', 'Net 60', 'COD'])],
             'incoterms' => ['nullable', Rule::in(['DDP', 'FOB', 'CIF', 'EXW'])],

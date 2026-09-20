@@ -18,6 +18,8 @@ class PurchaseOrderLine extends Model
         'quote_line_id',
         'item_id',
         'line_number',
+        'purchase_unit',
+        'conversion_factor',
         'ordered_quantity',
         'received_quantity',
         'invoiced_quantity',
@@ -28,6 +30,7 @@ class PurchaseOrderLine extends Model
 
     protected $casts = [
         'line_number' => 'integer',
+        'conversion_factor' => 'decimal:4',
         'ordered_quantity' => 'integer',
         'received_quantity' => 'integer',
         'invoiced_quantity' => 'integer',
@@ -58,5 +61,27 @@ class PurchaseOrderLine extends Model
     public function remainingQuantity(): int
     {
         return max(0, $this->ordered_quantity - $this->received_quantity);
+    }
+
+    public function conversionFactor(): float
+    {
+        $factor = (float) ($this->conversion_factor ?? 1);
+
+        return $factor > 0 ? $factor : 1.0;
+    }
+
+    public function orderedBaseQuantity(): int
+    {
+        return (int) round($this->ordered_quantity * $this->conversionFactor());
+    }
+
+    public function receivedBaseQuantity(): int
+    {
+        return (int) round($this->received_quantity * $this->conversionFactor());
+    }
+
+    public function remainingBaseQuantity(): int
+    {
+        return max(0, $this->orderedBaseQuantity() - $this->receivedBaseQuantity());
     }
 }
