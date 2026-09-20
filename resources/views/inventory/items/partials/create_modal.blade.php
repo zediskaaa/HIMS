@@ -338,23 +338,177 @@
                         <span class="text-[11px] font-bold uppercase tracking-wider text-neutral-500">3. Storage &amp; Procurement</span>
                     </div>
                     <div class="grid grid-cols-12 gap-2.5 sm:gap-3 items-start">
-                        {{-- Default Storage Location (6 cols) --}}
+                        {{-- Storage Location (6 cols) --}}
                         <div class="col-span-12 sm:col-span-6">
-                            <label for="field-default_location_id" class="block text-[11px] font-semibold text-neutral-700 mb-1">
-                                Default storage location <span x-show="hasOpeningStock" class="text-rose-500">*</span>
+                            <label for="field-default_location_id" class="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                                Storage location <span x-show="hasOpeningStock" class="text-rose-500">*</span>
                             </label>
-                            <select name="default_location_id"
-                                    id="field-default_location_id"
-                                    x-model="defaultLocationId"
-                                    :required="hasOpeningStock"
-                                    class="block w-full h-8.5 rounded-lg border-neutral-300 shadow-2xs text-xs font-medium py-1 px-2.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 {{ $errors->has('default_location_id') ? 'border-rose-500 ring-1 ring-rose-500' : '' }}">
-                                <option value="">-- Select location --</option>
-                                @foreach ($locations as $id => $label)
-                                    <option value="{{ $id }}" @selected((string) old('default_location_id') === (string) $id)>
-                                        {{ $label }}
-                                    </option>
-                                @endforeach
-                            </select>
+
+                            <div class="relative"
+                                 x-data="{
+                                     open: false,
+                                     search: '',
+                                     locations: {{ Js::from($locationOptions) }},
+                                     get selectedLoc() {
+                                         return this.locations.find(l => String(l.id) === String(defaultLocationId)) || null;
+                                     },
+                                     get filteredLocations() {
+                                         if (!this.search.trim()) return this.locations;
+                                         const q = this.search.toLowerCase();
+                                         return this.locations.filter(l =>
+                                             (l.name && l.name.toLowerCase().includes(q)) ||
+                                             (l.code && l.code.toLowerCase().includes(q)) ||
+                                             (l.type && l.type.toLowerCase().includes(q)) ||
+                                             (l.parent_name && l.parent_name.toLowerCase().includes(q))
+                                         );
+                                     },
+                                     select(loc) {
+                                         if (!loc.is_active) return;
+                                         defaultLocationId = String(loc.id);
+                                         this.open = false;
+                                         this.search = '';
+                                     },
+                                     clear() {
+                                         defaultLocationId = '';
+                                         this.search = '';
+                                     }
+                                 }"
+                                 @click.outside="open = false"
+                                 @keydown.escape.stop="open = false">
+
+                                {{-- Synchronized Native Select for Standard Form Submission & Accessibility --}}
+                                <select name="default_location_id"
+                                        id="field-default_location_id"
+                                        x-model="defaultLocationId"
+                                        class="sr-only"
+                                        tabindex="-1"
+                                        aria-hidden="true">
+                                    <option value="">Select storage location</option>
+                                    @foreach ($locationOptions as $loc)
+                                        <option value="{{ $loc['id'] }}"
+                                                @disabled(! $loc['is_active'])
+                                                @selected((string) old('default_location_id') === (string) $loc['id'])>
+                                            {{ $loc['display_label'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                {{-- Combobox Trigger Button --}}
+                                <button type="button"
+                                        id="field-default_location_id-trigger"
+                                        @click="open = !open; if(open) { $nextTick(() => $refs.locSearchInput?.focus()); }"
+                                        aria-haspopup="listbox"
+                                        :aria-expanded="open"
+                                        class="flex items-center justify-between w-full h-8.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1 text-xs text-left shadow-2xs focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 {{ $errors->has('default_location_id') ? 'border-rose-500 ring-1 ring-rose-500' : '' }}">
+                                    <div class="truncate mr-2 flex items-center gap-1.5 min-w-0">
+                                        <template x-if="selectedLoc">
+                                            <span class="flex items-center gap-1.5 truncate">
+                                                <span class="font-medium text-neutral-900 dark:text-neutral-100 truncate" x-text="selectedLoc.name"></span>
+                                                <span class="font-mono text-[10px] text-neutral-400 shrink-0" x-text="'(' + selectedLoc.code + ' • ' + selectedLoc.type + ')'"></span>
+                                            </span>
+                                        </template>
+                                        <template x-if="!selectedLoc">
+                                            <span class="text-neutral-400 dark:text-neutral-500">Select storage location</span>
+                                        </template>
+                                    </div>
+                                    <div class="flex items-center gap-1 shrink-0">
+                                        <template x-if="selectedLoc">
+                                            <span @click.stop="clear()"
+                                                  role="button"
+                                                  tabindex="0"
+                                                  class="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 p-0.5 rounded cursor-pointer"
+                                                  title="Clear location">
+                                                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </span>
+                                        </template>
+                                        <svg class="h-3.5 w-3.5 text-neutral-400 transition-transform duration-150"
+                                             :class="{ 'rotate-180': open }"
+                                             fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </button>
+
+                                {{-- Dropdown Search & Options Panel --}}
+                                <div x-show="open"
+                                     x-cloak
+                                     x-transition:enter="transition ease-out duration-100"
+                                     x-transition:enter-start="opacity-0 scale-95"
+                                     x-transition:enter-end="opacity-100 scale-100"
+                                     x-transition:leave="transition ease-in duration-75"
+                                     x-transition:leave-start="opacity-100 scale-100"
+                                     x-transition:leave-end="opacity-0 scale-95"
+                                     class="absolute left-0 top-full mt-1 w-full z-40 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-2 shadow-xl">
+
+                                    {{-- Search Input --}}
+                                    <div class="relative mb-2">
+                                        <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                                            <svg class="h-3.5 w-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                            </svg>
+                                        </div>
+                                        <input type="text"
+                                               x-ref="locSearchInput"
+                                               x-model="search"
+                                               placeholder="Search code, name, type, warehouse..."
+                                               class="w-full h-8 pl-8 pr-2.5 py-1 text-xs rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500" />
+                                    </div>
+
+                                    {{-- Scrollable List of Locations --}}
+                                    <div class="max-h-48 overflow-y-auto space-y-1 divide-y divide-neutral-100 dark:divide-neutral-700/50">
+                                        <template x-for="loc in filteredLocations" :key="loc.id">
+                                            <div>
+                                                {{-- Active Location Option --}}
+                                                <template x-if="loc.is_active">
+                                                    <button type="button"
+                                                            @click="select(loc)"
+                                                            class="w-full text-left px-2 py-1.5 rounded-lg text-xs transition flex items-center justify-between group"
+                                                            :class="String(defaultLocationId) === String(loc.id) ? 'bg-primary-50 text-primary-900 dark:bg-primary-950/40 dark:text-primary-200 font-semibold' : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700/60'">
+                                                        <div class="min-w-0 pr-2">
+                                                            <div class="flex items-center gap-1.5">
+                                                                <span class="truncate" x-text="loc.name"></span>
+                                                                <span class="font-mono text-[10px] text-neutral-400 dark:text-neutral-500" x-text="loc.code"></span>
+                                                            </div>
+                                                            <div class="text-[10px] text-neutral-400 dark:text-neutral-500 truncate" x-text="loc.type + (loc.parent_name ? ' • ' + loc.parent_name : '')"></div>
+                                                        </div>
+                                                        <template x-if="String(defaultLocationId) === String(loc.id)">
+                                                            <svg class="h-4 w-4 text-primary-600 dark:text-primary-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        </template>
+                                                    </button>
+                                                </template>
+
+                                                {{-- Inactive Location Option (Disabled & Clearly Marked) --}}
+                                                <template x-if="!loc.is_active">
+                                                    <div class="w-full text-left px-2 py-1.5 rounded-lg text-xs opacity-55 bg-neutral-50/70 dark:bg-neutral-800/60 flex items-center justify-between cursor-not-allowed select-none"
+                                                         title="Inactive storage locations cannot receive or store new inventory">
+                                                        <div class="min-w-0 pr-2">
+                                                            <div class="flex items-center gap-1.5">
+                                                                <span class="line-through text-neutral-500 dark:text-neutral-400 truncate" x-text="loc.name"></span>
+                                                                <span class="font-mono text-[10px] text-neutral-400" x-text="loc.code"></span>
+                                                            </div>
+                                                            <div class="text-[10px] text-neutral-400" x-text="loc.type + (loc.parent_name ? ' • ' + loc.parent_name : '')"></div>
+                                                        </div>
+                                                        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-900 shrink-0">
+                                                            [Inactive]
+                                                        </span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+
+                                        <template x-if="filteredLocations.length === 0">
+                                            <div class="py-3 px-2 text-center text-[11px] text-neutral-400">
+                                                No matching storage locations found
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+
                             <p class="mt-0.5 text-[10px] text-neutral-400">Required when recording opening quantity.</p>
                             @error('default_location_id')
                                 <p class="mt-0.5 text-[11px] text-rose-600 font-medium">{{ $message }}</p>

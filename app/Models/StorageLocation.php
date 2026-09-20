@@ -183,4 +183,15 @@ class StorageLocation extends Model
     {
         return $query->whereNull('parent_id');
     }
+
+    /**
+     * Useful display label showing Name (CODE • Type) with inactive indicator when needed.
+     */
+    public function displayOptionLabel(): string
+    {
+        $typeLabel = ucfirst(str_replace('_', ' ', (string) ($this->type ?? 'location')));
+        $inactiveTag = $this->status !== 'active' ? ' — [Inactive]' : '';
+
+        return "{$this->name} ({$this->code} • {$typeLabel}){$inactiveTag}";
+    }
 }

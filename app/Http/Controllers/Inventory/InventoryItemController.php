@@ -86,6 +86,13 @@ class InventoryItemController extends Controller implements HasMiddleware
                 fn ($query) => $query->stockStatus($request->query('status')),
             )
             ->when($request->filled('category_id'), fn ($query) => $query->where('category_id', $request->integer('category_id')))
+            ->when($request->filled('location_id'), function ($query) use ($request): void {
+                $locationId = $request->integer('location_id');
+                $query->where(function ($sub) use ($locationId): void {
+                    $sub->where('default_location_id', $locationId)
+                        ->orWhereHas('stockLevels', fn ($sl) => $sl->where('storage_location_id', $locationId)->where('quantity', '>', 0));
+                });
+            })
             ->latest('id')
             ->paginate(20)
             ->withQueryString();
@@ -113,12 +120,31 @@ class InventoryItemController extends Controller implements HasMiddleware
             ->orderBy('name')
             ->get()
             ->mapWithKeys(fn (ItemCategory $category) => [$category->id => $category->fullPath()]);
-        $locations = $canManageItems
-            ? StorageLocation::active()
-                ->with('parent')
+        $filterLocations = StorageLocation::active()
+            ->with('parent')
+            ->orderBy('name')
+            ->get();
+        $locationOptions = $canManageItems
+            ? StorageLocation::with('parent')
                 ->orderBy('name')
                 ->get()
-                ->mapWithKeys(fn (StorageLocation $location) => [$location->id => $location->fullPath()])
+                ->map(fn (StorageLocation $location) => [
+                    'id' => $location->id,
+                    'name' => $location->name,
+                    'code' => $location->code,
+                    'type' => ucfirst(str_replace('_', ' ', (string) ($location->type ?? 'location'))),
+                    'parent_name' => $location->parent?->name ?? '',
+                    'full_path' => $location->fullPath(),
+                    'is_active' => $location->status === 'active',
+                    'status' => $location->status,
+                    'display_label' => $location->displayOptionLabel(),
+                ])
+            : collect();
+        $locations = $canManageItems
+            ? StorageLocation::with('parent')
+                ->orderBy('name')
+                ->get()
+                ->mapWithKeys(fn (StorageLocation $location) => [$location->id => $location->displayOptionLabel()])
             : collect();
         $unitOptions = $canManageItems
             ? UnitOfMeasure::optionsWithLegacy()
@@ -127,8 +153,10 @@ class InventoryItemController extends Controller implements HasMiddleware
         return view('inventory.items.index', [
             'categories' => $categories,
             'eligibleSuppliers' => $eligibleSuppliers,
-            'filters' => $request->only(['search', 'status', 'category_id']),
+            'filterLocations' => $filterLocations,
+            'filters' => $request->only(['search', 'status', 'category_id', 'location_id']),
             'items' => $items,
+            'locationOptions' => $locationOptions,
             'locations' => $locations,
             'stockStatuses' => $stockStatuses,
             'unavailableSuppliers' => $unavailableSuppliers,
@@ -173,6 +201,8 @@ class InventoryItemController extends Controller implements HasMiddleware
         ], [
             'unit.required' => 'The unit of measure field is required.',
             'unit.in' => 'The selected unit of measure is invalid. Please choose from the allowed units.',
+            'default_location_id.required' => 'A storage location is required when recording opening stock.',
+            'default_location_id.exists' => 'The selected storage location is invalid or inactive. Only active locations can be assigned.',
         ]);
 
         if (! $request->boolean('is_batch_tracked') && ($request->boolean('is_expiry_tracked') || filled($validated['expiry_date'] ?? null))) {

@@ -36,7 +36,15 @@ class UpdateInventoryItemRequest extends FormRequest
             'reorder_level' => 'nullable|integer|min:0',
             'unit_cost' => 'nullable|numeric|min:0|max:9999999999.99|decimal:0,2',
             'supplier_id' => ['nullable', new ProcurementEligibleSupplier],
+            'default_location_id' => ['nullable', 'integer', Rule::exists('storage_locations', 'id')->where('status', 'active')],
             'status' => 'nullable|string|in:active,inactive',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'default_location_id.exists' => 'The selected storage location is invalid or inactive. Only active locations can be assigned.',
         ];
     }
 }

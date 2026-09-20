@@ -76,6 +76,11 @@ class InventoryItemModalUxTest extends TestCase
         $response->assertSee('name="expiry_date"', false);
         $response->assertSee('name="supplier_id"', false);
 
+        // Check storage location dropdown integration
+        $response->assertSee('id="field-default_location_id"', false);
+        $response->assertSee('Select storage location');
+        $response->assertSee('Main Warehouse (MWH-01 • Warehouse)');
+
         // Check unit dropdown integration
         $response->assertSee('id="field-unit"', false);
         $response->assertSee('Select unit');

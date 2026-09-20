@@ -63,6 +63,17 @@
                             @endforeach
                         </select>
                     </div>
+                    <div class="w-full sm:w-52 lg:w-60 shrink-0">
+                        <label class="sr-only" for="item-location">Storage location</label>
+                        <select id="item-location" name="location_id" class="block w-full rounded-lg border border-neutral-300 bg-white py-2 pl-3 pr-8 text-xs text-neutral-900 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100">
+                            <option value="">All storage locations</option>
+                            @foreach ($filterLocations as $location)
+                                <option value="{{ $location->id }}" @selected((string) ($filters['location_id'] ?? '') === (string) $location->id)>
+                                    {{ $location->displayOptionLabel() }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div class="flex items-center gap-1.5 shrink-0">
                         <x-ui.button type="submit" size="sm" class="px-4 py-2 text-xs">Apply</x-ui.button>
                         @if ($activeFilterCount > 0)
@@ -89,7 +100,18 @@
                     <tbody id="inventory-items-table-body" class="divide-y divide-neutral-200 dark:divide-neutral-800">
                         @forelse ($items as $item)
                             <tr class="transition-colors hover:bg-neutral-50/70 dark:hover:bg-neutral-800/50">
-                                <td class="px-3.5 py-2.5 font-medium text-neutral-900 dark:text-neutral-100">{{ $item->name }}</td>
+                                <td class="px-3.5 py-2.5 font-medium text-neutral-900 dark:text-neutral-100">
+                                    <div>{{ $item->name }}</div>
+                                    @if ($item->defaultLocation)
+                                        <div class="text-[11px] text-neutral-500 dark:text-neutral-400 font-normal flex items-center gap-1 mt-0.5" title="Default storage location: {{ $item->defaultLocation->name }}">
+                                            <svg class="h-3 w-3 text-neutral-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                            <span class="truncate">{{ $item->defaultLocation->name }} ({{ $item->defaultLocation->code }})</span>
+                                        </div>
+                                    @endif
+                                </td>
                                 <td class="px-3 py-2.5 font-mono text-neutral-600 dark:text-neutral-400 whitespace-nowrap">{{ $item->sku }}</td>
                                 <td class="px-3 py-2.5 text-neutral-600 dark:text-neutral-400 whitespace-nowrap">{{ $item->unit ?: 'unit' }}</td>
                                 <td class="px-3 py-2.5 whitespace-nowrap">
