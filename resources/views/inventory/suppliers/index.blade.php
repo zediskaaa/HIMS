@@ -10,6 +10,16 @@
         :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Supplier Management' => null]"
     />
 
+    @if ($errors->any())
+        <x-ui.alert variant="danger" class="mt-4" title="Operation refused">
+            <ul class="space-y-0.5 list-disc list-inside">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </x-ui.alert>
+    @endif
+
     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <x-ui.stat compact label="Active suppliers" :value="$counts['active']" icon="users" tone="primary" :hint="$counts['new_this_month'].' added this month · '.$counts['total'].' total'" />
         <x-ui.stat compact label="Procurement eligible" :value="$counts['eligible']" icon="shield-check" tone="success" :hint="$counts['pending'].' awaiting accreditation review'" />
@@ -171,7 +181,31 @@
                                     <span class="mt-1 block truncate text-xs text-neutral-500">{{ $supplier->effectiveAccreditationStatus()->label() }}</span>
                                 </x-ui.table.td>
                                 <x-ui.table.td align="right" class="!pr-4 !pl-1" onclick="event.stopPropagation()">
-                                    <x-ui.button size="sm" variant="secondary" :href="route('inventory.suppliers.show', $supplier)" icon="eye">View</x-ui.button>
+                                    <div class="flex items-center justify-end gap-1.5">
+                                        <x-ui.button size="sm" variant="secondary" :href="route('inventory.suppliers.show', $supplier)" icon="eye">View</x-ui.button>
+                                        @can(\App\Enums\Permission::ManageArchive->value)
+                                            <x-ui.button
+                                                type="button"
+                                                size="sm"
+                                                variant="ghost"
+                                                class="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                                @click="$dispatch('open-archive-modal', {
+                                                    actionUrl: '{{ route('inventory.suppliers.archive', $supplier) }}',
+                                                    title: '{{ addslashes($supplier->name) }}',
+                                                    identifier: 'SUP-{{ str_pad((string) $supplier->id, 4, '0', STR_PAD_LEFT) }}',
+                                                    context: 'Tax ID: {{ addslashes($supplier->tax_number ?? 'N/A') }}',
+                                                    type: 'Supplier',
+                                                    presets: [
+                                                        'Vendor business ceased operations / bankruptcy',
+                                                        'Procurement contract concluded / terminated',
+                                                        'Failed compliance / accreditation standards',
+                                                        'Duplicate vendor listing'
+                                                    ]
+                                                })">
+                                                Archive
+                                            </x-ui.button>
+                                        @endcan
+                                    </div>
                                 </x-ui.table.td>
                             </x-ui.table.row>
                         @empty
@@ -382,8 +416,29 @@
                         @endif
                     </div>
 
-                    <div class="border-t border-neutral-200 bg-neutral-50 p-4">
-                        <x-ui.button class="w-full" :href="route('inventory.suppliers.show', $selectedSupplier)" icon="eye">View Supplier</x-ui.button>
+                    <div class="border-t border-neutral-200 bg-neutral-50 p-4 flex items-center gap-2">
+                        <x-ui.button class="flex-1" :href="route('inventory.suppliers.show', $selectedSupplier)" icon="eye">View Supplier</x-ui.button>
+                        @can(\App\Enums\Permission::ManageArchive->value)
+                            <x-ui.button
+                                type="button"
+                                variant="ghost"
+                                class="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                @click="$dispatch('open-archive-modal', {
+                                    actionUrl: '{{ route('inventory.suppliers.archive', $selectedSupplier) }}',
+                                    title: '{{ addslashes($selectedSupplier->name) }}',
+                                    identifier: 'SUP-{{ str_pad((string) $selectedSupplier->id, 4, '0', STR_PAD_LEFT) }}',
+                                    context: 'Tax ID: {{ addslashes($selectedSupplier->tax_number ?? 'N/A') }}',
+                                    type: 'Supplier',
+                                    presets: [
+                                        'Vendor business ceased operations / bankruptcy',
+                                        'Procurement contract concluded / terminated',
+                                        'Failed compliance / accreditation standards',
+                                        'Duplicate vendor listing'
+                                    ]
+                                })">
+                                Archive
+                            </x-ui.button>
+                        @endcan
                     </div>
                 @else
                     <div class="p-8 text-center"><x-ui.icon name="users" class="mx-auto h-8 w-8 text-neutral-300" /><p class="mt-2 text-sm font-semibold text-neutral-800">No supplier selected</p><p class="mt-1 text-xs text-neutral-500">Add a supplier or adjust the directory filters.</p></div>

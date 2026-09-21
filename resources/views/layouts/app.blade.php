@@ -148,6 +148,9 @@
     @if (auth()->user()?->isSuperAdministrator())
         @include('layouts.partials.super-admin-password-confirmation')
     @endif
+    @can(\App\Enums\Permission::ManageArchive->value)
+        @include('layouts.partials.archive-record-modal')
+    @endcan
 
     <dialog
         data-session-warning

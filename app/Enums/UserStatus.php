@@ -13,12 +13,14 @@ enum UserStatus: string
 {
     case Active = 'active';
     case Inactive = 'inactive';
+    case Archived = 'archived';
 
     public function label(): string
     {
         return match ($this) {
             self::Active => 'Active',
             self::Inactive => 'Inactive',
+            self::Archived => 'Archived',
         };
     }
 
@@ -27,12 +29,17 @@ enum UserStatus: string
         return $this === self::Active;
     }
 
+    public function isArchived(): bool
+    {
+        return $this === self::Archived;
+    }
+
     /**
      * @return array<string, string>
      */
     public static function options(): array
     {
-        return collect(self::cases())
+        return collect([self::Active, self::Inactive])
             ->mapWithKeys(fn (self $status) => [$status->value => $status->label()])
             ->all();
     }

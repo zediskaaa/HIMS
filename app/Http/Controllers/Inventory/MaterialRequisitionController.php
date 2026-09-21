@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class MaterialRequisitionController extends Controller implements HasMiddleware
@@ -189,7 +190,10 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
             'urgency' => ['nullable', 'in:routine,urgent,stat_emergency'],
             'justification' => ['nullable', 'string', 'max:500'],
             'lines' => ['required', 'array', 'min:1'],
-            'lines.*.item_id' => ['required', 'exists:inventory_items,id'],
+            'lines.*.item_id' => [
+                'required',
+                Rule::exists('inventory_items', 'id')->where(fn ($q) => $q->whereNotIn('status', ['inactive', 'archived'])),
+            ],
             'lines.*.requested_quantity' => ['required', 'integer', 'min:1'],
             'lines.*.ai_suggested_quantity' => ['nullable', 'integer', 'min:0'],
             'lines.*.allocation_strategy' => ['nullable', 'in:FEFO,FIFO,MANUAL'],

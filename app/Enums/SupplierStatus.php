@@ -10,6 +10,7 @@ enum SupplierStatus: string
     // Retained for rows created by the original supplier CRUD. Accreditation
     // review now lives in SupplierAccreditationStatus instead.
     case UnderReview = 'under_review';
+    case Archived = 'archived';
 
     public function label(): string
     {
@@ -18,7 +19,13 @@ enum SupplierStatus: string
             self::Inactive => 'Inactive',
             self::Suspended => 'Suspended',
             self::UnderReview => 'Under Review',
+            self::Archived => 'Archived',
         };
+    }
+
+    public function isArchived(): bool
+    {
+        return $this === self::Archived;
     }
 
     /**

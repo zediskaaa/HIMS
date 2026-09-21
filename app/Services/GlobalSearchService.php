@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Enums\Permission;
+use App\Enums\SupplierStatus;
+use App\Enums\UserStatus;
 use App\Models\BarcodeAlias;
 use App\Models\CycleCountDoc;
 use App\Models\GoodsReceiptNote;
@@ -208,6 +210,7 @@ class GlobalSearchService
     {
         $query = InventoryItem::query()
             ->with(['category'])
+            ->where('status', '!=', 'archived')
             ->where(function ($q) use ($term): void {
                 $q->where('name', 'like', "%{$term}%")
                     ->orWhere('sku', 'like', "%{$term}%")
@@ -277,6 +280,7 @@ class GlobalSearchService
         $canSensitive = $user->can(Permission::ViewSupplierSensitiveData->value);
 
         $query = Supplier::query()
+            ->where('status', '!=', SupplierStatus::Archived->value)
             ->where(function ($q) use ($term, $canSensitive): void {
                 $q->where('name', 'like', "%{$term}%")
                     ->orWhere('trade_name', 'like', "%{$term}%")
@@ -983,6 +987,7 @@ class GlobalSearchService
         $isEmailQuery = str_contains($term, '@');
 
         $query = User::query()
+            ->where('status', '!=', UserStatus::Archived->value)
             ->where(function ($q) use ($term, $isEmailQuery): void {
                 $q->where('name', 'like', "%{$term}%")
                     ->orWhere('first_name', 'like', "%{$term}%")
@@ -998,7 +1003,9 @@ class GlobalSearchService
 
         // If no user matched by name or ID, allow fallback to email for specific email/username searches
         if ($total === 0 && ! $isEmailQuery && strlen($term) >= 4 && ! str_contains($term, ' ')) {
-            $query = User::query()->where('email', 'like', "%{$term}%");
+            $query = User::query()
+                ->where('status', '!=', UserStatus::Archived->value)
+                ->where('email', 'like', "%{$term}%");
             $total = (clone $query)->count();
         }
 

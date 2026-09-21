@@ -161,14 +161,25 @@
         </div>
 
         @if ($isEdit)
-            <x-ui.field
-                name="status"
-                label="Status"
-                type="select"
-                required
-                :value="$user->status->value"
-                :options="\App\Enums\UserStatus::options()"
-                hint="Inactive accounts are signed out and cannot sign back in." />
+            @if ($user->isArchived())
+                <div>
+                    <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">Status</label>
+                    <div class="flex items-center gap-2 p-2.5 rounded-md bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs">
+                        <x-ui.badge variant="neutral">Archived</x-ui.badge>
+                        <span class="text-neutral-500 dark:text-neutral-400">Archived accounts must be restored through the Archive workspace.</span>
+                    </div>
+                    <input type="hidden" name="status" value="archived">
+                </div>
+            @else
+                <x-ui.field
+                    name="status"
+                    label="Status"
+                    type="select"
+                    required
+                    :value="$user->status->value"
+                    :options="\App\Enums\UserStatus::options()"
+                    hint="Inactive accounts are signed out and cannot sign back in." />
+            @endif
         @endif
 
         <x-ui.field

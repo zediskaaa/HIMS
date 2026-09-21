@@ -21,7 +21,7 @@ class StorePurchaseOrderRequest extends FormRequest
             'item_id' => [
                 'required',
                 'integer',
-                Rule::exists('inventory_items', 'id')->where(fn ($query) => $query->where('status', '!=', 'inactive')),
+                Rule::exists('inventory_items', 'id')->where(fn ($query) => $query->whereNotIn('status', ['inactive', 'archived'])),
             ],
             'cost_center_id' => [
                 'required',

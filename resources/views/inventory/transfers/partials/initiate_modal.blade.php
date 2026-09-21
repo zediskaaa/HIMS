@@ -1,3 +1,6 @@
+@php
+    $preselectedItem = $preselectedItem ?? null;
+@endphp
 {{-- INITIATE TRANSFER MODAL (Unified Single Transfer Form) --}}
 @can(\App\Enums\Permission::TransferStock->value)
 <div x-show="newTransferModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;"

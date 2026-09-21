@@ -81,6 +81,8 @@ enum Permission: string
     case ViewAuditTrail = 'view_audit_trail';
     case ManageSystemRecovery = 'manage_system_recovery';
     case ManagePrivacyCompliance = 'manage_privacy_compliance';
+    case ViewArchive = 'view_archive';
+    case ManageArchive = 'manage_archive';
 
     public function label(): string
     {
@@ -135,6 +137,8 @@ enum Permission: string
             self::ViewAuditTrail => 'View audit trail',
             self::ManageSystemRecovery => 'Manage system recovery and diagnostics',
             self::ManagePrivacyCompliance => 'Manage privacy and security governance',
+            self::ViewArchive => 'View archive',
+            self::ManageArchive => 'Archive and unarchive master records',
             self::ViewProcessReviews => 'View evidence-based process reviews',
             self::CreateProcessReview => 'Draft evidence-based process reviews',
             self::ApproveProcessReview => 'Approve or reject process reviews (Maker-Checker)',
@@ -195,6 +199,8 @@ enum Permission: string
             self::ViewAuditTrail => 'Read the append-only organization-wide Audit Trail.',
             self::ManageSystemRecovery => 'Access Super Admin Recovery Center, retry failed operations, and inspect system health.',
             self::ManagePrivacyCompliance => 'Manage privacy and security governance, data subject requests, and incident response.',
+            self::ViewArchive => 'Read the centralized archive of historical items, suppliers, and users.',
+            self::ManageArchive => 'Archive active master records and restore preserved records from archive.',
             self::ViewProcessReviews => 'Read evidence-based process review records, findings, and metrics.',
             self::CreateProcessReview => 'Create and submit operational process reviews for supervisory audit.',
             self::ApproveProcessReview => 'Review, approve, or reject operational process review recommendations.',
@@ -226,7 +232,7 @@ enum Permission: string
             self::PerformTechnicalInspection, self::ApproveIarAcceptance, self::ManageChainOfCustody => 'Logistics & Records',
             self::ViewReports, self::GenerateForecasts, self::ViewProcessReviews,
             self::CreateProcessReview, self::ApproveProcessReview, self::ImplementProcessReview => 'Records & Analysis',
-            self::ManageUsers, self::ViewAuditTrail, self::ManageSystemRecovery, self::ManagePrivacyCompliance => 'Administration',
+            self::ManageUsers, self::ViewAuditTrail, self::ManageSystemRecovery, self::ManagePrivacyCompliance, self::ViewArchive, self::ManageArchive => 'Administration',
         };
     }
 

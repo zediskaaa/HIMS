@@ -144,6 +144,12 @@ class UserAccountService
                 ]);
             }
 
+            if ($user->isArchived() && $newStatus !== UserStatus::Archived) {
+                throw ValidationException::withMessages([
+                    'status' => ['Archived user accounts must be restored through the Archive workspace.'],
+                ]);
+            }
+
             $losesAdmin = $user->isAdministrator()
                 && (! $newRole->isAdministrator() || ! $newStatus->isActive());
 
@@ -189,6 +195,12 @@ class UserAccountService
     {
         return DB::transaction(function () use ($user, $actor): User {
             $this->assertCanManage($actor, $user);
+
+            if ($user->isArchived()) {
+                throw ValidationException::withMessages([
+                    'status' => ['Archived user accounts cannot be activated via status toggle. Use the Restore workflow in the Archive workspace.'],
+                ]);
+            }
 
             if ($user->isActive()) {
                 $this->assertNotSelf($user, $actor, 'You cannot deactivate your own account.');

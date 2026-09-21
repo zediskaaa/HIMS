@@ -66,6 +66,7 @@ class InventoryItemController extends Controller implements HasMiddleware
         ];
 
         $items = InventoryItem::query()
+            ->where('status', '!=', 'archived')
             ->with(array_filter([
                 $canViewSuppliers ? 'supplier' : null,
                 'category',

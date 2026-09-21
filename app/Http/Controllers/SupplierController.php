@@ -79,6 +79,7 @@ class SupplierController extends Controller implements HasMiddleware
         $direction = $request->query('direction') === 'desc' ? 'desc' : 'asc';
 
         $suppliers = Supplier::query()
+            ->where('status', '!=', SupplierStatus::Archived->value)
             ->with([
                 'supplierProducts' => fn ($query) => $query->where('is_active', true)->with('item.category'),
                 'latestApprovedScorecard.processReview',
@@ -194,10 +195,10 @@ class SupplierController extends Controller implements HasMiddleware
 
         $supplierCounts = DB::table('suppliers')
             ->selectRaw("
-                COUNT(*) as total,
+                COUNT(CASE WHEN status != 'archived' THEN 1 END) as total,
                 COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
-                COUNT(CASE WHEN created_at >= ? THEN 1 END) as new_this_month,
-                COUNT(CASE WHEN accreditation_status = 'pending_review' THEN 1 END) as pending
+                COUNT(CASE WHEN created_at >= ? AND status != 'archived' THEN 1 END) as new_this_month,
+                COUNT(CASE WHEN accreditation_status = 'pending_review' AND status != 'archived' THEN 1 END) as pending
             ", [now()->startOfMonth()])
             ->first();
 
@@ -209,6 +210,7 @@ class SupplierController extends Controller implements HasMiddleware
             ->first();
 
         $supplierAttentionCount = Supplier::query()
+            ->where('status', '!=', SupplierStatus::Archived->value)
             ->whereHas('complianceAlerts', fn ($alerts) => $alerts->active())
             ->count();
 
@@ -612,7 +614,7 @@ class SupplierController extends Controller implements HasMiddleware
             'item_id' => [
                 'required',
                 'integer',
-                Rule::exists('inventory_items', 'id')->where(fn ($query) => $query->where('status', '!=', 'inactive')),
+                Rule::exists('inventory_items', 'id')->where(fn ($query) => $query->whereNotIn('status', ['inactive', 'archived'])),
                 Rule::unique('supplier_products')->where('supplier_id', $supplier->id),
             ],
             'supplier_sku' => ['nullable', 'string', 'max:255'],

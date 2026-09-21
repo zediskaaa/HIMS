@@ -26,25 +26,82 @@
                         Edit
                     </x-ui.button>
                     @unless ($user->is(auth()->user()))
-                        <form method="POST" action="{{ route('admin.users.toggle-status', $user) }}"
-                              data-confirm-title="Confirm account status change"
-                              data-confirm-message="Are you sure you want to {{ $user->isActive() ? 'deactivate' : 'reactivate' }} this user?"
-                              data-confirm-label="{{ $user->isActive() ? 'Deactivate' : 'Reactivate' }}"
-                              @if (auth()->user()?->isSuperAdministrator() && $user->isActive()) data-super-admin-deactivate="true" @endif>
-                            @csrf
-                            @method('PATCH')
-                            <x-ui.button
-                                type="submit"
-                                data-loading-text="Updating account..."
-                                :variant="$user->isActive() ? 'secondary' : 'primary'">
-                                {{ $user->isActive() ? 'Deactivate' : 'Reactivate' }}
-                            </x-ui.button>
-                        </form>
+                        @if ($user->isArchived())
+                            @can(\App\Enums\Permission::ManageArchive->value)
+                                <form method="POST" action="{{ route('admin.users.unarchive', $user) }}"
+                                      data-confirm-title="Restore User Account"
+                                      data-confirm-message="Restore account for {{ $user->name }} ({{ $user->email }}) to active status? Duplicate email or employee ID checks will be enforced."
+                                      data-confirm-label="Restore Account">
+                                    @csrf
+                                    <x-ui.button
+                                        type="submit"
+                                        variant="secondary"
+                                        icon="arrow-path"
+                                        data-loading-text="Restoring account...">
+                                        Restore Account
+                                    </x-ui.button>
+                                </form>
+                            @endcan
+                        @else
+                            <form method="POST" action="{{ route('admin.users.toggle-status', $user) }}"
+                                  data-confirm-title="Confirm account status change"
+                                  data-confirm-message="Are you sure you want to {{ $user->isActive() ? 'deactivate' : 'reactivate' }} this user?"
+                                  data-confirm-label="{{ $user->isActive() ? 'Deactivate' : 'Reactivate' }}"
+                                  @if (auth()->user()?->isSuperAdministrator() && $user->isActive()) data-super-admin-deactivate="true" @endif>
+                                @csrf
+                                @method('PATCH')
+                                <x-ui.button
+                                    type="submit"
+                                    data-loading-text="Updating account..."
+                                    :variant="$user->isActive() ? 'secondary' : 'primary'">
+                                    {{ $user->isActive() ? 'Deactivate' : 'Reactivate' }}
+                                </x-ui.button>
+                            </form>
+
+                            @can(\App\Enums\Permission::ManageArchive->value)
+                                @unless ($user->isProtected())
+                                    <x-ui.button
+                                        type="button"
+                                        variant="danger"
+                                        @click="$dispatch('open-archive-modal', {
+                                            actionUrl: '{{ route('admin.users.archive', $user) }}',
+                                            title: '{{ addslashes($user->name) }}',
+                                            identifier: 'Employee ID: {{ addslashes($user->employee_id ?? 'N/A') }} · {{ addslashes($user->email) }}',
+                                            context: 'Role: {{ addslashes($user->role?->label() ?? 'Staff') }}',
+                                            type: 'User Account',
+                                            presets: [
+                                                'Employee resignation / separation from hospital',
+                                                'Contract ended / tenure completed',
+                                                'Department transfer / role access revoked',
+                                                'Duplicate user account profile'
+                                            ]
+                                        })">
+                                        Archive User
+                                    </x-ui.button>
+                                @endunless
+                            @endcan
+                        @endif
                     @endunless
                 </div>
             </x-slot:actions>
         @endif
     </x-ui.page-header>
+
+    @if ($errors->any())
+        <x-ui.alert variant="danger" class="mt-4" title="Operation refused">
+            <ul class="space-y-0.5 list-disc list-inside">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </x-ui.alert>
+    @endif
+
+    @if ($user->isArchived())
+        <x-ui.alert variant="neutral" title="Archived Account" class="mt-4">
+            This user account is archived and deactivated. Historical inventory movements, procurement orders, and audit logs remain preserved with full attribution.
+        </x-ui.alert>
+    @endif
 
     <div class="grid gap-6 lg:grid-cols-3">
         <div class="lg:col-span-1 space-y-6">

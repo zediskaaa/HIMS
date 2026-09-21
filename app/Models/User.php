@@ -39,6 +39,9 @@ class User extends Authenticatable
         'department',
         'phone',
         'avatar_path',
+        'archived_at',
+        'archived_by',
+        'archive_reason',
     ];
 
     /**
@@ -79,6 +82,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'role' => UserRole::class,
             'status' => UserStatus::class,
+            'archived_at' => 'datetime',
         ];
     }
 
@@ -218,6 +222,11 @@ class User extends Authenticatable
         return $this->hasMany(AuditLog::class);
     }
 
+    public function archivedBy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(self::class, 'archived_by');
+    }
+
     /**
      * Whether this account's role grants an ability.
      *
@@ -327,9 +336,19 @@ class User extends Authenticatable
         return route('users.avatar', $this);
     }
 
+    public function isArchived(): bool
+    {
+        return $this->status === UserStatus::Archived;
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', UserStatus::Active->value);
+    }
+
+    public function scopeArchived(Builder $query): Builder
+    {
+        return $query->where('status', UserStatus::Archived->value);
     }
 
     public function scopeRole(Builder $query, UserRole|string $role): Builder

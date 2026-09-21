@@ -53,7 +53,11 @@ class UserController extends Controller implements HasMiddleware
                     ->orWhere('department', 'like', $term));
             })
             ->when($request->filled('role'), fn ($q) => $q->where('role', $request->string('role')))
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
+            ->when(
+                $request->filled('status'),
+                fn ($q) => $q->where('status', $request->string('status')),
+                fn ($q) => $q->where('status', '!=', UserStatus::Archived->value)
+            )
             ->orderBy('name')
             ->paginate(15)
             ->withQueryString();
@@ -64,7 +68,7 @@ class UserController extends Controller implements HasMiddleware
             'statuses' => UserStatus::options(),
             'filters' => $request->only(['search', 'role', 'status']),
             'counts' => [
-                'total' => User::count(),
+                'total' => User::where('status', '!=', UserStatus::Archived->value)->count(),
                 'active' => User::active()->count(),
                 'administrators' => User::administrators()->active()->count(),
             ],

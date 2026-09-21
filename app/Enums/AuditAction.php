@@ -22,9 +22,15 @@ enum AuditAction: string
     case SuspendedSupplier = 'suspended_supplier';
     case InactivatedSupplier = 'inactivated_supplier';
     case ReactivatedSupplier = 'reactivated_supplier';
+    case ArchivedSupplier = 'archived_supplier';
+    case UnarchivedSupplier = 'unarchived_supplier';
     case CreatedInventoryItem = 'created_inventory_item';
     case UpdatedInventoryItem = 'updated_inventory_item';
     case DeletedInventoryItem = 'deleted_inventory_item';
+    case ArchivedInventoryItem = 'archived_inventory_item';
+    case UnarchivedInventoryItem = 'unarchived_inventory_item';
+    case ArchivedUser = 'archived_user';
+    case UnarchivedUser = 'unarchived_user';
     case RecordedStockMovement = 'recorded_stock_movement';
     case GeneratedDemandForecast = 'generated_demand_forecast';
     case RefreshedDemandForecast = 'refreshed_demand_forecast';
@@ -135,9 +141,15 @@ enum AuditAction: string
             self::SuspendedSupplier => 'Suspended Supplier',
             self::InactivatedSupplier => 'Inactivated Supplier',
             self::ReactivatedSupplier => 'Reactivated Supplier',
+            self::ArchivedSupplier => 'Archived Supplier',
+            self::UnarchivedSupplier => 'Unarchived Supplier',
             self::CreatedInventoryItem => 'Created Inventory Item',
             self::UpdatedInventoryItem => 'Updated Inventory Item',
             self::DeletedInventoryItem => 'Deleted Inventory Item',
+            self::ArchivedInventoryItem => 'Archived Inventory Item',
+            self::UnarchivedInventoryItem => 'Unarchived Inventory Item',
+            self::ArchivedUser => 'Archived User',
+            self::UnarchivedUser => 'Unarchived User',
             self::RecordedStockMovement => 'Recorded Stock Movement',
             self::GeneratedDemandForecast => 'Generated Demand Forecast',
             self::RefreshedDemandForecast => 'Refreshed Demand Forecast',
@@ -241,7 +253,7 @@ enum AuditAction: string
                 self::TemporarilyLockedUser,
                 self::UnlockedUser,
             ], true) => 'Authentication',
-            in_array($this, [self::CreatedUser, self::UpdatedUser, self::DeletedUser], true) => 'User Administration',
+            in_array($this, [self::CreatedUser, self::UpdatedUser, self::DeletedUser, self::ArchivedUser, self::UnarchivedUser], true) => 'User Administration',
             str_contains($this->value, 'privacy_request')
                 || str_contains($this->value, 'security_incident')
                 || $this === self::ExecutedDataRetention => 'Privacy & Security Governance',

@@ -37,6 +37,9 @@ class Supplier extends Model
         'approved_by',
         'last_reviewed_at',
         'suspension_reason',
+        'archived_at',
+        'archived_by',
+        'archive_reason',
     ];
 
     protected function casts(): array
@@ -48,6 +51,7 @@ class Supplier extends Model
             'accreditation_expires_at' => 'date',
             'standard_lead_time_days' => 'integer',
             'last_reviewed_at' => 'datetime',
+            'archived_at' => 'datetime',
         ];
     }
 
@@ -106,6 +110,11 @@ class Supplier extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function archivedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'archived_by');
     }
 
     public function hasLogo(): bool
@@ -217,5 +226,20 @@ class Supplier extends Model
                             ->whereNotNull('expires_at')
                             ->whereDate('expires_at', '<', today()));
                 }));
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->status === SupplierStatus::Archived;
+    }
+
+    public function scopeArchived(Builder $query): Builder
+    {
+        return $query->where('status', SupplierStatus::Archived->value);
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', SupplierStatus::Active->value);
     }
 }

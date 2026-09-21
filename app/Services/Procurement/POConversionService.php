@@ -34,7 +34,7 @@ class POConversionService
         return DB::transaction(function () use ($data, $buyer): PurchaseOrder {
             $supplier = Supplier::procurementEligible()->find($data['supplier_id']);
             $item = InventoryItem::query()
-                ->where('status', '!=', 'inactive')
+                ->whereNotIn('status', ['inactive', 'archived'])
                 ->find($data['item_id']);
 
             if (! $supplier || ! $item) {

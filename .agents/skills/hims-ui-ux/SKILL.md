@@ -87,6 +87,33 @@ Operational hospital workspaces, clinical catalogs, inventory tables, procuremen
 - Route flash messages through the existing central flash rendering. Do not add a second banner partial or a page-local duplicate.
 - Keep `dismissible` for transient confirmations only. A condition the user still has to resolve must stay visible.
 
+### Avoid Redundant Feedback & Dual Notifications ("Bawal ang Redundant / Isang Success Feedback Lang")
+
+Every authenticated page in HIMS wrapped with `<x-app-layout>` automatically includes the centralized, floating toast notification HUD (`layouts/partials/toast-notifications.blade.php`), which intercepts `session('status')`, `session('success')`, `session('error')`, `session('warning')`, and `session('info')`.
+
+- **Strict Prohibition of Duplicate In-Page Success Alerts**:
+  - Never add an in-page `@if (session('success')) <x-ui.alert variant="success">` or page-local green alert banner on screens using `<x-app-layout>`.
+  - Doing so creates dual/redundant notifications—the floating toast HUD appears in the top-right corner while an identical green banner renders simultaneously in the main document, cluttering the view, pushing down tables and dashboards, and confusing the user ("kasi redundant na yang mga ganiyan kapag may another na nag-e-exist, make sure na may matitirang isa na success ang action na ginawa").
+  - **Only ONE success notification must exist per action**: The centralized floating toast notification HUD serves as the single authority for transient success feedback.
+- **When are Page Alerts Permitted?**:
+  - In-page alerts (`x-ui.alert`) are reserved strictly for:
+    1. Actionable blocking error summaries (`@if ($errors->any()) <x-ui.alert variant="danger">`), where the user must review specific form fields or system rejections.
+    2. Persistent operational warnings or compliance states (e.g. "Archived Supplier Record", "Not eligible for procurement").
+  - Never use an in-page banner for routine success confirmations that the central toast already handles.
+
+### Avoid Redundant Loading Indicators ("Bawal ang Dalawang Loading / Isang Loading Indicator Lang")
+
+Never show multiple loading indicators simultaneously for a single user action. Redundant loading states—such as an in-button spinner running simultaneously with a center-screen modal overlay card—create visual noise, distract the user, and obscure form content ("pati sa pag-loading, hindi rin dapat may redundant, tulad niyan dalawa ang nag-lo-loading, itira ang much better na loading or yung mas akma, sa login page, mas gusto ko yung nag-lo-loading sa mismong button kaysa doon sa nasa gitna na may HIMS na nakalagay").
+
+- **Form Submissions with Action Buttons (Login, Modals, Edit/Create Forms, Lifecycle Actions)**:
+  - **In-Button Loading State as the Standard**: When a form is submitted via an action button, use the in-button loader (`setButtonLoading` with `data-loading-text="..."` e.g., "Signing in...", "Saving...", "Archiving..."). The button is automatically disabled to prevent double submissions and displays an inline micro-spinner and contextual text.
+  - **Prohibition of Center Screen Overlay on Button Submissions**: Never trigger the central screen overlay (`data-hims-loading-overlay` card saying "Please wait while HIMS processes your request") when an in-button loader is already active. The button itself is the much cleaner, more contextual, and superior feedback mechanism.
+- **When is the Central Loading Overlay Permitted?**:
+  - The central screen overlay is strictly reserved for actions where no contextual button exists:
+    1. Full-page internal link navigation (`a[href]` clicks) where navigation progress needs visibility ("Loading page...").
+    2. File export/download operations via `[data-hims-download]` ("Preparing document...").
+    3. Headless or programmatic form submissions where no submitter button exists ("Processing request...").
+
 ### No emoji
 
 - No emoji in labels, headings, buttons, badges, table cells, flash copy, validation messages, notifications, or option text.
@@ -260,7 +287,7 @@ Every paginated table, list, log, and workspace in HIMS must follow the exact sa
 
 - Forms and internal navigation participate in the global loading system in `resources/js/app.js`. Use established `data-loading-text` and opt-out hooks rather than adding a second spinner system. Loading behavior also guards against duplicate submissions.
 - Confirmation dialogs use the shared decision-confirmation partial and `data-confirm-*` hooks, with specialized handling for MFA and email changes. Do not add a competing modal without checking this flow.
-- Flash feedback is rendered centrally for `status`/`success`, `error`, and `info`; profile/auth pages also have local named error bags and messages. Keep redirects and message keys aligned with the controller.
+- Flash feedback is rendered centrally by the floating Toast Notification HUD in `layouts/partials/toast-notifications.blade.php` for `status`/`success`, `error`, `warning`, and `info`. Never create duplicate in-page success alert banners for messages already captured by the central toast. Profile/auth pages maintain local named error bags for inline form validation errors.
 - The session-warning UI reflects server state; client timers must not become the authority for session validity.
 - Dashboard and audit autocomplete interactions already use Alpine/JavaScript contracts. Preserve cancellation, loading, empty, error, and stale-request behavior.
 - Keep route names, breadcrumbs, sidebar active states, back/redirect behavior, and permission-based visibility consistent.

@@ -178,6 +178,31 @@
                                         {{ $account->isActive() ? 'Deactivate' : 'Reactivate' }}
                                     </x-ui.button>
                                 </form>
+
+                                @can(\App\Enums\Permission::ManageArchive->value)
+                                    @unless ($account->isProtected())
+                                        <x-ui.button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            class="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                            @click="$dispatch('open-archive-modal', {
+                                                actionUrl: '{{ route('admin.users.archive', $account) }}',
+                                                title: '{{ addslashes($account->name) }}',
+                                                identifier: 'Employee ID: {{ addslashes($account->employee_id ?? 'N/A') }} · {{ addslashes($account->email) }}',
+                                                context: 'Role: {{ addslashes($account->role?->label() ?? 'Staff') }}',
+                                                type: 'User Account',
+                                                presets: [
+                                                    'Employee resignation / separation from hospital',
+                                                    'Contract ended / tenure completed',
+                                                    'Department transfer / role access revoked',
+                                                    'Duplicate user account profile'
+                                                ]
+                                            })">
+                                            Archive
+                                        </x-ui.button>
+                                    @endunless
+                                @endcan
                             @endunless
                         @elseif ($account->isProtected())
                             <x-ui.badge variant="warning">Protected</x-ui.badge>
@@ -316,6 +341,31 @@
                                                     {{ $account->isActive() ? 'Deactivate' : 'Reactivate' }}
                                                 </x-ui.button>
                                             </form>
+
+                                            @can(\App\Enums\Permission::ManageArchive->value)
+                                                @unless ($account->isProtected())
+                                                    <x-ui.button
+                                                        type="button"
+                                                        size="sm"
+                                                        class="px-2 py-1 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                                        variant="ghost"
+                                                        @click="$dispatch('open-archive-modal', {
+                                                            actionUrl: '{{ route('admin.users.archive', $account) }}',
+                                                            title: '{{ addslashes($account->name) }}',
+                                                            identifier: 'Employee ID: {{ addslashes($account->employee_id ?? 'N/A') }} · {{ addslashes($account->email) }}',
+                                                            context: 'Role: {{ addslashes($account->role?->label() ?? 'Staff') }}',
+                                                            type: 'User Account',
+                                                            presets: [
+                                                                'Employee resignation / separation from hospital',
+                                                                'Contract ended / tenure completed',
+                                                                'Department transfer / role access revoked',
+                                                                'Duplicate user account profile'
+                                                            ]
+                                                        })">
+                                                        Archive
+                                                    </x-ui.button>
+                                                @endunless
+                                            @endcan
                                         @endunless
                                     @elseif ($account->isProtected())
                                         <x-ui.badge variant="warning">Protected</x-ui.badge>

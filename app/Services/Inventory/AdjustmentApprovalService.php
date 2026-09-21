@@ -37,6 +37,13 @@ class AdjustmentApprovalService
     {
         $adjustment = DB::transaction(function () use ($data, $requester) {
             $item = InventoryItem::lockForUpdate()->findOrFail($data['item_id']);
+
+            if ($item->isArchived()) {
+                throw ValidationException::withMessages([
+                    'item_id' => ["Cannot adjust stock for archived item '{$item->name}'. Restore the item from the archive first."],
+                ]);
+            }
+
             $location = StorageLocation::findOrFail($data['storage_location_id']);
             $batchId = $data['item_batch_id'] ?? null;
             $type = $data['adjustment_type']; // increase, decrease, correction

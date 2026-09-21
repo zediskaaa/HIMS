@@ -91,6 +91,8 @@ enum UserRole: string
                 Permission::ManageWarehouseTopology,
                 Permission::PrintWarehouseLabels,
                 Permission::GenerateForecasts,
+                Permission::ViewArchive,
+                Permission::ManageArchive,
             ],
 
             // Owns the storeroom records: the item master, supplier directory,
@@ -205,6 +207,7 @@ enum UserRole: string
                 Permission::ViewLogisticsSensitiveData,
                 Permission::ViewProcessReviews,
                 Permission::ViewAuditTrail,
+                Permission::ViewArchive,
             ],
 
             // Passive executive observers: read-only operational summaries and

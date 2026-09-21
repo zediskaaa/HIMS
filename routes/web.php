@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ArchiveController;
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\PermissionMatrixController;
 use App\Http\Controllers\Admin\PrivacyGovernanceController;
@@ -107,6 +108,8 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::post('/inventory/suppliers/{supplier}/approve', [SupplierController::class, 'approve'])->name('inventory.suppliers.approve');
     Route::post('/inventory/suppliers/{supplier}/reject', [SupplierController::class, 'reject'])->name('inventory.suppliers.reject');
     Route::post('/inventory/suppliers/{supplier}/suspend', [SupplierController::class, 'suspend'])->name('inventory.suppliers.suspend');
+    Route::post('/inventory/suppliers/{supplier}/archive', [ArchiveController::class, 'archiveSupplier'])->name('inventory.suppliers.archive');
+    Route::post('/inventory/suppliers/{supplier}/unarchive', [ArchiveController::class, 'unarchiveSupplier'])->name('inventory.suppliers.unarchive');
     Route::post('/inventory/suppliers/{supplier}/inactivate', [SupplierController::class, 'inactivate'])->name('inventory.suppliers.inactivate');
     Route::post('/inventory/suppliers/{supplier}/reactivate', [SupplierController::class, 'reactivate'])->name('inventory.suppliers.reactivate');
     Route::post('/inventory/suppliers/{supplier}/products', [SupplierController::class, 'addProduct'])->name('inventory.suppliers.products.store');
@@ -117,6 +120,8 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::patch('/inventory/suppliers/{supplier}/contracts/{contract}', [SupplierController::class, 'updateContract'])->name('inventory.suppliers.contracts.update');
     Route::get('/inventory/items', [InventoryItemController::class, 'index'])->name('inventory.items');
     Route::post('/inventory/items', [InventoryItemController::class, 'store'])->name('inventory.items.store');
+    Route::post('/inventory/items/{item}/archive', [ArchiveController::class, 'archiveItem'])->name('inventory.items.archive');
+    Route::post('/inventory/items/{item}/unarchive', [ArchiveController::class, 'unarchiveItem'])->name('inventory.items.unarchive');
     Route::get('/inventory/storage-locations', [StorageLocationController::class, 'index'])->name('inventory.storage-locations');
     Route::post('/inventory/storage-locations', [StorageLocationController::class, 'store'])->name('inventory.storage-locations.store');
     Route::patch('/inventory/storage-locations/{storageLocation}/status', [StorageLocationController::class, 'updateStatus'])->name('inventory.storage-locations.status');
@@ -319,6 +324,17 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
     Route::patch('/users/{user}/status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
     Route::patch('/users/{user}/unlock', [UserController::class, 'unlock'])->name('users.unlock');
+    Route::post('/users/{user}/archive', [ArchiveController::class, 'archiveUser'])->name('users.archive');
+    Route::post('/users/{user}/unarchive', [ArchiveController::class, 'unarchiveUser'])->name('users.unarchive');
+
+    // Centralized Master Record Archive Workspace
+    Route::get('/archive', [ArchiveController::class, 'index'])->name('archive.index');
+    Route::post('/archive/items/{item}/archive', [ArchiveController::class, 'archiveItem'])->name('archive.items.archive');
+    Route::post('/archive/items/{item}/unarchive', [ArchiveController::class, 'unarchiveItem'])->name('archive.items.unarchive');
+    Route::post('/archive/suppliers/{supplier}/archive', [ArchiveController::class, 'archiveSupplier'])->name('archive.suppliers.archive');
+    Route::post('/archive/suppliers/{supplier}/unarchive', [ArchiveController::class, 'unarchiveSupplier'])->name('archive.suppliers.unarchive');
+    Route::post('/archive/users/{user}/archive', [ArchiveController::class, 'archiveUser'])->name('archive.users.archive');
+    Route::post('/archive/users/{user}/unarchive', [ArchiveController::class, 'unarchiveUser'])->name('archive.users.unarchive');
 
     // The role-versus-module matrix, generated from the same enum the gates are
     // registered from, so it cannot drift from what is actually enforced.

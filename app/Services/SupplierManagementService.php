@@ -236,6 +236,9 @@ class SupplierManagementService
             if ($supplier->status === SupplierStatus::Inactive) {
                 throw ValidationException::withMessages(['status' => 'The supplier is already inactive.']);
             }
+            if ($supplier->isArchived()) {
+                throw ValidationException::withMessages(['status' => 'Archived suppliers cannot be inactivated. Use the Archive workspace to restore this record.']);
+            }
             $oldStatus = $supplier->status->value;
             $supplier->update(['status' => SupplierStatus::Inactive, 'suspension_reason' => $reason]);
             $this->audit->log(AuditAction::InactivatedSupplier, $actor, 'Inactivated the supplier record for new procurement.', $supplier, $supplier->name, ['status' => $oldStatus], ['status' => 'inactive', 'reason' => $reason]);

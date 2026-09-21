@@ -14,7 +14,8 @@
         $hasLifecycle = ($canReview && in_array($accreditation, $reviewableStates, true))
             || ($canApprove && $supplier->accreditation_status === \App\Enums\SupplierAccreditationStatus::PendingReview)
             || ($canApprove && $supplier->status === \App\Enums\SupplierStatus::Active)
-            || ($canApprove && in_array($supplier->status, [\App\Enums\SupplierStatus::Suspended, \App\Enums\SupplierStatus::Inactive], true));
+            || ($canApprove && in_array($supplier->status, [\App\Enums\SupplierStatus::Suspended, \App\Enums\SupplierStatus::Inactive], true))
+            || auth()->user()?->can(\App\Enums\Permission::ManageArchive->value);
 
         // Sections render as tabs, so only the permitted ones become tabs at all.
         $profileSections = ['overview' => 'Overview'];
@@ -55,8 +56,22 @@
         </x-slot:actions>
     </x-ui.page-header>
 
+    @if ($errors->any())
+        <x-ui.alert variant="danger" class="mt-4" title="Operation refused">
+            <ul class="space-y-0.5 list-disc list-inside">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </x-ui.alert>
+    @endif
+
     {{-- Page-level, so it stays visible whichever tab is open. --}}
-    @if (! $supplier->isProcurementEligible())
+    @if ($supplier->isArchived())
+        <x-ui.alert variant="neutral" title="Archived Supplier Record" class="mt-5">
+            This supplier has been archived and removed from active procurement. Historical purchase orders, invoices, and compliance audits remain preserved.
+        </x-ui.alert>
+    @elseif (! $supplier->isProcurementEligible())
         <x-ui.alert variant="warning" title="Not eligible for new procurement" class="mt-5">
             This record is retained for history, but it will not appear in new requisition, quotation, or purchase-order supplier choices until operational status, accreditation, and blocking evidence are current.
         </x-ui.alert>
@@ -733,6 +748,45 @@
                         <x-ui.button type="submit" class="w-full" data-loading-text="Reactivating...">Reactivate Supplier</x-ui.button>
                     </form>
                 @endif
+
+                @can(\App\Enums\Permission::ManageArchive->value)
+                    @unless ($supplier->isArchived())
+                        <form method="POST" action="{{ route('inventory.suppliers.archive', $supplier) }}" class="space-y-3 border-t border-neutral-200 pt-4"
+                              x-data="{
+                                  archiveReason: '',
+                                  setReason(val) { this.archiveReason = val; }
+                              }">
+                            @csrf
+                            <input type="hidden" name="_supplier_form" value="lifecycle">
+                            <div class="space-y-1.5">
+                                <label for="supplier_show_archive_reason" class="block text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                                    Archive Justification / Reason <span class="text-rose-600">*</span>
+                                </label>
+                                <div class="flex flex-wrap gap-1.5 pb-1">
+                                    <button type="button" @click="setReason('Vendor business ceased operations / bankruptcy')" class="px-2 py-0.5 text-[11px] rounded border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700">Business ceased</button>
+                                    <button type="button" @click="setReason('Procurement contract concluded / terminated')" class="px-2 py-0.5 text-[11px] rounded border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700">Contract terminated</button>
+                                    <button type="button" @click="setReason('Failed compliance / accreditation standards')" class="px-2 py-0.5 text-[11px] rounded border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700">Failed compliance</button>
+                                    <button type="button" @click="setReason('Duplicate vendor record')" class="px-2 py-0.5 text-[11px] rounded border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700">Duplicate</button>
+                                </div>
+                                <textarea
+                                    id="supplier_show_archive_reason"
+                                    name="reason"
+                                    x-model="archiveReason"
+                                    required
+                                    minlength="3"
+                                    maxlength="500"
+                                    rows="2"
+                                    class="w-full rounded-md border-neutral-300 text-xs shadow-2xs focus:border-rose-500 focus:ring-rose-500"
+                                    placeholder="State operational reason for archiving this supplier (e.g. Contract terminated, failed compliance)..."
+                                ></textarea>
+                                <p class="text-[11px] text-neutral-500">Historical purchase orders, invoices, and compliance audits will remain preserved in the archive.</p>
+                            </div>
+                            <x-ui.button type="submit" variant="danger" class="w-full" data-loading-text="Archiving..." x-bind:disabled="archiveReason.trim().length < 3">
+                                Archive Supplier Record
+                            </x-ui.button>
+                        </form>
+                    @endunless
+                @endcan
             </div>
         </x-ui.modal>
 

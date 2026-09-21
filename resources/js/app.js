@@ -1366,7 +1366,9 @@ const startLoadingIndicators = () => {
         if (submitter) {
             const label = loadingLabelFor(submitter, form);
             setButtonLoading(submitter, label);
-            showOverlay(label);
+            if (form.matches('[data-show-overlay]') || submitter.matches('[data-show-overlay]')) {
+                showOverlay(label);
+            }
         } else {
             showOverlay('Processing request...');
         }

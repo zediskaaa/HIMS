@@ -52,9 +52,13 @@ class InventoryItem extends Model
         'supplier_id',
         'default_location_id',
         'status',
+        'archived_at',
+        'archived_by',
+        'archive_reason',
     ];
 
     protected $casts = [
+        'archived_at' => 'datetime',
         'is_batch_tracked' => 'boolean',
         'is_serial_tracked' => 'boolean',
         'is_expiry_tracked' => 'boolean',
@@ -104,6 +108,11 @@ class InventoryItem extends Model
     public function defaultLocation(): BelongsTo
     {
         return $this->belongsTo(StorageLocation::class, 'default_location_id');
+    }
+
+    public function archivedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'archived_by');
     }
 
     public function batches(): HasMany
@@ -373,6 +382,16 @@ class InventoryItem extends Model
      * lifecycle. Master-data pickers read through here so a deactivated item is
      * not offered, and so the column keeps one vocabulary.
      */
+    public function isArchived(): bool
+    {
+        return $this->status === 'archived';
+    }
+
+    public function scopeArchived($query)
+    {
+        return $query->where('status', 'archived');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');

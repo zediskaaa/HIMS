@@ -3,7 +3,7 @@
 @endphp
 
 <x-app-layout full-width>
-    <div x-data="{ createItemModal: {{ $errors->any() ? 'true' : 'false' }}, openDropdown: null }"
+    <div x-data="{ createItemModal: {{ ($errors->any() && ! $errors->has('archive') && ! $errors->has('unarchive')) ? 'true' : 'false' }}, openDropdown: null }"
          @keydown.escape.window="createItemModal = false"
          class="space-y-6">
 
@@ -11,9 +11,13 @@
             title="Inventory Items"
             :breadcrumbs="['Home' => route(\App\Support\AuthenticationContext::dashboardRoute()), 'Inventory Items' => null]" />
 
-        @if (session('success'))
-            <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-                {{ session('success') }}
+        @if ($errors->any())
+            <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
+                <ul class="space-y-1 list-disc list-inside">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
             </div>
         @endif
 
@@ -150,6 +154,26 @@
                                                title="Adjust stock balance for {{ $item->name }}">
                                                 Adjust
                                             </a>
+                                        @endcan
+                                        @can(\App\Enums\Permission::ManageArchive->value)
+                                            <button type="button"
+                                                    @click="$dispatch('open-archive-modal', {
+                                                        actionUrl: '{{ route('inventory.items.archive', $item) }}',
+                                                        title: '{{ addslashes($item->name) }}',
+                                                        identifier: 'SKU: {{ addslashes($item->sku) }}',
+                                                        context: 'Stock on Hand: {{ number_format($item->quantity_on_hand) }} units',
+                                                        type: 'Inventory Item',
+                                                        presets: [
+                                                            'Discontinued by manufacturer / vendor',
+                                                            'Replaced by alternate formulary / newer SKU',
+                                                            'Expired / obsolete clinical catalog record',
+                                                            'Duplicate inventory item listing'
+                                                        ]
+                                                    })"
+                                                    class="inline-flex items-center gap-1 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition shadow-2xs"
+                                                    title="Archive {{ $item->name }}">
+                                                Archive
+                                            </button>
                                         @endcan
                                     </div>
                                 </td>
