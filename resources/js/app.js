@@ -1536,6 +1536,8 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     chartAnimationFrame: null,
     chartAnimationProgress: 1,
     chartAnimating: false,
+    hoveredMiniItem: null,
+    miniTooltipStyle: '',
 
     init() {
         if (this.forecast) {
@@ -1730,6 +1732,68 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         if (low >= threshold) return 'Low';
 
         return 'Medium';
+    },
+
+    highDemandCount() {
+        return this.filteredItems().filter((item) => (
+            item.demand_trend === 'increasing'
+            || (Number(item.predicted_demand || 0) > Number(item.historical_consumption || 0) && Number(item.predicted_demand || 0) > 0)
+        )).length;
+    },
+
+    stableRiskCount() {
+        return this.filteredItems().filter((item) => (
+            item.risk_level === 'low'
+            && (item.projected_stock_status === 'sufficient' || item.projected_stock_status === 'uncertain')
+        )).length;
+    },
+
+    confidenceBreakdown() {
+        const items = this.filteredItems();
+        return {
+            high: items.filter((item) => item.confidence === 'high').length,
+            medium: items.filter((item) => item.confidence === 'medium').length,
+            low: items.filter((item) => item.confidence === 'low').length,
+        };
+    },
+
+    topRiskItems(limit = 3) {
+        const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
+        return [...this.filteredItems()].sort((a, b) => {
+            const prioA = priorityOrder[a.reorder_priority] ?? (a.risk_level === 'high' ? 1 : (a.risk_level === 'medium' ? 2 : 3));
+            const prioB = priorityOrder[b.reorder_priority] ?? (b.risk_level === 'high' ? 1 : (b.risk_level === 'medium' ? 2 : 3));
+            if (prioA !== prioB) return prioA - prioB;
+            const deficitA = Math.max(0, Number(a.predicted_demand || 0) - Number(a.current_stock || 0));
+            const deficitB = Math.max(0, Number(b.predicted_demand || 0) - Number(b.current_stock || 0));
+            if (deficitA !== deficitB) return deficitB - deficitA;
+            return Number(b.predicted_demand || 0) - Number(a.predicted_demand || 0);
+        }).slice(0, limit);
+    },
+
+    setMiniHover(item, event) {
+        this.hoveredMiniItem = item;
+        if (!item || !event) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const tipWidth = 270;
+        const tipHeight = 135;
+        const gutter = 12;
+
+        let x = rect.left + (rect.width / 2) - (tipWidth / 2);
+        if (x + tipWidth > window.innerWidth - gutter) {
+            x = window.innerWidth - tipWidth - gutter;
+        }
+        if (x < gutter) x = gutter;
+
+        let y = rect.top - tipHeight - 8;
+        if (y < gutter) {
+            y = rect.bottom + 8;
+        }
+
+        this.miniTooltipStyle = `position: fixed; left: ${Math.round(x)}px; top: ${Math.round(y)}px; z-index: 70;`;
+    },
+
+    clearMiniHover() {
+        this.hoveredMiniItem = null;
     },
 
     summaryPredictedDemand() {
@@ -2551,16 +2615,18 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
         const highRisk = this.highRiskCount();
         const lowStock = this.lowStockRiskCount();
         const reorder = this.recommendedReorder();
+        const periodText = this.forecast?.forecast_period ? this.forecast.forecast_period.toLowerCase() : 'the forecast period';
+        const hasLimitedData = this.filteredItems().some((item) => item.limited_data);
 
-        if (highRisk > 0) {
-            return `${highRisk} ${highRisk === 1 ? 'item is' : 'items are'} at high demand risk; ${lowStock} ${lowStock === 1 ? 'item is' : 'items are'} projected to have low or no stock.`;
+        if (highRisk > 0 || lowStock > 0) {
+            return `${highRisk} ${highRisk === 1 ? 'item is' : 'items are'} currently at high demand risk, with ${lowStock} projected to reach low or no stock during ${periodText}.`;
         }
 
-        if (lowStock > 0) {
-            return `${lowStock} ${lowStock === 1 ? 'item is' : 'items are'} projected to have low stock, with ${this.formatNumber(reorder)} suggested reorder units.`;
+        if (hasLimitedData && this.confidenceLabel() === 'Low') {
+            return 'Forecast coverage is limited because some items do not have sufficient historical demand data.';
         }
 
-        return `No filtered items are projected to run low. Predicted demand is ${this.formatNumber(this.predictedDemand())} units for this period.`;
+        return `No high-risk items are currently projected during the selected forecast period. Total predicted demand is ${this.formatNumber(this.predictedDemand())} units.`;
     },
 
     clearFilters() {

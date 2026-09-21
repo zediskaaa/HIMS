@@ -786,52 +786,235 @@
                     </div>
                 </x-ui.card>
 
-                <x-ui.card :padding="false">
-                    <div class="p-3">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-700">
-                                <x-ui.icon name="arrow-trending-up" class="h-4 w-4" />
+                <x-ui.card :padding="false" class="min-w-0">
+                    <div class="p-3 space-y-2.5">
+                        {{-- Header & Context: Compact AI Forecast Insight Identity & Dynamic Statement --}}
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-start gap-2.5 min-w-0">
+                                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-700 dark:bg-primary-950/80 dark:text-primary-300 ring-1 ring-primary-200 dark:ring-primary-800/50">
+                                    <x-ui.icon name="arrow-trending-up" class="h-3.5 w-3.5" />
+                                </span>
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        <h2 class="text-xs font-bold text-neutral-900 dark:text-neutral-100" x-text="forecast?.source === 'ai' ? 'AI forecast insight' : 'Forecast insight'">AI forecast insight</h2>
+                                        <span class="text-[10px] font-medium text-neutral-400 dark:text-neutral-500" x-text="`&middot; ${forecast?.forecast_period || `Next ${forecastDays} days`}`"></span>
+                                    </div>
+                                    <p class="mt-0.5 text-[11px] leading-snug text-neutral-600 dark:text-neutral-300 line-clamp-2" x-text="forecast ? insight() : 'Forecast data is unavailable for demand and reorder guidance.'"></p>
+                                </div>
+                            </div>
+                            <span x-show="loading" x-cloak class="inline-flex shrink-0 items-center gap-1 text-[10px] text-primary-600 dark:text-primary-400">
+                                <x-ui.icon name="arrow-path" class="h-3 w-3 animate-spin" />
                             </span>
-                            <div class="min-w-0">
-                                <h2 class="text-sm font-semibold text-neutral-900" x-text="forecast?.source === 'ai' ? 'AI forecast insight' : 'Forecast insight'"></h2>
-                                <p class="mt-1 text-xs leading-relaxed text-neutral-600" x-text="forecast ? insight() : 'Forecast data is unavailable for demand and reorder guidance.'"></p>
+                        </div>
+
+                        {{-- Loading Skeleton State --}}
+                        <div x-show="loading && !forecast" x-cloak class="space-y-2 py-2 animate-pulse">
+                            <div class="grid grid-cols-4 gap-1.5">
+                                <div class="h-10 rounded bg-neutral-100 dark:bg-neutral-800"></div>
+                                <div class="h-10 rounded bg-neutral-100 dark:bg-neutral-800"></div>
+                                <div class="h-10 rounded bg-neutral-100 dark:bg-neutral-800"></div>
+                                <div class="h-10 rounded bg-neutral-100 dark:bg-neutral-800"></div>
+                            </div>
+                            <div class="h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800"></div>
+                            <div class="h-14 rounded bg-neutral-100 dark:bg-neutral-800"></div>
+                        </div>
+
+                        {{-- Empty State --}}
+                        <div x-show="!loading && !error && (!forecast || allItems().length === 0)" x-cloak class="rounded-lg border border-neutral-200/80 bg-neutral-50/60 p-3 text-center text-xs text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900/40 dark:text-neutral-400">
+                            No forecast data available for the selected period.
+                        </div>
+
+                        {{-- Compact Forecast Overview Content --}}
+                        <div x-show="forecast && allItems().length > 0" class="space-y-2.5">
+                            {{-- 1. Key Forecast Indicators (Ultra-Dense 4-Col Grid) --}}
+                            <div class="grid grid-cols-4 gap-1.5 rounded-lg border border-neutral-200/90 bg-neutral-50/70 p-1.5 text-center dark:border-neutral-800 dark:bg-neutral-800/40">
+                                {{-- Projected at-risk items --}}
+                                <div title="Projected at-risk items" class="min-w-0">
+                                    <span class="block text-[10px] font-medium text-neutral-500 dark:text-neutral-400 truncate">Projected at-risk items</span>
+                                    <span class="text-base font-bold tabular-nums text-danger-700 dark:text-rose-400" x-text="highRiskCount()"></span>
+                                </div>
+                                {{-- Low / No Stock --}}
+                                <div title="Low / No Stock" class="min-w-0">
+                                    <span class="block text-[10px] font-medium text-neutral-500 dark:text-neutral-400 truncate">Low / No Stock</span>
+                                    <span class="text-base font-bold tabular-nums text-amber-600 dark:text-amber-400" x-text="lowStockRiskCount()"></span>
+                                </div>
+                                {{-- High Demand --}}
+                                <div title="High Demand" class="min-w-0">
+                                    <span class="block text-[10px] font-medium text-neutral-500 dark:text-neutral-400 truncate">High Demand</span>
+                                    <span class="text-base font-bold tabular-nums text-violet-700 dark:text-violet-400" x-text="highDemandCount()"></span>
+                                </div>
+                                {{-- Forecast Items --}}
+                                <div title="Forecast Items" class="min-w-0">
+                                    <span class="block text-[10px] font-medium text-neutral-500 dark:text-neutral-400 truncate">Forecast Items</span>
+                                    <span class="text-base font-bold tabular-nums text-neutral-900 dark:text-neutral-100" x-text="allItems().length"></span>
+                                </div>
+                            </div>
+
+                            {{-- 2. Confidence & Demand Risk Breakdown (Combined Dense Row) --}}
+                            <div class="space-y-1 text-[11px]">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-1">
+                                        <span class="font-medium text-neutral-500 dark:text-neutral-400">Risk:</span>
+                                        <span class="font-bold text-danger-600 dark:text-rose-400 tabular-nums" x-text="`${highRiskCount()} High`"></span> &middot;
+                                        <span class="font-bold text-amber-600 dark:text-amber-400 tabular-nums" x-text="`${moderateRiskCount()} Med`"></span> &middot;
+                                        <span class="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums" x-text="`${lowRiskCount()} Low`"></span>
+                                    </div>
+                                    <div class="text-[10px] tabular-nums text-neutral-400 dark:text-neutral-500 flex items-center gap-1">
+                                        <span class="font-medium">Forecast confidence:</span>
+                                        <strong class="capitalize font-bold text-neutral-800 dark:text-neutral-200" x-text="confidenceLabel()"></strong>
+                                        <span
+                                            x-show="lowStockRiskCount() > 0 && confidenceLabel() === 'Low'"
+                                            x-cloak
+                                            class="text-[10px] font-medium text-warning-700 dark:text-amber-400"
+                                        >(review needed)</span>
+                                    </div>
+                                </div>
+                                {{-- Proportional Segmented Bar --}}
+                                <div class="flex h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
+                                    <div
+                                        class="bg-danger-500 dark:bg-rose-500 transition-all duration-300"
+                                        x-bind:style="`width: ${allItems().length ? (highRiskCount() / allItems().length) * 100 : 0}%`"
+                                    ></div>
+                                    <div
+                                        class="bg-warning-500 dark:bg-amber-500 transition-all duration-300"
+                                        x-bind:style="`width: ${allItems().length ? (moderateRiskCount() / allItems().length) * 100 : 0}%`"
+                                    ></div>
+                                    <div
+                                        class="bg-success-500 dark:bg-emerald-500 transition-all duration-300"
+                                        x-bind:style="`width: ${allItems().length ? (lowRiskCount() / allItems().length) * 100 : 0}%`"
+                                    ></div>
+                                </div>
+                            </div>
+
+                            {{-- 3. Top Forecast Risks: Compact Dual-Bar Comparison --}}
+                            <div class="space-y-1.5 pt-0.5">
+                                <div class="flex items-center justify-between text-xs">
+                                    <span class="font-semibold text-neutral-900 dark:text-neutral-100">Top Forecast Risks</span>
+                                    <button
+                                        type="button"
+                                        x-on:click="clearFilters(); $dispatch('open-modal', 'dashboard-demand-forecast')"
+                                        class="text-[10px] font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
+                                    >
+                                        Review all <span x-text="allItems().length"></span> forecast items &rarr;
+                                    </button>
+                                </div>
+
+                                <div class="space-y-1.5">
+                                    <template x-for="item in topRiskItems(2)" x-bind:key="item.item_id">
+                                        <div
+                                            class="group/item cursor-pointer rounded-md border border-neutral-200/80 bg-neutral-50/50 p-2 transition hover:border-primary-300 hover:bg-primary-50/20 dark:border-neutral-800 dark:bg-neutral-800/30 dark:hover:border-primary-700/50 dark:hover:bg-primary-950/20"
+                                            x-on:click="selectItem(item.item_id)"
+                                            x-on:mouseenter="setMiniHover(item, $event)"
+                                            x-on:mouseleave="clearMiniHover()"
+                                            tabindex="0"
+                                            x-on:keydown.enter="selectItem(item.item_id)"
+                                            aria-label="Select item for chart inspection"
+                                        >
+                                            <div class="flex items-center justify-between gap-2">
+                                                <p class="truncate text-xs font-semibold text-neutral-900 dark:text-neutral-100" x-text="item.item_name"></p>
+                                                <span
+                                                    class="shrink-0 text-[10px] font-bold uppercase tracking-wider"
+                                                    x-bind:class="item.risk_level === 'high' ? 'text-danger-600 dark:text-rose-400' : (item.risk_level === 'medium' ? 'text-amber-600 dark:text-amber-400' : 'text-success-600 dark:text-emerald-400')"
+                                                    x-text="`${item.risk_level} risk`"
+                                                ></span>
+                                            </div>
+
+                                            {{-- Compact Dual Micro-Bars --}}
+                                            <div class="mt-1 space-y-1 text-[10px]">
+                                                <div class="flex items-center gap-1.5">
+                                                    <span class="w-11 text-neutral-500 dark:text-neutral-400 shrink-0">Demand</span>
+                                                    <div class="h-1.5 flex-1 rounded-full bg-neutral-200/70 dark:bg-neutral-700 overflow-hidden">
+                                                        <div
+                                                            class="h-full rounded-full bg-violet-600 dark:bg-violet-500 transition-all"
+                                                            x-bind:style="`width: ${Math.min(100, Math.max(10, (Number(item.predicted_demand || 0) / Math.max(Number(item.predicted_demand || 1), Number(item.current_stock || 1))) * 100))}%`"
+                                                        ></div>
+                                                    </div>
+                                                    <span class="w-11 text-right font-medium tabular-nums text-neutral-800 dark:text-neutral-200 shrink-0" x-text="formatNumber(item.predicted_demand)"></span>
+                                                </div>
+                                                <div class="flex items-center gap-1.5">
+                                                    <span class="w-11 text-neutral-500 dark:text-neutral-400 shrink-0">Stock</span>
+                                                    <div class="h-1.5 flex-1 rounded-full bg-neutral-200/70 dark:bg-neutral-700 overflow-hidden">
+                                                        <div
+                                                            class="h-full rounded-full transition-all"
+                                                            x-bind:class="item.current_stock <= 0 ? 'bg-danger-500 dark:bg-rose-500' : (item.current_stock < item.predicted_demand ? 'bg-amber-500 dark:bg-amber-400' : 'bg-emerald-500 dark:bg-emerald-400')"
+                                                            x-bind:style="`width: ${Math.min(100, Math.max(item.current_stock > 0 ? 8 : 0, (Number(item.current_stock || 0) / Math.max(Number(item.predicted_demand || 1), Number(item.current_stock || 1))) * 100))}%`"
+                                                        ></div>
+                                                    </div>
+                                                    <span class="w-11 text-right font-medium tabular-nums shrink-0" x-bind:class="item.current_stock <= 0 ? 'text-danger-600 dark:text-rose-400 font-bold' : 'text-neutral-800 dark:text-neutral-200'" x-text="formatNumber(item.current_stock)"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            {{-- 4. Compact Action Bar --}}
+                            <div class="flex items-center gap-1.5 pt-0.5">
+                                <button
+                                    type="button"
+                                    x-show="forecast"
+                                    x-cloak
+                                    x-on:click="risk = 'high'; $dispatch('open-modal', 'dashboard-demand-forecast')"
+                                    class="flex-1 inline-flex items-center justify-center gap-1 rounded-md border border-danger-200 bg-danger-50/80 py-1 px-2 text-xs font-semibold text-danger-700 shadow-2xs hover:bg-danger-100 dark:border-danger-800/80 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/50 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-500"
+                                >
+                                    <x-ui.icon name="exclamation-triangle" class="h-3 w-3" />
+                                    <span>Review High-Risk (<span x-text="highRiskCount()"></span>)</span>
+                                </button>
+                                <a
+                                    href="{{ route('inventory.demand-forecast') }}"
+                                    class="flex-1 inline-flex items-center justify-center gap-1 rounded-md border border-neutral-300 bg-white py-1 px-2 text-xs font-semibold text-neutral-700 shadow-2xs hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800 transition truncate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                >
+                                    <span>Full Module</span>
+                                    <x-ui.icon name="arrow-right" class="h-3 w-3" />
+                                </a>
                             </div>
                         </div>
 
-                        <dl x-show="forecast" x-cloak class="mt-3 grid grid-cols-2 gap-3 border-y border-neutral-200 py-2.5">
+                        {{-- Preserved Advisory Footer --}}
+                        <div class="border-t border-neutral-100 pt-1.5 dark:border-neutral-800/80 flex items-center justify-between text-[10px]">
+                            <p
+                                class="leading-tight text-neutral-400 dark:text-neutral-500"
+                                x-bind:class="lowStockRiskCount() > 0 && confidenceLabel() === 'Low' ? 'font-medium text-warning-700 dark:text-amber-400' : 'text-neutral-400 dark:text-neutral-500'"
+                                x-text="lowStockRiskCount() > 0 && confidenceLabel() === 'Low'
+                                    ? 'Low confidence: risk is preliminary - verify movement history before acting.'
+                                    : 'Advisory only; no stock or purchase order is changed automatically.'"
+                            >Advisory only; no stock or purchase order is changed automatically.</p>
+                            @can(\App\Enums\Permission::CreateRequisition->value)
+                                <a href="{{ route('inventory.requisitions.index') }}" class="shrink-0 text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 ml-2">Requisitions &rarr;</a>
+                            @endcan
+                        </div>
+                    </div>
+
+                    {{-- Fixed Intelligent Tooltip for Top Forecast Risks (Positioned safely without clipping) --}}
+                    <div
+                        x-show="hoveredMiniItem"
+                        x-cloak
+                        x-bind:style="miniTooltipStyle"
+                        class="pointer-events-none w-64 rounded-xl border border-neutral-200/90 bg-white/95 p-2.5 text-xs shadow-xl backdrop-blur-xs transition-all dark:border-neutral-700 dark:bg-neutral-900/95 dark:text-neutral-100"
+                    >
+                        <div class="border-b border-neutral-100 pb-1 dark:border-neutral-800">
+                            <p class="font-bold text-neutral-900 dark:text-neutral-100 truncate" x-text="hoveredMiniItem?.item_name"></p>
+                            <p class="text-[10px] text-neutral-400 dark:text-neutral-500" x-text="`SKU: ${hoveredMiniItem?.sku || 'N/A'} &middot; ${hoveredMiniItem?.category || 'General'}`"></p>
+                        </div>
+                        <dl class="mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1 text-[10px]">
                             <div>
-                                <dt class="text-[11px] text-neutral-500">Projected at-risk items</dt>
-                                <dd class="mt-0.5 text-lg font-semibold tabular-nums text-danger-700" x-text="lowStockRiskCount()"></dd>
+                                <dt class="text-neutral-400 dark:text-neutral-500">Predicted Demand</dt>
+                                <dd class="font-bold tabular-nums text-violet-700 dark:text-violet-400" x-text="`${formatNumber(hoveredMiniItem?.predicted_demand)} units`"></dd>
                             </div>
                             <div>
-                                <dt class="text-[11px] text-neutral-500">Forecast confidence</dt>
-                                <dd class="mt-0.5 flex flex-wrap items-baseline gap-x-1 text-sm font-semibold text-neutral-900">
-                                    <span class="capitalize" x-text="confidenceLabel()"></span>
-                                    <span
-                                        x-show="lowStockRiskCount() > 0 && confidenceLabel() === 'Low'"
-                                        x-cloak
-                                        class="text-[10px] font-medium normal-case text-warning-700"
-                                    >(review needed)</span>
-                                </dd>
+                                <dt class="text-neutral-400 dark:text-neutral-500">Available Stock</dt>
+                                <dd class="font-bold tabular-nums" x-bind:class="hoveredMiniItem?.current_stock <= 0 ? 'text-danger-600 dark:text-rose-400' : 'text-neutral-800 dark:text-neutral-200'" x-text="`${formatNumber(hoveredMiniItem?.current_stock)} units`"></dd>
+                            </div>
+                            <div>
+                                <dt class="text-neutral-400 dark:text-neutral-500">Reorder Suggested</dt>
+                                <dd class="font-bold tabular-nums text-amber-600 dark:text-amber-400" x-text="`${formatNumber(hoveredMiniItem?.recommended_reorder_quantity)} units`"></dd>
+                            </div>
+                            <div>
+                                <dt class="text-neutral-400 dark:text-neutral-500">Demand Trend</dt>
+                                <dd class="font-semibold capitalize text-neutral-800 dark:text-neutral-200" x-text="hoveredMiniItem?.demand_trend || 'stable'"></dd>
                             </div>
                         </dl>
-
-                        <button
-                            type="button"
-                            x-show="forecast"
-                            x-cloak
-                            x-on:click="$dispatch('open-modal', 'dashboard-demand-forecast')"
-                            class="mt-3 inline-flex text-xs font-semibold text-primary-700 hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                        >
-                            Review all <span class="mx-1" x-text="filteredItems().length"></span> forecast items
-                        </button>
-                        <p
-                            class="mt-2 text-[10px] leading-relaxed"
-                            x-bind:class="lowStockRiskCount() > 0 && confidenceLabel() === 'Low' ? 'font-medium text-warning-700' : 'text-neutral-400'"
-                            x-text="lowStockRiskCount() > 0 && confidenceLabel() === 'Low'
-                                ? 'Low confidence: risk is preliminary - verify movement history before acting.'
-                                : 'Advisory only; no stock or purchase order is changed automatically.'"
-                        ></p>
+                        <p class="mt-1.5 text-[10px] italic leading-tight text-neutral-500 dark:text-neutral-400 line-clamp-2" x-text="hoveredMiniItem?.explanation"></p>
                     </div>
                 </x-ui.card>
             </aside>
