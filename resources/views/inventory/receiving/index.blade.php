@@ -16,7 +16,28 @@
         openOrders: {{ Js::from($openPurchaseOrders) }},
         selectPo(poId) {
             this.selectedPo = this.openOrders.find(p => p.id == poId);
-            this.poLines = this.selectedPo ? this.selectedPo.lines : [];
+            if (!this.selectedPo) {
+                this.poLines = [];
+                return;
+            }
+            if (Array.isArray(this.selectedPo.lines) && this.selectedPo.lines.length > 0) {
+                this.poLines = this.selectedPo.lines;
+            } else if (this.selectedPo.item_id) {
+                this.poLines = [{
+                    id: this.selectedPo.id,
+                    po_line_id: this.selectedPo.id,
+                    item_id: this.selectedPo.item_id,
+                    item: this.selectedPo.item || null,
+                    ordered_quantity: this.selectedPo.quantity,
+                    received_quantity: 0,
+                    unit_price: this.selectedPo.unit_cost,
+                    total_line_amount: this.selectedPo.total_amount,
+                    purchase_unit: this.selectedPo.purchase_unit,
+                    conversion_factor: this.selectedPo.conversion_factor,
+                }];
+            } else {
+                this.poLines = [];
+            }
         }
     }">
 
@@ -239,13 +260,11 @@
                 @endif
             </div>
 
-        </div>
-
         {{-- Receive Shipment Modal --}}
         @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
         <div
             x-show="showReceiveModal"
-            class="fixed inset-0 z-50 overflow-y-auto bg-neutral-900/60 p-4 sm:p-6 md:p-20"
+            class="fixed inset-0 z-50 overflow-y-auto bg-neutral-900/70 p-3 sm:p-5 md:p-6 lg:p-8 flex items-center justify-center min-h-screen"
             x-cloak
             x-transition:enter="transition ease-out duration-200"
             x-transition:enter-start="opacity-0"
@@ -255,7 +274,7 @@
             x-transition:leave-end="opacity-0"
         >
             <div
-                class="mx-auto max-w-4xl rounded-2xl bg-white shadow-2xl ring-1 ring-neutral-900/10 overflow-hidden"
+                class="w-full max-w-6xl xl:max-w-7xl my-auto rounded-2xl bg-white dark:bg-neutral-900 shadow-2xl ring-1 ring-neutral-900/10 dark:ring-neutral-800 overflow-hidden border border-neutral-200 dark:border-neutral-800"
                 @click.away="showReceiveModal = false"
             >
                 <form action="{{ route('inventory.receiving.store') }}" method="POST" class="space-y-6"
@@ -265,87 +284,87 @@
                     @csrf
                     <input type="hidden" name="purchase_order_id" :value="selectedPo ? selectedPo.id : ''">
 
-                    <div class="border-b border-neutral-200 bg-neutral-50 px-6 py-4 flex items-center justify-between">
+                    <div class="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/80 px-6 py-4 flex items-center justify-between">
                         <div>
-                            <h3 class="text-lg font-bold text-neutral-900">Dock Receiving &amp; Goods Receipt Note</h3>
-                            <p class="text-xs text-neutral-500">Capture carrier bill of lading, verify line quantities (+5% max tolerance), and place in Quarantine.</p>
+                            <h3 class="text-lg font-bold text-neutral-900 dark:text-neutral-100">Dock Receiving &amp; Goods Receipt Note</h3>
+                            <p class="text-xs text-neutral-500 dark:text-neutral-400">Capture carrier bill of lading, verify line quantities (+5% max tolerance), and place in Quarantine.</p>
                         </div>
-                        <button type="button" @click="showReceiveModal = false" class="text-neutral-400 hover:text-neutral-600">
+                        <button type="button" @click="showReceiveModal = false" class="rounded-lg p-1.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
                             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
 
                     <div class="px-6 space-y-6">
                         {{-- PO & Supplier Header --}}
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-primary-50/50 p-4 rounded-xl border border-primary-100">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-primary-50/50 dark:bg-primary-950/40 p-4 rounded-xl border border-primary-100 dark:border-primary-900/50">
                             <div>
-                                <label class="text-xs font-semibold text-neutral-500">Purchase Order</label>
-                                <p class="text-sm font-bold font-mono text-primary-800" x-text="selectedPo ? selectedPo.po_number : ''"></p>
+                                <label class="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Purchase Order</label>
+                                <p class="text-base font-bold font-mono text-primary-800 dark:text-primary-300" x-text="selectedPo ? selectedPo.po_number : ''"></p>
                             </div>
                             <div>
-                                <label class="text-xs font-semibold text-neutral-500">Authorized Supplier</label>
-                                <p class="text-sm font-semibold text-neutral-800" x-text="selectedPo && selectedPo.supplier ? selectedPo.supplier.name : ''"></p>
+                                <label class="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Authorized Supplier</label>
+                                <p class="text-base font-semibold text-neutral-800 dark:text-neutral-200" x-text="selectedPo && selectedPo.supplier ? selectedPo.supplier.name : ''"></p>
                             </div>
                             <div>
-                                <label class="text-xs font-semibold text-neutral-500">Total Commitment Value</label>
-                                <p class="text-sm font-mono font-semibold text-neutral-800" x-text="selectedPo ? '₱' + Number(selectedPo.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''"></p>
+                                <label class="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Total Commitment Value</label>
+                                <p class="text-base font-mono font-semibold text-neutral-800 dark:text-neutral-200" x-text="selectedPo ? '₱' + Number(selectedPo.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''"></p>
                             </div>
                         </div>
 
                         {{-- Carrier & Logistics Inputs --}}
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label class="block text-xs font-medium text-neutral-700">Carrier / Logistics Provider</label>
-                                <input type="text" name="carrier_name" placeholder="e.g. LBC Express, 2GO" class="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+                                <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Carrier / Logistics Provider</label>
+                                <input type="text" name="carrier_name" placeholder="e.g. LBC Express, 2GO" class="mt-1 block w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 shadow-xs focus:border-primary-500 focus:ring-primary-500 text-sm">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-neutral-700">Waybill / Airway Bill No.</label>
-                                <input type="text" name="waybill_number" placeholder="e.g. AWB-982341" class="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+                                <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Waybill / Airway Bill No.</label>
+                                <input type="text" name="waybill_number" placeholder="e.g. AWB-982341" class="mt-1 block w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 shadow-xs focus:border-primary-500 focus:ring-primary-500 text-sm">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-neutral-700">Packing Slip / Delivery Receipt</label>
-                                <input type="text" name="packing_slip_number" placeholder="e.g. DR-2026-881" class="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+                                <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Packing Slip / Delivery Receipt</label>
+                                <input type="text" name="packing_slip_number" placeholder="e.g. DR-2026-881" class="mt-1 block w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 shadow-xs focus:border-primary-500 focus:ring-primary-500 text-sm">
                             </div>
                         </div>
 
                         {{-- Line Items Table --}}
-                        <div class="max-w-full overflow-x-auto rounded-xl border border-neutral-200">
-                            <table class="min-w-[54rem] w-full text-left text-xs text-neutral-600">
-                                <thead class="bg-neutral-100 uppercase text-neutral-600 font-semibold border-b">
+                        <div class="w-full overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+                            <table class="min-w-[62rem] w-full text-left text-xs text-neutral-700 dark:text-neutral-300 divide-y divide-neutral-200 dark:divide-neutral-800">
+                                <thead class="bg-neutral-100/90 dark:bg-neutral-800/90 text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700">
                                     <tr>
-                                        <th class="px-3 py-2.5">Item Description</th>
-                                        <th class="px-3 py-2.5">Ordered / Unit</th>
-                                        <th class="px-3 py-2.5 text-right">Price / Unit</th>
-                                        <th class="px-3 py-2.5 text-right">Total Price</th>
-                                        <th class="px-3 py-2.5">Receiving Qty</th>
-                                        <th class="px-3 py-2.5">Batch / Lot No.</th>
-                                        <th class="px-3 py-2.5">Expiry Date</th>
+                                        <th class="px-4 py-3.5 min-w-[15rem]">Item Description</th>
+                                        <th class="px-3.5 py-3.5 whitespace-nowrap min-w-[7.5rem]">Ordered / Unit</th>
+                                        <th class="px-3.5 py-3.5 text-right whitespace-nowrap min-w-[7.5rem]">Price / Unit</th>
+                                        <th class="px-3.5 py-3.5 text-right whitespace-nowrap min-w-[8rem]">Total Price</th>
+                                        <th class="px-3.5 py-3.5 min-w-[8.5rem]">Receiving Qty</th>
+                                        <th class="px-3.5 py-3.5 min-w-[12rem]">Batch / Lot No.</th>
+                                        <th class="px-3.5 py-3.5 min-w-[12rem]">Expiry Date</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-neutral-200">
+                                <tbody class="divide-y divide-neutral-200 dark:divide-neutral-800">
                                     <template x-for="(line, index) in poLines" :key="line.id">
-                                        <tr class="hover:bg-neutral-50">
-                                            <td class="px-3 py-3">
+                                        <tr class="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 transition-colors">
+                                            <td class="px-4 py-3.5">
                                                 <input type="hidden" :name="`lines[${index}][po_line_id]`" :value="line.id">
-                                                <p class="font-semibold text-neutral-900" x-text="line.item ? line.item.name : 'Item'"></p>
-                                                <p class="text-[11px] font-mono text-neutral-500" x-text="line.item ? line.item.sku : ''"></p>
+                                                <p class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 leading-snug" x-text="line.item ? line.item.name : 'Item'"></p>
+                                                <p class="text-xs font-mono text-neutral-500 dark:text-neutral-400 mt-0.5" x-text="line.item ? line.item.sku : ''"></p>
                                                 <template x-if="line.conversion_factor && Number(line.conversion_factor) > 1">
-                                                    <span class="inline-block mt-0.5 rounded bg-primary-50 px-1.5 py-0.5 text-[10px] font-mono font-medium text-primary-700" x-text="`1 ${line.purchase_unit || (line.item ? line.item.unit : 'unit')} = ${Number(line.conversion_factor)} ${line.item ? line.item.unit : 'units'}`"></span>
+                                                    <span class="inline-block mt-1 rounded bg-primary-50 dark:bg-primary-950/60 px-2 py-0.5 text-[11px] font-mono font-medium text-primary-700 dark:text-primary-300 ring-1 ring-inset ring-primary-200 dark:ring-primary-800" x-text="`1 ${line.purchase_unit || (line.item ? line.item.unit : 'unit')} = ${Number(line.conversion_factor)} ${line.item ? line.item.unit : 'units'}`"></span>
                                                 </template>
                                             </td>
-                                            <td class="px-3 py-3 font-mono">
-                                                <span class="font-semibold text-neutral-900" x-text="line.ordered_quantity"></span>
-                                                <span class="capitalize text-neutral-600" x-text="line.purchase_unit || (line.item ? line.item.unit : 'units')"></span>
-                                                <p class="text-[11px] text-neutral-500 mt-0.5" x-text="`Open: ${Math.max(0, line.ordered_quantity - line.received_quantity)}`"></p>
+                                            <td class="px-3.5 py-3.5 whitespace-nowrap font-mono">
+                                                <span class="text-sm font-bold text-neutral-900 dark:text-neutral-100" x-text="line.ordered_quantity"></span>
+                                                <span class="capitalize text-xs text-neutral-600 dark:text-neutral-300 ml-0.5" x-text="line.purchase_unit || (line.item ? line.item.unit : 'units')"></span>
+                                                <p class="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 font-medium" x-text="`Open: ${Math.max(0, line.ordered_quantity - line.received_quantity)}`"></p>
                                             </td>
-                                            <td class="px-3 py-3 text-right font-mono text-neutral-700">
-                                                <span x-text="'₱' + Number(line.unit_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
-                                                <span class="block text-[10px] text-neutral-400" x-text="`/${line.purchase_unit || (line.item ? line.item.unit : 'unit')}`"></span>
+                                            <td class="px-3.5 py-3.5 text-right whitespace-nowrap font-mono text-neutral-700 dark:text-neutral-300">
+                                                <span class="text-xs font-semibold" x-text="'₱' + Number(line.unit_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                                                <span class="block text-[11px] text-neutral-400 dark:text-neutral-500" x-text="`/${line.purchase_unit || (line.item ? line.item.unit : 'unit')}`"></span>
                                             </td>
-                                            <td class="px-3 py-3 text-right font-mono font-semibold text-neutral-900">
+                                            <td class="px-3.5 py-3.5 text-right whitespace-nowrap font-mono font-bold text-neutral-900 dark:text-neutral-100 text-xs">
                                                 <span x-text="'₱' + Number(line.total_line_amount || ((line.ordered_quantity || 0) * (line.unit_price || 0))).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                                             </td>
-                                            <td class="px-3 py-3">
+                                            <td class="px-3.5 py-3.5">
                                                 <input
                                                     type="number"
                                                     :name="`lines[${index}][received_quantity]`"
@@ -354,24 +373,24 @@
                                                     min="1"
                                                     step="1"
                                                     required
-                                                    class="w-24 rounded border-neutral-300 text-xs font-mono focus:ring-primary-500"
+                                                    class="w-full max-w-[7.5rem] rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs font-mono font-semibold py-2 px-3 focus:ring-primary-500 focus:border-primary-500 shadow-xs"
                                                 >
-                                                <span class="block text-[10px] text-neutral-400 mt-0.5">Max +5%: <span x-text="Math.ceil(Math.max(1, line.ordered_quantity - line.received_quantity) * 1.05)"></span></span>
+                                                <span class="block text-[11px] text-neutral-500 dark:text-neutral-400 mt-1 font-medium">Max +5%: <span x-text="Math.ceil(Math.max(1, line.ordered_quantity - line.received_quantity) * 1.05)"></span></span>
                                             </td>
-                                            <td class="px-3 py-3">
+                                            <td class="px-3.5 py-3.5">
                                                 <input
                                                     type="text"
                                                     :name="`lines[${index}][batch_number]`"
                                                     placeholder="e.g. LOT-2026-X1"
-                                                    class="w-32 rounded border-neutral-300 text-xs font-mono focus:ring-primary-500"
+                                                    class="w-full min-w-[10.5rem] rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 text-xs font-mono py-2 px-3 focus:ring-primary-500 focus:border-primary-500 shadow-xs"
                                                     :required="line.item && line.item.is_batch_tracked"
                                                 >
                                             </td>
-                                            <td class="px-3 py-3">
+                                            <td class="px-3.5 py-3.5">
                                                 <input
                                                     type="date"
                                                     :name="`lines[${index}][expiry_date]`"
-                                                    class="w-32 rounded border-neutral-300 text-xs focus:ring-primary-500"
+                                                    class="w-full min-w-[10.5rem] rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs font-mono py-2 px-3 focus:ring-primary-500 focus:border-primary-500 shadow-xs"
                                                     :min="new Date().toISOString().split('T')[0]"
                                                     :required="line.item && line.item.expiry_alert_days > 0"
                                                 >
@@ -379,10 +398,10 @@
                                         </tr>
                                     </template>
                                 </tbody>
-                                <tfoot class="border-t border-neutral-200 bg-neutral-50 font-semibold text-neutral-900">
+                                <tfoot class="border-t border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/70 font-semibold text-neutral-900 dark:text-neutral-100">
                                     <tr>
-                                        <td colspan="3" class="px-3 py-2 text-right text-xs">Total Purchase Order Commitment:</td>
-                                        <td class="px-3 py-2 text-right font-mono font-bold text-xs text-primary-700" x-text="selectedPo ? '₱' + Number(selectedPo.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '₱0.00'"></td>
+                                        <td colspan="3" class="px-4 py-3.5 text-right text-xs">Total Purchase Order Commitment:</td>
+                                        <td class="px-4 py-3.5 text-right font-mono font-bold text-sm text-primary-700 dark:text-primary-400" x-text="selectedPo ? '₱' + Number(selectedPo.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '₱0.00'"></td>
                                         <td colspan="3"></td>
                                     </tr>
                                 </tfoot>
@@ -391,16 +410,16 @@
 
                         {{-- Delivery Notes --}}
                         <div>
-                            <label class="block text-xs font-medium text-neutral-700">Dock Intake Notes / Packaging Observations</label>
-                            <textarea name="notes" rows="2" placeholder="Document packaging integrity, seal numbers, or delivery notes..." class="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-xs"></textarea>
+                            <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Dock Intake Notes / Packaging Observations</label>
+                            <textarea name="notes" rows="2" placeholder="Document packaging integrity, seal numbers, or delivery notes..." class="mt-1 block w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 shadow-xs focus:border-primary-500 focus:ring-primary-500 text-xs"></textarea>
                         </div>
                     </div>
 
-                    <div class="border-t border-neutral-200 bg-neutral-50 px-6 py-4 flex items-center justify-end gap-3">
-                        <button type="button" @click="showReceiveModal = false" class="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50">
+                    <div class="border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/80 px-6 py-4 flex items-center justify-end gap-3">
+                        <button type="button" @click="showReceiveModal = false" class="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
                             Cancel
                         </button>
-                        <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
+                        <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-colors">
                             Confirm Dock Receipt &amp; Quarantine Stock
                         </button>
                     </div>
@@ -408,4 +427,5 @@
             </div>
         </div>
         @endcan
+    </div>
 </x-app-layout>

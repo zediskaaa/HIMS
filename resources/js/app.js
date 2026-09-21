@@ -4140,7 +4140,43 @@ Alpine.data('procurementWorkspace', ({
     },
 
     openPurchaseOrderReview(form) {
-        if (!form || !form.reportValidity()) return;
+        if (!form) return;
+
+        if (!this.selectedItem()) {
+            const itemSelect = form.querySelector('[name="item_id"]');
+            if (itemSelect) {
+                itemSelect.focus();
+                itemSelect.reportValidity();
+            }
+            return;
+        }
+
+        if (!this.selectedSupplier()) {
+            const supplierSelect = form.querySelector('[name="supplier_id"]');
+            if (supplierSelect) {
+                supplierSelect.focus();
+                supplierSelect.reportValidity();
+            }
+            return;
+        }
+
+        if (this.trustedUnitCost() <= 0) {
+            const warningEl = form.querySelector('#po-cost-warning');
+            if (warningEl) {
+                warningEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            return;
+        }
+
+        // If any required field inside a collapsed <details> tag (e.g. cost center) is invalid,
+        // expand the details tag first so the browser can focus and show the constraint validation message.
+        const details = form.querySelectorAll('details');
+        if (!form.checkValidity()) {
+            details.forEach((d) => { d.open = true; });
+            form.reportValidity();
+            return;
+        }
+
         this.$dispatch('open-modal', 'review-purchase-order');
     },
 

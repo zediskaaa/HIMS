@@ -487,4 +487,38 @@ class PurchaseOrderWorkspaceTest extends TestCase
             ->post(route('inventory.purchases.orders.approve', $po))
             ->assertForbidden();
     }
+
+    public function test_review_purchase_order_and_inbound_receiving_shipment_modals_render_properly(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+        $item = $this->item();
+        $supplier = $this->supplier();
+        $costCenter = $this->costCenter();
+
+        // 1. Direct PO creation screen has Review Purchase Order button and pre-selected cost center
+        $response = $this->actingAs($manager)->get('/inventory/purchases');
+        $response->assertOk()
+            ->assertSee('Review Purchase Order')
+            ->assertSee('value="'.$costCenter->id.'" selected', false);
+
+        // 2. Inbound receiving dock has Receive Shipment button and the modal inside Alpine component
+        $po = PurchaseOrder::create([
+            'po_number' => 'PO-RECEIVE-TEST-001',
+            'supplier_id' => $supplier->id,
+            'item_id' => $item->id,
+            'quantity' => 10,
+            'unit_cost' => 100,
+            'total_amount' => 1000,
+            'status' => 'dispatched',
+            'requested_at' => now(),
+        ]);
+
+        $receiveResponse = $this->actingAs($manager)->get('/inventory/receiving');
+        $receiveResponse->assertOk()
+            ->assertSee('Receive Shipment')
+            ->assertSee('showReceiveModal')
+            ->assertSee('PO-RECEIVE-TEST-001')
+            ->assertSee('Confirm Dock Receipt &amp; Quarantine Stock', false);
+    }
 }
+

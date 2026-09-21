@@ -1276,9 +1276,11 @@
                                         <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">Order terms and instructions</summary>
                                         <div class="grid gap-3 border-t border-neutral-200 p-3 sm:grid-cols-2">
                                             <x-ui.field name="cost_center_id" label="Cost center" type="select" required>
-                                                <option value="">Select active cost center</option>
+                                                @if($costCenters->isEmpty())
+                                                    <option value="">No active cost center available</option>
+                                                @endif
                                                 @foreach($costCenters as $costCenter)
-                                                    <option value="{{ $costCenter->id }}" @selected((string) old('cost_center_id') === (string) $costCenter->id)>{{ $costCenter->name }} ({{ $costCenter->code }})</option>
+                                                    <option value="{{ $costCenter->id }}" @selected((string) old('cost_center_id', $costCenters->first()?->id) === (string) $costCenter->id)>{{ $costCenter->name }} ({{ $costCenter->code }})</option>
                                                 @endforeach
                                             </x-ui.field>
 
@@ -1298,14 +1300,22 @@
                                         </div>
                                     </details>
 
-                                    <div class="rounded-lg border border-primary-100 bg-primary-50/60 p-3">
+                                    <div id="po-cost-warning" x-show="selectedItem() && selectedSupplier() && trustedUnitCost() <= 0" x-cloak class="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
+                                        <div class="flex items-center gap-1.5 font-medium">
+                                            <svg class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                            <span>No catalog unit price configured (₱0.00)</span>
+                                        </div>
+                                        <p class="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">This item requires a catalog price or contracted price before a purchase order can be issued.</p>
+                                    </div>
+
+                                    <div class="rounded-lg border border-primary-100 bg-primary-50/60 p-3 dark:border-primary-900/60 dark:bg-primary-950/30">
                                         <div class="flex items-end justify-between gap-3">
                                             <div>
-                                                <p class="text-[10px] font-medium uppercase tracking-wide text-primary-700">Estimated commitment</p>
-                                                <p class="mt-0.5 text-xl font-semibold tabular-nums text-primary-900" x-text="formatCurrency(orderTotal(), selectedTerms()?.currency)"></p>
-                                                <p class="mt-0.5 text-[10px] text-primary-700">Expected <span class="font-medium" x-text="expectedDeliveryLabel()"></span></p>
+                                                <p class="text-[10px] font-medium uppercase tracking-wide text-primary-700 dark:text-primary-400">Estimated commitment</p>
+                                                <p class="mt-0.5 text-xl font-semibold tabular-nums text-primary-900 dark:text-primary-100" x-text="formatCurrency(orderTotal(), selectedTerms()?.currency)"></p>
+                                                <p class="mt-0.5 text-[10px] text-primary-700 dark:text-primary-400">Expected <span class="font-medium" x-text="expectedDeliveryLabel()"></span></p>
                                             </div>
-                                            <x-ui.button type="button" size="sm" x-on:click="openPurchaseOrderReview($refs.purchaseOrderForm)" x-bind:disabled="!selectedItem() || !selectedSupplier() || trustedUnitCost() <= 0" icon="clipboard-document-check">Review Purchase Order</x-ui.button>
+                                            <x-ui.button type="button" size="sm" x-on:click="openPurchaseOrderReview($refs.purchaseOrderForm)" icon="clipboard-document-check">Review Purchase Order</x-ui.button>
                                         </div>
                                     </div>
                                 </form>
@@ -1747,7 +1757,7 @@
                 </div>
 
                 @can(\App\Enums\Permission::IssuePurchaseOrder->value)
-                    <x-ui.modal name="review-purchase-order" title="Review purchase order" maxWidth="lg">
+                    <x-ui.modal name="review-purchase-order" title="Review purchase order" maxWidth="xl">
                         <div class="space-y-4">
                             <div class="rounded-lg border border-warning-200 bg-warning-50 px-3 py-2.5 text-xs text-warning-800 dark:border-warning-800 dark:bg-warning-950/40 dark:text-warning-300">Confirm the item, supplier, quantity, and delivery timing. Creating this order commits funds but does not change stock.</div>
                             <dl class="divide-y divide-neutral-100 dark:divide-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-800">
