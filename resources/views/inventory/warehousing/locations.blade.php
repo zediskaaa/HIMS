@@ -46,31 +46,31 @@
 
         {{-- Filter Bar --}}
         <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-2xs dark:border-neutral-800 dark:bg-neutral-900">
-            <form method="GET" action="{{ route('inventory.warehousing.locations') }}" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                <div>
+            <form method="GET" action="{{ route('inventory.warehousing.locations') }}" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-12">
+                <div class="sm:col-span-2 lg:col-span-3">
                     <label for="search" class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">Search</label>
                     <input type="text" id="search" name="search" value="{{ request('search') }}" placeholder="Code, name, or barcode..." class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
                 </div>
-                <div>
+                <div class="sm:col-span-1 lg:col-span-2">
                     <label for="type" class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">Location Type</label>
-                    <select id="type" name="type" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
+                    <select id="type" name="type" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500 pl-3 pr-10 shadow-2xs">
                         <option value="">All Types</option>
                         @foreach(['warehouse' => 'Warehouse', 'zone' => 'Zone', 'aisle' => 'Aisle', 'rack' => 'Rack', 'shelf' => 'Shelf', 'bin' => 'Bin', 'cold_room' => 'Cold Room', 'vault' => 'Narcotics Vault'] as $k => $v)
                             <option value="{{ $k }}" @selected(request('type') === $k)>{{ $v }}</option>
                         @endforeach
                     </select>
                 </div>
-                <div>
+                <div class="sm:col-span-1 lg:col-span-2">
                     <label for="status" class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">Status</label>
-                    <select id="status" name="status" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
+                    <select id="status" name="status" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500 pl-3 pr-10 shadow-2xs">
                         <option value="">All Statuses</option>
                         <option value="active" @selected(request('status') === 'active')>Active</option>
                         <option value="inactive" @selected(request('status') === 'inactive')>Inactive</option>
                     </select>
                 </div>
-                <div>
+                <div class="sm:col-span-1 lg:col-span-2">
                     <label for="thermal" class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">Thermal Zone</label>
-                    <select id="thermal" name="thermal" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500">
+                    <select id="thermal" name="thermal" class="mt-1 w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500 pl-3 pr-10 shadow-2xs">
                         <option value="">All Temperatures</option>
                         <option value="ambient" @selected(request('thermal') === 'ambient')>Ambient (15°C - 25°C)</option>
                         <option value="refrigerated" @selected(request('thermal') === 'refrigerated')>Refrigerated (2°C - 8°C)</option>
@@ -78,11 +78,11 @@
                         <option value="ultra_cold" @selected(request('thermal') === 'ultra_cold')>Ultra-Cold (-80°C)</option>
                     </select>
                 </div>
-                <div class="flex items-end gap-2">
-                    <button type="submit" class="w-full rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-semibold text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-white shadow-2xs">
+                <div class="flex items-end gap-2 sm:col-span-1 lg:col-span-3">
+                    <button type="submit" class="flex-1 inline-flex items-center justify-center rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-semibold text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-2xs whitespace-nowrap transition">
                         Apply Filters
                     </button>
-                    <a href="{{ route('inventory.warehousing.locations') }}" class="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 shadow-2xs">
+                    <a href="{{ route('inventory.warehousing.locations') }}" class="shrink-0 inline-flex items-center justify-center rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3.5 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 shadow-2xs whitespace-nowrap transition">
                         Reset
                     </a>
                 </div>

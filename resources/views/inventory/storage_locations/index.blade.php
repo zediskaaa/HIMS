@@ -2,43 +2,202 @@
     <x-slot name="header">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <p class="text-xs font-semibold uppercase tracking-wider text-primary-700">Smart Warehousing</p>
-                <h2 class="text-2xl font-bold text-neutral-900">Warehouse Hierarchy &amp; Locations</h2>
+                <p class="text-xs font-semibold uppercase tracking-wider text-primary-700 dark:text-primary-400">Smart Warehousing</p>
+                <h2 class="text-2xl font-bold text-neutral-900 dark:text-neutral-100">Warehouse Hierarchy &amp; Locations</h2>
             </div>
-            <x-ui.button variant="secondary" :href="route('inventory.warehousing.dashboard')" icon="arrow-left">Back to Smart Warehousing</x-ui.button>
+            <div class="flex flex-wrap items-center gap-2">
+                @can(\App\Enums\Permission::ManageLocations->value)
+                    <x-ui.button type="button" variant="primary" icon="plus" x-data x-on:click="$dispatch('open-modal', 'add-storage-location')">
+                        Add Location
+                    </x-ui.button>
+                @endcan
+                <x-ui.button variant="secondary" :href="route('inventory.warehousing.dashboard')" icon="arrow-left">Back to Smart Warehousing</x-ui.button>
+            </div>
         </div>
     </x-slot>
 
     {{-- SWS Consolidated Workflow Navigation --}}
     @include('inventory.warehousing.partials.workflow_nav')
 
-        @if ($errors->any())<x-ui.alert variant="danger" title="Location could not be saved"><ul class="list-disc pl-5">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></x-ui.alert>@endif
+    @can(\App\Enums\Permission::ManageLocations->value)
+        <x-ui.modal name="add-storage-location" maxWidth="3xl">
+            <x-slot:header>
+                <div>
+                    <h2 class="text-base font-bold text-neutral-900 dark:text-neutral-100">Add Storage Location</h2>
+                    <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                        Use only the hierarchy levels your physical warehouse actually needs.
+                    </p>
+                </div>
+            </x-slot:header>
 
-        @can(\App\Enums\Permission::ManageLocations->value)
-            <x-ui.card title="Add location" subtitle="Use only the hierarchy levels your physical warehouse actually needs.">
-                <form method="POST" action="{{ route('inventory.storage-locations.store') }}" class="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
-                      data-confirm-title="Create storage location"
-                      data-confirm-message="Are you sure you want to add this storage location to the warehouse layout?"
-                      data-confirm-label="Create Location">@csrf
-                    <div><label for="name" class="text-sm font-medium">Display name</label><input id="name" type="text" name="name" required maxlength="255" value="{{ old('name') }}" class="mt-1 w-full rounded-lg border-neutral-300"></div>
-                    <div><label for="type" class="text-sm font-medium">Location type</label><select id="type" name="type" required class="mt-1 w-full rounded-lg border-neutral-300"><option value="">Select type</option>@foreach(['warehouse'=>'Warehouse','zone'=>'Zone','aisle'=>'Aisle','rack'=>'Rack','shelf'=>'Shelf','level'=>'Level','bin'=>'Bin','pharmacy'=>'Pharmacy stockroom','department'=>'Department stockroom'] as $value=>$label)<option value="{{ $value }}" @selected(old('type')===$value)>{{ $label }}</option>@endforeach</select></div>
-                    <div><label for="parent_id" class="text-sm font-medium">Parent location</label><select id="parent_id" name="parent_id" class="mt-1 w-full rounded-lg border-neutral-300"><option value="">None / root</option>@foreach($parentLocations as $parent)<option value="{{ $parent->id }}" @selected((string)old('parent_id')===(string)$parent->id)>{{ $parent->code }} - {{ $parent->fullPath() }}</option>@endforeach</select></div>
-                    <div><label for="code" class="text-sm font-medium">Internal code <span class="font-normal text-neutral-500">(optional)</span></label><input id="code" type="text" name="code" maxlength="100" value="{{ old('code') }}" placeholder="Auto-generated when blank" class="mt-1 w-full rounded-lg border-neutral-300 font-mono"><p class="mt-1 text-xs text-neutral-500">Letters, numbers, dot, dash, and underscore only.</p></div>
-                    <div><label for="storage_classification" class="text-sm font-medium">Storage classification</label><select id="storage_classification" name="storage_classification" class="mt-1 w-full rounded-lg border-neutral-300"><option value="">Any compatible item</option>@foreach(['general'=>'General','medical_supply'=>'Medical supply','pharmaceutical'=>'Pharmaceutical','sterile'=>'Sterile','cold_chain'=>'Cold chain','hazardous'=>'Hazardous','flammable'=>'Flammable','controlled'=>'Controlled / restricted'] as $value=>$label)<option value="{{ $value }}">{{ $label }}</option>@endforeach</select></div>
-                    <div><label for="temperature_classification" class="text-sm font-medium">Temperature classification</label><select id="temperature_classification" name="temperature_classification" class="mt-1 w-full rounded-lg border-neutral-300"><option value="">Use product/manufacturer requirement</option>@foreach(['ambient'=>'Ambient','controlled_room'=>'Controlled room temperature','refrigerated'=>'Refrigerated','frozen'=>'Frozen','deep_frozen'=>'Deep frozen'] as $value=>$label)<option value="{{ $value }}">{{ $label }}</option>@endforeach</select></div>
-                    <div><label for="capacity" class="text-sm font-medium">Capacity</label><input id="capacity" type="number" name="capacity" min="1" step="1" inputmode="numeric" value="{{ old('capacity') }}" class="mt-1 w-full rounded-lg border-neutral-300"></div>
-                    <div><label for="capacity_unit" class="text-sm font-medium">Capacity unit</label><select id="capacity_unit" name="capacity_unit" class="mt-1 w-full rounded-lg border-neutral-300">@foreach(['units'=>'Units','boxes'=>'Boxes','pallets'=>'Pallets'] as $value=>$label)<option value="{{ $value }}">{{ $label }}</option>@endforeach</select></div>
-                    <div><label for="status" class="text-sm font-medium">Operational status</label><select id="status" name="status" required class="mt-1 w-full rounded-lg border-neutral-300"><option value="active">Active</option><option value="blocked">Blocked</option><option value="inactive">Inactive</option></select></div>
-                    <div><label for="sort_sequence" class="text-sm font-medium">Pick sort sequence</label><input id="sort_sequence" type="number" name="sort_sequence" min="0" step="1" value="{{ old('sort_sequence', 0) }}" class="mt-1 w-full rounded-lg border-neutral-300"></div>
-                    <fieldset class="md:col-span-2 xl:col-span-4"><legend class="text-sm font-medium">Operational purpose</legend><div class="mt-2 flex flex-wrap gap-x-5 gap-y-2">@foreach(['is_receiving_staging'=>'Receiving staging','is_quarantine'=>'Quarantine','is_pick_face'=>'Pick face','is_reserve'=>'Reserve storage','is_dispatch_staging'=>'Dispatch staging','is_returns_area'=>'Returns area','is_damaged_stock'=>'Damaged stock'] as $name=>$label)<label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="{{ $name }}" value="1" @checked(old($name)) class="rounded border-neutral-300 text-primary-600">{{ $label }}</label>@endforeach</div></fieldset>
-                    <div class="md:col-span-2 xl:col-span-3"><label for="description" class="text-sm font-medium">Description</label><textarea id="description" name="description" maxlength="255" rows="2" class="mt-1 w-full rounded-lg border-neutral-300">{{ old('description') }}</textarea></div>
-                    <div class="flex items-end"><x-ui.button type="submit">Save location</x-ui.button></div>
-                </form>
-            </x-ui.card>
-        @endcan
+            <form method="POST" action="{{ route('inventory.storage-locations.store') }}"
+                  @if ($errors->any()) x-init="open = true" @endif
+                  class="space-y-4"
+                  data-confirm-title="Create storage location"
+                  data-confirm-message="Are you sure you want to add this storage location to the warehouse layout?"
+                  data-confirm-label="Create Location">
+                @csrf
 
-        <div x-data="{ deactivateModal: false, confirmDeactivateModal: false, activateModal: false, confirmActivateModal: false, targetLocation: null, reason: '', reasonError: null }" class="space-y-6">
+                @if ($errors->any())
+                    <x-ui.alert variant="danger" title="Location could not be saved">
+                        <ul class="list-disc pl-5 space-y-1">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </x-ui.alert>
+                @endif
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="name" class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Display name <span class="text-rose-500">*</span></label>
+                        <input id="name" type="text" name="name" required maxlength="255" value="{{ old('name') }}" placeholder="e.g. Ambient Bin 01" class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 text-sm">
+                    </div>
+                    <div>
+                        <label for="type" class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Location type <span class="text-rose-500">*</span></label>
+                        <select id="type" name="type" required class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 text-sm pl-3 pr-10">
+                            <option value="">Select type</option>
+                            @foreach(['warehouse'=>'Warehouse','zone'=>'Zone','aisle'=>'Aisle','rack'=>'Rack','shelf'=>'Shelf','level'=>'Level','bin'=>'Bin','pharmacy'=>'Pharmacy stockroom','department'=>'Department stockroom'] as $value=>$label)
+                                <option value="{{ $value }}" @selected(old('type')===$value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="parent_id" class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Parent location</label>
+                        <select id="parent_id" name="parent_id" class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 text-sm pl-3 pr-10">
+                            <option value="">None / root</option>
+                            @foreach($parentLocations as $parent)
+                                <option value="{{ $parent->id }}" @selected((string)old('parent_id')===(string)$parent->id)>{{ $parent->code }} - {{ $parent->fullPath() }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="code" class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Internal code <span class="font-normal text-neutral-500 dark:text-neutral-400">(optional)</span></label>
+                        <input id="code" type="text" name="code" maxlength="100" value="{{ old('code') }}" placeholder="Auto-generated when blank" class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 text-sm font-mono">
+                        <p class="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">Letters, numbers, dot, dash, and underscore only.</p>
+                    </div>
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="storage_classification" class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Storage classification</label>
+                        <select id="storage_classification" name="storage_classification" class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 text-sm pl-3 pr-10">
+                            <option value="">Any compatible item</option>
+                            @foreach(['general'=>'General','medical_supply'=>'Medical supply','pharmaceutical'=>'Pharmaceutical','sterile'=>'Sterile','cold_chain'=>'Cold chain','hazardous'=>'Hazardous','flammable'=>'Flammable','controlled'=>'Controlled / restricted'] as $value=>$label)
+                                <option value="{{ $value }}" @selected(old('storage_classification')===$value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="temperature_classification" class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Temperature classification</label>
+                        <select id="temperature_classification" name="temperature_classification" class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 text-sm pl-3 pr-10">
+                            <option value="">Use product/manufacturer requirement</option>
+                            @foreach(['ambient'=>'Ambient','controlled_room'=>'Controlled room temperature','refrigerated'=>'Refrigerated','frozen'=>'Frozen','deep_frozen'=>'Deep frozen'] as $value=>$label)
+                                <option value="{{ $value }}" @selected(old('temperature_classification')===$value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-4">
+                    <div>
+                        <label for="capacity" class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Capacity</label>
+                        <input id="capacity" type="number" name="capacity" min="1" step="1" inputmode="numeric" value="{{ old('capacity') }}" placeholder="e.g. 500" class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 text-sm">
+                    </div>
+                    <div>
+                        <label for="capacity_unit" class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Capacity unit</label>
+                        <select id="capacity_unit" name="capacity_unit" class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 text-sm pl-3 pr-10">
+                            @foreach(['units'=>'Units','boxes'=>'Boxes','pallets'=>'Pallets'] as $value=>$label)
+                                <option value="{{ $value }}" @selected(old('capacity_unit', 'units')===$value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="status" class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Operational status <span class="text-rose-500">*</span></label>
+                        <select id="status" name="status" required class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 text-sm pl-3 pr-10">
+                            <option value="active" @selected(old('status', 'active')==='active')>Active</option>
+                            <option value="blocked" @selected(old('status')==='blocked')>Blocked</option>
+                            <option value="inactive" @selected(old('status')==='inactive')>Inactive</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="sort_sequence" class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Pick sort sequence</label>
+                        <input id="sort_sequence" type="number" name="sort_sequence" min="0" step="1" value="{{ old('sort_sequence', 0) }}" class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 text-sm">
+                    </div>
+                </div>
+
+                <fieldset class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <legend class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">Operational Purpose</legend>
+                        <span class="text-[11px] text-neutral-500 dark:text-neutral-400">Select all applicable warehouse roles</span>
+                    </div>
+
+                    @php
+                        $purposes = [
+                            'is_receiving_staging' => 'Receiving staging',
+                            'is_quarantine'        => 'Quarantine',
+                            'is_pick_face'         => 'Pick face',
+                            'is_reserve'           => 'Reserve storage',
+                            'is_dispatch_staging'  => 'Dispatch staging',
+                            'is_returns_area'      => 'Returns area',
+                            'is_damaged_stock'     => 'Damaged stock',
+                        ];
+                    @endphp
+
+                    <div class="flex flex-wrap gap-2.5">
+                        @foreach($purposes as $name => $label)
+                            <label
+                                x-data="{ isChecked: {{ old($name) ? 'true' : 'false' }} }"
+                                :class="isChecked
+                                    ? 'border-primary-500 bg-primary-50/70 text-primary-900 dark:border-primary-500 dark:bg-primary-950/50 dark:text-primary-100 ring-1 ring-primary-500 shadow-2xs'
+                                    : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700/80 dark:bg-neutral-800/80 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-800'"
+                                class="group relative inline-flex items-center gap-2.5 rounded-lg border px-3.5 py-2.5 shadow-2xs transition-all duration-150 cursor-pointer select-none"
+                            >
+                                <input
+                                    type="checkbox"
+                                    name="{{ $name }}"
+                                    value="1"
+                                    @checked(old($name))
+                                    x-on:change="isChecked = $event.target.checked"
+                                    class="h-4 w-4 rounded border-neutral-300 dark:border-neutral-600 dark:bg-neutral-700 text-primary-600 focus:ring-primary-500 focus:ring-offset-0 transition cursor-pointer"
+                                >
+                                <span class="text-xs font-semibold whitespace-nowrap">
+                                    {{ $label }}
+                                </span>
+                            </label>
+                        @endforeach
+                    </div>
+                </fieldset>
+
+                <div>
+                    <label for="description" class="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Description</label>
+                    <textarea id="description" name="description" maxlength="255" rows="2" placeholder="Optional notes about location dimensions, accessibility, or handling..." class="block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500 text-sm">{{ old('description') }}</textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+                    <x-ui.button type="button" variant="secondary" x-on:click="open = false">Cancel</x-ui.button>
+                    <x-ui.button type="submit" variant="primary">Save location</x-ui.button>
+                </div>
+            </form>
+        </x-ui.modal>
+
+        @if ($errors->any())
+            <div x-data x-init="$nextTick(() => $dispatch('open-modal', 'add-storage-location'))"></div>
+        @endif
+    @endcan
+
+    <div x-data="{ deactivateModal: false, confirmDeactivateModal: false, activateModal: false, confirmActivateModal: false, targetLocation: null, reason: '', reasonError: null }" class="space-y-6">
         <x-ui.card title="Location registry" subtitle="Occupancy is calculated from the authoritative location balance.">
+            @can(\App\Enums\Permission::ManageLocations->value)
+                <x-slot:actions>
+                    <x-ui.button type="button" size="sm" variant="primary" icon="plus" x-data x-on:click="$dispatch('open-modal', 'add-storage-location')">
+                        Add Location
+                    </x-ui.button>
+                </x-slot:actions>
+            @endcan
             <x-ui.table>
                 <x-ui.table.head><tr><x-ui.table.th>Code / location</x-ui.table.th><x-ui.table.th>Type</x-ui.table.th><x-ui.table.th>Classification</x-ui.table.th><x-ui.table.th>Purpose</x-ui.table.th><x-ui.table.th>Occupancy</x-ui.table.th><x-ui.table.th>Status</x-ui.table.th><x-ui.table.th>Controls</x-ui.table.th></tr></x-ui.table.head>
                 <tbody>@forelse($locations as $location)<x-ui.table.row>

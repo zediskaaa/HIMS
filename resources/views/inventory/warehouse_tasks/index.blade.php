@@ -225,15 +225,20 @@
         @endcan
 
         <form method="GET" action="{{ route('inventory.warehouse-tasks.index') }}" class="mb-5 grid gap-3 sm:grid-cols-3">
-            <select name="type" class="rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
+            <select name="type" class="rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500 pl-3 pr-10">
                 <option value="">All task types</option>
                 @foreach (\App\Enums\WarehouseTaskType::cases() as $type)<option value="{{ $type->value }}" @selected(request('type') === $type->value)>{{ $type->label() }}</option>@endforeach
             </select>
-            <select name="status" class="rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
+            <select name="status" class="rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm focus:border-primary-500 focus:ring-primary-500 pl-3 pr-10">
                 <option value="">All statuses</option>
                 @foreach (\App\Enums\WarehouseTaskStatus::cases() as $status)<option value="{{ $status->value }}" @selected(request('status') === $status->value)>{{ $status->label() }}</option>@endforeach
             </select>
-            <x-ui.button type="submit" variant="secondary">Apply filters</x-ui.button>
+            <div class="flex items-center gap-2">
+                <x-ui.button type="submit" variant="secondary" class="flex-1 justify-center whitespace-nowrap">Apply filters</x-ui.button>
+                @if (request()->hasAny(['type', 'status']))
+                    <x-ui.button variant="ghost" :href="route('inventory.warehouse-tasks.index')" class="shrink-0 whitespace-nowrap">Reset</x-ui.button>
+                @endif
+            </div>
         </form>
 
                 <x-ui.table>
