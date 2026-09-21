@@ -56,6 +56,19 @@
         color-scheme: dark;
     }
 
+    @media print {
+        :root,
+        html,
+        body,
+        html.dark,
+        body.dark,
+        .dark body {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+            color-scheme: light !important;
+        }
+    }
+
     @supports (overflow: clip) {
         html,
         body {

@@ -30,15 +30,12 @@
 <div class="space-y-8">
     @if ($isSuperAdmin)
         <header class="-mx-6 -mt-6 animate-fade-up border-b border-neutral-800 bg-neutral-950 px-6 py-7 text-white [animation-delay:320ms] sm:-mx-8 sm:-mt-8 sm:px-8">
-            <div class="flex items-start gap-4">
-                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-warning-500/30 bg-warning-500/10 text-warning-500 shadow-sm shadow-black/30">
-                    <x-ui.icon name="shield-check" class="h-6 w-6" />
-                </div>
-                <div class="min-w-0">
+            <div>
+                @if ($badge)
                     <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-warning-500">{{ $badge }}</p>
-                    <h1 class="mt-2 text-3xl font-semibold tracking-tight text-white">{{ $heading }}</h1>
-                    <p class="mt-3 max-w-sm text-sm leading-6 text-neutral-300">{{ $description }}</p>
-                </div>
+                @endif
+                <h1 class="{{ $badge ? 'mt-2' : '' }} text-3xl font-semibold tracking-tight text-white">{{ $heading }}</h1>
+                <p class="mt-3 max-w-sm text-sm leading-6 text-neutral-300">{{ $description }}</p>
             </div>
         </header>
     @elseif ($isAdmin)

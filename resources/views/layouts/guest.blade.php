@@ -86,11 +86,7 @@
                 <main class="grid flex-1 items-center gap-10 py-8 lg:grid-cols-[minmax(0,1fr)_28rem] lg:gap-16 lg:py-12">
                     <section class="hidden max-w-xl lg:block">
                         @if ($isSuperAdminPortal)
-                            <p class="inline-flex animate-fade-up items-center gap-2 rounded-full border border-warning-500/25 bg-warning-500/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.14em] text-warning-500 [animation-delay:120ms]">
-                                <x-ui.icon name="shield-check" class="h-3.5 w-3.5" />
-                                HIMS privileged access
-                            </p>
-                            <h1 class="mt-6 animate-fade-up text-balance text-4xl font-semibold leading-tight tracking-tight text-white [animation-delay:240ms] xl:text-5xl">
+                            <h1 class="animate-fade-up text-balance text-4xl font-semibold leading-tight tracking-tight text-white [animation-delay:240ms] xl:text-5xl">
                                 System-wide governance, secured at the highest level.
                             </h1>
                             <p class="mt-5 max-w-lg animate-fade-up text-base leading-7 text-neutral-300 [animation-delay:360ms]">
