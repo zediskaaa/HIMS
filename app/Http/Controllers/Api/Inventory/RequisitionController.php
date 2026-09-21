@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Inventory;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\CostCenter;
 use App\Models\MaterialRequisition;
 use App\Services\Inventory\IssuanceEngine;
 use DomainException;
@@ -11,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use Illuminate\Support\Facades\Validator;
 
 class RequisitionController extends Controller implements HasMiddleware
 {
@@ -45,9 +47,9 @@ class RequisitionController extends Controller implements HasMiddleware
 
     public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'department' => ['required', 'string', 'max:100'],
-            'cost_center_id' => ['nullable', 'exists:cost_centers,id'],
+            'cost_center_id' => ['nullable', 'integer'],
             'required_date' => ['nullable', 'date'],
             'urgency' => ['nullable', 'in:routine,urgent,stat_emergency'],
             'justification' => ['nullable', 'string', 'max:500'],
@@ -57,6 +59,44 @@ class RequisitionController extends Controller implements HasMiddleware
             'lines.*.allocation_strategy' => ['nullable', 'in:FEFO,FIFO,MANUAL'],
             'lines.*.notes' => ['nullable', 'string', 'max:255'],
         ]);
+
+        $validator->after(function ($v) use ($request) {
+            $department = $request->string('department')->trim()->value();
+            if (empty($department)) {
+                return;
+            }
+
+            $assignedCostCenter = CostCenter::resolveForDepartment($department);
+            if (! $assignedCostCenter) {
+                $v->errors()->add(
+                    'department',
+                    "The selected requesting department ({$department}) does not have an active Cost Center assigned."
+                );
+
+                return;
+            }
+
+            if ($request->filled('cost_center_id') && (int) $request->input('cost_center_id') !== $assignedCostCenter->id) {
+                $v->errors()->add(
+                    'cost_center_id',
+                    'The selected Cost Center does not belong to the requesting department.'
+                );
+            }
+        });
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+
+        $assignedCostCenter = CostCenter::resolveForDepartment($validated['department']);
+        if ($assignedCostCenter) {
+            $validated['cost_center_id'] = $assignedCostCenter->id;
+        }
 
         try {
             $req = $this->issuanceEngine->createRequisition($validated, $request->user());

@@ -21,6 +21,12 @@ class MaterialRequisitionWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        CostCenter::ensureDefaultTestCostCenters();
+    }
+
     private function createPharmacyUser(): User
     {
         return User::factory()->pharmacyStaff()->create();
@@ -362,6 +368,13 @@ class MaterialRequisitionWorkflowTest extends TestCase
             'reserved_quantity' => 0,
         ]);
 
+        CostCenter::create([
+            'code' => 'CC-OPD',
+            'name' => 'Outpatient Department Clinic',
+            'department' => 'Outpatient Department',
+            'is_active' => true,
+        ]);
+
         $this->actingAs($requester)->post(route('inventory.requisitions.store'), [
             'department' => 'Outpatient Department',
             'urgency' => 'urgent',
@@ -665,6 +678,13 @@ class MaterialRequisitionWorkflowTest extends TestCase
         $justification1 = 'Required for routine blood glucose monitoring of diabetic patients.';
         $justification2 = 'Required for scheduled coronary intervention.';
 
+        CostCenter::create([
+            'code' => 'CC-CARD',
+            'name' => 'Cardiology & Endocrinology Clinic',
+            'department' => 'Cardiology & Endocrinology Clinic',
+            'is_active' => true,
+        ]);
+
         $response = $this->actingAs($requester)->post(route('inventory.requisitions.store'), [
             'department' => 'Cardiology & Endocrinology Clinic',
             'urgency' => 'routine',
@@ -713,6 +733,248 @@ class MaterialRequisitionWorkflowTest extends TestCase
         $showResponse->assertOk();
         $showResponse->assertSeeText($justification1);
         $showResponse->assertSeeText($justification2);
+    }
+
+    public function test_department_to_cost_center_map_is_passed_to_index_view(): void
+    {
+        $user = $this->createPharmacyUser();
+        $this->createItem();
+
+        $response = $this->actingAs($user)->get(route('inventory.requisitions.index'));
+
+        $response->assertOk();
+        $response->assertViewHas('departmentCostCenterMap');
+
+        $map = $response->viewData('departmentCostCenterMap');
+        $this->assertIsArray($map);
+
+        // Emergency resolves to CC-ER
+        $this->assertArrayHasKey('Emergency', $map);
+        $this->assertNotNull($map['Emergency']);
+        $this->assertSame('CC-ER', $map['Emergency']['code']);
+        $this->assertStringContainsString('Emergency & Trauma Department', $map['Emergency']['display']);
+
+        // Operating Room (OR) resolves to CC-OR
+        $this->assertArrayHasKey('Operating Room (OR)', $map);
+        $this->assertNotNull($map['Operating Room (OR)']);
+        $this->assertSame('CC-OR', $map['Operating Room (OR)']['code']);
+
+        // Department without Cost Center maps to null
+        $this->assertArrayHasKey('Central Supply', $map);
+        $this->assertNull($map['Central Supply']);
+    }
+
+    public function test_backend_rejects_submitting_mismatched_department_and_cost_center(): void
+    {
+        $requester = $this->createPharmacyUser();
+        $item = $this->createItem();
+
+        $orCostCenter = CostCenter::where('code', 'CC-OR')->first();
+        $this->assertNotNull($orCostCenter);
+
+        // Attempt to submit Emergency with OR's Cost Center
+        $response = $this->actingAs($requester)->post(route('inventory.requisitions.store'), [
+            'department' => 'Emergency',
+            'cost_center_id' => $orCostCenter->id, // Mismatched cost center!
+            'urgency' => 'routine',
+            'lines' => [
+                ['item_id' => $item->id, 'requested_quantity' => 10, 'clinical_justification' => 'Standard ER supply'],
+            ],
+        ]);
+
+        $response->assertSessionHasErrors(['cost_center_id']);
+        $this->assertSame(
+            'The selected Cost Center does not belong to the requesting department.',
+            session('errors')->first('cost_center_id')
+        );
+
+        $this->assertDatabaseMissing('material_requisitions', [
+            'department' => 'Emergency',
+            'cost_center_id' => $orCostCenter->id,
+        ]);
+    }
+
+    public function test_backend_rejects_department_without_assigned_cost_center(): void
+    {
+        $requester = $this->createPharmacyUser();
+        $item = $this->createItem();
+
+        // Central Supply has no Cost Center configured
+        $response = $this->actingAs($requester)->post(route('inventory.requisitions.store'), [
+            'department' => 'Central Supply',
+            'urgency' => 'routine',
+            'lines' => [
+                ['item_id' => $item->id, 'requested_quantity' => 5, 'clinical_justification' => 'Supply room replenishment'],
+            ],
+        ]);
+
+        $response->assertSessionHasErrors(['department']);
+        $this->assertStringContainsString(
+            'does not have an active Cost Center assigned',
+            session('errors')->first('department')
+        );
+
+        $this->assertDatabaseMissing('material_requisitions', [
+            'department' => 'Central Supply',
+        ]);
+    }
+
+    public function test_valid_requisition_automatically_persists_correct_cost_center(): void
+    {
+        $requester = $this->createPharmacyUser();
+        $item = $this->createItem();
+
+        $erCostCenter = CostCenter::where('code', 'CC-ER')->first();
+
+        // Case 1 & 5: Department 'Emergency' submitted without cost_center_id
+        $response = $this->actingAs($requester)->post(route('inventory.requisitions.store'), [
+            'department' => 'Emergency',
+            'urgency' => 'routine',
+            'lines' => [
+                ['item_id' => $item->id, 'requested_quantity' => 20, 'clinical_justification' => 'Emergency triage stock'],
+            ],
+        ]);
+
+        $response->assertRedirect(route('inventory.requisitions.index'));
+
+        $requisition = MaterialRequisition::where('department', 'Emergency')->first();
+        $this->assertNotNull($requisition);
+        $this->assertSame($erCostCenter->id, $requisition->cost_center_id);
+    }
+
+    public function test_tampered_cost_center_id_is_not_persisted_if_invalid_and_derived_on_valid_match(): void
+    {
+        $requester = $this->createPharmacyUser();
+        $item = $this->createItem();
+
+        $orCostCenter = CostCenter::where('code', 'CC-OR')->first();
+
+        // Valid Operating Room submission with explicit valid matching cost_center_id
+        $response = $this->actingAs($requester)->post(route('inventory.requisitions.store'), [
+            'department' => 'Operating Room (OR)',
+            'cost_center_id' => $orCostCenter->id,
+            'urgency' => 'routine',
+            'lines' => [
+                ['item_id' => $item->id, 'requested_quantity' => 15, 'clinical_justification' => 'Surgical theatre restock'],
+            ],
+        ]);
+
+        $response->assertRedirect(route('inventory.requisitions.index'));
+
+        $requisition = MaterialRequisition::where('department', 'Operating Room (OR)')->first();
+        $this->assertNotNull($requisition);
+        $this->assertSame($orCostCenter->id, $requisition->cost_center_id);
+    }
+
+    public function test_requisition_show_and_registry_display_true_cost_center_code_and_name(): void
+    {
+        $requester = $this->createPharmacyUser();
+        $manager = $this->createInventoryManager();
+        $item = $this->createItem();
+
+        $erCostCenter = CostCenter::where('code', 'CC-ER')->first();
+
+        $this->actingAs($requester)->post(route('inventory.requisitions.store'), [
+            'department' => 'Emergency',
+            'urgency' => 'urgent',
+            'lines' => [
+                ['item_id' => $item->id, 'requested_quantity' => 25, 'clinical_justification' => 'Trauma bay reserve'],
+            ],
+        ]);
+
+        $requisition = MaterialRequisition::where('department', 'Emergency')->first();
+        $this->assertNotNull($requisition);
+
+        // Case 6 & 7: Check Show Page
+        $showResponse = $this->actingAs($manager)->get(route('inventory.requisitions.show', $requisition));
+        $showResponse->assertOk();
+        $showResponse->assertSeeText($erCostCenter->code);
+        $showResponse->assertSeeText($erCostCenter->name);
+        $showResponse->assertDontSeeText('Default Operating Fund');
+
+        // Check Registry Index Page
+        $indexResponse = $this->actingAs($manager)->get(route('inventory.requisitions.index'));
+        $indexResponse->assertOk();
+        $indexResponse->assertSeeText($erCostCenter->code);
+        $indexResponse->assertSeeText($erCostCenter->name);
+        $indexResponse->assertDontSeeText('Default Cost Center');
+    }
+
+    public function test_approval_workflow_preserves_cost_center_integrity(): void
+    {
+        $requester = $this->createPharmacyUser();
+        $manager = $this->createInventoryManager();
+        $item = $this->createItem();
+        $location = $this->createLocation();
+
+        ItemStockLevel::create([
+            'item_id' => $item->id,
+            'storage_location_id' => $location->id,
+            'quantity' => 100,
+            'reserved_quantity' => 0,
+        ]);
+
+        $erCostCenter = CostCenter::where('code', 'CC-ER')->first();
+
+        $this->actingAs($requester)->post(route('inventory.requisitions.store'), [
+            'department' => 'Emergency',
+            'urgency' => 'routine',
+            'lines' => [
+                ['item_id' => $item->id, 'requested_quantity' => 10, 'clinical_justification' => 'Clinical replenishment'],
+            ],
+        ]);
+
+        $requisition = MaterialRequisition::where('department', 'Emergency')->first();
+        $this->assertSame($erCostCenter->id, $requisition->cost_center_id);
+
+        // Case 8: Approver approves
+        $approveResponse = $this->actingAs($manager)->post(route('inventory.requisitions.approve', $requisition));
+        $approveResponse->assertRedirect();
+
+        $requisition->refresh();
+        $this->assertSame('approved', $requisition->status);
+        $this->assertSame($erCostCenter->id, $requisition->cost_center_id);
+        $this->assertSame($erCostCenter->code, $requisition->costCenter->code);
+    }
+
+    public function test_api_rejects_mismatched_cost_center_and_persists_derived_cost_center(): void
+    {
+        $requester = $this->createPharmacyUser();
+        $item = $this->createItem();
+        $orCostCenter = CostCenter::where('code', 'CC-OR')->first();
+        $pharmCostCenter = CostCenter::where('code', 'CC-PHARM')->first();
+
+        Sanctum::actingAs($requester, ['*']);
+
+        // API Mismatch rejection
+        $failResponse = $this->postJson('/api/v1/inventory/requisitions', [
+            'department' => 'Pharmacy',
+            'cost_center_id' => $orCostCenter->id,
+            'lines' => [
+                ['item_id' => $item->id, 'requested_quantity' => 5],
+            ],
+        ]);
+
+        $failResponse->assertStatus(422);
+        $failResponse->assertJsonValidationErrors(['cost_center_id']);
+        $this->assertSame(
+            'The selected Cost Center does not belong to the requesting department.',
+            $failResponse->json('errors.cost_center_id.0')
+        );
+
+        // API Valid derivation
+        $successResponse = $this->postJson('/api/v1/inventory/requisitions', [
+            'department' => 'Pharmacy',
+            'lines' => [
+                ['item_id' => $item->id, 'requested_quantity' => 5],
+            ],
+        ]);
+
+        $successResponse->assertStatus(201);
+        $createdId = $successResponse->json('data.id');
+        $persisted = MaterialRequisition::find($createdId);
+        $this->assertNotNull($persisted);
+        $this->assertSame($pharmCostCenter->id, $persisted->cost_center_id);
     }
 }
 

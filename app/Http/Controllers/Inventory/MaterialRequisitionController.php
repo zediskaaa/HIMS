@@ -47,7 +47,10 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
                 $query->where(fn ($q) => $q
                     ->where('requisition_number', 'like', $term)
                     ->orWhere('department', 'like', $term)
-                    ->orWhere('justification', 'like', $term));
+                    ->orWhere('justification', 'like', $term)
+                    ->orWhereHas('costCenter', fn ($ccQ) => $ccQ
+                        ->where('code', 'like', $term)
+                        ->orWhere('name', 'like', $term)));
             })
             ->latest()
             ->paginate(15)
@@ -60,17 +63,20 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
             ->distinct()
             ->pluck('department')
             ->concat([
-                'Emergency Department',
-                'Intensive Care Unit (ICU)',
+                'Emergency',
                 'Operating Room (OR)',
-                'Central Supply',
+                'Intensive Care Unit (ICU)',
                 'Pharmacy',
                 'Laboratory',
+                'Central Supply',
                 'Inpatient Ward',
                 'Outpatient Clinic',
             ])
+            ->filter()
             ->unique()
             ->values();
+
+        $departmentCostCenterMap = CostCenter::getDepartmentCostCenterMap($departments);
 
         $requisitionMetrics = [
             'total' => MaterialRequisition::count(),
@@ -101,6 +107,7 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
             'items',
             'costCenters',
             'departments',
+            'departmentCostCenterMap',
             'requisitionMetrics',
             'approverRoleLabels',
             'preselectedItem',
@@ -185,7 +192,7 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
     {
         $validator = Validator::make($request->all(), [
             'department' => ['required', 'string', 'max:100'],
-            'cost_center_id' => ['nullable', 'exists:cost_centers,id'],
+            'cost_center_id' => ['nullable', 'integer'],
             'required_date' => ['nullable', 'date'],
             'urgency' => ['nullable', 'in:routine,urgent,stat_emergency'],
             'justification' => ['nullable', 'string', 'max:500'],
@@ -207,7 +214,37 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
             'lines.*.requested_quantity.min' => 'Requested quantity must be at least 1.',
         ]);
 
+        $validator->after(function ($v) use ($request) {
+            $department = $request->string('department')->trim()->value();
+            if (empty($department)) {
+                return;
+            }
+
+            $assignedCostCenter = CostCenter::resolveForDepartment($department);
+            if (! $assignedCostCenter) {
+                $v->errors()->add(
+                    'department',
+                    "The selected requesting department ({$department}) does not have an active Cost Center assigned."
+                );
+
+                return;
+            }
+
+            if ($request->filled('cost_center_id') && (int) $request->input('cost_center_id') !== $assignedCostCenter->id) {
+                $v->errors()->add(
+                    'cost_center_id',
+                    'The selected Cost Center does not belong to the requesting department.'
+                );
+            }
+        });
+
         $validated = $validator->validate();
+
+        // Server-side authoritative derivation of Cost Center from Requesting Department
+        $assignedCostCenter = CostCenter::resolveForDepartment($validated['department']);
+        if ($assignedCostCenter) {
+            $validated['cost_center_id'] = $assignedCostCenter->id;
+        }
 
         // Ensure lines.*.notes has the item-specific clinical justification
         foreach ($validated['lines'] as $idx => $line) {

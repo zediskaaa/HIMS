@@ -198,7 +198,14 @@
                     <div>
                         <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">Department / Unit</p>
                         <p class="mt-1 text-sm font-semibold text-neutral-900">{{ $requisition->department }}</p>
-                        <p class="text-xs text-neutral-500">Cost Center: {{ $requisition->costCenter->name ?? 'Default Operating Fund' }}</p>
+                        <p class="text-xs text-neutral-500">
+                            Cost Center:
+                            @if($requisition->costCenter)
+                                <span class="font-medium text-neutral-800 dark:text-neutral-200">{{ $requisition->costCenter->code }} &bull; {{ $requisition->costCenter->name }}</span>
+                            @else
+                                <span class="text-amber-600 dark:text-amber-400">No Cost Center assigned</span>
+                            @endif
+                        </p>
                     </div>
                     <div>
                         <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">Personnel &amp; Governance</p>

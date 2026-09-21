@@ -1,6 +1,12 @@
 <x-app-layout>
     <div class="space-y-6" x-data="{
         newRequisitionModal: {{ ($errors->any() || $preselectedItem) ? 'true' : 'false' }},
+        selectedDepartment: '{{ old('department', (auth()->user()->department && isset($departmentCostCenterMap[auth()->user()->department])) ? auth()->user()->department : 'Emergency') }}',
+        departmentCostCenterMap: {{ Js::from($departmentCostCenterMap) }},
+        assignedCostCenter() {
+            if (!this.selectedDepartment) return null;
+            return this.departmentCostCenterMap[this.selectedDepartment] || null;
+        },
         itemsList: {{ Js::from($items) }},
         preselectedItem: {{ Js::from($preselectedItem) }},
         aiRecommendation: {{ Js::from($aiRecommendation) }},
@@ -247,6 +253,16 @@
         },
         validateAndSubmit(e) {
             this.clientValidationError = '';
+            if (!this.selectedDepartment) {
+                e.preventDefault();
+                this.clientValidationError = 'Please select a requesting department.';
+                return false;
+            }
+            if (!this.assignedCostCenter()) {
+                e.preventDefault();
+                this.clientValidationError = 'The selected department has no active Cost Center assigned. Requisition cannot be submitted.';
+                return false;
+            }
             if (this.lines.length === 0) {
                 e.preventDefault();
                 this.clientValidationError = 'At least one item must be requested in the requisition.';
@@ -412,7 +428,13 @@
                                     </td>
                                     <td class="px-6 py-4">
                                         <p class="font-medium text-neutral-900">{{ $req->department }}</p>
-                                        <p class="text-xs text-neutral-500">{{ $req->costCenter->name ?? 'Default Cost Center' }}</p>
+                                        <p class="text-xs text-neutral-500">
+                                            @if($req->costCenter)
+                                                {{ $req->costCenter->code }} &bull; {{ $req->costCenter->name }}
+                                            @else
+                                                <span class="text-amber-600 dark:text-amber-400">No Cost Center assigned</span>
+                                            @endif
+                                        </p>
                                     </td>
                                     <td class="px-6 py-4 text-xs">
                                         <p class="font-medium text-neutral-800">{{ $req->requestingUser->name ?? 'System' }}</p>
@@ -746,23 +768,54 @@
                                     <label class="flex items-end text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5 h-6 truncate" title="Requesting Department">
                                         <span>Requesting Dept.</span> <span class="text-rose-500 ml-0.5">*</span>
                                     </label>
-                                    <select name="department" required class="h-9 block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs font-medium py-1.5 px-2.5">
+                                    <select name="department" x-model="selectedDepartment" required class="h-9 block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs font-medium py-1.5 px-2.5">
                                         <option value="">-- Select Dept --</option>
                                         @foreach($departments as $dept)
-                                            <option value="{{ $dept }}" {{ (auth()->user()->department === $dept) ? 'selected' : '' }}>{{ $dept }}</option>
+                                            <option value="{{ $dept }}">{{ $dept }}</option>
                                         @endforeach
                                     </select>
                                 </div>
                                 <div class="flex flex-col justify-end">
-                                    <label class="flex items-end text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5 h-6 truncate" title="Cost Center">
-                                        <span>Cost Center</span>
-                                    </label>
-                                    <select name="cost_center_id" class="h-9 block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-2xs focus:border-primary-500 focus:ring-primary-500 text-xs font-medium py-1.5 px-2.5">
-                                        <option value="">-- Optional Cost Center --</option>
-                                        @foreach($costCenters as $cc)
-                                            <option value="{{ $cc->id }}">{{ $cc->code }} &bull; {{ $cc->name }}</option>
-                                        @endforeach
-                                    </select>
+                                    <div class="flex items-end justify-between mb-1.5 h-6">
+                                        <label class="text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 truncate" title="Cost Center">
+                                            Cost Center
+                                        </label>
+                                        <span x-show="assignedCostCenter()" class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.2 rounded">
+                                            Auto-assigned
+                                        </span>
+                                    </div>
+                                    
+                                    {{-- Read-only system-derived presentation --}}
+                                    <div class="relative">
+                                        <div class="h-9 w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-100/90 dark:bg-neutral-800/90 text-neutral-900 dark:text-neutral-100 px-2.5 flex items-center justify-between shadow-2xs select-none"
+                                             :class="{
+                                                 'border-amber-400 dark:border-amber-600 bg-amber-50/50 dark:bg-amber-950/20': (!assignedCostCenter() && selectedDepartment)
+                                             }">
+                                            <template x-if="assignedCostCenter()">
+                                                <div class="flex items-center gap-1.5 min-w-0 pr-1">
+                                                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                                    <span class="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate" x-text="assignedCostCenter().display"></span>
+                                                </div>
+                                            </template>
+                                            <template x-if="!assignedCostCenter() && selectedDepartment">
+                                                <div class="flex items-center gap-1.5 min-w-0 text-amber-600 dark:text-amber-400">
+                                                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                                    </svg>
+                                                    <span class="text-xs font-medium truncate">No Cost Center assigned</span>
+                                                </div>
+                                            </template>
+                                            <template x-if="!selectedDepartment">
+                                                <span class="text-xs text-neutral-400 dark:text-neutral-500">Select department first</span>
+                                            </template>
+                                            <svg class="w-3.5 h-3.5 text-neutral-400 shrink-0 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" title="System-derived organizational data">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                            </svg>
+                                        </div>
+                                        
+                                        {{-- Hidden Form Input ensuring value is submitted --}}
+                                        <input type="hidden" name="cost_center_id" :value="assignedCostCenter() ? assignedCostCenter().id : ''">
+                                    </div>
                                 </div>
                                 <div class="flex flex-col justify-end">
                                     <label class="flex items-end text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5 h-6 truncate" title="Urgency Level">
@@ -912,7 +965,10 @@
                                 <button type="button" @click="newRequisitionModal = false" class="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition">
                                     Cancel
                                 </button>
-                                <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 active:bg-primary-800 transition">
+                                <button type="submit"
+                                    :disabled="lines.length === 0 || !assignedCostCenter()"
+                                    :class="(!assignedCostCenter() && selectedDepartment) ? 'opacity-50 cursor-not-allowed' : ''"
+                                    class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 active:bg-primary-800 transition disabled:opacity-50 disabled:cursor-not-allowed">
                                     Submit Store Requisition
                                 </button>
                             </div>

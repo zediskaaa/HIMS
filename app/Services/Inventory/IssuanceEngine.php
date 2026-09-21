@@ -8,6 +8,7 @@ use App\Enums\NotificationDestination;
 use App\Enums\NotificationPriority;
 use App\Enums\Permission;
 use App\Enums\WarehouseTaskType;
+use App\Models\CostCenter;
 use App\Models\InventoryItem;
 use App\Models\ItemStockLevel;
 use App\Models\MaterialRequisition;
@@ -43,12 +44,14 @@ class IssuanceEngine
     {
         $requisition = DB::transaction(function () use ($data, $requester) {
             $reqNumber = self::generateRequisitionNumber();
+            $department = $data['department'] ?? $requester->department ?? 'General Clinic';
+            $costCenterId = $data['cost_center_id'] ?? CostCenter::resolveForDepartment($department)?->id;
 
             $requisition = MaterialRequisition::create([
                 'requisition_number' => $reqNumber,
                 'requesting_user_id' => $requester->id,
-                'department' => $data['department'] ?? $requester->department ?? 'General Clinic',
-                'cost_center_id' => $data['cost_center_id'] ?? null,
+                'department' => $department,
+                'cost_center_id' => $costCenterId,
                 'required_date' => isset($data['required_date']) ? Carbon::parse($data['required_date']) : now()->addDays(2),
                 'status' => 'pending_approval',
                 'urgency' => $data['urgency'] ?? 'routine',
