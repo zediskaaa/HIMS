@@ -21,17 +21,13 @@
                     </span>
                 </div>
                 {{-- Zone 2: Primary Value --}}
-                <div class="mt-3 flex items-baseline justify-between gap-2">
-                    <div class="flex items-baseline gap-1.5">
-                        <span id="stat-out-of-stock" class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-rose-600 dark:text-rose-400">—</span>
-                        <span class="text-sm sm:text-base font-bold text-rose-500/80 dark:text-rose-400/80">items</span>
-                    </div>
-                    <span class="inline-flex shrink-0 items-center rounded-full bg-rose-100 dark:bg-rose-950/80 px-2.5 py-0.5 text-xs font-bold text-rose-700 dark:text-rose-300 ring-1 ring-inset ring-rose-200 dark:ring-rose-800/60">Depleted</span>
+                <div class="mt-3 flex items-baseline gap-1.5">
+                    <span id="stat-out-of-stock" class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-rose-600 dark:text-rose-400">—</span>
+                    <span class="text-sm sm:text-base font-bold text-rose-500/80 dark:text-rose-400/80">items</span>
                 </div>
                 {{-- Zone 3: Footer --}}
-                <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                <div class="mt-3.5 flex items-center border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
                     <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">Zero on hand available</span>
-                    <span class="inline-flex shrink-0 items-center rounded-md bg-rose-100/80 dark:bg-rose-900/60 px-2 py-0.5 text-xs font-bold text-rose-700 dark:text-rose-300">Immediate order</span>
                 </div>
             </div>
 
@@ -45,17 +41,13 @@
                     </span>
                 </div>
                 {{-- Zone 2: Primary Value --}}
-                <div class="mt-3 flex items-baseline justify-between gap-2">
-                    <div class="flex items-baseline gap-1.5">
-                        <span id="stat-low-stock" class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-amber-600 dark:text-amber-400">—</span>
-                        <span class="text-sm sm:text-base font-bold text-amber-600/80 dark:text-amber-400/80">items</span>
-                    </div>
-                    <span class="inline-flex shrink-0 items-center rounded-full bg-amber-100 dark:bg-amber-950/80 px-2.5 py-0.5 text-xs font-bold text-amber-700 dark:text-amber-300 ring-1 ring-inset ring-amber-200 dark:ring-amber-800/60">Reorder trigger</span>
+                <div class="mt-3 flex items-baseline gap-1.5">
+                    <span id="stat-low-stock" class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-amber-600 dark:text-amber-400">—</span>
+                    <span class="text-sm sm:text-base font-bold text-amber-600/80 dark:text-amber-400/80">items</span>
                 </div>
                 {{-- Zone 3: Footer --}}
-                <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                <div class="mt-3.5 flex items-center border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
                     <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">Below reorder threshold</span>
-                    <span class="inline-flex shrink-0 items-center rounded-md bg-amber-100/80 dark:bg-amber-900/60 px-2 py-0.5 text-xs font-bold text-amber-700 dark:text-amber-300">Restock needed</span>
                 </div>
             </div>
 
@@ -69,17 +61,13 @@
                     </span>
                 </div>
                 {{-- Zone 2: Primary Value --}}
-                <div class="mt-3 flex items-baseline justify-between gap-2">
-                    <div class="flex items-baseline gap-1.5">
-                        <span id="stat-expiring" class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-indigo-600 dark:text-indigo-400">—</span>
-                        <span class="text-sm sm:text-base font-bold text-indigo-600/80 dark:text-indigo-400/80">batches</span>
-                    </div>
-                    <span class="inline-flex shrink-0 items-center rounded-full bg-indigo-100 dark:bg-indigo-950/80 px-2.5 py-0.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 ring-1 ring-inset ring-indigo-200 dark:ring-indigo-800/60">&le; 30 days</span>
+                <div class="mt-3 flex items-baseline gap-1.5">
+                    <span id="stat-expiring" class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-indigo-600 dark:text-indigo-400">—</span>
+                    <span class="text-sm sm:text-base font-bold text-indigo-600/80 dark:text-indigo-400/80">batches</span>
                 </div>
                 {{-- Zone 3: Footer --}}
-                <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                <div class="mt-3.5 flex items-center border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
                     <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">Expiring in &le; 30 days</span>
-                    <span class="inline-flex shrink-0 items-center rounded-md bg-indigo-100/80 dark:bg-indigo-900/60 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:text-indigo-300">FEFO priority</span>
                 </div>
             </div>
         </div>

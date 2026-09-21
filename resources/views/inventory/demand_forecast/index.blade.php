@@ -49,12 +49,8 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <h2 class="text-xs font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Forecast scope</h2>
                     @if ($aiForecast)
-                        <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset" x-bind:class="sourceClasses()">
-                            <span class="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true"></span>
-                            <span>{{ $aiForecast['source_label'] }}</span>
-                        </span>
-                        <span class="text-[11px] text-neutral-400 dark:text-neutral-500">
-                            {{ $aiForecast['forecast_period'] }} · Generated {{ \Illuminate\Support\Carbon::parse($aiForecast['generated_at'])->format('M d, Y g:i A') }}
+                        <span class="text-[11px] text-neutral-500 dark:text-neutral-400">
+                            {{ $aiForecast['source_label'] }} · {{ $aiForecast['forecast_period'] }} · Generated {{ \Illuminate\Support\Carbon::parse($aiForecast['generated_at'])->format('M d, Y g:i A') }}
                         </span>
                     @endif
                 </div>
@@ -210,7 +206,7 @@
                     <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">
                         ~<span class="font-bold text-violet-700 dark:text-violet-300" x-text="formatNumber(summaryPredictedDailyDemand(), 1)"></span> units / day
                     </span>
-                    <span class="inline-flex shrink-0 items-center rounded-md bg-violet-100/80 dark:bg-violet-900/60 px-2 py-0.5 text-xs font-bold text-violet-700 dark:text-violet-300" x-text="`${forecastDays}d horizon`"></span>
+                    <span class="text-xs font-semibold text-neutral-500 dark:text-neutral-400" x-text="`${forecastDays}d horizon`"></span>
                 </div>
             </div>
 
@@ -242,20 +238,13 @@
                         <x-ui.icon name="exclamation-triangle" class="h-5 w-5" />
                     </span>
                 </div>
-                <div class="mt-3 flex items-baseline justify-between gap-2">
-                    <div class="flex items-baseline gap-1.5">
-                        <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums"
-                              :class="highRiskCount() > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'"
-                              x-text="highRiskCount()">
-                            {{ $aiForecast['summary']['high_risk_items'] ?? 0 }}
-                        </span>
-                        <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">critical</span>
-                    </div>
-                    <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs sm:text-sm font-black uppercase tracking-wider ring-1 ring-inset shadow-2xs"
-                          x-bind:class="riskClasses(summaryStockRisk())"
-                          x-text="summaryStockRisk().toUpperCase()">
-                        {{ ($aiForecast['summary']['high_risk_items'] ?? 0) > 0 ? 'HIGH' : 'LOW' }}
+                <div class="mt-3 flex items-baseline gap-1.5">
+                    <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums"
+                          :class="highRiskCount() > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'"
+                          x-text="highRiskCount()">
+                        {{ $aiForecast['summary']['high_risk_items'] ?? 0 }}
                     </span>
+                    <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">critical</span>
                 </div>
                 <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
                     <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">Immediate action required</span>

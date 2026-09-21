@@ -130,6 +130,19 @@ Never show multiple loading indicators simultaneously for a single user action. 
 - Keep labels to a word or two. The component is `whitespace-nowrap`, so a long label widens its column and is a common cause of table overflow.
 - Use plain `tabular-nums` text for counts. Reserve colour for state, not magnitude.
 
+### Strict Badge Restraint: Avoid Excessive, Redundant & Decorative Badges ("Bawal ang Sobrang Badge / Iwasan ang Paggawa ng Badge")
+
+Do not litter the user interface with badges. Excessive badges create visual fatigue, noise, and clutter, making it difficult to spot genuine operational statuses ("ayaw ko ng masyadong maraming badge kaya kung maari iwasan na huwag gumawa ng badge").
+
+- **Never Use Badges as Visual Decoration**:
+  - Never add redundant status pills, action chips, or decorative labels on stat cards, KPI card footers, cards, or page headers (such as `Catalog active`, `Replenish`, `Action required`, `Asset valuation`, `Investigate`, `Pipeline active`, `In transit`, `Urgent`, `DOA Queue`, `Cleared`).
+  - Zone 3 KPI card footers must use plain, unadorned text (`text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate`) for grounding details. Do NOT append decorative pill badges or chips in card footers.
+- **Strictly Limited to Essential Entity Lifecycle Status**:
+  - Badges are strictly reserved for core lifecycle status values in data tables and resource detail screens where instant visual classification of an entity state is required (e.g. `status` in table rows like `Pending`, `Approved`, `Dispatched`, `Delivered`, `Archived`).
+  - Convey only ONE state per field. If the metric or label already explains the condition (e.g., "Needs reorder", "Open alerts"), do not attach another badge that merely repeats the concept.
+- **Prefer Plain Typography**:
+  - Use clear, subtle text labels, tabular numbers, or simple dot indicators instead of wrapping every secondary string in a colored pill container.
+
 ### Standardized Operational KPI & Stat Metric Cards
 
 All primary operational dashboards (such as Demand Forecasting, Executive Dashboard, Inventory Overview, and Procurement Summaries) must use the standardized **3-Zone KPI Card Pattern** to ensure strict visual consistency, dark-mode readability, and high data density.
@@ -143,11 +156,11 @@ Every KPI card is structured in a vertically balanced flex container (`flex flex
 - **Zone 2: Primary Value Display (Visual Anchor)**
   - **Dominant Metric**: Large, high-contrast number formatted with `tabular-nums` (`text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-neutral-950 dark:text-white` or semantic tone color). Never use small or faint numbers.
   - **Unit Suffix**: Inline unit suffix with baseline alignment (`text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400` or matching tone color).
-  - **Optional State Pill**: Right-aligned status pill or risk badge (e.g. `HIGH` danger pill, `● Active` indicator) aligned with the metric baseline.
-- **Zone 3: Contextual Footer (Sub-metrics & Grounding Details)**
-  - Separated by a subtle divider: `mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80`.
-  - **Left**: Grounding explanation (`text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate`).
-  - **Right**: Secondary metric, counter, or scope chip (`text-xs font-bold`, e.g. `● 28 items`, `30d horizon` chip, `8 need restock`, `4 moderate`, `95% CI`).
+  - **No State Pills / Status Badges**: Strictly avoid placing badges or status pills (e.g. `ACTIVE`, `OPEN`, `OUT OF STOCK`, `HIGH`, `LOW`) inside Zone 2. Let the metric, its color, and its label speak for itself without redundant badge clutter.
+- **Zone 3: Contextual Footer (Grounding Details & Clean Context)**
+  - Separated by a subtle divider: `mt-3.5 flex items-center border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80`.
+  - **Grounding Explanation**: Clean, unadorned typography (`text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate`).
+  - **No Decorative Badges / Chips**: Never append pill badges or status tags to the footer. Keep the grounding footer simple and badge-free.
 
 #### 2. Standard Container Markup
 ```blade
@@ -160,16 +173,13 @@ Every KPI card is structured in a vertically balanced flex container (`flex flex
         </span>
     </div>
     {{-- Zone 2: Value --}}
-    <div class="mt-3 flex items-baseline justify-between gap-2">
-        <div class="flex items-baseline gap-1.5">
-            <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-violet-700 dark:text-violet-300">1,181</span>
-            <span class="text-sm sm:text-base font-bold text-violet-600/80 dark:text-violet-400/80">units</span>
-        </div>
+    <div class="mt-3 flex items-baseline gap-1.5">
+        <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-violet-700 dark:text-violet-300">1,181</span>
+        <span class="text-sm sm:text-base font-bold text-violet-600/80 dark:text-violet-400/80">units</span>
     </div>
     {{-- Zone 3: Footer --}}
-    <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
-        <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">~39.4 units / day</span>
-        <span class="inline-flex shrink-0 items-center rounded-md bg-violet-100/80 dark:bg-violet-900/60 px-2 py-0.5 text-xs font-bold text-violet-700 dark:text-violet-300">30d horizon</span>
+    <div class="mt-3.5 flex items-center border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+        <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">~39.4 units / day (30d horizon)</span>
     </div>
 </div>
 ```

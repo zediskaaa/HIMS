@@ -78,19 +78,13 @@
                         </span>
                     </div>
                     {{-- Zone 2: Value --}}
-                    <div class="mt-3 flex items-baseline justify-between gap-2">
-                        <div class="flex items-baseline gap-1.5">
-                            <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-neutral-950 dark:text-white">{{ number_format($poMetrics['open']) }}</span>
-                            <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">orders</span>
-                        </div>
-                        @if($poMetrics['open'] > 0)
-                            <span class="inline-flex items-center rounded-lg bg-primary-50 dark:bg-primary-950/80 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-primary-700 dark:text-primary-300 ring-1 ring-inset ring-primary-200 dark:ring-primary-800/50">ACTIVE</span>
-                        @endif
+                    <div class="mt-3 flex items-baseline gap-1.5">
+                        <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-neutral-950 dark:text-white">{{ number_format($poMetrics['open']) }}</span>
+                        <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">orders</span>
                     </div>
                     {{-- Zone 3: Footer --}}
-                    <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                    <div class="mt-3.5 flex items-center border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
                         <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">Active commitments</span>
-                        <span class="inline-flex shrink-0 items-center rounded-md bg-primary-50 dark:bg-primary-950/60 px-2 py-0.5 text-xs font-bold text-primary-700 dark:text-primary-300">Pipeline active</span>
                     </div>
                 </div>
 
@@ -104,19 +98,13 @@
                         </span>
                     </div>
                     {{-- Zone 2: Value --}}
-                    <div class="mt-3 flex items-baseline justify-between gap-2">
-                        <div class="flex items-baseline gap-1.5">
-                            <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums {{ $poMetrics['pending_approval'] > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400' }}">{{ number_format($poMetrics['pending_approval']) }}</span>
-                            <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">orders</span>
-                        </div>
-                        @if($poMetrics['pending_approval'] > 0)
-                            <span class="inline-flex items-center rounded-lg bg-amber-100 dark:bg-amber-950/80 px-2 py-0.5 text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-300 ring-1 ring-inset ring-amber-200 dark:ring-amber-800/50 shadow-2xs">NEEDS REVIEW</span>
-                        @endif
+                    <div class="mt-3 flex items-baseline gap-1.5">
+                        <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums {{ $poMetrics['pending_approval'] > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400' }}">{{ number_format($poMetrics['pending_approval']) }}</span>
+                        <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">orders</span>
                     </div>
                     {{-- Zone 3: Footer --}}
-                    <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                    <div class="mt-3.5 flex items-center border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
                         <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">{{ $poMetrics['pending_approval'] > 0 ? 'Awaiting authorization' : 'All orders authorized' }}</span>
-                        <span class="inline-flex shrink-0 items-center rounded-md {{ $poMetrics['pending_approval'] > 0 ? 'bg-amber-100/80 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300' : 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300' }} px-2 py-0.5 text-xs font-bold">{{ $poMetrics['pending_approval'] > 0 ? 'DOA Queue' : 'Cleared' }}</span>
                     </div>
                 </div>
 
@@ -130,19 +118,13 @@
                         </span>
                     </div>
                     {{-- Zone 2: Value --}}
-                    <div class="mt-3 flex items-baseline justify-between gap-2">
-                        <div class="flex items-baseline gap-1.5">
-                            <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-neutral-950 dark:text-white">{{ number_format($poMetrics['in_transit']) }}</span>
-                            <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">orders</span>
-                        </div>
-                        @if($poMetrics['in_transit'] > 0)
-                            <span class="inline-flex items-center rounded-lg bg-sky-50 dark:bg-sky-950/80 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300 ring-1 ring-inset ring-sky-200 dark:ring-sky-800/50">DISPATCHED</span>
-                        @endif
+                    <div class="mt-3 flex items-baseline gap-1.5">
+                        <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-neutral-950 dark:text-white">{{ number_format($poMetrics['in_transit']) }}</span>
+                        <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">orders</span>
                     </div>
                     {{-- Zone 3: Footer --}}
-                    <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                    <div class="mt-3.5 flex items-center border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
                         <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">Dispatched or partial</span>
-                        <span class="inline-flex shrink-0 items-center rounded-md bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5 text-xs font-bold text-sky-700 dark:text-sky-300">In transit</span>
                     </div>
                 </div>
 
@@ -156,19 +138,13 @@
                         </span>
                     </div>
                     {{-- Zone 2: Value --}}
-                    <div class="mt-3 flex items-baseline justify-between gap-2">
-                        <div class="flex items-baseline gap-1.5">
-                            <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums {{ $poMetrics['overdue'] > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400' }}">{{ number_format($poMetrics['overdue']) }}</span>
-                            <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">orders</span>
-                        </div>
-                        @if($poMetrics['overdue'] > 0)
-                            <span class="inline-flex items-center rounded-lg bg-rose-100 dark:bg-rose-950/80 px-2.5 py-1 text-xs font-black uppercase tracking-wider text-rose-700 dark:text-rose-300 ring-1 ring-inset ring-rose-200 dark:ring-rose-800/50 shadow-2xs animate-pulse">DELAYED</span>
-                        @endif
+                    <div class="mt-3 flex items-baseline gap-1.5">
+                        <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums {{ $poMetrics['overdue'] > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400' }}">{{ number_format($poMetrics['overdue']) }}</span>
+                        <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">orders</span>
                     </div>
                     {{-- Zone 3: Footer --}}
-                    <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                    <div class="mt-3.5 flex items-center border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
                         <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">{{ $poMetrics['overdue'] > 0 ? 'Past required delivery date' : 'All shipments on schedule' }}</span>
-                        <span class="inline-flex shrink-0 items-center rounded-md {{ $poMetrics['overdue'] > 0 ? 'bg-rose-100/80 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300' : 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300' }} px-2 py-0.5 text-xs font-bold">{{ $poMetrics['overdue'] > 0 ? 'Urgent' : 'On track' }}</span>
                     </div>
                 </div>
             </div>

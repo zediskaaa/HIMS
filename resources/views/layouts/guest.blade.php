@@ -146,10 +146,6 @@
                     </section>
 
                     <div class="mx-auto w-full max-w-md animate-fade-in-scale overflow-hidden rounded-2xl border {{ $isSuperAdminPortal ? 'border-warning-500/25' : ($isAdminPortal ? 'border-primary-300/30' : 'border-white/20') }} bg-white shadow-2xl shadow-neutral-950/60 [animation-delay:200ms] dark:bg-neutral-900">
-                        {{-- A slow highlight travels the accent bar so the card reads as live. --}}
-                        <div class="relative h-1 overflow-hidden {{ $isSuperAdminPortal ? 'bg-gradient-to-r from-neutral-950 via-warning-600 to-neutral-950' : 'bg-gradient-to-r from-primary-700 via-primary-500 to-primary-300' }}">
-                            <span class="absolute inset-0 -translate-x-full animate-sheen bg-gradient-to-r from-transparent via-white/70 to-transparent" aria-hidden="true"></span>
-                        </div>
                         <div class="p-6 sm:p-8">
                             {{ $slot }}
                         </div>
