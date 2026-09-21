@@ -142,6 +142,7 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::get('/inventory/warehousing/locations/{storageLocation}/items', [SmartWarehousingController::class, 'locationItems'])->name('inventory.warehousing.locations.items');
     Route::post('/inventory/warehousing/locations', [SmartWarehousingController::class, 'storeLocation'])->name('inventory.warehousing.locations.store');
     Route::get('/inventory/warehousing/scan-station', [SmartWarehousingController::class, 'scanStation'])->name('inventory.warehousing.scan-station');
+    Route::post('/inventory/warehousing/lookup-barcode', [SmartWarehousingController::class, 'lookupBarcode'])->name('inventory.warehousing.lookup-barcode');
 
 
     // Dangerous Drugs & PDEA Narcotics Vault

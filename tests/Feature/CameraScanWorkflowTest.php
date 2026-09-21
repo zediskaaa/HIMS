@@ -356,4 +356,138 @@ class CameraScanWorkflowTest extends TestCase
             ->assertSee('Smart Warehousing System (SWS)')
             ->assertSee($source->barcode_value);
     }
+
+    public function test_unauthorized_user_cannot_perform_barcode_lookup(): void
+    {
+        $viewer = User::factory()->role(UserRole::Viewer)->create();
+        [$source] = $this->seedTaskPrerequisites();
+
+        $this->actingAs($viewer)
+            ->postJson(route('inventory.warehousing.lookup-barcode'), ['barcode' => $source->code])
+            ->assertForbidden();
+    }
+
+    public function test_operator_can_lookup_item_barcode_and_get_details(): void
+    {
+        $operator = User::factory()->warehouseStaff()->create();
+        [, , $item] = $this->seedTaskPrerequisites();
+
+        $response = $this->actingAs($operator)
+            ->postJson(route('inventory.warehousing.lookup-barcode'), ['barcode' => $item->sku]);
+
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'type' => 'item',
+                'id' => $item->id,
+                'sku' => $item->sku,
+                'is_active' => true,
+            ]);
+    }
+
+    public function test_operator_can_lookup_storage_location_barcode(): void
+    {
+        $operator = User::factory()->warehouseStaff()->create();
+        [$source] = $this->seedTaskPrerequisites();
+
+        $response = $this->actingAs($operator)
+            ->postJson(route('inventory.warehousing.lookup-barcode'), ['barcode' => $source->code]);
+
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'type' => 'location',
+                'id' => $source->id,
+                'code' => $source->code,
+                'is_active' => true,
+            ]);
+    }
+
+    public function test_operator_lookup_flags_inactive_storage_location(): void
+    {
+        $operator = User::factory()->warehouseStaff()->create();
+        $inactiveLocation = StorageLocation::create([
+            'name' => 'Decommissioned Bin 99',
+            'code' => 'BIN-99-INACT',
+            'barcode_value' => 'LOC-BIN-99-INACT',
+            'status' => 'inactive',
+        ]);
+
+        $response = $this->actingAs($operator)
+            ->postJson(route('inventory.warehousing.lookup-barcode'), ['barcode' => $inactiveLocation->code]);
+
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'type' => 'location',
+                'location_status' => 'inactive',
+                'is_active' => false,
+            ]);
+        $this->assertNotNull($response->json('warning'));
+    }
+
+    public function test_operator_cannot_perform_inbound_into_inactive_location(): void
+    {
+        $operator = User::factory()->warehouseStaff()->create();
+        $inactiveLocation = StorageLocation::create([
+            'name' => 'Decommissioned Bin 99',
+            'code' => 'BIN-99-INACT',
+            'barcode_value' => 'LOC-BIN-99-INACT',
+            'status' => 'inactive',
+        ]);
+
+        $response = $this->actingAs($operator)
+            ->postJson(route('inventory.warehousing.lookup-barcode'), [
+                'barcode' => $inactiveLocation->code,
+                'operation' => 'inbound',
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'status' => 'inactive_location_blocked',
+            ]);
+    }
+
+    public function test_operator_can_lookup_warehouse_task_number(): void
+    {
+        $operator = User::factory()->warehouseStaff()->create();
+        [$source, $destination, $item, $batch] = $this->seedTaskPrerequisites();
+
+        $task = app(WarehouseTaskService::class)->create([
+            'task_type' => WarehouseTaskType::Move,
+            'priority' => 'normal',
+            'source_location_id' => $source->id,
+            'destination_location_id' => $destination->id,
+            'item_id' => $item->id,
+            'item_batch_id' => $batch->id,
+            'requested_quantity' => 5,
+            'assigned_to_id' => $operator->id,
+        ], $operator);
+
+        $response = $this->actingAs($operator)
+            ->postJson(route('inventory.warehousing.lookup-barcode'), ['barcode' => $task->task_number]);
+
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'type' => 'task',
+                'id' => $task->id,
+                'task_number' => $task->task_number,
+            ]);
+    }
+
+    public function test_lookup_returns_404_for_unknown_barcode(): void
+    {
+        $operator = User::factory()->warehouseStaff()->create();
+
+        $response = $this->actingAs($operator)
+            ->postJson(route('inventory.warehousing.lookup-barcode'), ['barcode' => 'UNKNOWN-NONEXISTENT-999']);
+
+        $response->assertNotFound()
+            ->assertJson([
+                'success' => false,
+                'status' => 'not_found',
+            ]);
+    }
 }

@@ -6,6 +6,7 @@ use App\Enums\AuditAction;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
+use App\Models\ItemBatch;
 use App\Models\ItemStockLevel;
 use App\Models\PdeaDangerousDrugsRegister;
 use App\Models\StorageLocation;
@@ -38,7 +39,7 @@ class SmartWarehousingController extends Controller implements HasMiddleware
         return [
             'auth:web,admin,super_admin',
             new Middleware('can:'.Permission::ViewWarehouseTasks->value, only: ['dashboard', 'locations', 'locationItems']),
-            new Middleware('can:'.Permission::ExecuteWarehouseTasks->value, only: ['scanStation']),
+            new Middleware('can:'.Permission::ExecuteWarehouseTasks->value, only: ['scanStation', 'lookupBarcode']),
             new Middleware('can:'.Permission::ManageWarehouseTopology->value, only: ['storeLocation']),
         ];
     }
@@ -244,11 +245,174 @@ class SmartWarehousingController extends Controller implements HasMiddleware
             ->take(15)
             ->get();
 
+        $recentTasks = WarehouseTask::with(['item', 'batch', 'sourceLocation', 'destinationLocation', 'assignedTo'])
+            ->latest()
+            ->take(6)
+            ->get();
+
         $recentScans = WarehouseScanEvent::with(['warehouseTask', 'scannedBy'])
             ->latest('id')
             ->take(10)
             ->get();
 
-        return view('inventory.warehousing.scan_station', compact('activeTasks', 'recentScans'));
+        $workstationMetrics = [
+            'active_tasks' => $activeTasks->count(),
+            'completed_today' => WarehouseTask::where('status', 'completed')->whereDate('completed_at', today())->count(),
+            'total_scans_today' => WarehouseScanEvent::whereDate('created_at', today())->count(),
+            'open_exceptions' => WarehouseException::where('status', 'open')->count(),
+        ];
+
+        return view('inventory.warehousing.scan_station', compact('activeTasks', 'recentTasks', 'recentScans', 'workstationMetrics'));
+    }
+
+    /**
+     * Resolve scanned barcode, QR code, or manually entered identifier (Item, Location, Task, Batch)
+     * using the central BarcodeService, strictly enforcing authorization and business rules
+     * (e.g. inactive storage locations cannot accept new stock).
+     */
+    public function lookupBarcode(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'barcode' => ['required', 'string', 'max:255'],
+            'operation' => ['nullable', 'string', 'in:lookup,receive,inbound,dispatch,pick,transfer'],
+        ]);
+
+        $raw = trim($validated['barcode']);
+        $operation = $validated['operation'] ?? 'lookup';
+
+        $resolved = $this->barcodeService->parseAndResolve($raw);
+
+        if ($resolved['resolved_type'] === null) {
+            return response()->json([
+                'success' => false,
+                'status' => 'not_found',
+                'raw' => $raw,
+                'message' => "No matching item, storage location, or warehouse task found for identifier [{$raw}].",
+            ], 404);
+        }
+
+        if ($resolved['resolved_type'] === 'location') {
+            $location = StorageLocation::find($resolved['resolved_id']);
+            if (! $location) {
+                return response()->json([
+                    'success' => false,
+                    'status' => 'not_found',
+                    'raw' => $raw,
+                    'message' => "Location with ID {$resolved['resolved_id']} was not found.",
+                ], 404);
+            }
+
+            $isInactive = $location->status === 'inactive';
+
+            // Respect warehouse business rules:
+            // Inactive locations cannot receive new stock or inbound assignments
+            if ($isInactive && in_array($operation, ['receive', 'inbound'], true)) {
+                return response()->json([
+                    'success' => false,
+                    'status' => 'inactive_location_blocked',
+                    'type' => 'location',
+                    'id' => $location->id,
+                    'code' => $location->code,
+                    'name' => $location->name,
+                    'location_status' => 'inactive',
+                    'message' => "Storage location [{$location->code}] is INACTIVE. Inbound receiving and new stock assignments into inactive storage are prohibited.",
+                ], 422);
+            }
+
+            return response()->json([
+                'success' => true,
+                'status' => $isInactive ? 'location_inactive' : 'location_active',
+                'type' => 'location',
+                'id' => $location->id,
+                'code' => $location->code,
+                'name' => $location->name,
+                'location_status' => $location->status,
+                'is_active' => ! $isInactive,
+                'warning' => $isInactive ? 'This storage location is INACTIVE. Inbound receiving and new stock assignments are prohibited. Existing inventory may be transferred or released.' : null,
+                'redirect_url' => route('inventory.warehousing.locations.items', $location),
+                'message' => "Storage location [{$location->code}] ({$location->name}) identified." . ($isInactive ? ' NOTE: Location is inactive.' : ''),
+            ]);
+        }
+
+        if ($resolved['resolved_type'] === 'item') {
+            $item = InventoryItem::find($resolved['resolved_id']);
+            if (! $item) {
+                return response()->json([
+                    'success' => false,
+                    'status' => 'not_found',
+                    'raw' => $raw,
+                    'message' => "Item with ID {$resolved['resolved_id']} was not found.",
+                ], 404);
+            }
+
+            $isArchived = $item->status === 'archived' || $item->archived_at !== null;
+
+            return response()->json([
+                'success' => true,
+                'status' => $isArchived ? 'item_archived' : 'item_active',
+                'type' => 'item',
+                'id' => $item->id,
+                'sku' => $item->sku,
+                'name' => $item->name,
+                'item_status' => $item->status,
+                'is_active' => ! $isArchived,
+                'warning' => $isArchived ? 'This item is ARCHIVED. It is retained for historical records but cannot receive new transactions.' : null,
+                'redirect_url' => route('inventory.items', ['search' => $item->sku]),
+                'message' => "Item [{$item->sku}] ({$item->name}) identified." . ($isArchived ? ' NOTE: Item is archived.' : ''),
+            ]);
+        }
+
+        if ($resolved['resolved_type'] === 'task') {
+            $task = WarehouseTask::find($resolved['resolved_id']);
+            if (! $task) {
+                return response()->json([
+                    'success' => false,
+                    'status' => 'not_found',
+                    'raw' => $raw,
+                    'message' => "Warehouse task with ID {$resolved['resolved_id']} was not found.",
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'status' => 'task_found',
+                'type' => 'task',
+                'id' => $task->id,
+                'task_number' => $task->task_number,
+                'task_status' => $task->status->value,
+                'redirect_url' => route('inventory.warehouse-tasks.show', $task),
+                'message' => "Warehouse task [{$task->task_number}] identified.",
+            ]);
+        }
+
+        if ($resolved['resolved_type'] === 'batch') {
+            $batch = ItemBatch::with('item')->find($resolved['resolved_id']);
+            if (! $batch) {
+                return response()->json([
+                    'success' => false,
+                    'status' => 'not_found',
+                    'raw' => $raw,
+                    'message' => "Batch with ID {$resolved['resolved_id']} was not found.",
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'status' => 'batch_found',
+                'type' => 'batch',
+                'id' => $batch->id,
+                'batch_number' => $batch->batch_number,
+                'item_sku' => $batch->item?->sku,
+                'redirect_url' => $batch->item ? route('inventory.items', ['search' => $batch->item->sku]) : null,
+                'message' => "Item batch [{$batch->batch_number}] identified.",
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'status' => 'unsupported_type',
+            'raw' => $raw,
+            'message' => "Identifier [{$raw}] resolved to an unsupported type [{$resolved['resolved_type']}].",
+        ], 422);
     }
 }
