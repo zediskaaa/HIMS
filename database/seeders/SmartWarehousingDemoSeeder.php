@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Enums\WarehouseTaskType;
 use App\Models\InventoryItem;
 use App\Models\InventorySerial;
-use App\Models\IoTTelemetryLog;
 use App\Models\ItemBatch;
 use App\Models\ItemCategory;
 use App\Models\ItemStockLevel;
@@ -307,17 +306,6 @@ class SmartWarehousingDemoSeeder extends Seeder
                     'item_batch_id' => $batchStent->id,
                     'storage_location_id' => $binConsignment->id,
                     'status' => 'available',
-                ],
-            );
-
-            // 4. Seed Simulated Telemetry Stream
-            IoTTelemetryLog::firstOrCreate(
-                ['sensor_id' => 'IOT-TMP-COLD01', 'storage_location_id' => $binCold->id, 'recorded_at' => now()->subMinutes(10)->startOfMinute()],
-                [
-                    'temperature_celsius' => 4.50,
-                    'relative_humidity_pct' => 52.10,
-                    'excursion_status' => 'normal',
-                    'resulting_event' => 'Steady-state cold chain compliance',
                 ],
             );
 

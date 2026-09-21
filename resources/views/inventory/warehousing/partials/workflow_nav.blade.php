@@ -9,8 +9,7 @@
 
     $isLocationsActive = request()->routeIs(
         'inventory.warehousing.locations',
-        'inventory.storage-locations*',
-        'inventory.warehousing.telemetry*'
+        'inventory.storage-locations*'
     );
 
     $isComplianceActive = request()->routeIs(
@@ -54,17 +53,14 @@
                 </optgroup>
             @endcanany
 
-            @canany([\App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::ManageTelemetryExcursions->value])
+            @canany([\App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ViewInventory->value])
                 <optgroup label="Locations &amp; Storage">
                     @canany([\App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ViewWarehouseTasks->value])
-                        <option value="{{ route('inventory.warehousing.locations') }}" @selected(request()->routeIs('inventory.warehousing.locations'))>Locations Explorer</option>
+                        <option value="{{ route('inventory.warehousing.locations') }}" @selected(request()->routeIs('inventory.warehousing.locations'))>Spatial Topology &amp; Locations</option>
                     @endcanany
                     @canany([\App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ViewInventory->value])
                         <option value="{{ route('inventory.storage-locations') }}" @selected(request()->routeIs('inventory.storage-locations*'))>Location Registry</option>
                     @endcanany
-                    @can(\App\Enums\Permission::ManageTelemetryExcursions->value)
-                        <option value="{{ route('inventory.warehousing.telemetry') }}" @selected(request()->routeIs('inventory.warehousing.telemetry*'))>IoT Telemetry Monitor</option>
-                    @endcan
                 </optgroup>
             @endcanany
 
@@ -184,7 +180,7 @@
         @endcanany
 
         {{-- 2. Locations & Storage --}}
-        @canany([\App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ViewInventory->value, \App\Enums\Permission::ManageTelemetryExcursions->value])
+        @canany([\App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ViewInventory->value])
             <div class="relative" @click.outside="if (openDropdown === 'locations') openDropdown = null">
                 <button
                     type="button"
@@ -214,7 +210,7 @@
                         >
                             <span class="flex items-center gap-2">
                                 <x-ui.icon name="map-pin" class="w-4 h-4 {{ request()->routeIs('inventory.warehousing.locations') ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-400 dark:text-neutral-500' }}" />
-                                <span>Locations Explorer</span>
+                                <span>Spatial Topology &amp; Locations</span>
                             </span>
                             @if (request()->routeIs('inventory.warehousing.locations'))
                                 <span class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
@@ -236,21 +232,6 @@
                             @endif
                         </a>
                     @endcanany
-
-                    @can(\App\Enums\Permission::ManageTelemetryExcursions->value)
-                        <a
-                            href="{{ route('inventory.warehousing.telemetry') }}"
-                            class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition {{ request()->routeIs('inventory.warehousing.telemetry*') ? 'bg-primary-50 text-primary-800 font-semibold dark:bg-primary-950/60 dark:text-primary-200' : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800' }}"
-                        >
-                            <span class="flex items-center gap-2">
-                                <x-ui.icon name="bolt" class="w-4 h-4 {{ request()->routeIs('inventory.warehousing.telemetry*') ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-400 dark:text-neutral-500' }}" />
-                                <span>IoT Telemetry Monitor</span>
-                            </span>
-                            @if (request()->routeIs('inventory.warehousing.telemetry*'))
-                                <span class="h-1.5 w-1.5 rounded-full bg-primary-600"></span>
-                            @endif
-                        </a>
-                    @endcan
                 </div>
             </div>
         @endcanany

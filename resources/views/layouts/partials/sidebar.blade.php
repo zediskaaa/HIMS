@@ -83,7 +83,7 @@
         @endcanany
 
         {{-- 3. Smart Warehousing --}}
-        @canany([\App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ExecuteWarehouseTasks->value, \App\Enums\Permission::ManageTelemetryExcursions->value])
+        @canany([\App\Enums\Permission::ViewWarehouseTasks->value, \App\Enums\Permission::ReceivePurchaseOrder->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ExecuteWarehouseTasks->value])
             @php
                 $isWarehousingActive = request()->routeIs(
                     'inventory.warehousing*', 'inventory.receiving*', 'inventory.qc*',

@@ -27,18 +27,14 @@
 
                 <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold uppercase tracking-wider text-neutral-500">IoT Cold Chain</span>
-                        <span class="rounded-full bg-cyan-100 p-2 text-cyan-700"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></span>
+                        <span class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Storage Locations</span>
+                        <span class="rounded-full bg-cyan-100 p-2 text-cyan-700"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg></span>
                     </div>
                     <div class="mt-3 flex items-baseline justify-between">
-                        <span class="text-3xl font-bold text-neutral-900">{{ $metrics['active_excursions'] }}</span>
-                        @if($metrics['active_excursions'] > 0)
-                            <span class="inline-flex items-center rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Excursion Holds</span>
-                        @else
-                            <span class="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">Compliant</span>
-                        @endif
+                        <span class="text-3xl font-bold text-neutral-900">{{ $metrics['active_locations'] }}</span>
+                        <span class="inline-flex items-center rounded-md bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-800">{{ $metrics['total_locations'] }} Total</span>
                     </div>
-                    <p class="mt-1 text-xs text-neutral-500">DOH AO 2014-0034 continuous thermal tracking</p>
+                    <p class="mt-1 text-xs text-neutral-500">Active bins, racks, shelves, and storage zones</p>
                 </div>
 
                 <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
@@ -69,50 +65,6 @@
             {{-- SWS Consolidated Workflow Navigation --}}
             @include('inventory.warehousing.partials.workflow_nav')
 
-            {{-- Live Environmental Telemetry & MKT Status --}}
-            <div class="rounded-xl border border-neutral-200 bg-white shadow-sm">
-                <div class="flex items-center justify-between border-b border-neutral-100 px-6 py-4">
-                    <div>
-                        <h3 class="text-base font-semibold text-neutral-900">Cold Chain & Environmental Telemetry (Haynes MKT)</h3>
-                        <p class="text-xs text-neutral-500">Calibrated real-time sensor streams and Mean Kinetic Temperature evaluations.</p>
-                    </div>
-                    @canany([\App\Enums\Permission::ManageTelemetryExcursions->value, \App\Enums\Permission::ViewWarehouseTasks->value])
-                    <a href="{{ route('inventory.warehousing.telemetry') }}" class="text-xs font-semibold text-primary-600 hover:text-primary-800">
-                        View Telemetry Console &rarr;
-                    </a>
-                    @endcanany
-                </div>
-                <div class="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
-                    @forelse($criticalSensors as $sensor)
-                        <div class="rounded-lg border @if($sensor['hold']) border-red-300 bg-red-50 @elseif($sensor['status'] === 'warning') border-amber-300 bg-amber-50 @else border-neutral-200 bg-neutral-50 @endif p-4">
-                            <div class="flex items-center justify-between">
-                                <span class="font-mono text-xs font-bold text-neutral-700">{{ $sensor['location']->code }}</span>
-                                @if($sensor['hold'])
-                                    <span class="rounded bg-red-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">EXCURSION HOLD</span>
-                                @elseif($sensor['status'] === 'warning')
-                                    <span class="rounded bg-amber-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">WARNING</span>
-                                @else
-                                    <span class="rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">COMPLIANT</span>
-                                @endif
-                            </div>
-                            <div class="mt-3 flex items-baseline justify-between">
-                                <div>
-                                    <p class="text-2xl font-black text-neutral-900">{{ $sensor['latest_temp'] !== null ? number_format($sensor['latest_temp'], 1).'°C' : 'N/A' }}</p>
-                                    <p class="text-[11px] text-neutral-500 capitalize">{{ $sensor['location']->temperature_classification ?? 'Ambient' }} Storage</p>
-                                </div>
-                                <div class="text-right">
-                                    <p class="text-sm font-semibold text-neutral-700">MKT: {{ $sensor['mkt'] !== null ? number_format($sensor['mkt'], 1).'°C' : '--' }}</p>
-                                    <p class="text-[11px] text-neutral-500">24h Haynes Index</p>
-                                </div>
-                            </div>
-                        </div>
-                    @empty
-                        <div class="col-span-full py-6 text-center text-sm text-neutral-500">
-                            No temperature-classified storage zones currently configured.
-                        </div>
-                    @endforelse
-                </div>
-            </div>
 
             {{-- Recent Warehouse Operational Tasks & Scans --}}
             <div class="grid gap-6 lg:grid-cols-2">
@@ -207,64 +159,5 @@
                         @endforelse
                     </div>
                 </div>
-            </div>
-
-            {{-- Smart Warehousing Submodules Quick Links --}}
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                @can(\App\Enums\Permission::AccessNarcoticsVault->value)
-                <a href="{{ route('inventory.warehousing.narcotics') }}" class="group rounded-xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-purple-300 hover:shadow-md">
-                    <div class="flex items-center gap-3">
-                        <div class="rounded-lg bg-purple-50 p-2.5 text-purple-700 group-hover:bg-purple-100">
-                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                        </div>
-                        <div>
-                            <h4 class="text-sm font-bold text-neutral-900 group-hover:text-purple-700">PDEA Narcotics Vault</h4>
-                            <p class="text-xs text-neutral-500">Dual-custody DDRB registry</p>
-                        </div>
-                    </div>
-                </a>
-                @endcan
-
-                @canany([\App\Enums\Permission::ManageTelemetryExcursions->value, \App\Enums\Permission::ViewWarehouseTasks->value])
-                <a href="{{ route('inventory.warehousing.telemetry') }}" class="group rounded-xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-cyan-300 hover:shadow-md">
-                    <div class="flex items-center gap-3">
-                        <div class="rounded-lg bg-cyan-50 p-2.5 text-cyan-700 group-hover:bg-cyan-100">
-                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                        </div>
-                        <div>
-                            <h4 class="text-sm font-bold text-neutral-900 group-hover:text-cyan-700">Cold Chain Monitor</h4>
-                            <p class="text-xs text-neutral-500">Haynes MKT & sensor feeds</p>
-                        </div>
-                    </div>
-                </a>
-                @endcanany
-
-                @canany([\App\Enums\Permission::RecordConsignments->value, \App\Enums\Permission::ViewWarehouseTasks->value])
-                <a href="{{ route('inventory.warehousing.consignment') }}" class="group rounded-xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md">
-                    <div class="flex items-center gap-3">
-                        <div class="rounded-lg bg-amber-50 p-2.5 text-amber-700 group-hover:bg-amber-100">
-                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                        </div>
-                        <div>
-                            <h4 class="text-sm font-bold text-neutral-900 group-hover:text-amber-700">Surgical Consignment</h4>
-                            <p class="text-xs text-neutral-500">Bill-Only OR implant scans</p>
-                        </div>
-                    </div>
-                </a>
-                @endcanany
-
-                @canany([\App\Enums\Permission::ManageWarehouseTopology->value, \App\Enums\Permission::ManageLocations->value, \App\Enums\Permission::ViewWarehouseTasks->value])
-                <a href="{{ route('inventory.warehousing.locations') }}" class="group rounded-xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-emerald-300 hover:shadow-md">
-                    <div class="flex items-center gap-3">
-                        <div class="rounded-lg bg-emerald-50 p-2.5 text-emerald-700 group-hover:bg-emerald-100">
-                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-                        </div>
-                        <div>
-                            <h4 class="text-sm font-bold text-neutral-900 group-hover:text-emerald-700">Spatial Topology</h4>
-                            <p class="text-xs text-neutral-500">Aisles, racks, and LASA rules</p>
-                        </div>
-                    </div>
-                </a>
-                @endcanany
             </div>
 </x-app-layout>

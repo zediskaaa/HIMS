@@ -6,7 +6,6 @@ use App\Enums\UserRole;
 use App\Models\DpriReferencePrice;
 use App\Models\InspectionAcceptanceReport;
 use App\Models\InventoryItem;
-use App\Models\IoTTelemetryLog;
 use App\Models\LogisticsDocument;
 use App\Models\ProcurementCategory;
 use App\Models\PurchaseOrder;
@@ -35,7 +34,6 @@ class ComprehensiveDemoSeederTest extends TestCase
         $this->assertTrue(ProcurementCategory::query()->exists());
         $this->assertTrue(SourcingRfq::query()->exists());
         $this->assertTrue(PurchaseOrder::query()->exists());
-        $this->assertTrue(IoTTelemetryLog::query()->exists());
         $this->assertTrue(Shipment::query()->exists());
         $this->assertTrue(InspectionAcceptanceReport::query()->exists());
         $this->assertTrue(LogisticsDocument::query()->exists());
@@ -62,7 +60,6 @@ class ComprehensiveDemoSeederTest extends TestCase
             'procurement_categories' => ProcurementCategory::count(),
             'rfqs' => SourcingRfq::count(),
             'purchase_orders' => PurchaseOrder::count(),
-            'telemetry_logs' => IoTTelemetryLog::count(),
             'shipments' => Shipment::count(),
             'inspection_reports' => InspectionAcceptanceReport::count(),
             'logistics_documents' => LogisticsDocument::count(),

@@ -41,9 +41,6 @@
                                     @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
                                         <a href="{{ route('inventory.warehousing.scan-station') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Scan Workstation</a>
                                     @endcan
-                                    @can(\App\Enums\Permission::ManageTelemetryExcursions->value)
-                                        <a href="{{ route('inventory.warehousing.telemetry') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Cold Chain &amp; IoT Telemetry</a>
-                                    @endcan
                                     @can(\App\Enums\Permission::AccessNarcoticsVault->value)
                                         <a href="{{ route('inventory.warehousing.narcotics') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">PDEA Narcotics Vault &amp; DDRB</a>
                                     @endcan

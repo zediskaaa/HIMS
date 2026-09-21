@@ -387,7 +387,7 @@
 
                 <div x-show="dockModalOpen" class="inline-block w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-bottom shadow-2xl transition-all sm:my-8 sm:align-middle dark:bg-neutral-900 dark:border dark:border-neutral-800">
                     <div class="flex items-center justify-between border-b border-neutral-200 pb-3 dark:border-neutral-800">
-                        <h3 class="text-base font-bold text-neutral-900 dark:text-neutral-100">Record Dock Arrival &amp; Telemetry</h3>
+                        <h3 class="text-base font-bold text-neutral-900 dark:text-neutral-100">Record Dock Arrival &amp; Temperature</h3>
                         <button @click="dockModalOpen = false" class="rounded-lg p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:text-neutral-500 dark:hover:text-neutral-300 dark:hover:bg-neutral-800 transition">&times;</button>
                     </div>
 

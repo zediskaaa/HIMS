@@ -6,7 +6,6 @@ use App\Enums\AuditAction;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
-use App\Models\IoTTelemetryLog;
 use App\Models\ItemStockLevel;
 use App\Models\PdeaDangerousDrugsRegister;
 use App\Models\StorageLocation;
@@ -17,7 +16,6 @@ use App\Models\WarehouseScanEvent;
 use App\Models\WarehouseTask;
 use App\Services\AuditLogger;
 use App\Services\Warehouse\BarcodeService;
-use App\Services\Warehouse\TelemetryService;
 use App\Services\Warehouse\WarehouseTaskService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
@@ -32,7 +30,6 @@ class SmartWarehousingController extends Controller implements HasMiddleware
     public function __construct(
         private readonly WarehouseTaskService $tasks,
         private readonly BarcodeService $barcodeService,
-        private readonly TelemetryService $telemetry,
         private readonly AuditLogger $auditLogger,
     ) {}
 
@@ -51,7 +48,6 @@ class SmartWarehousingController extends Controller implements HasMiddleware
         $metrics = [
             'open_tasks' => WarehouseTask::whereNotIn('status', ['completed', 'cancelled'])->count(),
             'overdue_tasks' => WarehouseTask::whereNotIn('status', ['completed', 'cancelled'])->where('due_at', '<', now())->count(),
-            'active_excursions' => StorageLocation::where('excursion_hold', true)->count(),
             'open_exceptions' => WarehouseException::where('status', 'open')->count(),
             'narcotics_items' => InventoryItem::where('regulatory_category', 'DANGEROUS_DRUG')->count(),
             'pending_bill_onlys' => SurgicalConsignmentBillOnly::where('status', 'pending_po')->count(),
@@ -69,25 +65,7 @@ class SmartWarehousingController extends Controller implements HasMiddleware
             ->take(8)
             ->get();
 
-        $criticalSensors = StorageLocation::whereNotNull('temperature_classification')
-            ->with(['telemetryLogs' => fn ($q) => $q->latest('id')->take(1)])
-            ->take(6)
-            ->get()
-            ->map(function (StorageLocation $location) {
-                $latest = $location->telemetryLogs->first();
-                $mkt = $this->telemetry->calculateMkt($location, null, 24);
-
-                return [
-                    'location' => $location,
-                    'latest_temp' => $latest?->temperature_celsius,
-                    'latest_humidity' => $latest?->relative_humidity_pct,
-                    'mkt' => $mkt,
-                    'status' => $latest?->excursion_status ?? ($location->excursion_hold ? 'excursion' : 'normal'),
-                    'hold' => $location->excursion_hold,
-                ];
-            });
-
-        return view('inventory.warehousing.index', compact('metrics', 'recentTasks', 'recentScans', 'criticalSensors'));
+        return view('inventory.warehousing.index', compact('metrics', 'recentTasks', 'recentScans'));
     }
 
     public function locations(Request $request): View

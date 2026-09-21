@@ -17,7 +17,6 @@ use App\Services\Warehouse\ConsignmentService;
 use App\Services\Warehouse\LedgerIntegrityService;
 use App\Services\Warehouse\LocationCompatibilityService;
 use App\Services\Warehouse\NarcoticsVaultService;
-use App\Services\Warehouse\TelemetryService;
 use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -29,143 +28,32 @@ class SmartWarehousingAdvancedWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_telemetry_ingestion_and_haynes_mkt_calculation(): void
+    public function test_location_compatibility_validates_classification_and_capacity(): void
     {
-        $location = StorageLocation::create([
-            'name' => 'Biologics Vaccine Refrigerator 1',
-            'code' => 'COLD-01-A',
-            'barcode_value' => 'LOC-COLD-01-A',
-            'type' => 'bin',
-            'storage_classification' => 'medication',
-            'temperature_classification' => 'cold_chain',
-            'capacity' => 500,
-            'status' => 'active',
-            'excursion_hold' => false,
-        ]);
-
-        $service = app(TelemetryService::class);
-
-        $readings = [3.5, 4.0, 4.2, 3.8, 4.5];
-        foreach ($readings as $i => $temp) {
-            $log = $service->ingest([
-                'sensor_id' => 'IOT-COLD-01',
-                'storage_location_id' => $location->id,
-                'temperature_celsius' => $temp,
-                'relative_humidity_pct' => 55.0 + $i,
-                'recorded_at' => now()->subMinutes(10 * (5 - $i)),
-            ]);
-
-            $this->assertSame('normal', $log->excursion_status);
-        }
-
-        $this->assertSame(5, $location->telemetryLogs()->count());
-
-        $mkt = $service->calculateMkt($location);
-        $this->assertNotNull($mkt);
-        $this->assertGreaterThanOrEqual(3.5, $mkt);
-        $this->assertLessThanOrEqual(4.5, $mkt);
-    }
-
-    public function test_temperature_excursion_automatically_locks_location_and_quarantines_stock(): void
-    {
-        $pharmacist = User::factory()->pharmacyStaff()->create([
-            'password' => Hash::make('PharmacistPass123!'),
-        ]);
-
-        $location = StorageLocation::create([
-            'name' => 'Vaccine Refrigerator 2',
-            'code' => 'COLD-02-A',
-            'barcode_value' => 'LOC-COLD-02-A',
-            'type' => 'bin',
-            'storage_classification' => 'medication',
-            'temperature_classification' => 'cold_chain',
-            'capacity' => 200,
-            'status' => 'active',
-            'excursion_hold' => false,
-        ]);
-
-        $item = InventoryItem::create([
-            'name' => 'Rabies Vaccine (PCEC)',
-            'sku' => 'VAX-RAB-01',
-            'storage_classification' => 'medication',
-            'temperature_classification' => 'cold_chain',
-            'unit' => 'vial',
-            'status' => 'active',
-        ]);
-
-        $stock = ItemStockLevel::create([
-            'item_id' => $item->id,
-            'storage_location_id' => $location->id,
-            'quantity' => 50,
-            'quarantined_quantity' => 0,
-        ]);
-
-        $service = app(TelemetryService::class);
-
-        // Ingest excursion breach: 11.5°C on cold chain (normal 2.0°C - 8.0°C)
-        $breachLog = $service->ingest([
-            'sensor_id' => 'IOT-COLD-02',
-            'storage_location_id' => $location->id,
-            'temperature_celsius' => 11.5,
-            'relative_humidity_pct' => 70.0,
-        ], $pharmacist);
-
-        $this->assertSame('excursion', $breachLog->excursion_status);
-        $location->refresh();
-        $this->assertTrue($location->excursion_hold);
-
-        $stock->refresh();
-        $this->assertSame(50, $stock->quarantined_quantity);
-
-        // Location compatibility blocks placing or picking from excursion hold location
         $compatibility = app(LocationCompatibilityService::class);
-        $this->expectException(DomainException::class);
-        $this->expectExceptionMessage('under an active temperature excursion hold');
-        $compatibility->assertCompatible($location, $item, 10);
-    }
 
-    public function test_pharmacist_can_release_excursion_hold_with_stability_justification(): void
-    {
-        $pharmacist = User::factory()->pharmacyStaff()->create();
-
-        $location = StorageLocation::create([
-            'name' => 'Insulin Chiller 3',
-            'code' => 'COLD-03-A',
-            'barcode_value' => 'LOC-COLD-03-A',
+        $coldLocation = StorageLocation::create([
+            'name' => 'Vaccine Refrigerator',
+            'code' => 'COLD-01',
             'type' => 'bin',
             'storage_classification' => 'medication',
             'temperature_classification' => 'cold_chain',
-            'capacity' => 100,
+            'capacity' => 10,
             'status' => 'active',
-            'excursion_hold' => true,
         ]);
 
-        ItemStockLevel::create([
-            'item_id' => InventoryItem::create([
-                'name' => 'Insulin Glargine 100 IU/mL',
-                'sku' => 'MED-INS-01',
-                'storage_classification' => 'medication',
-                'temperature_classification' => 'cold_chain',
-                'unit' => 'pen',
-                'status' => 'active',
-            ])->id,
-            'storage_location_id' => $location->id,
-            'quantity' => 20,
-            'quarantined_quantity' => 20,
+        $ambientItem = InventoryItem::create([
+            'name' => 'Paracetamol 500mg Tablet',
+            'sku' => 'MED-PCM-500',
+            'storage_classification' => 'medication',
+            'temperature_classification' => 'ambient',
+            'unit' => 'box',
+            'status' => 'active',
         ]);
 
-        $service = app(TelemetryService::class);
-        $service->releaseExcursionHold(
-            $location,
-            'Compressor recovered within 12 minutes; Haynes MKT remains 4.6°C; manufacturer stability verified.',
-            $pharmacist
-        );
-
-        $location->refresh();
-        $this->assertFalse($location->excursion_hold);
-
-        $stock = ItemStockLevel::where('storage_location_id', $location->id)->firstOrFail();
-        $this->assertSame(0, $stock->quarantined_quantity);
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('incompatible temperature classification');
+        $compatibility->assertCompatible($coldLocation, $ambientItem, 5);
     }
 
     public function test_lasa_isolation_prevents_adjacent_rack_placement_of_sound_alike_medications(): void
@@ -522,11 +410,24 @@ class SmartWarehousingAdvancedWorkflowTest extends TestCase
         $this->get('/inventory/warehousing')->assertRedirect('/login');
 
         // Authenticated staff can view dashboard and locations
-        $this->actingAs($user)
-            ->get('/inventory/warehousing')
-            ->assertOk()
+        $dashboardResponse = $this->actingAs($user)
+            ->get('/inventory/warehousing');
+        $dashboardResponse->assertOk()
             ->assertSee('Smart Warehousing System')
-            ->assertSee('Spatial Topology');
+            ->assertSee('Spatial Topology')
+            ->assertSee('Storage Locations')
+            ->assertDontSee('IoT Cold Chain')
+            ->assertDontSee('IoT Telemetry Monitor')
+            ->assertDontSee('Cold Chain & Environmental Telemetry');
+
+        // Verify IoT Telemetry routes are completely eliminated (404 Not Found)
+        $this->actingAs($user)
+            ->get('/inventory/warehousing/telemetry')
+            ->assertNotFound();
+
+        $this->actingAs($user)
+            ->postJson('/api/v1/inventory/telemetry/ingest', [])
+            ->assertNotFound();
 
         $this->actingAs($user)
             ->get('/inventory/warehousing/locations')
@@ -549,37 +450,5 @@ class SmartWarehousingAdvancedWorkflowTest extends TestCase
             ->get('/inventory/warehousing/narcotics')
             ->assertOk()
             ->assertSee('Dangerous Drugs Vault');
-    }
-
-    public function test_rest_telemetry_ingest_api_endpoint(): void
-    {
-        $user = User::factory()->inventoryManager()->create();
-        \Laravel\Sanctum\Sanctum::actingAs($user);
-
-        $location = StorageLocation::create([
-            'name' => 'API Cold Room',
-            'code' => 'API-COLD-01',
-            'barcode_value' => 'LOC-API-COLD-01',
-            'type' => 'bin',
-            'temperature_classification' => 'cold_chain',
-            'status' => 'active',
-        ]);
-
-        $response = $this->postJson('/api/v1/inventory/telemetry/ingest', [
-            'sensor_id' => 'IOT-GATEWAY-99',
-            'storage_location_id' => $location->id,
-            'temperature_celsius' => 4.8,
-            'relative_humidity_pct' => 52.3,
-        ]);
-
-        $response->assertStatus(201)
-            ->assertJsonPath('status', 'success')
-            ->assertJsonPath('data.excursion_status', 'normal');
-
-        $this->assertDatabaseHas('iot_telemetry_logs', [
-            'sensor_id' => 'IOT-GATEWAY-99',
-            'storage_location_id' => $location->id,
-            'temperature_celsius' => 4.8,
-        ]);
     }
 }

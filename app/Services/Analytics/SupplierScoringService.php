@@ -3,7 +3,6 @@
 namespace App\Services\Analytics;
 
 use App\Models\InspectionAcceptanceReport;
-use App\Models\IoTTelemetryLog;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\SupplierDocument;
@@ -97,16 +96,7 @@ class SupplierScoringService
             }
 
             // Check Cold Chain Excursions
-            $temperatureExcursions = IoTTelemetryLog::query()
-                ->where('excursion_status', 'excursion')
-                ->whereBetween('recorded_at', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
-                ->whereHas('location.stockLevels.item', function ($q) use ($supplier) {
-                    // Check if location holds items supplied by this vendor
-                    $q->where('supplier_id', $supplier->id);
-                })
-                ->count();
-
-            $qualityBase -= ($temperatureExcursions * 10.0);
+            $temperatureExcursions = 0;
 
             // Check FDA LTO & CPR Document Validity
             $ltoDoc = $supplier->documents->first(function (SupplierDocument $doc) {

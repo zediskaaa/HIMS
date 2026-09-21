@@ -26,7 +26,6 @@ use App\Http\Controllers\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Inventory\StockMovementController;
 use App\Http\Controllers\Inventory\StockTransferController;
 use App\Http\Controllers\Inventory\StorageLocationController;
-use App\Http\Controllers\Inventory\TelemetryController;
 use App\Http\Controllers\Inventory\WarehouseTaskController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\NotificationController;
@@ -144,10 +143,6 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::post('/inventory/warehousing/locations', [SmartWarehousingController::class, 'storeLocation'])->name('inventory.warehousing.locations.store');
     Route::get('/inventory/warehousing/scan-station', [SmartWarehousingController::class, 'scanStation'])->name('inventory.warehousing.scan-station');
 
-    // IoT Cold-Chain Telemetry & MKT
-    Route::get('/inventory/warehousing/telemetry', [TelemetryController::class, 'index'])->name('inventory.warehousing.telemetry');
-    Route::post('/inventory/warehousing/telemetry', [TelemetryController::class, 'store'])->name('inventory.warehousing.telemetry.store');
-    Route::post('/inventory/warehousing/telemetry/{location}/release', [TelemetryController::class, 'release'])->name('inventory.warehousing.telemetry.release');
 
     // Dangerous Drugs & PDEA Narcotics Vault
     Route::get('/inventory/warehousing/narcotics', [NarcoticsVaultController::class, 'index'])->name('inventory.warehousing.narcotics');

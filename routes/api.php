@@ -8,7 +8,6 @@ use App\Http\Controllers\Api\Inventory\CycleCountController;
 use App\Http\Controllers\Api\Inventory\GoodsReceiptController;
 use App\Http\Controllers\Api\Inventory\QualityControlController;
 use App\Http\Controllers\Api\Inventory\ReplenishmentController;
-use App\Http\Controllers\Api\Inventory\TelemetryApiController;
 use App\Http\Controllers\Api\Inventory\WarehouseTaskController;
 use App\Http\Controllers\Api\InventoryItemController;
 use App\Http\Controllers\Api\Procurement\AwardController;
@@ -109,8 +108,6 @@ Route::prefix('v1')->group(function () {
             Route::post('warehouse-tasks/{warehouseTask}/scans', [WarehouseTaskController::class, 'scan']);
             Route::post('warehouse-tasks/{warehouseTask}/complete', [WarehouseTaskController::class, 'complete']);
             Route::post('warehouse-tasks/{warehouseTask}/cancel', [WarehouseTaskController::class, 'cancel']);
-
-            Route::post('telemetry/ingest', [TelemetryApiController::class, 'ingest']);
         });
     });
 });
