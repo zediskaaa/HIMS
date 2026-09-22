@@ -133,9 +133,21 @@ class InventoryController extends Controller implements HasMiddleware
     {
         $days = [DemandForecastService::DEFAULT_ANALYSIS_DAYS, DemandForecastService::DEFAULT_FORECAST_DAYS];
 
-        return $user->can(Permission::GenerateForecasts->value)
+        $forecast = $user->can(Permission::GenerateForecasts->value)
             ? $this->aiForecasts->ensure($user, ...$days)
             : $this->aiForecasts->cached(...$days);
+
+        if ($user->can(Permission::GenerateForecasts->value)) {
+            defer(function () use ($user): void {
+                foreach ([7, 14, 60, 90] as $period) {
+                    if ($this->aiForecasts->cached(DemandForecastService::DEFAULT_ANALYSIS_DAYS, $period) === null) {
+                        $this->aiForecasts->ensure($user, DemandForecastService::DEFAULT_ANALYSIS_DAYS, $period);
+                    }
+                }
+            });
+        }
+
+        return $forecast;
     }
 
     /**

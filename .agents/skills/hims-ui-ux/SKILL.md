@@ -293,6 +293,344 @@ Every paginated table, list, log, and workspace in HIMS must follow the exact sa
   - Paginator callers should configure standard sliding windows (e.g. `->onEachSide(1)`).
   - Any client-side pagination (such as Alpine.js or JavaScript tabular components) must strictly enforce this exact same 20-button ceiling and visual hierarchy.
 
+## Skeleton Loading Design
+
+All HIMS pages and components that load asynchronous data must have a proper loading state when appropriate.
+
+The loading state must clearly communicate that the system is still processing/loading data, rather than making the interface look broken, empty, or unavailable.
+
+### 1. USE SKELETONS FOR DATA LOADING
+
+When content is being fetched or calculated, prefer an animated skeleton that resembles the structure of the final content.
+
+Examples:
+- Dashboard cards
+- Tables
+- Charts
+- AI forecast results
+- Inventory data
+- Supplier lists
+- User lists
+- Notifications
+- Reports
+- Detail panels
+- KPI sections
+- Search results
+- Modal content
+
+The skeleton should approximately match the size and layout of the content it will replace.
+
+Do NOT use arbitrary large blank areas.
+
+### 2. NEVER CONFUSE LOADING WITH EMPTY STATE
+
+Loading, empty, and error states must be separate.
+
+- **LOADING**: Show an animated skeleton.
+- **EMPTY**: The request completed successfully, but there is genuinely no data.
+- **ERROR**: The request failed. Show a useful error state and an appropriate Retry action.
+- **SUCCESS**: Show the actual data.
+
+Never display messages such as:
+- "No data"
+- "Data unavailable"
+- "No results"
+- "Nothing found"
+
+while the request is still loading.
+
+Do not use an empty-state message as a substitute for a loading state.
+
+### 3. ANIMATED SKELETON
+
+Skeletons should have a subtle animation such as shimmer or pulse.
+
+The animation must:
+- Be smooth
+- Be subtle
+- Match the HIMS visual design
+- Avoid distracting the user
+- Avoid excessive CPU usage
+- Stop when loading finishes
+- Respect `prefers-reduced-motion`
+
+For reduced-motion users, use a static skeleton or significantly reduced animation.
+
+### 4. MATCH THE ACTUAL COMPONENT
+
+A skeleton should resemble the final component.
+
+For example:
+
+- **A chart should have**:
+  - Chart-area skeleton
+  - Axis/label placeholders where appropriate
+  - Legend/value placeholders if they exist
+
+- **A KPI card should have**:
+  - Label placeholder
+  - Value placeholder
+  - Supporting text placeholder
+
+- **A table should have**:
+  - Header skeleton
+  - Multiple row skeletons
+  - Appropriate column widths
+
+- **A detail panel should have**:
+  - Title placeholder
+  - Metadata placeholders
+  - Content placeholders
+  - Action placeholders where appropriate
+
+Do not use the same generic rectangular skeleton everywhere if it does not represent the final content.
+
+### 5. DARK MODE COMPATIBILITY
+
+Skeletons must work correctly in HIMS dark mode.
+
+Use:
+- Dark base surfaces
+- Slightly lighter skeleton surfaces
+- Subtle borders
+- Low-contrast shimmer
+
+Avoid bright white loading blocks.
+
+The skeleton must remain visible without becoming visually aggressive.
+
+Also ensure skeleton styles do not leak incorrectly into light mode.
+
+### 6. PREVENT LAYOUT SHIFT
+
+The loading state should reserve approximately the same amount of space as the final content.
+
+Avoid:
+- Page jumping
+- Cards changing height dramatically
+- Content moving when loading completes
+- Unexpected horizontal overflow
+- Large vertical expansion
+- Sudden modal resizing
+
+The transition should be:
+- `LOADING` → `SUCCESS`
+or:
+- `LOADING` → `EMPTY`
+or:
+- `LOADING` → `ERROR`
+
+without unnecessary layout movement.
+
+### 7. ASYNC FILTERS AND SEARCH
+
+When users change filters, search terms, selected items, date ranges, or other controls that trigger asynchronous requests:
+
+1. Enter the loading state immediately.
+2. Show the appropriate skeleton.
+3. Fetch the new data.
+4. Replace the skeleton with the correct result.
+5. Never present stale data as the result of the new selection.
+
+If appropriate, preserve the existing layout while replacing only the affected content with skeletons.
+
+### 8. PREVENT STALE RESULTS AND RACE CONDITIONS
+
+If multiple requests can happen quickly, ensure an older request cannot overwrite a newer request.
+
+Example:
+Item A → Item B → Item C
+
+The UI must ultimately display Item C's result.
+
+Do not allow Item A or Item B to overwrite the latest selection after their requests finish.
+
+Use the existing application architecture/state-management approach where possible.
+
+### 9. NO FAKE DATA DURING LOADING
+
+Skeletons are visual placeholders only.
+
+Do NOT:
+- Generate fake numbers
+- Randomize KPI values
+- Display fake chart data
+- Display fake forecast results
+- Display fake inventory quantities
+- Insert temporary database records
+
+Use real HIMS data once loading finishes.
+
+### 10. LOADING STATES FOR AI FEATURES
+
+AI-powered HIMS features must also use proper loading states.
+
+Examples:
+- AI demand forecasting
+- AI forecast insights
+- AI-generated recommendations
+- HIMS AI chatbot responses
+- Forecast confidence
+- Risk analysis
+
+While AI processing is happening, show an appropriate loading state.
+
+Do not prematurely display:
+- "No forecast"
+- "No insight"
+- "Outside scope"
+- "No recommendation"
+- Empty result messages
+
+unless the AI request has actually completed and returned that result.
+
+### 11. LOADING STATES IN MODALS
+
+When a modal opens and its content requires asynchronous data:
+- Open the modal at the intended size.
+- Show a modal-specific skeleton.
+- Avoid displaying an empty modal while waiting.
+- Avoid unnecessary modal resizing.
+- Keep actions disabled only when necessary.
+- Replace the skeleton with actual content when ready.
+
+Do not make the entire page reload simply to populate modal content.
+
+### 12. ACCESSIBILITY
+
+Where appropriate, loading containers should expose their state through accessible semantics such as:
+- `aria-busy="true"`
+- Appropriate status/live-region behavior
+- Meaningful screen-reader loading text
+
+Do not repeatedly announce animation changes to screen readers.
+
+When loading finishes, update the accessible state correctly.
+
+### 13. ERROR AND RETRY
+
+If a real request fails:
+- Stop the skeleton animation.
+- Display a clear error state.
+- Explain the problem briefly.
+- Provide Retry when appropriate.
+- Do not expose raw Laravel/database/debug errors.
+
+Do not automatically classify slow requests as errors.
+
+### 14. PERFORMANCE
+
+Skeleton implementations should be lightweight.
+
+Prefer:
+- CSS animations
+- Existing component utilities
+- Reusable skeleton components
+
+Avoid unnecessary JavaScript animation loops.
+
+Do not introduce heavy dependencies only for skeleton loading.
+
+### 15. REUSABILITY
+
+When multiple pages use similar loading patterns, create reusable components where appropriate.
+
+Examples:
+- `SkeletonCard`
+- `SkeletonTable`
+- `SkeletonChart`
+- `SkeletonList`
+- `SkeletonDetail`
+- `SkeletonModal`
+
+Use the project's existing component architecture instead of creating duplicate implementations.
+
+### 16. VISUAL QUALITY STANDARD
+
+A good skeleton should make the user feel:
+"The system is currently loading the information."
+
+It must NOT make the user feel:
+"The system is broken."
+"There is no data."
+"The feature does not work."
+
+Skeleton loading is part of the HIMS UX, not an afterthought.
+
+### 17. FINAL RULE
+
+Whenever implementing a new asynchronous HIMS feature or modifying an existing one, explicitly consider all four states:
+1. Loading
+2. Success
+3. Empty
+4. Error
+
+Do not consider a feature complete if it only handles the successful state.
+
+The loading state must be intentional, responsive, accessible, visually consistent with HIMS, and representative of the content that will eventually appear.
+
+### Accurate Skeleton Structure
+
+Skeleton loaders MUST accurately represent the final loaded component.
+
+The skeleton is not a generic placeholder layout.
+
+Before implementing a skeleton:
+
+1. Inspect the actual loaded component.
+2. Identify its real sections and hierarchy.
+3. Match the skeleton to those sections.
+4. Match approximate dimensions and spacing.
+5. Match the responsive layout.
+6. Verify the loading state against the final loaded state.
+
+The skeleton must maintain visual continuity between:
+
+LOADING → LOADED
+
+### Shape Accuracy Rule
+
+Every skeleton placeholder should correspond to an actual final UI element.
+
+Do not add:
+
+- Generic boxes
+- Arbitrary cards
+- Placeholder sections that do not exist
+- Incorrect numbers of containers
+- Incorrect grid structures
+- Incorrect chart dimensions
+- Oversized or undersized placeholders
+
+If the final component has a chart, the skeleton should resemble a chart.
+
+If the final component has KPI cards, the skeleton should resemble KPI cards.
+
+If the final component has a sidebar, the skeleton should preserve the sidebar structure.
+
+### Before-and-After Validation
+
+When implementing or modifying a skeleton, compare:
+
+1. Loading state
+2. Loaded state
+
+The skeleton should be evaluated based on structural similarity, not merely whether it looks visually polished.
+
+The final content should feel like it is replacing the skeleton rather than replacing an entirely different layout.
+
+### Responsive Skeleton Accuracy
+
+Skeleton structure must also match the final component at each responsive breakpoint.
+
+Do not design the skeleton only for desktop while the actual component uses a different mobile/tablet structure.
+
+### No Generic Skeleton Shortcut
+
+Never use generic repeated rectangles as a shortcut when the final UI has a known structure.
+
+Use component-specific skeletons that accurately reflect the actual UI.
+
 ## Preserve Existing Interaction Contracts
 
 - Forms and internal navigation participate in the global loading system in `resources/js/app.js`. Use established `data-loading-text` and opt-out hooks rather than adding a second spinner system. Loading behavior also guards against duplicate submissions.

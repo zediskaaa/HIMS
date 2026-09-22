@@ -136,6 +136,10 @@ class DemandForecastController extends Controller implements HasMiddleware
             if ($request->boolean('reuse_cached')) {
                 $forecast = $this->aiForecasts->cached($analysisDays, $forecastDays);
                 $usedCachedForecast = $forecast !== null;
+
+                if (! $usedCachedForecast) {
+                    $forecast = $this->aiForecasts->ensure($request->user(), $analysisDays, $forecastDays);
+                }
             }
 
             $forecast ??= $this->aiForecasts->generate($request->user(), $analysisDays, $forecastDays);

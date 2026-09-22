@@ -929,6 +929,66 @@ class AiDemandForecastTest extends TestCase
         ]);
     }
 
+    public function test_dashboard_forecast_renders_animated_skeleton_loading_states_and_reusable_components(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+        $this->holdForecastWarmup();
+
+        $response = $this->actingAs($manager)->get(route('dashboard'));
+
+        $response->assertOk()
+            ->assertSee('x-show="isLoading()"', false)
+            ->assertSee('x-show="isSuccess()"', false)
+            ->assertSee('x-show="isEmpty()"', false)
+            ->assertSee('x-show="isError()"', false)
+            ->assertSee('animate-pulse', false)
+            ->assertSee('motion-reduce:animate-none', false)
+            ->assertSee('aria-hidden="true"', false)
+            ->assertSee('Retry Forecast', false)
+            ->assertSee('Scanning stock levels...', false)
+            ->assertSee('sm:grid-cols-2 lg:grid-cols-5 lg:items-end', false)
+            ->assertSee('grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-neutral-200 bg-neutral-200 sm:grid-cols-3 xl:grid-cols-6', false)
+            ->assertSee('viewBox="0 0 760 240"', false)
+            ->assertSee('Units/day', false)
+            ->assertSee('grid-cols-4 gap-1.5 rounded-lg border border-neutral-200/90', false)
+            ->assertDontSee('Forecast data unavailable')
+            ->assertDontSee('grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3', false)
+            ->assertDontSee('h-28 bg-white dark:bg-neutral-800 rounded-xl', false);
+    }
+
+    public function test_dashboard_javascript_enforces_skeleton_loading_state_management_and_filter_transitions(): void
+    {
+        $script = file_get_contents(resource_path('js/app.js'));
+        $this->assertIsString($script);
+
+        $this->assertStringContainsString('currentState()', $script);
+        $this->assertStringContainsString('isLoading()', $script);
+        $this->assertStringContainsString('isSuccess()', $script);
+        $this->assertStringContainsString('isEmpty()', $script);
+        $this->assertStringContainsString('isError()', $script);
+        $this->assertStringContainsString('triggerFilterTransition()', $script);
+        $this->assertStringContainsString('filterLoading: false,', $script);
+        $this->assertStringContainsString('this.filterLoading = true;', $script);
+        $this->assertStringContainsString('this.triggerFilterTransition();', $script);
+    }
+
+    public function test_demand_forecast_index_renders_animated_skeleton_loading_states(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+        $this->holdForecastWarmup();
+
+        $response = $this->actingAs($manager)->get(route('inventory.demand-forecast'));
+
+        $response->assertOk()
+            ->assertSee('x-show="isLoading()"', false)
+            ->assertSee('x-show="isSuccess()"', false)
+            ->assertSee('x-show="isEmpty()', false)
+            ->assertSee('x-show="isError()"', false)
+            ->assertSee('animate-pulse', false)
+            ->assertSee('motion-reduce:animate-none', false)
+            ->assertDontSee('Historical consumption and forecast points are calculating or unavailable');
+    }
+
     /**
      * Claim the lock the deferred Gemini warm-up runs under.
      *

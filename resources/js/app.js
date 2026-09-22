@@ -1514,7 +1514,9 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     category: '',
     risk: '',
     search: '',
-    loading: false,
+    loading: !initialForecast && Boolean(endpoint),
+    filterLoading: false,
+    filterLoadingTimeout: null,
     error: '',
     success: '',
     activePoint: null,
@@ -1539,17 +1541,97 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     hoveredMiniItem: null,
     miniTooltipStyle: '',
 
+    hasOverallData() {
+        if (!this.forecast || this.allItems().length === 0) return false;
+        const hist = this.aggregateSeries('historical_series');
+        const fore = this.aggregateSeries('forecast_series');
+        return hist.length > 0 || fore.length > 0;
+    },
+
+    currentState() {
+        if (this.loading || this.filterLoading) return 'loading';
+        if (this.error) return 'error';
+        if (!this.hasOverallData()) return 'empty';
+        return 'success';
+    },
+
+    isLoading() {
+        return this.currentState() === 'loading';
+    },
+
+    isSuccess() {
+        return this.currentState() === 'success';
+    },
+
+    isEmpty() {
+        return this.currentState() === 'empty';
+    },
+
+    isError() {
+        return this.currentState() === 'error';
+    },
+
+    triggerFilterTransition() {
+        this.clearActivePoint();
+        if (this.filterLoadingTimeout) clearTimeout(this.filterLoadingTimeout);
+        this.filterLoading = true;
+        this.$nextTick(() => {
+            this.resetActivePointToTransition();
+            this.filterLoadingTimeout = setTimeout(() => {
+                this.filterLoading = false;
+                this.filterLoadingTimeout = null;
+            }, 180);
+        });
+    },
+
     init() {
         if (this.forecast) {
             this.forecastCache[this.forecastCacheKey(this.forecast.forecast_days)] = this.forecast;
+            if (this.endpoint) {
+                setTimeout(() => {
+                    [7, 14, 60, 90].forEach(async (days) => {
+                        const cacheKey = this.forecastCacheKey(days);
+                        if (this.forecastCache[cacheKey]) return;
+                        try {
+                            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+                            const response = await fetch(this.endpoint, {
+                                method: 'POST',
+                                credentials: 'same-origin',
+                                headers: {
+                                    Accept: 'application/json',
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': csrfToken || '',
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                },
+                                body: JSON.stringify({
+                                    analysis_days: Number(this.analysisDays),
+                                    forecast_days: days,
+                                    return_to: 'dashboard',
+                                    reuse_cached: true,
+                                }),
+                            });
+                            const data = await response.json().catch(() => ({}));
+                            if (data?.forecast) {
+                                this.forecastCache[cacheKey] = data.forecast;
+                            }
+                        } catch (_) {}
+                    });
+                }, 500);
+            }
+        } else if (this.endpoint) {
+            this.loading = true;
+            this.updateForecastPeriod(this.forecastDays);
         }
         this.$nextTick(() => {
             this.resetActivePointToTransition();
         });
-        ['selectedItemId', 'category', 'risk', 'search'].forEach((property) => {
+        ['selectedItemId', 'category', 'risk'].forEach((property) => {
             this.$watch(property, () => {
-                this.$nextTick(() => this.clearActivePoint());
+                this.triggerFilterTransition();
             });
+        });
+        this.$watch('search', () => {
+            this.$nextTick(() => this.clearActivePoint());
         });
         window.addEventListener('resize', () => {
             if (this.activePoint) {
@@ -2719,9 +2801,9 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
     },
 
     retryForecast() {
-        if (!this.failedForecastDays) return;
-        this.forecastDays = String(this.failedForecastDays);
-        this.updateForecastPeriod(this.failedForecastDays, true);
+        const days = this.failedForecastDays || Number(this.forecastDays) || 30;
+        this.forecastDays = String(days);
+        this.updateForecastPeriod(days, true);
     },
 
     async updateForecastPeriod(value, force = false) {

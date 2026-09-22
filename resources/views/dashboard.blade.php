@@ -199,13 +199,17 @@
                     </div>
 
                     <div class="flex items-center gap-2 sm:shrink-0">
+                        <span x-show="isLoading()" class="inline-flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+                            <span class="h-2 w-2 rounded-full bg-primary-500 animate-pulse"></span>
+                            <span>Scanning stock levels...</span>
+                        </span>
                         <x-ui.button
                             type="button"
                             variant="ghost"
                             size="sm"
                             icon="eye"
                             x-on:click="$dispatch('open-modal', 'dashboard-demand-forecast')"
-                            x-bind:disabled="!forecast"
+                            x-bind:disabled="!isSuccess()"
                         >
                             Forecast details
                         </x-ui.button>
@@ -232,147 +236,174 @@
                         </button>
                     </div>
 
-                    <div class="grid min-w-0 gap-2.5 rounded-lg border border-neutral-200 bg-neutral-50 p-2.5 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
-                        {{-- Item Selection --}}
-                        <div class="min-w-0 space-y-1.5 sm:col-span-2 lg:col-span-3">
-                            <div class="flex items-center justify-between">
-                                <label for="dashboard-forecast-item" class="block text-xs font-medium text-neutral-700">Select Item</label>
-                                <button
-                                    type="button"
-                                    x-show="selectedItemId"
-                                    x-cloak
-                                    x-on:click="selectedItemId = ''"
-                                    class="text-[11px] font-medium text-primary-600 hover:text-primary-800"
-                                >
-                                    View All Items
-                                </button>
-                            </div>
-                            <select
-                                id="dashboard-forecast-item"
-                                x-model="selectedItemId"
-                                class="block min-h-10 w-full rounded-md border-neutral-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500/30"
-                            >
-                                <option value="">All Inventory Items (Overall Hospital Demand)</option>
-                                <template x-for="item in allItems()" x-bind:key="item.item_id">
-                                    <option x-bind:value="String(item.item_id)" x-text="`${item.item_name} (${item.sku}) · ${item.risk_level.toUpperCase()} risk`"></option>
-                                </template>
-                            </select>
-                        </div>
-
-                        {{-- Forecast Period --}}
-                        <div class="min-w-0 space-y-1.5">
-                            <label for="dashboard-forecast-period" class="block text-xs font-medium text-neutral-700">Forecast period</label>
-                            <select
-                                id="dashboard-forecast-period"
-                                name="forecast_days"
-                                x-model="forecastDays"
-                                x-on:change="updateForecastPeriod($event.target.value)"
-                                @cannot(\App\Enums\Permission::GenerateForecasts->value) disabled @endcannot
-                                class="block min-h-10 w-full rounded-md border-neutral-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500/30 disabled:bg-neutral-100"
-                            >
-                                <option value="7">Next 7 days</option>
-                                <option value="14">Next 14 days</option>
-                                <option value="30">Next 30 days</option>
-                                <option value="60">Next 60 days</option>
-                                <option value="90">Next 90 days</option>
-                            </select>
-                        </div>
-
-                        <div class="flex min-w-0 items-end">
-                            <x-ui.button
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                icon="funnel"
-                                class="w-full"
-                                x-on:click="filtersOpen = !filtersOpen"
-                                x-bind:aria-expanded="filtersOpen"
-                                aria-controls="dashboard-forecast-filters"
-                            >
-                                <span x-text="filtersOpen ? 'Hide filters' : 'More filters'"></span>
-                                <span
-                                    x-show="activeFilterCount() > 0"
-                                    x-cloak
-                                    class="rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold text-primary-700"
-                                    x-text="activeFilterCount()"
-                                ></span>
-                            </x-ui.button>
-                        </div>
-
-                        <div
-                            id="dashboard-forecast-filters"
-                            x-show="filtersOpen"
-                            x-cloak
-                            class="grid min-w-0 gap-3 rounded-lg border border-neutral-200 bg-white p-3 sm:col-span-2 sm:grid-cols-3 lg:col-span-5"
+                    {{-- 1. ERROR STATE: When the forecast request fails, with retry --}}
+                    <div
+                        x-show="isError()"
+                        x-cloak
+                        role="alert"
+                        class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-700 dark:border-danger-900/60 dark:bg-rose-950/20 dark:text-rose-300"
+                    >
+                        <span x-text="error || 'A problem occurred while retrieving the forecast.'"></span>
+                        <button
+                            type="button"
+                            x-on:click="retryForecast()"
+                            x-bind:disabled="loading"
+                            class="inline-flex items-center gap-1.5 rounded-md bg-danger-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-danger-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-500 disabled:opacity-60 dark:text-white dark:bg-rose-600 dark:hover:bg-rose-700"
                         >
-                        {{-- Item category --}}
-                        <div class="min-w-0 space-y-1.5">
-                            <label for="dashboard-forecast-category" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Item category</label>
-                            <select
-                                id="dashboard-forecast-category"
-                                x-model="category"
-                                class="block min-h-10 w-full rounded-md border-neutral-300 pl-3 pr-10 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500/30 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
-                            >
-                                <option value="">All categories</option>
-                                @foreach ($forecastCategories as $category)
-                                    <option value="{{ $category->id }}">{{ $category->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                            <x-ui.icon name="arrow-path" class="h-3.5 w-3.5" />
+                            <span>Retry Forecast</span>
+                        </button>
+                    </div>
 
-                        {{-- Risk level --}}
-                        <div class="min-w-0 space-y-1.5">
-                            <label for="dashboard-forecast-risk" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Risk level</label>
-                            <select
-                                id="dashboard-forecast-risk"
-                                x-model="risk"
-                                class="block min-h-10 w-full rounded-md border-neutral-300 pl-3 pr-10 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500/30 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
-                            >
-                                <option value="">All risk levels</option>
-                                <option value="high">High risk</option>
-                                <option value="medium">Medium risk</option>
-                                <option value="low">Low risk</option>
-                            </select>
-                        </div>
+                    {{-- 2. LOADING STATE: Animated Skeleton (Exact Pic 2 layout) --}}
+                    <div
+                        x-show="isLoading()"
+                        aria-busy="true"
+                    >
+                        <x-ui.forecast-chart-skeleton />
+                    </div>
 
-                        {{-- Search item --}}
-                        <div class="min-w-0 space-y-1.5">
-                            <div class="flex items-center justify-between gap-2">
-                                <label for="dashboard-forecast-search" class="block text-xs font-medium text-neutral-700">Search item</label>
-                                <button
-                                    type="button"
-                                    x-show="activeFilterCount() > 0"
-                                    x-on:click="clearFilters()"
-                                    class="text-[11px] font-medium text-primary-700 hover:text-primary-800"
+                    {{-- 3. EMPTY STATE: When there is no forecast data yet (Exact Pic 2 layout) --}}
+                    <div
+                        x-show="isEmpty()"
+                        x-cloak
+                        aria-busy="true"
+                    >
+                        <x-ui.forecast-chart-skeleton />
+                    </div>
+
+                    {{-- 4. SUCCESS / POPULATED FORECAST STATE (Only revealed when real data exists) --}}
+                    <div
+                        x-show="isSuccess()"
+                        x-cloak
+                        class="space-y-3"
+                    >
+                        {{-- Filter Controls --}}
+                        <div class="grid min-w-0 gap-2.5 rounded-lg border border-neutral-200 bg-neutral-50 p-2.5 sm:grid-cols-2 lg:grid-cols-5 lg:items-end dark:border-neutral-800 dark:bg-neutral-800/40">
+                            {{-- Item Selection --}}
+                            <div class="min-w-0 space-y-1.5 sm:col-span-2 lg:col-span-3">
+                                <div class="flex items-center justify-between">
+                                    <label for="dashboard-forecast-item" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Select Item</label>
+                                    <button
+                                        type="button"
+                                        x-show="selectedItemId"
+                                        x-cloak
+                                        x-on:click="selectedItemId = ''"
+                                        class="text-[11px] font-medium text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300"
+                                    >
+                                        View All Items
+                                    </button>
+                                </div>
+                                <select
+                                    id="dashboard-forecast-item"
+                                    x-model="selectedItemId"
+                                    class="block min-h-10 w-full rounded-md border-neutral-300 pl-3 pr-10 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500/30 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                                 >
-                                    Clear filters
-                                </button>
+                                    <option value="">All Inventory Items (Overall Hospital Demand)</option>
+                                    <template x-for="item in allItems()" x-bind:key="item.item_id">
+                                        <option x-bind:value="String(item.item_id)" x-text="`${item.item_name} (${item.sku})`"></option>
+                                    </template>
+                                </select>
                             </div>
-                            <input
-                                id="dashboard-forecast-search"
-                                type="search"
-                                x-model.debounce.200ms="search"
-                                placeholder="Name or SKU"
-                                autocomplete="off"
-                                class="block min-h-10 w-full rounded-md border-neutral-300 text-sm shadow-sm placeholder:text-neutral-400 focus:border-primary-500 focus:ring-primary-500/30"
+
+                            {{-- Forecast Period --}}
+                            <div class="min-w-0 space-y-1.5">
+                                <label for="dashboard-forecast-period" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Forecast period</label>
+                                <select
+                                    id="dashboard-forecast-period"
+                                    name="forecast_days"
+                                    x-model="forecastDays"
+                                    x-on:change="updateForecastPeriod($event.target.value)"
+                                    @cannot(\App\Enums\Permission::GenerateForecasts->value) disabled @endcannot
+                                    class="block min-h-10 w-full rounded-md border-neutral-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500/30 disabled:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                                >
+                                    @foreach ([7 => 'Next 7 days', 14 => 'Next 14 days', 30 => 'Next 30 days', 60 => 'Next 60 days', 90 => 'Next 90 days'] as $days => $label)
+                                        <option value="{{ $days }}" @selected(($aiForecast['forecast_days'] ?? 30) === $days)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="flex min-w-0 items-end">
+                                <x-ui.button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    icon="funnel"
+                                    class="w-full"
+                                    x-on:click="filtersOpen = !filtersOpen"
+                                    x-bind:aria-expanded="filtersOpen"
+                                    aria-controls="dashboard-forecast-filters"
+                                >
+                                    <span x-text="filtersOpen ? 'Hide filters' : 'More filters'"></span>
+                                    <span
+                                        x-show="activeFilterCount() > 0"
+                                        x-cloak
+                                        class="rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold text-primary-700 dark:bg-primary-900/60 dark:text-primary-300"
+                                        x-text="activeFilterCount()"
+                                    ></span>
+                                </x-ui.button>
+                            </div>
+
+                            <div
+                                id="dashboard-forecast-filters"
+                                x-show="filtersOpen"
+                                x-cloak
+                                class="grid min-w-0 gap-3 rounded-lg border border-neutral-200 bg-white p-3 sm:col-span-2 sm:grid-cols-3 lg:col-span-5 dark:border-neutral-700 dark:bg-neutral-900"
                             >
+                                {{-- Item category --}}
+                                <div class="min-w-0 space-y-1.5">
+                                    <label for="dashboard-forecast-category" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Item category</label>
+                                    <select
+                                        id="dashboard-forecast-category"
+                                        x-model="category"
+                                        class="block min-h-10 w-full rounded-md border-neutral-300 pl-3 pr-10 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500/30 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+                                    >
+                                        <option value="">All categories</option>
+                                        @foreach ($forecastCategories as $category)
+                                            <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                {{-- Risk level --}}
+                                <div class="min-w-0 space-y-1.5">
+                                    <label for="dashboard-forecast-risk" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Risk level</label>
+                                    <select
+                                        id="dashboard-forecast-risk"
+                                        x-model="risk"
+                                        class="block min-h-10 w-full rounded-md border-neutral-300 pl-3 pr-10 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500/30 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+                                    >
+                                        <option value="">All risk levels</option>
+                                        <option value="high">High risk</option>
+                                        <option value="medium">Medium risk</option>
+                                        <option value="low">Low risk</option>
+                                    </select>
+                                </div>
+
+                                {{-- Search item --}}
+                                <div class="min-w-0 space-y-1.5">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <label for="dashboard-forecast-search" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Search item</label>
+                                        <button
+                                            type="button"
+                                            x-show="activeFilterCount() > 0"
+                                            x-on:click="clearFilters()"
+                                            class="text-[11px] font-medium text-primary-700 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300"
+                                        >
+                                            Clear filters
+                                        </button>
+                                    </div>
+                                    <input
+                                        id="dashboard-forecast-search"
+                                        type="search"
+                                        x-model.debounce.200ms="search"
+                                        placeholder="Name or SKU"
+                                        autocomplete="off"
+                                        class="block min-h-10 w-full rounded-md border-neutral-300 text-sm shadow-sm placeholder:text-neutral-400 focus:border-primary-500 focus:ring-primary-500/30 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500"
+                                    >
+                                </div>
+                            </div>
                         </div>
-                        </div>
-
-
-                    </div>
-
-                    <div x-show="!forecast" class="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-4 py-7 text-center">
-                        <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-primary-50 text-primary-700">
-                            <x-ui.icon name="chart-bar" class="h-5 w-5" />
-                        </span>
-                        <p class="mt-3 text-sm font-medium text-neutral-800">Forecast data unavailable</p>
-                        <p class="mx-auto mt-1 max-w-xl text-xs text-neutral-500">
-                            Forecasts are calculated from recorded HIMS inventory history. No inventory record or purchase order is changed.
-                        </p>
-                    </div>
-
-                    <div x-show="forecast" x-cloak class="space-y-3">
                         {{-- Compact forecast summary strip --}}
                         <dl class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-neutral-200 bg-neutral-200 sm:grid-cols-3 xl:grid-cols-6">
                             <div class="bg-neutral-50 p-2.5">
@@ -757,7 +788,7 @@
                                     </div>
                                 </div>
 
-                                <div x-show="!hasChartData()" class="border-y border-neutral-100 py-12 text-center text-sm text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+                                <div x-show="!hasChartData()" x-cloak class="border-y border-neutral-100 py-12 text-center text-sm text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
                                     Historical and forecast series are not available for the current selection.
                                 </div>
                             </div>
@@ -799,33 +830,38 @@
                                         <h2 class="text-xs font-bold text-neutral-900 dark:text-neutral-100" x-text="forecast?.source === 'ai' ? 'AI forecast insight' : 'Forecast insight'">AI forecast insight</h2>
                                         <span class="text-[10px] font-medium text-neutral-400 dark:text-neutral-500" x-text="`&middot; ${forecast?.forecast_period || `Next ${forecastDays} days`}`"></span>
                                     </div>
-                                    <p class="mt-0.5 text-[11px] leading-snug text-neutral-600 dark:text-neutral-300 line-clamp-2" x-text="forecast ? insight() : 'Forecast data is unavailable for demand and reorder guidance.'"></p>
+                                    <p class="mt-0.5 text-[11px] leading-snug text-neutral-600 dark:text-neutral-300 line-clamp-2" x-text="isLoading() ? 'Calculating demand insights and risk projections...' : (forecast ? insight() : 'No forecast insights available.')"></p>
                                 </div>
                             </div>
-                            <span x-show="loading" x-cloak class="inline-flex shrink-0 items-center gap-1 text-[10px] text-primary-600 dark:text-primary-400">
+                            <span x-show="isLoading()" x-cloak class="inline-flex shrink-0 items-center gap-1 text-[10px] text-primary-600 dark:text-primary-400">
                                 <x-ui.icon name="arrow-path" class="h-3 w-3 animate-spin" />
                             </span>
                         </div>
 
-                        {{-- Loading Skeleton State --}}
-                        <div x-show="loading && !forecast" x-cloak class="space-y-2 py-2 animate-pulse">
-                            <div class="grid grid-cols-4 gap-1.5">
-                                <div class="h-10 rounded bg-neutral-100 dark:bg-neutral-800"></div>
-                                <div class="h-10 rounded bg-neutral-100 dark:bg-neutral-800"></div>
-                                <div class="h-10 rounded bg-neutral-100 dark:bg-neutral-800"></div>
-                                <div class="h-10 rounded bg-neutral-100 dark:bg-neutral-800"></div>
-                            </div>
-                            <div class="h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800"></div>
-                            <div class="h-14 rounded bg-neutral-100 dark:bg-neutral-800"></div>
+                        {{-- 1. Loading Skeleton State --}}
+                        <div
+                            x-show="isLoading()"
+                            aria-busy="true"
+                        >
+                            <x-ui.forecast-insight-skeleton />
                         </div>
 
-                        {{-- Empty State --}}
-                        <div x-show="!loading && !error && (!forecast || allItems().length === 0)" x-cloak class="rounded-lg border border-neutral-200/80 bg-neutral-50/60 p-3 text-center text-xs text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900/40 dark:text-neutral-400">
-                            No forecast data available for the selected period.
+                        {{-- 2. Empty Skeleton State --}}
+                        <div
+                            x-show="isEmpty()"
+                            x-cloak
+                            aria-busy="true"
+                        >
+                            <x-ui.forecast-insight-skeleton />
                         </div>
 
-                        {{-- Compact Forecast Overview Content --}}
-                        <div x-show="forecast && allItems().length > 0" class="space-y-2.5">
+                        {{-- 3. Error State --}}
+                        <div x-show="isError()" x-cloak class="rounded-lg border border-danger-200 bg-danger-50/60 p-4 text-center text-xs text-danger-700 dark:border-danger-900/60 dark:bg-rose-950/20 dark:text-rose-300">
+                            Unable to calculate forecast insights.
+                        </div>
+
+                        {{-- 4. Compact Forecast Overview Content --}}
+                        <div x-show="isSuccess()" x-cloak class="space-y-2.5">
                             {{-- 1. Key Forecast Indicators (Ultra-Dense 4-Col Grid) --}}
                             <div class="grid grid-cols-4 gap-1.5 rounded-lg border border-neutral-200/90 bg-neutral-50/70 p-1.5 text-center dark:border-neutral-800 dark:bg-neutral-800/40">
                                 {{-- Projected at-risk items --}}
