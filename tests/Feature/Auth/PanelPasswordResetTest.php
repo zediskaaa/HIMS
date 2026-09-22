@@ -239,7 +239,7 @@ class PanelPasswordResetTest extends TestCase
         ]);
         $resetUrl = $verification->headers->get('Location');
         $this->assertStringContainsString('/admin/reset-password/', $resetUrl);
-        $this->get($resetUrl)->assertOk()->assertSee('Admin password recovery');
+        $this->get($resetUrl)->assertOk()->assertSee('Back to Admin Login');
 
         $this->post(route('admin.password.store'), [
             'token' => $this->tokenFromRedirect($verification),
@@ -268,7 +268,7 @@ class PanelPasswordResetTest extends TestCase
         ]);
         $resetUrl = $verification->headers->get('Location');
         $this->assertStringContainsString('/super-admin/reset-password/', $resetUrl);
-        $this->get($resetUrl)->assertOk()->assertSee('Super Admin password recovery');
+        $this->get($resetUrl)->assertOk()->assertSee('Back to Super Admin Login');
 
         $this->post(route('super-admin.password.store'), [
             'token' => $this->tokenFromRedirect($verification),

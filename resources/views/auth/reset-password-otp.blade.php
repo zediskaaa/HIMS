@@ -1,10 +1,6 @@
 <x-guest-layout :title="$panel->label().' Password Reset Verification'">
     <div class="space-y-7">
         <header>
-            <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
-                <span class="h-1.5 w-1.5 rounded-full bg-primary-500"></span>
-                {{ $panel->label() }} password recovery
-            </div>
             <h1 class="text-3xl font-semibold tracking-tight text-neutral-900">Enter verification code</h1>
             <p class="mt-3 text-sm leading-6 text-neutral-500">
                 Enter the 6-digit code sent to <span class="font-medium text-neutral-700">{{ $email }}</span>.

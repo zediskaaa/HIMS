@@ -1,10 +1,6 @@
 <x-guest-layout :title="$panel->label().' Password Reset'">
     <div class="space-y-7">
         <header>
-            <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
-                <span class="h-1.5 w-1.5 rounded-full bg-primary-500"></span>
-                {{ $panel->label() }} password recovery
-            </div>
             <h1 class="text-3xl font-semibold tracking-tight text-neutral-900">Reset your password</h1>
             <p class="mt-3 text-sm leading-6 text-neutral-500">
                 Enter your {{ strtolower($panel->label()) }} account email. If the account is eligible, we will send a secure, time-limited verification code.
