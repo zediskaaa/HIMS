@@ -1251,6 +1251,7 @@ const startLoadingIndicators = () => {
     const nativeFetch = window.fetch.bind(window);
     let activeApiRequests = 0;
     let pageTransitionPending = false;
+    let navigationWatchdog = null;
 
     const showOverlay = (message) => {
         if (!(overlay instanceof HTMLElement)) return;
@@ -1274,6 +1275,11 @@ const startLoadingIndicators = () => {
     };
 
     const reset = () => {
+        if (navigationWatchdog) {
+            clearTimeout(navigationWatchdog);
+            navigationWatchdog = null;
+        }
+
         activeApiRequests = 0;
         pageTransitionPending = false;
 
@@ -1438,7 +1444,11 @@ const startLoadingIndicators = () => {
             return;
         }
 
-        if (link.matches('[data-hims-download]')) {
+        const isDownloadLink = link.matches('[data-hims-download], [download]')
+            || /\/(export|download)(\/|$)/i.test(url.pathname)
+            || /\.(csv|xlsx|xls|pdf|json|zip|txt)(\?|$)/i.test(url.pathname);
+
+        if (isDownloadLink) {
             event.preventDefault();
             if (processingDownloads.has(link)) return;
 
@@ -1447,7 +1457,7 @@ const startLoadingIndicators = () => {
             link.setAttribute('aria-busy', 'true');
             link.setAttribute('aria-disabled', 'true');
             link.setAttribute('data-hims-download-active', '');
-            showOverlay(link.dataset.loadingText || 'Preparing document...');
+            showOverlay(link.dataset.loadingText || (url.pathname.includes('export') ? 'Preparing export...' : 'Preparing document...'));
 
             void (async () => {
                 let objectUrl = null;
@@ -1459,16 +1469,22 @@ const startLoadingIndicators = () => {
                     });
                     const disposition = response.headers.get('Content-Disposition') || '';
 
-                    if (!response.ok || !disposition.toLowerCase().startsWith('attachment')) {
+                    if (!response.ok || !disposition.toLowerCase().includes('attachment')) {
                         throw new Error(`Download request failed with status ${response.status}.`);
+                    }
+
+                    let serverFilename = '';
+                    const filenameMatch = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^;"']+)["']?/i);
+                    if (filenameMatch && filenameMatch[1]) {
+                        serverFilename = decodeURIComponent(filenameMatch[1].trim());
                     }
 
                     objectUrl = URL.createObjectURL(await response.blob());
                     const download = document.createElement('a');
-                    const downloadName = (link.dataset.downloadName || 'document')
-                        .split(/[\\/]/)
-                        .pop()
-                        .replace(/[\u0000-\u001F\u007F]/g, '') || 'document';
+                    const downloadName = serverFilename
+                        || (link.dataset.downloadName || '')
+                        || url.pathname.split('/').filter(Boolean).pop()
+                        || 'document';
                     download.href = objectUrl;
                     download.download = downloadName;
                     download.hidden = true;
@@ -1506,6 +1522,13 @@ const startLoadingIndicators = () => {
         link.setAttribute('data-hims-navigation-active', '');
         showOverlay('Loading page...');
 
+        if (navigationWatchdog) clearTimeout(navigationWatchdog);
+        navigationWatchdog = setTimeout(() => {
+            if (pageTransitionPending) {
+                reset();
+            }
+        }, 4000);
+
         continueAfterPaint(() => {
             try {
                 window.location.assign(url.href);
@@ -1522,6 +1545,16 @@ const startLoadingIndicators = () => {
                 document.documentElement.style.display = 'none';
                 window.location.reload();
             }
+        }
+    });
+
+    window.addEventListener('focus', () => {
+        if (pageTransitionPending) {
+            setTimeout(() => {
+                if (document.visibilityState === 'visible' && pageTransitionPending) {
+                    reset();
+                }
+            }, 800);
         }
     });
 

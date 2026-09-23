@@ -75,15 +75,21 @@ class ProfileController extends Controller
 
     public function updateMfa(Request $request): RedirectResponse
     {
-        $user = $request->user();
+        $guard = AuthenticationContext::authenticatedGuard() ?? AuthenticationContext::WEB_GUARD;
+        $user = $request->user($guard);
 
         abort_unless($user instanceof User && $user->isAdministrator(), 403);
 
         $validated = $request->validate([
             'mfa_enabled' => ['required', 'boolean'],
+            'current_password' => ['required', 'current_password:'.$guard],
         ]);
 
         $enabled = (bool) $validated['mfa_enabled'];
+        if ($enabled === (bool) $user->mfa_enabled) {
+            return Redirect::route('profile.edit');
+        }
+
         $user->forceFill(['mfa_enabled' => $enabled])->save();
         if ($enabled) {
             $guard = AuthenticationContext::authenticatedGuard() ?? AuthenticationContext::WEB_GUARD;

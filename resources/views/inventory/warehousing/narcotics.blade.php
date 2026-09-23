@@ -12,7 +12,7 @@
                         Record Vault Movement
                     </button>
                 @endcan
-                <a href="{{ route('inventory.warehousing.narcotics.export') }}" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
+                <a href="{{ route('inventory.warehousing.narcotics.export') }}" data-hims-download data-loading-text="Preparing export..." data-download-name="pdea-ddrb-report.csv" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">
                     <svg class="h-4 w-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     Export PDEA Report (CSV)
                 </a>

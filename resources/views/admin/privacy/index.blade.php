@@ -391,6 +391,9 @@
                                             @if ($requestItem->user)
                                                 <a
                                                     href="{{ route('admin.privacy.requests.export', $requestItem) }}"
+                                                    data-hims-download
+                                                    data-loading-text="Preparing export..."
+                                                    data-download-name="personal-data-export-{{ $requestItem->ticket_number }}.json"
                                                     class="inline-flex items-center px-2 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 rounded transition"
                                                     title="Download Sanitized Personal Data Export (JSON)"
                                                 >

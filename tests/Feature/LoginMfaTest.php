@@ -29,7 +29,10 @@ class LoginMfaTest extends TestCase
             ->assertSeeInOrder(['Email Multi-Factor Authentication', 'Disabled', 'Configure'])
             ->assertSee('data-original-mfa="0"', false);
 
-        $this->patch(route('profile.mfa.update'), ['mfa_enabled' => true])
+        $this->patch(route('profile.mfa.update'), [
+            'mfa_enabled' => true,
+            'current_password' => 'password',
+        ])
             ->assertRedirect(route('profile.edit'))
             ->assertSessionHas('mfa_success');
 
@@ -40,7 +43,10 @@ class LoginMfaTest extends TestCase
             ->assertSeeInOrder(['Email Multi-Factor Authentication', 'Enabled', 'Manage'])
             ->assertSee('data-original-mfa="1"', false);
 
-        $this->patch(route('profile.mfa.update'), ['mfa_enabled' => false])
+        $this->patch(route('profile.mfa.update'), [
+            'mfa_enabled' => false,
+            'current_password' => 'password',
+        ])
             ->assertRedirect(route('profile.edit'));
         $this->assertFalse($admin->fresh()->mfa_enabled);
 
@@ -51,7 +57,10 @@ class LoginMfaTest extends TestCase
 
         $superAdmin = User::factory()->superAdministrator()->create();
         $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
-            ->patch(route('profile.mfa.update'), ['mfa_enabled' => true])
+            ->patch(route('profile.mfa.update'), [
+                'mfa_enabled' => true,
+                'current_password' => 'password',
+            ])
             ->assertRedirect(route('profile.edit'));
         $this->assertTrue($superAdmin->fresh()->mfa_enabled);
     }
@@ -66,7 +75,10 @@ class LoginMfaTest extends TestCase
             ->assertDontSee('Multi-Factor Authentication')
             ->assertDontSee('configure-email-mfa', false);
 
-        $this->patch(route('profile.mfa.update'), ['mfa_enabled' => true])
+        $this->patch(route('profile.mfa.update'), [
+            'mfa_enabled' => true,
+            'current_password' => 'password',
+        ])
             ->assertForbidden();
         $this->assertFalse($staff->fresh()->mfa_enabled);
     }
@@ -77,7 +89,10 @@ class LoginMfaTest extends TestCase
 
         $this->actingAs($admin, AuthenticationContext::ADMIN_GUARD)
             ->from(route('profile.edit'))
-            ->patch(route('profile.mfa.update'), ['mfa_enabled' => 'invalid'])
+            ->patch(route('profile.mfa.update'), [
+                'mfa_enabled' => 'invalid',
+                'current_password' => 'password',
+            ])
             ->assertRedirect(route('profile.edit'))
             ->assertSessionHasErrors('mfa_enabled');
 
@@ -88,6 +103,27 @@ class LoginMfaTest extends TestCase
             ->assertSee('x-init="$nextTick(() => $dispatch(\'open-modal\', \'configure-email-mfa\'))"', false)
             ->assertSeeInOrder(['Email Multi-Factor Authentication', 'Disabled', 'Configure'])
             ->assertSee('data-original-mfa="0"', false);
+    }
+
+    public function test_mfa_update_requires_valid_current_password(): void
+    {
+        $admin = User::factory()->administrator()->create();
+
+        $this->actingAs($admin, AuthenticationContext::ADMIN_GUARD)
+            ->from(route('profile.edit'))
+            ->patch(route('profile.mfa.update'), [
+                'mfa_enabled' => true,
+                'current_password' => 'wrong-password',
+            ])
+            ->assertRedirect(route('profile.edit'))
+            ->assertSessionHasErrors('current_password');
+
+        $this->assertFalse($admin->fresh()->mfa_enabled);
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('x-init="$nextTick(() => $dispatch(\'open-modal\', \'configure-email-mfa\'))"', false)
+            ->assertSee('Could not update Email authentication');
     }
 
     public function test_admin_with_mfa_off_logs_in_without_an_otp(): void

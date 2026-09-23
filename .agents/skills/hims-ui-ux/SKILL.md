@@ -101,6 +101,118 @@ Every authenticated page in HIMS wrapped with `<x-app-layout>` automatically inc
     2. Persistent operational warnings or compliance states (e.g. "Archived Supplier Record", "Not eligible for procurement").
   - Never use an in-page banner for routine success confirmations that the central toast already handles.
 
+### Standardized Toast Notification & Feedback Template ("Design Consistency sa Success at Error Feedback")
+
+To maintain strict visual consistency across the entire hospital system, **all system feedback notifications—whether an action succeeded or failed ("success or not")—must adhere to the exact standardized card HUD template** implemented in `resources/views/layouts/partials/toast-notifications.blade.php`. Never invent disparate modal dialogs, ad-hoc alert boxes, browser `alert()`, or third-party popup plugins.
+
+#### 1. Visual Anatomy of the Feedback Card
+Every notification follows this precise layout and styling hierarchy:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ╭───╮  SUCCESS / ERROR / WARNING / NOTICE       Just now ✕ │
+│  │ ✓ │  Primary Action Message Headline.                    │
+│  ╰───╯  Secondary grounding detail or next steps.           │
+│                                                             │
+│ ═══════════════════════════════════════════════════════════ │ (Auto-dismiss accent line)
+└─────────────────────────────────────────────────────────────┘
+```
+
+1. **Card Container / Floating HUD (`rounded-2xl`)**:
+   - Fixed position in upper right corner: `fixed top-16 right-0 z-[80] flex flex-col items-end gap-3 p-4 sm:p-6 sm:max-w-md pointer-events-none`.
+   - Card surface: `pointer-events-auto relative w-full overflow-hidden rounded-2xl border border-neutral-200/90 bg-white/95 p-4 shadow-xl backdrop-blur-md transition-all dark:border-neutral-700 dark:bg-neutral-900/95`.
+   - Modern glassmorphism finish with generous rounded corners (`rounded-2xl`) and crisp border elevation.
+
+2. **Left Status Icon Badge (Circular Ring Badge)**:
+   - Dedicated circular badge on the left: `shrink-0 mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full ring-1`.
+   - Semantic tokens by state:
+     - **SUCCESS**:
+       - Badge: `bg-emerald-50 text-emerald-600 ring-emerald-200/80 dark:bg-emerald-950/60 dark:text-emerald-400 dark:ring-emerald-800/60`
+       - Icon: Checkmark (`<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>`, `stroke-width="2.5"`)
+     - **ERROR / NOT SUCCESS ("Kapag Hindi Success")**:
+       - Badge: `bg-rose-50 text-rose-600 ring-rose-200/80 dark:bg-rose-950/60 dark:text-rose-400 dark:ring-rose-800/60`
+       - Icon: Close / X mark (`<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>`, `stroke-width="2.5"`)
+     - **WARNING**:
+       - Badge: `bg-amber-50 text-amber-600 ring-amber-200/80 dark:bg-amber-950/60 dark:text-amber-400 dark:ring-amber-800/60`
+       - Icon: Exclamation triangle (`<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>`, `stroke-width="2.5"`)
+     - **INFO / NOTICE**:
+       - Badge: `bg-primary-50 text-primary-600 ring-primary-200/80 dark:bg-primary-950/60 dark:text-primary-400 dark:ring-primary-800/60`
+       - Icon: Information circle (`<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>`, `stroke-width="2.5"`)
+
+3. **Header Metadata Row**:
+   - **State Category Label (Left)**: Bold uppercase with tracking: `text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500` (renders `SUCCESS`, `ERROR`, `WARNING`, or `NOTICE`).
+   - **Timestamp (Right)**: Clean relative label: `text-[10px] text-neutral-400 dark:text-neutral-500` (`Just now`).
+   - **Dismiss Action (Far Right)**: Subtle interactive icon button: `shrink-0 -mr-1 -mt-1 rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:text-neutral-500` with 16px SVG `x-mark`.
+
+4. **Message & Grounding Body**:
+   - Text styling: `mt-0.5 text-xs sm:text-sm font-medium leading-snug text-neutral-800 dark:text-neutral-200`.
+   - Clear, professional hierarchy: Primary outcome first, followed by necessary operational grounding or consequences (e.g., *"Multi-factor authentication is now OFF. Future logins will use your password only."* or *"Purchase Order PO-2026-0042 approved successfully."*).
+   - Never use emojis in feedback copy.
+
+5. **Bottom Auto-Dismiss Countdown Accent Bar**:
+   - Sits completely flush along the bottom border: `absolute bottom-0 inset-x-0 h-0.5 bg-neutral-100 dark:bg-neutral-800`.
+   - Dynamic fill bar animates linearly across the active duration (default `5000ms`):
+     - Success: `bg-emerald-500`
+     - Error / Not Success: `bg-rose-500`
+     - Warning: `bg-amber-500`
+     - Info: `bg-primary-500`
+   - Pauses on mouse hover (`mouseenter="pauseTimer(toast)"`) and resumes on `mouseleave` so users have ample time to read longer messages without losing the notification.
+
+#### 2. System-Wide Implementation & Trigger Contracts
+Every backend controller, service, or frontend Alpine/JS action must dispatch notifications through the unified channels:
+
+- **Server-Side Laravel Controller Redirects**:
+  ```php
+  // 1. Success confirmation
+  return redirect()->route('settings.security')
+      ->with('success', 'Multi-factor authentication is now OFF. Future logins will use your password only.');
+
+  // 2. Error / Failed operation ("Not Success")
+  return back()
+      ->with('error', 'Unable to complete batch approval. 3 requisitions exceed authorized budget thresholds.');
+
+  // 3. Operational Warning
+  return back()
+      ->with('warning', 'Purchase order submitted, but vendor delivery lead-time exceeds standard window.');
+
+  // 4. General Notice
+  return back()
+      ->with('info', 'Demand forecast model retraining is queued and running in the background.');
+  ```
+
+- **Client-Side Alpine.js / Livewire / JavaScript Dispatch**:
+  ```javascript
+  // In Alpine.js components or event listeners:
+  $dispatch('toast', {
+      type: 'success', // 'success' | 'error' | 'warning' | 'info'
+      title: 'SUCCESS',
+      message: 'Multi-factor authentication is now OFF. Future logins will use your password only.',
+      duration: 5000 // optional, in ms (default: 5000)
+  });
+
+  // For failed operations ("not success"):
+  $dispatch('toast', {
+      type: 'error',
+      title: 'ERROR',
+      message: 'Failed to save changes. Please review required form fields.',
+      duration: 6000
+  });
+
+  // Global window event from vanilla JS / fetch / axios:
+  window.dispatchEvent(new CustomEvent('toast', {
+      detail: {
+          type: 'success',
+          title: 'SUCCESS',
+          message: 'Inventory batch successfully adjusted.',
+      }
+  }));
+  ```
+
+#### 3. Strict Consistency Invariants
+- **Bawal ang Iba-ibang Popup / Dialog Box**: Do not use ad-hoc modal popups, custom floating divs, `sweetalert`, or browser-native `alert()`/`confirm()` for notification feedback. Every action feedback must pass through this single unified toast system.
+- **Single Source of Truth**: The central toast HUD in `resources/views/layouts/partials/toast-notifications.blade.php` is the system standard. Any updates to toast visual styling must be applied directly to this partial and reflected across all screens.
+- **No In-Page Duplicate Success**: Never render a green in-page alert banner (`<x-ui.alert variant="success">`) alongside the toast notification on pages utilizing `<x-app-layout>`.
+
 ### Avoid Redundant Loading Indicators ("Bawal ang Dalawang Loading / Isang Loading Indicator Lang")
 
 Never show multiple loading indicators simultaneously for a single user action. Redundant loading states—such as an in-button spinner running simultaneously with a center-screen modal overlay card—create visual noise, distract the user, and obscure form content ("pati sa pag-loading, hindi rin dapat may redundant, tulad niyan dalawa ang nag-lo-loading, itira ang much better na loading or yung mas akma, sa login page, mas gusto ko yung nag-lo-loading sa mismong button kaysa doon sa nasa gitna na may HIMS na nakalagay").
@@ -635,7 +747,7 @@ Use component-specific skeletons that accurately reflect the actual UI.
 
 - Forms and internal navigation participate in the global loading system in `resources/js/app.js`. Use established `data-loading-text` and opt-out hooks rather than adding a second spinner system. Loading behavior also guards against duplicate submissions.
 - Confirmation dialogs use the shared decision-confirmation partial and `data-confirm-*` hooks, with specialized handling for MFA and email changes. Do not add a competing modal without checking this flow.
-- Flash feedback is rendered centrally by the floating Toast Notification HUD in `layouts/partials/toast-notifications.blade.php` for `status`/`success`, `error`, `warning`, and `info`. Never create duplicate in-page success alert banners for messages already captured by the central toast. Profile/auth pages maintain local named error bags for inline form validation errors.
+- Flash feedback is rendered centrally by the floating Toast Notification HUD in `layouts/partials/toast-notifications.blade.php` following the Standardized Toast Notification & Feedback Template (`rounded-2xl` floating card HUD, circular status icon badge, uppercase tracking category header with relative timestamp, and bottom countdown accent line) for `status`/`success`, `error`, `warning`, and `info`. Never create duplicate in-page success alert banners for messages already captured by the central toast. Profile/auth pages maintain local named error bags for inline form validation errors.
 - The session-warning UI reflects server state; client timers must not become the authority for session validity.
 - Dashboard and audit autocomplete interactions already use Alpine/JavaScript contracts. Preserve cancellation, loading, empty, error, and stale-request behavior.
 - Keep route names, breadcrumbs, sidebar active states, back/redirect behavior, and permission-based visibility consistent.

@@ -1,5 +1,6 @@
-<section class="py-4" x-data="{ enabled: @js((bool) $user->mfa_enabled), original: @js((bool) $user->mfa_enabled) }"
-         x-on:open-modal.window="if ($event.detail === 'configure-email-mfa') enabled = original">
+<section class="py-4" x-data="{ enabled: @js((bool) $user->mfa_enabled), original: @js((bool) $user->mfa_enabled), password: '' }"
+         x-on:open-modal.window="if ($event.detail === 'configure-email-mfa') { enabled = original; password = ''; }"
+         x-on:close-modal.window="if ($event.detail === 'configure-email-mfa') { enabled = original; password = ''; }">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="min-w-0">
             <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ __('Email Multi-Factor Authentication') }}</h3>
@@ -11,8 +12,12 @@
         </div>
     </div>
 
-    <div x-data @if ($errors->has('mfa_enabled')) x-init="$nextTick(() => $dispatch('open-modal', 'configure-email-mfa'))" @endif>
+    <div x-data @if ($errors->hasAny(['mfa_enabled', 'current_password'])) x-init="$nextTick(() => $dispatch('open-modal', 'configure-email-mfa'))" @endif>
     <x-ui.modal name="configure-email-mfa" :title="__('Email Multi-Factor Authentication')" maxWidth="md">
+        @if ($errors->has('current_password'))
+            <x-ui.alert variant="danger" title="Could not update Email authentication" class="mb-4">{{ $errors->first('current_password') }}</x-ui.alert>
+        @endif
+
         <form method="post" action="{{ route('profile.mfa.update') }}" class="space-y-4"
               data-confirm-mfa data-original-mfa="{{ $user->mfa_enabled ? '1' : '0' }}">
             @csrf
@@ -30,9 +35,18 @@
 
             <x-input-error :messages="$errors->get('mfa_enabled')" class="mt-1" />
 
+            <div>
+                <x-input-label for="email-mfa-current-password" value="Current password" class="text-neutral-700 dark:text-neutral-300" />
+                <x-text-input id="email-mfa-current-password" name="current_password" type="password" required autocomplete="off"
+                              x-model="password"
+                              data-lpignore="true" data-1p-ignore="true" data-bwignore="true"
+                              style="-webkit-text-security: disc; text-security: disc;" class="mt-1 block w-full" />
+                <x-input-error :messages="$errors->get('current_password')" class="mt-2" />
+            </div>
+
             <div class="flex flex-wrap items-center justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-neutral-800">
                 <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'configure-email-mfa')">{{ __('Cancel') }}</x-ui.button>
-                <x-ui.button type="submit" data-loading-text="Saving MFA setting...">{{ __('Save MFA setting') }}</x-ui.button>
+                <x-ui.button type="submit" x-bind:disabled="enabled === original || password.trim() === ''" data-loading-text="Saving MFA setting...">{{ __('Save MFA setting') }}</x-ui.button>
             </div>
         </form>
     </x-ui.modal>
