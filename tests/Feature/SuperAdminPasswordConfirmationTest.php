@@ -9,16 +9,28 @@ use App\Support\AuthenticationContext;
 use App\Support\SuperAdminPasswordConfirmation;
 use Database\Seeders\SuperAdminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class SuperAdminPasswordConfirmationTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const SUPER_ADMIN_EMAIL = 'zediskaaa@gmail.com';
+    private const SUPER_ADMIN_EMAIL = 'protected.super-admin@example.test';
 
-    private const SUPER_ADMIN_PASSWORD = 'SuperAdminZediskaaa123!';
+    private const SUPER_ADMIN_PASSWORD = 'SyntheticSuperAdmin123!';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set('account_provisioning.super_admin', [
+            'name' => 'Protected Super Administrator',
+            'email' => self::SUPER_ADMIN_EMAIL,
+            'phone' => null,
+            'department' => 'Administration',
+            'password' => self::SUPER_ADMIN_PASSWORD,
+        ]);
+    }
 
     private function getSuperAdmin(): User
     {

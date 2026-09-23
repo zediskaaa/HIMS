@@ -5,54 +5,46 @@ namespace Database\Seeders;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\User;
+use App\Rules\PasswordStandard;
 use App\Services\PasswordHistoryService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Validator;
 
-/**
- * The account holder's own day-to-day Administrator login.
- *
- * Kept apart from DemoUserSeeder on purpose. That roster is throwaway sample
- * staff any environment may recreate; this is a real person's account, so it
- * stands on its own and is never reset once it exists — re-running sample data
- * cannot undo a password this account changes later.
- */
 class OwnerAdminSeeder extends Seeder
 {
-    public const EMAIL = 'zedrickdemonteverde1@gmail.com';
-
-    public const NAME = 'Zedrick De Monteverde';
-
-    /**
-     * Initial setup secret only. Authentication always uses Laravel's hashed
-     * password verifier; this value is never written to logs or responses.
-     */
-    private const INITIAL_PASSWORD = 'ZedrickAdmin2026!';
-
     public function run(): void
     {
-        if (User::query()->where('email', self::EMAIL)->exists()) {
-            $this->command?->line('Preserved existing administrator account: '.self::EMAIL);
+        $account = $this->configuredAccount();
+        if ($account === null) {
+            $this->command?->line('Owner Administrator provisioning skipped because HIMS_OWNER_ADMIN_* values are not configured.');
+
+            return;
+        }
+
+        if (User::query()->where('email', $account['email'])->exists()) {
+            $this->command?->line('Preserved the configured Owner Administrator account.');
 
             return;
         }
 
         $passwords = app(PasswordHistoryService::class);
 
-        User::withoutEvents(function () use ($passwords): void {
+        User::withoutEvents(function () use ($account, $passwords): void {
             $passwords->usePassword(
-                self::INITIAL_PASSWORD,
-                function (string $passwordHash): User {
+                $account['password'],
+                function (string $passwordHash) use ($account): User {
                     $user = new User;
                     $user->forceFill([
-                        'name' => self::NAME,
-                        'email' => self::EMAIL,
+                        'name' => $account['name'],
+                        'email' => $account['email'],
+                        'phone' => $account['phone'],
                         'email_verified_at' => now(),
                         'password' => $passwordHash,
                         'password_changed_at' => now(),
                         'role' => UserRole::Administrator,
                         'status' => UserStatus::Active,
                         'employee_id' => $this->availableEmployeeId(),
-                        'department' => 'Information Technology',
+                        'department' => $account['department'],
                         'mfa_enabled' => false,
                     ])->save();
 
@@ -60,22 +52,33 @@ class OwnerAdminSeeder extends Seeder
                 },
             );
         });
-
-        $this->command?->info('Administrator account ready: '.self::EMAIL);
     }
 
-    /**
-     * `users.employee_id` is unique, so keep it clear of the demo roster and
-     * step past anything already holding the number.
-     */
+    /** @return array{name: string, email: string, phone: ?string, department: string, password: string}|null */
+    private function configuredAccount(): ?array
+    {
+        $account = config('account_provisioning.owner_admin', []);
+
+        if (! is_array($account) || blank($account['name'] ?? null) || blank($account['email'] ?? null) || blank($account['password'] ?? null)) {
+            return null;
+        }
+
+        return Validator::make($account, [
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'department' => ['required', 'string', 'max:255'],
+            'password' => ['required', 'string', new PasswordStandard],
+        ])->validate();
+    }
+
     private function availableEmployeeId(): string
     {
-        $employeeId = 'EMP-0100';
-        $suffix = 2;
+        $number = 1;
 
-        while (User::query()->where('employee_id', $employeeId)->exists()) {
-            $employeeId = 'EMP-0100-'.$suffix++;
-        }
+        do {
+            $employeeId = 'ADM-'.str_pad((string) $number++, 4, '0', STR_PAD_LEFT);
+        } while (User::query()->where('employee_id', $employeeId)->exists());
 
         return $employeeId;
     }

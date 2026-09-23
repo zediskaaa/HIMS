@@ -16,6 +16,7 @@ use App\Support\AuthenticationContext;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DemandForecastDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ConfiguresAccountProvisioning;
 use Tests\TestCase;
 
 /**
@@ -27,12 +28,14 @@ use Tests\TestCase;
  */
 class DemoSeedTest extends TestCase
 {
+    use ConfiguresAccountProvisioning;
     use RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->configureAccountProvisioning();
         $this->seed(DatabaseSeeder::class);
     }
 
@@ -48,7 +51,7 @@ class DemoSeedTest extends TestCase
 
         // The admin account is the one that can reach user management and
         // create everyone else, so the demo is unusable without it.
-        $admin = User::where('email', 'test@example.com')->firstOrFail();
+        $admin = User::where('email', 'administrator@example.test')->firstOrFail();
         $this->assertTrue($admin->isAdministrator());
         $this->assertTrue($admin->isActive());
         $this->assertSame(1, User::superAdministrators()->count());
@@ -59,8 +62,8 @@ class DemoSeedTest extends TestCase
     public function test_the_seeded_admin_can_sign_in_with_the_documented_password(): void
     {
         $this->post('/admin/login', [
-            'email' => 'test@example.com',
-            'password' => 'DemoAdmin1!',
+            'email' => 'administrator@example.test',
+            'password' => 'SyntheticAdministrator123!',
         ])->assertRedirect('/dashboard');
 
         $this->assertAuthenticated(AuthenticationContext::ADMIN_GUARD);
@@ -68,7 +71,7 @@ class DemoSeedTest extends TestCase
 
     public function test_reseeding_preserves_demo_accounts_and_passwords_without_duplicates(): void
     {
-        $admin = User::where('email', 'test@example.com')->firstOrFail();
+        $admin = User::where('email', 'administrator@example.test')->firstOrFail();
         $admin->forceFill(['department' => 'Locally Customized Department'])->save();
         $counts = [User::count(), PasswordHistory::count(), InventoryItem::count()];
 
@@ -78,8 +81,8 @@ class DemoSeedTest extends TestCase
         $this->assertSame('Locally Customized Department', $admin->fresh()->department);
 
         $this->post('/admin/login', [
-            'email' => 'test@example.com',
-            'password' => 'DemoAdmin1!',
+            'email' => 'administrator@example.test',
+            'password' => 'SyntheticAdministrator123!',
         ])->assertRedirect('/dashboard');
     }
 

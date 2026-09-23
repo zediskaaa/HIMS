@@ -5,33 +5,40 @@ namespace Database\Seeders;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\User;
+use App\Rules\PasswordStandard;
 use App\Services\PasswordHistoryService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class DemoUserSeeder extends Seeder
 {
-    /**
-     * Create one reusable demonstration account for every non-Super-Admin role.
-     *
-     * The protected Super Administrator remains owned by SuperAdminSeeder. An
-     * existing demo account is never reset, reactivated, or reassigned here, so
-     * re-running sample data cannot undo a password or account change.
-     */
     public function run(): void
     {
+        $accounts = config('account_provisioning.demo_accounts', []);
+
+        if (! is_array($accounts) || $accounts === []) {
+            $this->command?->line('Demo account provisioning skipped because HIMS_DEMO_ACCOUNTS_JSON is not configured.');
+
+            return;
+        }
+
         $passwords = app(PasswordHistoryService::class);
 
-        foreach ($this->accounts() as $account) {
+        foreach ($accounts as $account) {
+            $account = $this->validateAccount($account);
+            $role = UserRole::from($account['role']);
+
             if (User::query()->where('email', $account['email'])->exists()) {
-                $this->command?->line("Preserved existing demo account: {$account['email']}");
+                $this->command?->line("Preserved existing configured demo account: {$account['email']}");
 
                 continue;
             }
 
-            User::withoutEvents(function () use ($account, $passwords): void {
+            User::withoutEvents(function () use ($account, $passwords, $role): void {
                 $passwords->usePassword(
                     $account['password'],
-                    function (string $passwordHash) use ($account): User {
+                    function (string $passwordHash) use ($account, $role): User {
                         $user = new User;
                         $user->forceFill([
                             'name' => $account['name'],
@@ -39,11 +46,11 @@ class DemoUserSeeder extends Seeder
                             'email_verified_at' => now(),
                             'password' => $passwordHash,
                             'password_changed_at' => now(),
-                            'role' => $account['role'],
+                            'role' => $role,
                             'status' => UserStatus::Active,
                             'employee_id' => $this->availableEmployeeId($account['employee_id']),
                             'department' => $account['department'],
-                            'phone' => $account['phone'],
+                            'phone' => $account['phone'] ?? null,
                             'mfa_enabled' => false,
                         ])->save();
 
@@ -52,71 +59,26 @@ class DemoUserSeeder extends Seeder
                 );
             });
         }
-
-        $this->command?->info('Demo user accounts are available for every non-Super-Admin role.');
     }
 
-    /**
-     * @return array<int, array{role: UserRole, name: string, email: string, employee_id: string, department: string, phone: string, password: string}>
-     */
-    private function accounts(): array
+    /** @return array{name: string, email: string, employee_id: string, department: string, phone: ?string, password: string, role: string} */
+    private function validateAccount(mixed $account): array
     {
-        return [
-            [
-                'role' => UserRole::Administrator,
-                'name' => 'Adrian Mendoza',
-                'email' => 'test@example.com',
-                'employee_id' => 'EMP-0001',
-                'department' => 'Information Technology',
-                'phone' => '09170000001',
-                'password' => 'DemoAdmin1!',
+        return Validator::make(is_array($account) ? $account : [], [
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
+            'employee_id' => ['required', 'string', 'max:50'],
+            'department' => ['required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'password' => ['required', 'string', new PasswordStandard],
+            'role' => [
+                'required',
+                Rule::in(collect(UserRole::cases())
+                    ->reject(fn (UserRole $role) => $role === UserRole::SuperAdministrator)
+                    ->map->value
+                    ->all()),
             ],
-            [
-                'role' => UserRole::InventoryManager,
-                'name' => 'Ana Reyes',
-                'email' => 'ana.reyes@djnrmhs.test',
-                'employee_id' => 'EMP-0002',
-                'department' => 'Central Supply',
-                'phone' => '09170000002',
-                'password' => 'DemoInventory1!',
-            ],
-            [
-                'role' => UserRole::WarehouseStaff,
-                'name' => 'Ben Santos',
-                'email' => 'ben.santos@djnrmhs.test',
-                'employee_id' => 'EMP-0003',
-                'department' => 'Warehouse',
-                'phone' => '09170000003',
-                'password' => 'DemoWarehouse1!',
-            ],
-            [
-                'role' => UserRole::PharmacyStaff,
-                'name' => 'Cely Dizon',
-                'email' => 'cely.dizon@djnrmhs.test',
-                'employee_id' => 'EMP-0004',
-                'department' => 'Pharmacy',
-                'phone' => '09170000004',
-                'password' => 'DemoPharmacy1!',
-            ],
-            [
-                'role' => UserRole::Auditor,
-                'name' => 'Dino Cruz',
-                'email' => 'dino.cruz@djnrmhs.test',
-                'employee_id' => 'EMP-0005',
-                'department' => 'Internal Audit',
-                'phone' => '09170000005',
-                'password' => 'DemoAuditor1!',
-            ],
-            [
-                'role' => UserRole::Viewer,
-                'name' => 'Ella Flores',
-                'email' => 'ella.flores@djnrmhs.test',
-                'employee_id' => 'EMP-0006',
-                'department' => 'Quality Office',
-                'phone' => '09170000006',
-                'password' => 'DemoViewer1!',
-            ],
-        ];
+        ])->validate();
     }
 
     private function availableEmployeeId(string $preferred): string

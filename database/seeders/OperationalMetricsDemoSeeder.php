@@ -18,7 +18,6 @@ use App\Models\Supplier;
 use App\Models\SupplierContact;
 use App\Models\SupplierContract;
 use App\Models\SupplierDocument;
-use App\Models\SupplierScorecard;
 use App\Models\User;
 use App\Support\DemoPdfBuilder;
 use Illuminate\Database\Seeder;
@@ -59,8 +58,6 @@ class OperationalMetricsDemoSeeder extends Seeder
                     'fill_rate_pct' => 94.8,
                     'on_time_delivery_pct' => 92.1,
                     'ceiling_breaches_count' => 0,
-                    'suppliers_evaluated' => 3,
-                    'avg_supplier_score' => 91.7,
                     'overall_stock_accuracy' => 99.6,
                     'critical_bottleneck' => [
                         'key' => 'stage_3_po_conforme',
@@ -162,8 +159,6 @@ class OperationalMetricsDemoSeeder extends Seeder
                     'fill_rate_pct' => 91.5,
                     'on_time_delivery_pct' => 89.0,
                     'ceiling_breaches_count' => 0,
-                    'suppliers_evaluated' => 3,
-                    'avg_supplier_score' => 88.3,
                     'overall_stock_accuracy' => 98.8,
                     'critical_bottleneck' => [
                         'key' => 'stage_4_vendor_lead_time',
@@ -245,86 +240,7 @@ class OperationalMetricsDemoSeeder extends Seeder
         );
 
         // 2. Seed Supplier Scorecards
-        $suppliers = Supplier::take(3)->get();
-        if ($suppliers->isNotEmpty()) {
-            $scorecardData = [
-                [
-                    'delivery_score' => 94.50,
-                    'quality_score' => 98.00,
-                    'fill_rate_score' => 96.00,
-                    'total_score' => 95.80,
-                    'total_pos_count' => 12,
-                    'completed_pos_count' => 12,
-                    'late_deliveries_count' => 1,
-                    'avg_lead_time_days' => 4.20,
-                    'promised_lead_time_days' => 5.00,
-                    'non_conformance_count' => 0,
-                    'temperature_excursions_count' => 0,
-                    'has_valid_lto' => true,
-                    'has_valid_cpr' => true,
-                    'recommendation' => 'retain',
-                    'notes' => 'Consistently reliable on sterile surgical supplies and hospital consumables.',
-                ],
-                [
-                    'delivery_score' => 91.00,
-                    'quality_score' => 95.00,
-                    'fill_rate_score' => 92.50,
-                    'total_score' => 92.70,
-                    'total_pos_count' => 8,
-                    'completed_pos_count' => 8,
-                    'late_deliveries_count' => 1,
-                    'avg_lead_time_days' => 5.10,
-                    'promised_lead_time_days' => 5.00,
-                    'non_conformance_count' => 0,
-                    'temperature_excursions_count' => 0,
-                    'has_valid_lto' => true,
-                    'has_valid_cpr' => true,
-                    'recommendation' => 'retain',
-                    'notes' => 'Primary cooperative supplier for non-regulated hospital warehouse supplies.',
-                ],
-                [
-                    'delivery_score' => 86.00,
-                    'quality_score' => 89.00,
-                    'fill_rate_score' => 84.00,
-                    'total_score' => 86.50,
-                    'total_pos_count' => 6,
-                    'completed_pos_count' => 5,
-                    'late_deliveries_count' => 2,
-                    'avg_lead_time_days' => 7.50,
-                    'promised_lead_time_days' => 5.00,
-                    'non_conformance_count' => 1,
-                    'temperature_excursions_count' => 0,
-                    'has_valid_lto' => true,
-                    'has_valid_cpr' => true,
-                    'recommendation' => 'under_observation',
-                    'notes' => 'Lead time delays observed during recent adverse weather; recommended buffer inventory increase.',
-                ],
-            ];
-
-            foreach ($suppliers as $idx => $sup) {
-                if (isset($scorecardData[$idx])) {
-                    SupplierScorecard::updateOrCreate(
-                        [
-                            'kpi_process_review_id' => $reviewQ3->id,
-                            'supplier_id' => $sup->id,
-                        ],
-                        $scorecardData[$idx]
-                    );
-
-                    // Also seed active supplier scorecards for Q4 review
-                    SupplierScorecard::updateOrCreate(
-                        [
-                            'kpi_process_review_id' => $reviewQ4->id,
-                            'supplier_id' => $sup->id,
-                        ],
-                        array_merge($scorecardData[$idx], [
-                            'recommendation' => $idx === 2 ? 'under_observation' : 'retain',
-                            'notes' => 'Preliminary Q4 evaluation: Vendor accreditation and License to Operate (LTO) renewal pending.',
-                        ])
-                    );
-                }
-            }
-        }
+        $this->call(SupplierScorecardDemoSeeder::class);
 
         // 3. Seed Procurement Savings Logs
         $pos = PurchaseOrder::where('status', '!=', 'cancelled')->take(3)->get();

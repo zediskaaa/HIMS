@@ -15,9 +15,22 @@ class SuperAdminProvisioningTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const EMAIL = 'zediskaaa@gmail.com';
+    private const EMAIL = 'protected.super-admin@example.test';
 
-    private const INITIAL_PASSWORD = 'SuperAdminZediskaaa123!';
+    private const INITIAL_PASSWORD = 'SyntheticSuperAdmin123!';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set('account_provisioning.super_admin', [
+            'name' => 'Protected Super Administrator',
+            'email' => self::EMAIL,
+            'phone' => null,
+            'department' => 'Administration',
+            'password' => self::INITIAL_PASSWORD,
+        ]);
+    }
 
     /**
      * @return array<string, string>
@@ -285,24 +298,24 @@ class SuperAdminProvisioningTest extends TestCase
     public function test_artisan_command_can_provision_additional_super_admin(): void
     {
         $this->artisan('hims:create-super-admin', [
-            '--name' => 'Jayson A. Pinggoy',
-            '--email' => 'jaysonpinggoy11@gmail.com',
-            '--phone' => '09111094213',
-            '--password' => 'Jaysonpinggoy#123',
+            '--name' => 'Command Super Administrator',
+            '--email' => 'command.super-admin@example.test',
+            '--phone' => '09170000000',
+            '--password' => 'SyntheticCommandAdmin123!',
         ])->assertSuccessful();
 
-        $user = User::query()->where('email', 'jaysonpinggoy11@gmail.com')->firstOrFail();
+        $user = User::query()->where('email', 'command.super-admin@example.test')->firstOrFail();
 
-        $this->assertSame('Jayson A. Pinggoy', $user->name);
-        $this->assertSame('Jayson', $user->first_name);
-        $this->assertSame('A.', $user->middle_name);
-        $this->assertSame('Pinggoy', $user->surname);
-        $this->assertSame('09111094213', $user->phone);
+        $this->assertSame('Command Super Administrator', $user->name);
+        $this->assertSame('Command', $user->first_name);
+        $this->assertSame('Super', $user->middle_name);
+        $this->assertSame('Administrator', $user->surname);
+        $this->assertSame('09170000000', $user->phone);
         $this->assertSame(UserRole::SuperAdministrator, $user->role);
         $this->assertSame(UserStatus::Active, $user->status);
         $this->assertFalse($user->is_protected);
         $this->assertStringStartsWith('SA-', $user->employee_id);
-        $this->assertTrue(Hash::check('Jaysonpinggoy#123', $user->password));
+        $this->assertTrue(Hash::check('SyntheticCommandAdmin123!', $user->password));
     }
 
     public function test_artisan_command_validates_weak_password(): void
@@ -337,4 +350,3 @@ class SuperAdminProvisioningTest extends TestCase
             ->assertDontSee('This role can');
     }
 }
-

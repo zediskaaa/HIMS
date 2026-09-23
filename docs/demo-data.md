@@ -14,20 +14,11 @@ The seeder is designed to preserve existing demo accounts and records when it is
 
 ## Demo accounts
 
-Administrator accounts use the dedicated `/admin/login` page. All other accounts below use `/login`.
+No reusable account credentials are committed to the repository. Existing users remain in the database when demo data is reseeded.
 
-| Role | Email | Initial password | Panel |
-|---|---|---|---|
-| Administrator | `test@example.com` | `DemoAdmin1!` | `/admin/login` |
-| Inventory Manager | `ana.reyes@djnrmhs.test` | `DemoInventory1!` | `/login` |
-| Warehouse Staff | `ben.santos@djnrmhs.test` | `DemoWarehouse1!` | `/login` |
-| Pharmacy Staff | `cely.dizon@djnrmhs.test` | `DemoPharmacy1!` | `/login` |
-| Auditor | `dino.cruz@djnrmhs.test` | `DemoAuditor1!` | `/login` |
-| Viewer | `ella.flores@djnrmhs.test` | `DemoViewer1!` | `/login` |
+Provision a Super Administrator interactively with `php artisan hims:create-super-admin`. Optional automated provisioning reads `HIMS_SUPER_ADMIN_*`, `HIMS_OWNER_ADMIN_*`, and `HIMS_DEMO_ACCOUNTS_JSON` from the environment. Keep those values outside version control and use them only on an isolated local or disposable environment.
 
-The protected Super Administrator is provisioned separately by `SuperAdminSeeder` and signs in through `/super-admin/login`. Its credential is intentionally not duplicated in this general demo guide. Change every initial password before using the accounts outside an isolated demonstration environment.
-
-The account holder's own Administrator login (`OwnerAdminSeeder`, email `zedrickdemonteverde1@gmail.com`) also uses `/admin/login` and is kept out of the table above for the same reason: it is a real account rather than sample staff, and the seeder never resets it once it exists.
+Administrator accounts use `/admin/login`, Super Administrators use `/super-admin/login`, and staff accounts use `/login`.
 
 ## Included sample records
 

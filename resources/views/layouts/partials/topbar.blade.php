@@ -276,25 +276,25 @@
             x-cloak
             x-on:click.outside="open = false"
             x-transition.origin.top.right
-            class="fixed left-3 right-3 top-[4.25rem] z-50 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xl
+            class="fixed inset-x-3 top-[4.25rem] z-50 w-auto min-w-0 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xl
                    dark:border-neutral-800 dark:bg-neutral-900
-                   sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[26rem]"
+                   sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[26rem] sm:max-w-[calc(100vw-2rem)]"
             role="dialog"
             aria-modal="false"
             aria-label="Notifications"
         >
-            <div class="flex items-center justify-between gap-3 border-b border-neutral-200 dark:border-neutral-800 px-4 py-3">
-                <div>
+            <div class="flex min-w-0 items-center justify-between gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+                <div class="min-w-0">
                     <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Notifications</h2>
                     <p class="text-xs text-neutral-500 dark:text-neutral-400">
                         {{ $topbarUnreadCount > 0 ? $topbarUnreadCount.' unread' : 'You are all caught up' }}
                     </p>
                 </div>
                 @if($topbarUnreadCount > 0)
-                    <form method="POST" action="{{ route('notifications.read-all') }}">
+                    <form method="POST" action="{{ route('notifications.read-all') }}" class="shrink-0">
                         @csrf
                         @method('PATCH')
-                        <button type="submit" class="rounded-md px-2 py-1 text-xs font-semibold text-primary-700 hover:bg-primary-50
+                        <button type="submit" class="whitespace-nowrap rounded-md px-2 py-1 text-xs font-semibold text-primary-700 hover:bg-primary-50
                                                        dark:text-primary-400 dark:hover:bg-primary-950/50
                                                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
                             Mark all as read
@@ -303,7 +303,7 @@
                 @endif
             </div>
 
-            <div class="max-h-[min(70vh,32rem)] overflow-y-auto overscroll-contain">
+            <div class="max-h-[min(70vh,32rem)] w-full min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain">
                 @forelse($topbarNotifications as $notification)
                     @php
                         $priority = \App\Enums\NotificationPriority::tryFrom((string) ($notification->data['priority'] ?? ''))
@@ -318,11 +318,11 @@
                             ? 'Just now'
                             : $notification->created_at->diffForHumans();
                     @endphp
-                    <div class="grid grid-cols-[3px_minmax(0,1fr)_2.25rem] border-b border-neutral-100 dark:border-neutral-800/80 last:border-b-0
+                    <div class="grid w-full min-w-0 max-w-full grid-cols-[3px_minmax(0,1fr)_2.25rem] overflow-hidden border-b border-neutral-100 last:border-b-0 dark:border-neutral-800/80
                                 {{ $isUnread ? 'bg-primary-50/55 dark:bg-primary-950/20' : 'bg-white dark:bg-neutral-900' }}">
                         <span class="{{ $accent }}" aria-hidden="true"></span>
                         <a href="{{ route('notifications.open', $notification->id) }}"
-                           class="min-w-0 px-3 py-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 focus-visible:outline-none focus-visible:ring-2
+                           class="min-w-0 overflow-hidden px-3 py-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 focus-visible:outline-none focus-visible:ring-2
                                   focus-visible:ring-inset focus-visible:ring-primary-500">
                             <div class="flex items-start justify-between gap-2">
                                 <p class="truncate text-sm {{ $isUnread ? 'font-semibold text-neutral-950 dark:text-neutral-50' : 'font-medium text-neutral-800 dark:text-neutral-200' }}">
@@ -334,10 +334,10 @@
                                     </span>
                                 @endif
                             </div>
-                            <p class="mt-0.5 line-clamp-2 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+                            <p class="mt-0.5 line-clamp-2 break-words text-xs leading-5 text-neutral-600 [overflow-wrap:anywhere] dark:text-neutral-400">
                                 {{ $notification->data['message'] ?? '' }}
                             </p>
-                            <div class="mt-1.5 flex items-center gap-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+                            <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-neutral-500 dark:text-neutral-400">
                                 <time datetime="{{ $notification->created_at->toIso8601String() }}">{{ $timestamp }}</time>
                                 @if($isUnread)
                                     <span class="inline-flex items-center gap-1 font-medium text-primary-700 dark:text-primary-400">
@@ -349,7 +349,7 @@
                                 @endif
                             </div>
                         </a>
-                        <div class="flex items-start justify-center pt-3">
+                        <div class="flex min-w-0 items-start justify-center pt-3">
                             @if($isUnread)
                                 <form method="POST" action="{{ route('notifications.read', $notification->id) }}">
                                     @csrf

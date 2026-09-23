@@ -15,11 +15,20 @@ use App\Models\Supplier;
 use App\Models\User;
 use Database\Seeders\ComprehensiveDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ConfiguresAccountProvisioning;
 use Tests\TestCase;
 
 class ComprehensiveDemoSeederTest extends TestCase
 {
+    use ConfiguresAccountProvisioning;
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->configureAccountProvisioning();
+    }
 
     public function test_it_provides_accounts_and_guided_data_for_every_major_module(): void
     {

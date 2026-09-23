@@ -9,13 +9,13 @@ use App\Models\InventoryAdjustment;
 use App\Models\InventoryItem;
 use App\Models\KpiProcessReview;
 use App\Models\ProcessRecommendation;
-use App\Models\ProcurementSavingsLog;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Models\SupplierScorecard;
 use App\Models\SystemRecoveryAttempt;
 use App\Models\SystemRecoveryRecord;
 use App\Models\User;
+use App\Services\Analytics\SupplierScoringService;
 use App\Services\Import\ImportStagingService;
 use Database\Seeders\ErrorRecoveryDemoSeeder;
 use Database\Seeders\OperationalMetricsDemoSeeder;
@@ -28,9 +28,13 @@ class RecoveryAndMetricsSeedingTest extends TestCase
     use RefreshDatabase;
 
     private User $superAdmin;
+
     private User $admin;
+
     private User $inventoryManager;
+
     private User $warehouseStaff;
+
     private User $pharmacyStaff;
 
     protected function setUp(): void
@@ -131,9 +135,15 @@ class RecoveryAndMetricsSeedingTest extends TestCase
 
     public function test_operational_metrics_demo_seeder_populates_reviews_and_adjustments(): void
     {
-        Supplier::create([
-            'name' => 'MedSupply Demonstration Corp',
-            'status' => 'active',
+        $reviewedSuppliers = collect([
+            ['name' => 'MedSupply Demonstration Corp', 'status' => 'active', 'standard_lead_time_days' => 5],
+            ['name' => 'Clinical Diagnostics Demo Inc', 'status' => 'active', 'standard_lead_time_days' => 10],
+            ['name' => 'Suspended Supplier Demo Corp', 'status' => 'suspended', 'standard_lead_time_days' => 7],
+        ])->map(fn (array $attributes) => Supplier::create($attributes));
+
+        $archivedSupplier = Supplier::create([
+            'name' => 'Archived Supplier Demo Corp',
+            'status' => 'archived',
         ]);
         $item = $this->createItem();
         $location = $this->createLocation();
@@ -144,7 +154,30 @@ class RecoveryAndMetricsSeedingTest extends TestCase
         $this->assertDatabaseHas('kpi_process_reviews', ['review_number' => 'REV-2026-Q3', 'status' => 'approved']);
         $this->assertDatabaseHas('kpi_process_reviews', ['review_number' => 'REV-2026-Q4', 'status' => 'submitted']);
 
-        $this->assertGreaterThanOrEqual(1, SupplierScorecard::count());
+        $approvedReview = KpiProcessReview::where('review_number', 'REV-2026-Q3')->firstOrFail();
+        $submittedReview = KpiProcessReview::where('review_number', 'REV-2026-Q4')->firstOrFail();
+
+        $this->assertSame($reviewedSuppliers->count(), $approvedReview->supplierScorecards()->count());
+        $this->assertSame(0, $submittedReview->supplierScorecards()->count());
+        $this->assertSame($reviewedSuppliers->count(), $approvedReview->metrics_summary['suppliers_evaluated']);
+        $this->assertSame(0, $submittedReview->metrics_summary['suppliers_evaluated']);
+
+        $calculatedScores = app(SupplierScoringService::class)
+            ->evaluate($approvedReview->period_start, $approvedReview->period_end)
+            ->keyBy('supplier_id');
+
+        foreach ($reviewedSuppliers as $supplier) {
+            $scorecard = $supplier->fresh()->latestApprovedScorecard;
+
+            $this->assertNotNull($scorecard);
+            $this->assertTrue($supplier->purchaseOrders()->exists());
+            $this->assertSame(
+                number_format($calculatedScores[$supplier->id]['total_score'], 2, '.', ''),
+                $scorecard->total_score
+            );
+        }
+
+        $this->assertNull($archivedSupplier->fresh()->latestApprovedScorecard);
         $this->assertGreaterThanOrEqual(1, ProcessRecommendation::count());
         $this->assertGreaterThanOrEqual(1, InventoryAdjustment::count());
 
@@ -173,6 +206,8 @@ class RecoveryAndMetricsSeedingTest extends TestCase
         $recoveryCount = SystemRecoveryRecord::count();
         $failedJobsCount = DB::table('failed_jobs')->count();
         $reviewCount = KpiProcessReview::count();
+        $scorecardCount = SupplierScorecard::count();
+        $purchaseOrderCount = DB::table('purchase_orders')->count();
         $adjustmentCount = InventoryAdjustment::count();
 
         // Second run
@@ -182,6 +217,8 @@ class RecoveryAndMetricsSeedingTest extends TestCase
         $this->assertSame($recoveryCount, SystemRecoveryRecord::count());
         $this->assertSame($failedJobsCount, DB::table('failed_jobs')->count());
         $this->assertSame($reviewCount, KpiProcessReview::count());
+        $this->assertSame($scorecardCount, SupplierScorecard::count());
+        $this->assertSame($purchaseOrderCount, DB::table('purchase_orders')->count());
         $this->assertSame($adjustmentCount, InventoryAdjustment::count());
     }
 
