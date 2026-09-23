@@ -10,7 +10,7 @@
             </div>
             <div class="flex items-center gap-2" x-data>
                 @can(\App\Enums\Permission::ManageLogisticsRecords->value)
-                <button @click="$dispatch('open-upload-modal')" class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-2xs hover:bg-primary-700 dark:hover:bg-primary-500 transition active:scale-[0.98]">
+                <button type="button" id="btn-upload-document" @click="$dispatch('open-upload-modal')" class="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-2xs hover:bg-primary-700 dark:hover:bg-primary-500 transition active:scale-[0.98] w-full sm:w-auto">
                     <x-ui.icon name="arrow-up-tray" class="h-4 w-4" />
                     <span>Upload Document</span>
                 </button>
@@ -558,13 +558,10 @@
                             </div>
 
                             <div>
-                                <div class="flex items-center justify-between">
-                                    <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">File Attachment (PDF or Image, max 15MB) *</label>
-                                    <span class="text-[11px] text-primary-700 dark:text-primary-400 font-medium">Camera Photo Supported</span>
-                                </div>
-                                <input type="file" name="file" required accept=".pdf,.png,.jpg,.jpeg,.webp" capture="environment"
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">File Attachment (PDF or Image, max 15MB) *</label>
+                                <input type="file" name="file" required accept=".pdf,.png,.jpg,.jpeg,.webp"
                                        class="mt-1 block w-full text-xs text-neutral-500 dark:text-neutral-400 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-primary-950/60 dark:file:text-primary-300 cursor-pointer">
-                                <p class="mt-1 text-[11px] text-neutral-400 dark:text-neutral-500">On mobile or tablet devices, tap to take a photo directly with the camera.</p>
+                                <p class="mt-1 text-[11px] text-neutral-400 dark:text-neutral-500">Supported formats: PDF, PNG, JPG, JPEG, WEBP (up to 15MB).</p>
                             </div>
 
                             <div>

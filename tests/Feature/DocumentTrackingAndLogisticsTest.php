@@ -874,6 +874,27 @@ class DocumentTrackingAndLogisticsTest extends TestCase
         $response->assertSee('Revise');
     }
 
+    public function test_documents_page_renders_single_functional_upload_button(): void
+    {
+        extract($this->createSetup());
+
+        $response = $this->actingAs($buyer)->get(route('inventory.logistics.documents'));
+        $response->assertOk();
+
+        $content = $response->getContent();
+
+        // Exactly one "Upload Document" button in the DOM
+        $this->assertSame(1, substr_count($content, 'Upload Document'), 'There should only be one Upload Document button.');
+
+        // Verify the single button is the functional header button
+        $response->assertSee('id="btn-upload-document"', false);
+        $response->assertSee('$dispatch(\'open-upload-modal\')', false);
+
+        // Verify the upload modal exists and is bound to open-upload-modal
+        $response->assertSee('@open-upload-modal.window="uploadModalOpen = true"', false);
+        $response->assertSee('Upload Logistics Document');
+    }
+
     public function test_shipments_page_renders_space_efficient_full_width_layout(): void
     {
         extract($this->createSetup());

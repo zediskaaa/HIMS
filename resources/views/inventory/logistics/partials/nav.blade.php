@@ -77,9 +77,6 @@
         @canany([\App\Enums\Permission::ManageLogisticsRecords->value, \App\Enums\Permission::ViewLogisticsSensitiveData->value])
             <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-neutral-100 dark:border-neutral-800">
                 @can(\App\Enums\Permission::ManageLogisticsRecords->value)
-                    <x-ui.button variant="primary" size="sm" :href="route('inventory.logistics.documents')" icon="arrow-up-tray" class="flex-1">
-                        Upload Document
-                    </x-ui.button>
                     <x-ui.button
                         variant="secondary"
                         size="sm"
@@ -276,9 +273,6 @@
         @canany([\App\Enums\Permission::ManageLogisticsRecords->value, \App\Enums\Permission::ViewLogisticsSensitiveData->value])
             <div class="flex items-center gap-2 flex-wrap">
                 @can(\App\Enums\Permission::ManageLogisticsRecords->value)
-                    <x-ui.button variant="primary" size="sm" :href="route('inventory.logistics.documents')" icon="arrow-up-tray">
-                        Upload Document
-                    </x-ui.button>
                     <x-ui.button
                         variant="secondary"
                         size="sm"
