@@ -49,11 +49,43 @@ class AdminAuthenticationTest extends TestCase
             ->assertDontSee('Privileged system access');
     }
 
+    public function test_super_admin_login_associates_invalid_credentials_with_the_field_error(): void
+    {
+        $superAdmin = User::factory()->superAdministrator()->create([
+            'password' => bcrypt('password'),
+        ]);
+
+        $this->from(route('super-admin.login'))
+            ->post(route('super-admin.login.store'), [
+                'email' => $superAdmin->email,
+                'password' => 'incorrect-password',
+            ])
+            ->assertRedirect(route('super-admin.login'))
+            ->assertSessionHasErrors('email');
+
+        $this->get(route('super-admin.login'))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'id="email"',
+                'aria-invalid="true"',
+                'aria-describedby="login-email-error"',
+                'id="login-email-error"',
+                'id="password"',
+                'aria-invalid="true"',
+                'aria-describedby="login-email-error"',
+            ], escape: false);
+
+        $this->assertGuest(AuthenticationContext::SUPER_ADMIN_GUARD);
+    }
+
     public function test_staff_login_keeps_its_existing_visual_identity(): void
     {
         $this->get(route('login'))
             ->assertOk()
             ->assertSee('Staff Sign in')
+            ->assertSee('bg-neutral-50 dark:bg-neutral-950', false)
+            ->assertSee('bg-neutral-100/95 dark:bg-neutral-900', false)
+            ->assertSee('data-theme-toggle', false)
             ->assertDontSee('Administrative access')
             ->assertDontSee('Privileged system access');
     }

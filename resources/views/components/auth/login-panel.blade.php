@@ -27,15 +27,15 @@
     }
 @endphp
 
-<div class="space-y-8">
+<div class="{{ $isSuperAdmin ? 'space-y-6' : 'space-y-8' }}">
     @if ($isSuperAdmin)
-        <header class="-mx-6 -mt-6 animate-fade-up border-b border-neutral-800 bg-neutral-950 px-6 py-7 text-white [animation-delay:320ms] sm:-mx-8 sm:-mt-8 sm:px-8">
+        <header class="animate-fade-up [animation-delay:320ms]">
             <div>
                 @if ($badge)
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-warning-500">{{ $badge }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-warning-700 dark:text-warning-400">{{ $badge }}</p>
                 @endif
-                <h1 class="{{ $badge ? 'mt-2' : '' }} text-3xl font-semibold tracking-tight text-white">{{ $heading }}</h1>
-                <p class="mt-3 max-w-sm text-sm leading-6 text-neutral-300">{{ $description }}</p>
+                <h1 class="{{ $badge ? 'mt-2' : '' }} text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl dark:text-neutral-100">{{ $heading }}</h1>
+                <p class="mt-3 max-w-sm text-sm leading-6 text-neutral-600 dark:text-neutral-400">{{ $description }}</p>
             </div>
         </header>
     @elseif ($isAdmin)
@@ -115,16 +115,18 @@
             <x-input-label for="email" :value="__('Email address')" class="text-neutral-700 dark:text-neutral-300" />
             <x-text-input
                 id="email"
-                class="mt-2 block h-11 w-full rounded-lg bg-white px-3.5 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 {{ $errors->has('email') ? '!border-danger-500 focus:!border-danger-500' : 'border-neutral-300 focus:border-primary-500' }}"
+                class="mt-2 block h-11 w-full rounded-lg border-neutral-300 bg-white px-3.5 text-sm text-neutral-900 shadow-xs placeholder:text-neutral-500 transition-colors focus:border-primary-600 focus:ring-2 focus:ring-primary-500/20 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-400 dark:focus:border-primary-400 dark:focus:ring-primary-400/25 {{ $errors->has('email') ? '!border-danger-500 focus:!border-danger-500 focus:!ring-danger-500/20 dark:!border-danger-500 dark:focus:!ring-danger-400/25' : '' }}"
                 type="email"
                 name="email"
                 :value="$loginEmail"
                 placeholder="name@hospital.org"
+                :aria-invalid="$errors->has('email') ? 'true' : 'false'"
+                :aria-describedby="$errors->has('email') ? 'login-email-error' : null"
                 required
                 autofocus
                 autocomplete="off"
             />
-            <x-input-error :messages="$errors->get('email')" class="mt-2 text-danger-600" />
+            <x-input-error id="login-email-error" :messages="$errors->get('email')" class="mt-2 text-danger-600" />
         </div>
 
         <div>
@@ -139,16 +141,18 @@
                 </style>
                 <x-text-input
                     id="password"
-                    class="block h-11 w-full rounded-lg bg-white px-3.5 pr-11 text-sm text-neutral-900 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 {{ $errors->has('email') || $errors->has('password') ? '!border-danger-500 focus:!border-danger-500' : 'border-neutral-300 focus:border-primary-500' }} focus:ring-primary-500"
+                    class="block h-11 w-full rounded-lg border-neutral-300 bg-white px-3.5 pr-11 text-sm text-neutral-900 shadow-xs placeholder:text-neutral-500 transition-colors focus:border-primary-600 focus:ring-2 focus:ring-primary-500/20 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-400 dark:focus:border-primary-400 dark:focus:ring-primary-400/25 {{ $errors->has('email') || $errors->has('password') ? '!border-danger-500 focus:!border-danger-500 focus:!ring-danger-500/20 dark:!border-danger-500 dark:focus:!ring-danger-400/25' : '' }}"
                     x-bind:type="showPassword ? 'text' : 'password'"
                     name="password"
+                    :aria-invalid="$errors->has('email') || $errors->has('password') ? 'true' : 'false'"
+                    :aria-describedby="$errors->has('password') ? 'login-password-error' : ($errors->has('email') ? 'login-email-error' : null)"
                     required
                     autocomplete="new-password"
                 />
 
                 <button
                     type="button"
-                    class="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-neutral-400 transition-colors hover:text-neutral-700 focus-visible:ring-inset dark:text-neutral-500 dark:hover:text-neutral-200"
+                    class="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-neutral-400 transition-colors hover:text-neutral-600 focus-visible:ring-inset dark:text-neutral-500 dark:hover:text-neutral-200"
                     x-on:click="showPassword = !showPassword"
                     x-bind:aria-label="showPassword ? 'Hide password' : 'Show password'"
                     x-bind:aria-pressed="showPassword"
@@ -158,11 +162,11 @@
                     <x-ui.icon name="eye-slash" class="h-5 w-5" x-show="showPassword" x-cloak />
                 </button>
             </div>
-            <x-input-error :messages="$errors->get('password')" class="mt-2 text-danger-600" />
+            <x-input-error id="login-password-error" :messages="$errors->get('password')" class="mt-2 text-danger-600" />
 
             <div class="mt-2">
                 <a
-                    class="rounded text-xs font-medium text-primary-600 transition-colors hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                    class="rounded text-xs font-medium text-primary-700 transition-colors hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-100 dark:text-primary-400 dark:hover:text-primary-300 dark:focus-visible:ring-offset-neutral-900"
                     href="{{ $forgotPasswordUrl }}"
                 >
                     {{ __('Forgot password?') }}
@@ -174,7 +178,7 @@
             type="submit"
             size="lg"
             data-loading-text="Signing in..."
-            class="w-full {{ $isSuperAdmin ? '!border-neutral-900 !bg-neutral-900 hover:!border-primary-950 hover:!bg-primary-950 focus-visible:!ring-warning-500 dark:!border-neutral-100 dark:!bg-neutral-100 dark:!text-neutral-900 dark:hover:!border-white dark:hover:!bg-white' : '' }}"
+            class="w-full"
         >
             {{ $submitLabel }}
         </x-ui.button>

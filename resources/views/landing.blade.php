@@ -3,122 +3,134 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="description" content="HIMS keeps hospital procurement, stock levels, and replenishment on one record — from warehouse to ward.">
+        <meta name="description" content="HIMS connects hospital procurement, central warehouse inventory, and ward replenishment on one operational record.">
         <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
         <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32x32.png') }}">
         <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('favicon-16x16.png') }}">
         <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
         <title>HIMS | Supply Chain &amp; Inventory Management</title>
+        @include('layouts.partials.theme-script')
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="bg-neutral-950 text-neutral-100 antialiased">
+    @php
+        $hasLogin = Route::has('login');
+        $dashboardUrl = $hasLogin && \App\Support\AuthenticationContext::authenticatedGuard() !== null
+            ? route(\App\Support\AuthenticationContext::dashboardRoute())
+            : null;
+    @endphp
+    <body class="min-h-screen bg-neutral-50 text-neutral-800 antialiased dark:bg-neutral-950 dark:text-neutral-100">
         <div class="relative min-h-screen overflow-hidden">
-            {{-- Decorative backdrop. Content and contrast remain intact without it. --}}
-            <div class="absolute inset-0 z-0" aria-hidden="true">
-                <img src="{{ asset('img/landingpage.jpg') }}" alt="" class="h-full w-full animate-slow-zoom object-cover object-center will-change-transform" />
-                <div class="absolute inset-0 bg-neutral-950/65"></div>
-                <div class="absolute inset-0 bg-gradient-to-r from-neutral-950 via-neutral-950/90 via-50% to-neutral-950/45"></div>
-                <div class="absolute inset-0 bg-gradient-to-b from-neutral-950/70 via-transparent to-neutral-950"></div>
-                <div class="absolute -left-24 top-24 h-80 w-80 animate-float-slow rounded-full bg-primary-600/20 blur-3xl will-change-transform"></div>
-                <div class="absolute right-0 top-1/3 h-96 w-96 animate-drift-slow rounded-full bg-primary-500/10 blur-3xl will-change-transform"></div>
+            <div class="absolute inset-0" aria-hidden="true">
+                <img src="{{ asset('img/landingpage.jpg') }}" alt="" class="h-full w-full animate-slow-zoom object-cover object-center will-change-transform grayscale opacity-[0.06] dark:opacity-[0.14]" />
+                <div class="absolute inset-0 bg-neutral-50/35 dark:bg-neutral-950/40"></div>
             </div>
 
-            <div class="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 lg:px-8">
-                <header class="flex animate-fade-in items-center justify-between border-b border-white/10 py-5">
-                    <a href="{{ url('/') }}" class="group flex items-center gap-3 rounded-lg focus-visible:ring-offset-neutral-950">
-                        <img src="{{ asset('img/hims-logo.png') }}" alt="" class="h-10 w-10 rounded-lg bg-white object-cover ring-1 ring-inset ring-white/20 transition duration-300 group-hover:scale-105 group-hover:ring-primary-300/40" />
-                        <span>
-                            <span class="block text-base font-semibold tracking-tight text-white">HIMS</span>
-                            <span class="hidden text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-400 sm:block">Hospital operations</span>
-                        </span>
-                    </a>
+            <div class="relative mx-auto flex min-h-screen w-full max-w-[1680px] flex-col px-5 sm:px-8 xl:px-12">
+            <header class="flex items-center justify-between gap-4 border-b border-neutral-200 py-4 dark:border-neutral-800">
+                <a href="{{ url('/') }}" class="flex min-w-0 items-center gap-2.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-50 dark:focus-visible:ring-offset-neutral-950">
+                    <img src="{{ asset('img/hims-logo.png') }}" alt="" class="h-10 w-10 shrink-0 rounded-lg bg-white object-cover ring-1 ring-inset ring-neutral-200 dark:ring-neutral-700">
+                    <span class="min-w-0">
+                        <span class="block text-base font-semibold leading-5 tracking-tight text-neutral-950 dark:text-neutral-50">HIMS</span>
+                        <span class="hidden text-[10px] font-medium uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400 sm:block">Hospital Operations</span>
+                    </span>
+                </a>
 
-                    @if (Route::has('login') && \App\Support\AuthenticationContext::authenticatedGuard() !== null)
-                        <nav aria-label="Account navigation">
-                            <a href="{{ route(\App\Support\AuthenticationContext::dashboardRoute()) }}" class="group inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition duration-300 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/15 focus-visible:ring-offset-neutral-950">
-                                Dashboard
-                                <x-ui.icon name="chevron-right" class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-                            </a>
-                        </nav>
+                <nav aria-label="Site navigation" class="flex shrink-0 items-center gap-2 sm:gap-3">
+                    <x-ui.theme-toggle size="sm" />
+                    @if ($dashboardUrl)
+                        <x-ui.button variant="secondary" size="sm" :href="$dashboardUrl">Dashboard</x-ui.button>
                     @endif
-                </header>
+                </nav>
+            </header>
 
-                <main class="flex flex-1 flex-col justify-center py-14 sm:py-16 lg:py-20">
-                    <div class="max-w-3xl">
-                        <section>
-                            {{-- Keep both phrases as plain text for the landing-page contract. --}}
-                            <h1 class="max-w-2xl animate-fade-up text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-white [animation-delay:240ms] sm:text-5xl lg:text-6xl">
-                                Supply Chain &amp; Inventory Management that keeps care moving.
-                            </h1>
-
-                            <p class="mt-6 max-w-xl animate-fade-up text-pretty text-base leading-7 text-neutral-300 [animation-delay:360ms] sm:text-lg sm:leading-8">
-                                Connect procurement, stock visibility, and replenishment in one dependable workspace—from the central warehouse to every ward.
-                            </p>
-
-                            @if (Route::has('login'))
-                                <div class="mt-9 flex animate-fade-up flex-col gap-4 [animation-delay:480ms] sm:flex-row sm:items-center">
-                                    @if (\App\Support\AuthenticationContext::authenticatedGuard() !== null)
-                                        <a href="{{ route(\App\Support\AuthenticationContext::dashboardRoute()) }}" class="group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary-950/30 transition duration-300 hover:-translate-y-0.5 hover:bg-primary-500 hover:shadow-xl hover:shadow-primary-950/40 focus-visible:ring-primary-400 focus-visible:ring-offset-neutral-950">
-                                            {{-- Light sweeps across the button on hover only, so nothing loops in the background. --}}
-                                            <span class="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-full" aria-hidden="true"></span>
-                                            <span class="relative">Open dashboard</span>
-                                        </a>
-                                    @else
-                                        <a href="{{ route('login') }}" class="group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary-950/30 transition duration-300 hover:-translate-y-0.5 hover:bg-primary-500 hover:shadow-xl hover:shadow-primary-950/40 focus-visible:ring-primary-400 focus-visible:ring-offset-neutral-950">
-                                            <span class="pointer-events-none absolute inset-0 -translate-x-full animate-sheen bg-gradient-to-r from-transparent via-white/20 to-transparent" aria-hidden="true"></span>
-                                            <span class="relative">Log in to HIMS</span>
-                                        </a>
-                                    @endif
-
-                                    <span class="inline-flex items-center justify-center gap-2 text-xs text-neutral-400 sm:justify-start">
-                                        <x-ui.icon name="shield-check" class="h-4 w-4 text-primary-300" />
-                                        Secure access for authorized staff
-                                    </span>
-                                </div>
-                            @endif
-
-                        </section>
+            <main class="flex flex-1 flex-col justify-center py-8 sm:py-10 lg:py-12">
+                <section aria-labelledby="landing-title" class="grid border-b border-neutral-200 dark:border-neutral-800 sm:grid-cols-2 xl:grid-cols-12">
+                    <div class="pb-7 pt-2 sm:col-span-2 xl:col-span-6 xl:pb-10 xl:pr-10 xl:pt-4">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.13em] text-primary-700 dark:text-primary-300">Supply Chain &amp; Inventory Management</p>
+                        <h1 id="landing-title" class="mt-5 max-w-3xl text-balance text-[2rem] font-semibold leading-[1.13] tracking-tight text-neutral-950 dark:text-neutral-50 sm:text-5xl sm:leading-[1.1] xl:text-[3.25rem]">
+                            From supply request to ward, every handoff has a record.
+                        </h1>
                     </div>
-                </main>
 
-                @php
-                    $features = [
-                        ['icon' => 'truck', 'title' => 'Procurement', 'body' => 'Move requests, supplier quotes, and purchase orders through one controlled process.'],
-                        ['icon' => 'cube', 'title' => 'Inventory control', 'body' => 'See batches, stock levels, and movement across warehouses, wards, and pharmacies.'],
-                        ['icon' => 'chart-bar', 'title' => 'Reporting', 'body' => 'Turn daily warehouse activity into clear planning and audit-ready reports.'],
-                    ];
-                @endphp
+                    <div class="border-t border-neutral-200 py-6 dark:border-neutral-800 sm:pr-8 xl:col-span-3 xl:border-l xl:border-t-0 xl:px-8 xl:py-4">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.13em] text-neutral-500 dark:text-neutral-400">Hospital Operations</p>
+                        <p class="mt-4 max-w-md text-sm leading-6 text-neutral-700 dark:text-neutral-300 sm:text-base sm:leading-7">
+                            HIMS connects procurement, central warehouse stock, inventory movement, and ward replenishment in one accountable workflow.
+                        </p>
+                        <p class="mt-5 inline-flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+                            <x-ui.icon name="shield-check" class="h-4 w-4 shrink-0 text-primary-700 dark:text-primary-300" />
+                            Secure access for authorized staff
+                        </p>
+                    </div>
 
-                <section class="grid border-y border-white/10 sm:grid-cols-3" aria-label="HIMS core capabilities">
-                    @foreach ($features as $index => $feature)
-                        {{-- Cards land left-to-right, picking up where the hero stagger ended. --}}
-                        <article
-                            class="group animate-fade-up py-6 sm:px-6 sm:first:pl-0 sm:last:pr-0 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-white/10 sm:[&:not(:last-child)]:border-b-0 sm:[&:not(:last-child)]:border-r"
-                            style="animation-delay: {{ 620 + $index * 120 }}ms"
-                        >
-                            <div class="flex items-start gap-4">
-                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-primary-300 ring-1 ring-inset ring-white/10 transition duration-300 group-hover:-translate-y-0.5 group-hover:scale-110 group-hover:bg-primary-400/10 group-hover:ring-primary-300/20">
-                                    <x-ui.icon :name="$feature['icon']" class="h-4 w-4" />
-                                </span>
-                                <div>
-                                    <h2 class="text-sm font-semibold text-white transition-colors duration-300 group-hover:text-primary-200">{{ $feature['title'] }}</h2>
-                                    <p class="mt-1.5 text-xs leading-5 text-neutral-400">{{ $feature['body'] }}</p>
-                                </div>
-                            </div>
-                        </article>
-                    @endforeach
+                    <div class="flex flex-col justify-between border-t border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 sm:border-l xl:col-span-3 xl:border-t-0">
+                        <div class="px-5 py-4 lg:px-6">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.13em] text-neutral-500 dark:text-neutral-400">System access</p>
+                            <p class="mt-4 text-lg font-semibold leading-6 text-neutral-900 dark:text-neutral-100">Continue to HIMS</p>
+                            <p class="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-400">Use your assigned hospital account.</p>
+                        </div>
+                        @if ($hasLogin)
+                            <a href="{{ $dashboardUrl ?? route('login') }}" class="group flex min-h-14 items-center justify-between gap-4 border-l-4 border-primary-600 bg-neutral-900 px-5 py-4 text-sm font-semibold text-white transition-colors hover:bg-neutral-800 active:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-100 dark:border-primary-400 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700 dark:active:bg-neutral-600 dark:focus-visible:ring-offset-neutral-900 lg:px-6">
+                                <span>{{ $dashboardUrl ? 'Open dashboard' : 'Log in to HIMS' }}</span>
+                                <x-ui.icon name="arrow-right" class="h-4 w-4 shrink-0 text-primary-300 transition-transform group-hover:translate-x-0.5 dark:text-primary-400" />
+                            </a>
+                        @endif
+                    </div>
                 </section>
 
-                <footer class="flex animate-fade-in flex-col gap-2 py-6 text-xs text-neutral-500 [animation-delay:900ms] sm:flex-row sm:items-center sm:justify-between">
-                    <p>&copy; {{ date('Y') }} HIMS — hospital supply chain operations.</p>
-                    <div class="flex items-center gap-4 text-neutral-400">
-                        <a href="{{ route('privacy.notice') }}" class="hover:text-neutral-200 transition-colors">Privacy Notice</a>
-                        <a href="{{ route('terms') }}" class="hover:text-neutral-200 transition-colors">Terms of Use</a>
-                        <span class="text-neutral-600 hidden sm:inline">&middot;</span>
-                        <p class="hidden sm:inline">From warehouse to ward, on one record.</p>
+                <section aria-labelledby="route-title" class="mt-6 sm:mt-10">
+                    <div class="flex items-end justify-between gap-4">
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.13em] text-primary-700 dark:text-primary-300">Operational scope</p>
+                            <h2 id="route-title" class="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100 sm:text-2xl">The hospital supply route</h2>
+                        </div>
                     </div>
-                </footer>
-            </div>
+
+                    <ol class="mt-4 grid grid-cols-3 border-y border-neutral-200 dark:border-neutral-800 md:grid-cols-10" aria-label="Hospital supply route stages">
+                        <li class="min-w-0 border-r border-neutral-200 py-5 pl-2 pr-2 dark:border-neutral-800 sm:px-5 md:col-span-3 lg:px-7">
+                            <div class="flex items-center gap-2 text-primary-700 dark:text-primary-300">
+                                <span class="font-mono text-xs font-semibold">01</span>
+                                <span class="h-px min-w-0 flex-1 bg-primary-300 dark:bg-primary-800" aria-hidden="true"></span>
+                            </div>
+                            <p class="mt-5 text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-500 dark:text-neutral-400">Request</p>
+                            <h3 class="mt-1 text-xs font-semibold leading-5 text-neutral-900 dark:text-neutral-100 sm:text-base lg:text-lg">Procurement</h3>
+                            <p class="mt-2 hidden max-w-xs text-sm leading-6 text-neutral-600 dark:text-neutral-400 sm:block">Supply requests, supplier quotes, and purchase orders.</p>
+                        </li>
+                        <li class="min-w-0 border-r border-neutral-200 bg-neutral-100 py-5 pl-2 pr-2 dark:border-neutral-800 dark:bg-neutral-900 sm:px-5 md:col-span-4 lg:px-7">
+                            <div class="flex items-center gap-2 text-primary-700 dark:text-primary-300">
+                                <span class="font-mono text-xs font-semibold">02</span>
+                                <span class="h-px min-w-0 flex-1 bg-primary-300 dark:bg-primary-800" aria-hidden="true"></span>
+                            </div>
+                            <p class="mt-5 text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-500 dark:text-neutral-400">Store &amp; control</p>
+                            <h3 class="mt-1 text-xs font-semibold leading-5 text-neutral-900 dark:text-neutral-100 sm:text-base lg:text-lg">Central warehouse</h3>
+                            <p class="mt-2 hidden max-w-sm text-sm leading-6 text-neutral-600 dark:text-neutral-400 sm:block">Receiving, storage locations, batches, and stock visibility.</p>
+                        </li>
+                        <li class="min-w-0 py-5 pl-2 pr-2 sm:px-5 md:col-span-3 lg:px-7">
+                            <div class="flex items-center gap-2 text-primary-700 dark:text-primary-300">
+                                <span class="font-mono text-xs font-semibold">03</span>
+                                <span class="h-px min-w-0 flex-1 bg-primary-300 dark:bg-primary-800" aria-hidden="true"></span>
+                            </div>
+                            <p class="mt-5 text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-500 dark:text-neutral-400">Move &amp; replenish</p>
+                            <h3 class="mt-1 text-xs font-semibold leading-5 text-neutral-900 dark:text-neutral-100 sm:text-base lg:text-lg">Ward supply</h3>
+                            <p class="mt-2 hidden max-w-xs text-sm leading-6 text-neutral-600 dark:text-neutral-400 sm:block">Stock movement from central stores to care units.</p>
+                        </li>
+                    </ol>
+
+                    <div class="grid gap-2 border-b border-neutral-200 py-4 dark:border-neutral-800 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] sm:gap-6">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-500 dark:text-neutral-400">Reporting &amp; accountability</p>
+                        <p class="text-sm leading-6 text-neutral-700 dark:text-neutral-300">Warehouse activity and inventory movement support planning and audit-ready reports.</p>
+                    </div>
+                </section>
+            </main>
+
+            <footer class="flex flex-col gap-3 py-5 text-xs text-neutral-500 dark:text-neutral-400 sm:flex-row sm:items-center sm:justify-between">
+                <p>&copy; {{ date('Y') }} HIMS &middot; Hospital Operations</p>
+                <div class="flex items-center gap-5">
+                    <a href="{{ route('privacy.notice') }}" class="rounded-sm transition-colors hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-neutral-100">Privacy Notice</a>
+                    <a href="{{ route('terms') }}" class="rounded-sm transition-colors hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-neutral-100">Terms of Use</a>
+                </div>
+            </footer>
+        </div>
         </div>
 
         @include('layouts.partials.loading-overlay')
