@@ -126,7 +126,11 @@
                     <div>
                         <p class="font-bold">Requisition Rejected</p>
                         <p class="text-xs text-rose-700 mt-0.5">
-                            Reason: {{ $requisition->rejection_reason ?? 'Administrative / budgetary rejection' }}
+                            @if(filled($requisition->rejection_reason))
+                                Reason: {{ $requisition->rejection_reason }}
+                            @else
+                                No rejection reason recorded.
+                            @endif
                         </p>
                     </div>
                 </div>
@@ -209,14 +213,16 @@
                     </div>
                     <div>
                         <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">Personnel &amp; Governance</p>
-                        <p class="mt-1 text-sm font-semibold text-neutral-900">Requester: {{ $requisition->requestingUser->name ?? 'System' }}</p>
+                        <p class="mt-1 text-sm font-semibold text-neutral-900">Requester: {{ $requisition->requestingUser->name ?? 'Not recorded' }}</p>
                         <p class="text-xs text-neutral-500">
                             @if($requisition->status === 'rejected' && $requisition->approvedBy)
                                 Decision: Rejected by {{ $requisition->approvedBy->name }} ({{ $requisition->approvedBy->role->label() }})
                             @elseif($requisition->approvedBy)
                                 Approver: {{ $requisition->approvedBy->name }} ({{ $requisition->approvedBy->role->label() }})
-                            @else
+                            @elseif(in_array($requisition->status, ['submitted', 'pending_approval'], true))
                                 Approver: Not assigned — pending an independent {{ implode(', ', $approverRoleLabels) }}
+                            @else
+                                Approver: Not recorded
                             @endif
                         </p>
                         @if($requisition->issuedBy)
@@ -232,7 +238,7 @@
                             {{ $requisition->urgency }}
                         </p>
                         <p class="text-xs text-neutral-500">
-                            Required by: {{ $requisition->required_date ? $requisition->required_date->format('M d, Y') : 'Immediate' }}
+                            Required by: {{ $requisition->required_date ? $requisition->required_date->format('M d, Y') : 'Not specified' }}
                         </p>
                     </div>
                 </div>
@@ -315,7 +321,7 @@
                                 <th class="px-6 py-3 font-medium">Allocation Rule</th>
                                 <th class="px-6 py-3 font-medium text-right">Requested Qty</th>
                                 <th class="px-6 py-3 font-medium text-right">Issued Qty</th>
-                                <th class="px-6 py-3 font-medium text-right">Unit Price</th>
+                                <th class="px-6 py-3 font-medium text-right">Current Catalog Cost</th>
                                 <th class="px-6 py-3 font-medium">Status</th>
                             </tr>
                         </thead>
@@ -342,7 +348,7 @@
                                         {{ number_format($line->issued_quantity) }}
                                     </td>
                                     <td class="px-6 py-4 text-right text-neutral-700">
-                                        ₱{{ number_format($line->unit_cost ?? $line->item->unit_cost ?? 0, 2) }}
+                                        {{ $line->item?->unit_cost !== null ? '₱' . number_format($line->item->unit_cost, 2) : 'Not recorded' }}
                                     </td>
                                     <td class="px-6 py-4">
                                         @if($line->issued_quantity >= $line->requested_quantity)
@@ -355,7 +361,7 @@
                                             </span>
                                         @else
                                             <span class="inline-flex items-center rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
-                                                Pending Pick
+                                                {{ ucfirst(str_replace('_', ' ', $line->line_status ?? 'pending')) }}
                                             </span>
                                         @endif
                                     </td>

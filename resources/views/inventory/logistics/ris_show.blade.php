@@ -35,24 +35,24 @@
                 <div class="mt-6 border-t border-b border-neutral-800 py-2 flex justify-between text-xs font-sans">
                     <div>
                         <span class="font-bold">Entity Name:</span>
-                        <span class="underline font-semibold ml-1">HOSPITAL INFORMATION MANAGEMENT SYSTEM</span>
+                        <span class="underline font-semibold ml-1">____________________</span>
                     </div>
                     <div>
                         <span class="font-bold">Fund Cluster:</span>
-                        <span class="underline font-semibold ml-1">01 - Regular Agency Fund</span>
+                        <span class="underline font-semibold ml-1">____________________</span>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 border-b border-neutral-800 text-xs font-sans">
                     <div class="border-r border-neutral-800 p-2 space-y-1">
-                        <div><span class="font-bold">Division:</span> {{ $requisition->costCenter->department ?? 'Clinical Services' }}</div>
-                        <div><span class="font-bold">Office:</span> {{ $requisition->costCenter->name ?? 'Ward Pharmacy' }}</div>
-                        <div><span class="font-bold">Responsibility Center Code:</span> {{ $requisition->costCenter->code ?? 'RCC-2001' }}</div>
+                        <div><span class="font-bold">Division:</span> {{ $requisition->department }}</div>
+                        <div><span class="font-bold">Office:</span> {{ $requisition->costCenter?->name ?? '____________________' }}</div>
+                        <div><span class="font-bold">Responsibility Center Code:</span> {{ $requisition->costCenter?->code ?? '____________________' }}</div>
                     </div>
                     <div class="p-2 space-y-1">
                         <div><span class="font-bold">RIS No.:</span> <span class="font-mono font-bold">{{ $requisition->requisition_number }}</span></div>
                         <div><span class="font-bold">Date:</span> {{ $requisition->created_at->format('F d, Y') }}</div>
-                        <div><span class="font-bold">Status:</span> {{ ucwords($requisition->status) }}</div>
+                        <div><span class="font-bold">Status:</span> {{ ucwords(str_replace('_', ' ', $requisition->status)) }}</div>
                     </div>
                 </div>
 
@@ -79,17 +79,19 @@
                         <tbody class="divide-y divide-neutral-300">
                             @forelse($requisition->lines as $idx => $line)
                                 <tr>
-                                    <td class="border-r border-neutral-800 px-3 py-2 text-center font-mono">{{ $idx + 1 }}</td>
-                                    <td class="border-r border-neutral-800 px-3 py-2 text-center uppercase">{{ $line->item->unit_of_measure ?? 'pcs' }}</td>
+                                    <td class="border-r border-neutral-800 px-3 py-2 text-center font-mono">{{ $line->item?->sku }}</td>
+                                    <td class="border-r border-neutral-800 px-3 py-2 text-center uppercase">{{ $line->item?->unit }}</td>
                                     <td class="border-r border-neutral-800 px-3 py-2">
-                                        <div class="font-bold text-neutral-900">{{ $line->item->name ?? 'Supply Item' }}</div>
-                                        <div class="text-[10px] text-neutral-500 font-mono">SKU: {{ $line->item->sku ?? 'N/A' }}</div>
+                                        <div class="font-bold text-neutral-900">{{ $line->item?->name }}</div>
+                                        @if($line->notes)
+                                            <div class="text-[10px] text-neutral-500">{{ $line->notes }}</div>
+                                        @endif
                                     </td>
-                                    <td class="border-r border-neutral-800 px-3 py-2 text-right font-mono font-bold">{{ $line->quantity_requested }}</td>
-                                    <td class="border-r border-neutral-800 px-2 py-2 text-center font-bold">[X]</td>
+                                    <td class="border-r border-neutral-800 px-3 py-2 text-right font-mono font-bold">{{ $line->requested_quantity }}</td>
                                     <td class="border-r border-neutral-800 px-2 py-2 text-center font-bold">[ ]</td>
-                                    <td class="border-r border-neutral-800 px-3 py-2 text-right font-mono font-bold">{{ $line->quantity_issued ?? $line->quantity_requested }}</td>
-                                    <td class="px-3 py-2 text-[10px] text-neutral-600">{{ $line->remarks ?? 'Issued in good condition' }}</td>
+                                    <td class="border-r border-neutral-800 px-2 py-2 text-center font-bold">[ ]</td>
+                                    <td class="border-r border-neutral-800 px-3 py-2 text-right font-mono font-bold">{{ $line->issued_quantity }}</td>
+                                    <td class="px-3 py-2 text-[10px] text-neutral-600"></td>
                                 </tr>
                             @empty
                                 <tr>
@@ -103,7 +105,7 @@
                 {{-- Purpose Section --}}
                 <div class="border-b border-neutral-800 p-3 text-xs font-sans">
                     <span class="font-bold">Purpose:</span>
-                    <span class="ml-1 text-neutral-800">{{ $requisition->remarks ?? 'Ward patient care and medical operational stock replenishment.' }}</span>
+                    <span class="ml-1 text-neutral-800">{{ $requisition->justification }}</span>
                 </div>
 
                 {{-- QUADRUPLE STATUTORY SIGNATURE EXECUTION (COA GAM App. 63) --}}
@@ -118,7 +120,7 @@
                             <div class="text-[9px] text-center text-neutral-600 mt-1 uppercase">Printed Name & Signature</div>
                         </div>
                         <div class="mt-4 text-[10px]">
-                            <div>Designation: Nurse / Ward Officer</div>
+                            <div>Designation: ____________________</div>
                             <div>Date: {{ $requisition->created_at->format('m/d/Y') }}</div>
                         </div>
                     </div>
@@ -133,7 +135,7 @@
                             <div class="text-[9px] text-center text-neutral-600 mt-1 uppercase">Printed Name & Signature</div>
                         </div>
                         <div class="mt-4 text-[10px]">
-                            <div>Designation: Dept Head / Supervisor</div>
+                            <div>Designation: ____________________</div>
                             <div>Date: {{ $requisition->approved_at?->format('m/d/Y') ?? '___________' }}</div>
                         </div>
                     </div>
@@ -143,13 +145,13 @@
                         <div>
                             <div class="font-bold uppercase text-[10px] text-neutral-500 mb-4">Issued By:</div>
                             <div class="border-b border-neutral-800 pb-1 text-center font-bold">
-                                {{ auth()->user()->name ?? '____________________' }}
+                                {{ $requisition->issuedBy?->name ?? '____________________' }}
                             </div>
                             <div class="text-[9px] text-center text-neutral-600 mt-1 uppercase">Printed Name & Signature</div>
                         </div>
                         <div class="mt-4 text-[10px]">
-                            <div>Designation: Store Custodian</div>
-                            <div>Date: {{ date('m/d/Y') }}</div>
+                            <div>Designation: ____________________</div>
+                            <div>Date: {{ $requisition->issued_at?->format('m/d/Y') ?? '___________' }}</div>
                         </div>
                     </div>
 
@@ -158,13 +160,13 @@
                         <div>
                             <div class="font-bold uppercase text-[10px] text-neutral-500 mb-4">Received By:</div>
                             <div class="border-b border-neutral-800 pb-1 text-center font-bold">
-                                {{ $requisition->requestingUser->name ?? '____________________' }}
+                                {{ $requisition->acknowledgedBy?->name ?? '____________________' }}
                             </div>
                             <div class="text-[9px] text-center text-neutral-600 mt-1 uppercase">Printed Name & Signature</div>
                         </div>
                         <div class="mt-4 text-[10px]">
-                            <div>Designation: Requisitioner</div>
-                            <div>Date: {{ date('m/d/Y') }}</div>
+                            <div>Designation: ____________________</div>
+                            <div>Date: {{ $requisition->acknowledged_at?->format('m/d/Y') ?? '___________' }}</div>
                         </div>
                     </div>
                 </div>

@@ -61,7 +61,7 @@
                     <div>
                         <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">Carrier Logistics</p>
                         <p class="mt-1 text-sm font-semibold text-neutral-900">
-                            {{ $goodsReceiptNote->carrier_name ?? 'Internal Logistics' }}
+                            {{ $goodsReceiptNote->carrier_name ?: 'Not recorded' }}
                         </p>
                         <p class="text-xs text-neutral-500">
                             Waybill: {{ $goodsReceiptNote->waybill_number ?? 'N/A' }} | Slip: {{ $goodsReceiptNote->packing_slip_number ?? 'N/A' }}
@@ -138,7 +138,7 @@
                                                 {{ $line->expiry_date->format('M d, Y') }}
                                             </span>
                                         @else
-                                            <span class="text-neutral-400">Non-expiring</span>
+                                            <span class="text-neutral-400">Not recorded</span>
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-right font-semibold text-neutral-900">

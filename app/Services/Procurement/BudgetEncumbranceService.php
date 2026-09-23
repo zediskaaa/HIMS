@@ -45,16 +45,7 @@ class BudgetEncumbranceService
                 ->first();
 
             if (! $budget) {
-                // Auto-seed an initial departmental operating budget if none exists for demo/test isolation
-                $budget = CostCenterBudget::create([
-                    'cost_center_id' => $request->cost_center_id,
-                    'fiscal_year' => $year,
-                    'allocated_budget' => 10000000.00,
-                    'soft_encumbered' => 0,
-                    'hard_encumbered' => 0,
-                    'spent_amount' => 0,
-                    'currency' => $request->currency ?? 'PHP',
-                ]);
+                throw new DomainException("No budget configured for Cost Center #{$request->cost_center_id} in fiscal year {$year}.");
             }
 
             $amount = (float) $request->total_estimated_amount;
@@ -100,12 +91,15 @@ class BudgetEncumbranceService
     public function convertSoftToHardEncumbrance(PurchaseOrder $po): void
     {
         DB::transaction(function () use ($po) {
-            $costCenterId = $po->cost_center_id
-                ?? $po->purchaseRequest?->cost_center_id
-                ?? CostCenter::query()->orderBy('id')->value('id');
+            $purchaseRequest = $po->purchaseRequest;
+            $costCenterId = $po->cost_center_id ?? $purchaseRequest?->cost_center_id;
 
             if (! $costCenterId) {
-                return;
+                throw new DomainException("No cost center assigned to Purchase Order {$po->po_number}.");
+            }
+
+            if ($purchaseRequest && $purchaseRequest->cost_center_id !== $costCenterId) {
+                throw new DomainException("Purchase Order {$po->po_number} and its purchase request have different cost centers.");
             }
 
             $year = (int) ($po->requested_at?->format('Y') ?? date('Y'));
@@ -116,22 +110,28 @@ class BudgetEncumbranceService
                 ->first();
 
             if (! $budget) {
-                $budget = CostCenterBudget::create([
-                    'cost_center_id' => $costCenterId,
-                    'fiscal_year' => $year,
-                    'allocated_budget' => 10000000.00,
-                    'soft_encumbered' => 0,
-                    'hard_encumbered' => 0,
-                    'spent_amount' => 0,
-                    'currency' => $po->currency ?? 'PHP',
-                ]);
+                throw new DomainException("No budget configured for Cost Center #{$costCenterId} in fiscal year {$year}.");
             }
 
             $poAmount = (float) ($po->total_encumbered_amount > 0 ? $po->total_encumbered_amount : $po->total_amount);
-            $prAmount = (float) ($po->purchaseRequest?->total_estimated_amount ?? $poAmount);
+            $prAmount = (float) ($purchaseRequest?->total_estimated_amount ?? 0);
+
+            if ($prAmount > (float) $budget->soft_encumbered) {
+                throw new DomainException("The purchase request's soft commitment is not available in Cost Center #{$costCenterId}.");
+            }
+
+            $availableAfterRelease = (float) $budget->allocated_budget
+                - (float) $budget->soft_encumbered
+                - (float) $budget->hard_encumbered
+                - (float) $budget->spent_amount
+                + $prAmount;
+
+            if ($poAmount > $availableAfterRelease) {
+                throw new DomainException("Insufficient budget in Cost Center #{$costCenterId} for Purchase Order {$po->po_number}.");
+            }
 
             // Release the soft commitment and post hard encumbrance
-            $budget->soft_encumbered = max(0, $budget->soft_encumbered - $prAmount);
+            $budget->soft_encumbered -= $prAmount;
             $budget->hard_encumbered += $poAmount;
             $budget->save();
 

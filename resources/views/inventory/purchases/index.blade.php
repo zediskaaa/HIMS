@@ -427,7 +427,8 @@
                          prUnitPrice: 45.00,
                          prSelectedCost: 0,
                          prSelectedUom: 'units',
-                         prSelectedBudget: 0,
+                         prSelectedBudget: null,
+                         prCostCenterSelected: false,
                          prItemChanged(event) {
                              const opt = event.target.options[event.target.selectedIndex];
                              if (opt && opt.dataset.cost) {
@@ -437,9 +438,8 @@
                          },
                          prCostCenterChanged(event) {
                              const opt = event.target.options[event.target.selectedIndex];
-                             if (opt && opt.dataset.budget) {
-                                 this.prSelectedBudget = parseFloat(opt.dataset.budget);
-                             }
+                             this.prCostCenterSelected = !!opt?.value;
+                             this.prSelectedBudget = opt?.dataset.budget ? parseFloat(opt.dataset.budget) : null;
                          },
                          get prTotalEstimated() {
                              const q = parseFloat(this.prQuantity) || 0;
@@ -447,7 +447,7 @@
                              return (q * p).toFixed(2);
                          },
                          get isBudgetExceeded() {
-                             return this.prSelectedBudget > 0 && parseFloat(this.prTotalEstimated) > this.prSelectedBudget;
+                             return this.prSelectedBudget !== null && parseFloat(this.prTotalEstimated) > this.prSelectedBudget;
                          }
                      }">
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-neutral-100 pb-4 gap-2">
@@ -481,9 +481,9 @@
                             <select name="cost_center_id" @change="prCostCenterChanged($event)" class="w-full rounded-lg border border-neutral-300 pl-3 pr-10 py-2 text-sm focus:border-primary-500 focus:ring-primary-500" required>
                                 <option value="">Select Cost Center</option>
                                 @foreach($costCenters as $cc)
-                                    @php $avail = $cc->currentBudget()?->availableBudget() ?? 1000000; @endphp
-                                    <option value="{{ $cc->id }}" data-budget="{{ $avail }}">
-                                        {{ $cc->name }} ({{ $cc->code }}) — Avail: ₱{{ number_format($avail, 2) }}
+                                    @php $budget = $cc->currentBudget(); @endphp
+                                    <option value="{{ $cc->id }}" data-budget="{{ $budget?->availableBudget() }}">
+                                        {{ $cc->name }} ({{ $cc->code }}) — {{ $budget ? 'Avail: ' . ($budget->currency === 'PHP' ? '₱' : $budget->currency . ' ') . number_format($budget->availableBudget(), 2) : 'No budget configured' }}
                                     </option>
                                 @endforeach
                             </select>
@@ -578,6 +578,9 @@
                             <div x-show="isBudgetExceeded" class="rounded-md bg-rose-50 border border-rose-200 px-3 py-1.5 text-xs text-rose-700 font-semibold flex items-center gap-1.5">
                                 <svg class="h-4 w-4 shrink-0 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                 <span>Warning: Total exceeds selected Cost Center uncommitted budget!</span>
+                            </div>
+                            <div x-show="prCostCenterSelected && prSelectedBudget === null" class="rounded-md bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs text-amber-700 font-semibold">
+                                No budget configured for the selected Cost Center.
                             </div>
                             <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-primary-700">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>

@@ -273,6 +273,33 @@ class CameraScanWorkflowTest extends TestCase
             ->assertSee('Scan Surgical Implant Serial / DataMatrix');
     }
 
+    public function test_consignment_balance_does_not_claim_fda_registration_without_a_reference(): void
+    {
+        $staff = User::factory()->warehouseStaff()->create();
+        $location = StorageLocation::create([
+            'name' => 'Operating Suite Storage',
+            'code' => 'OR-STORAGE',
+            'status' => 'active',
+        ]);
+        $item = InventoryItem::create([
+            'name' => 'Consignment Orthopedic Implant',
+            'sku' => 'IMPLANT-ORTHO-01',
+            'is_consignment' => true,
+            'status' => 'active',
+        ]);
+        ItemStockLevel::create([
+            'item_id' => $item->id,
+            'storage_location_id' => $location->id,
+            'quantity' => 2,
+        ]);
+
+        $this->actingAs($staff)->get(route('inventory.warehousing.consignment'))
+            ->assertOk()
+            ->assertSee('Consignment Orthopedic Implant')
+            ->assertSee('Not recorded')
+            ->assertDontSee('MDR-Registered');
+    }
+
     public function test_cycle_count_show_renders_shelf_scanner(): void
     {
         $staff = User::factory()->warehouseStaff()->create();

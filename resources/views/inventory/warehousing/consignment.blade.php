@@ -77,7 +77,7 @@
                                         {{ $b->location?->code }} ({{ $b->location?->name }})
                                     </td>
                                     <td class="px-6 py-3.5 font-mono text-xs text-neutral-600">
-                                        {{ $b->item?->fda_cpr_number ?? 'MDR-Registered' }}
+                                        {{ $b->item?->fda_cpr_number ?: 'Not recorded' }}
                                     </td>
                                     <td class="px-6 py-3.5 font-mono text-xs text-neutral-900">
                                         ₱{{ number_format($b->item?->unit_cost ?? 0, 2) }}

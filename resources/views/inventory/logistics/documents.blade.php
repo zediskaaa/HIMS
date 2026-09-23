@@ -164,7 +164,7 @@
                                         'file_name' => $doc->original_name ?: $doc->file_name,
                                         'file_size' => number_format($doc->file_size_bytes / 1024, 1) . ' KB',
                                         'file_ext' => strtoupper(pathinfo($doc->file_name, PATHINFO_EXTENSION)),
-                                        'retention' => $doc->retention_until?->format('M d, Y') ?? 'Permanent',
+                                        'retention' => $doc->retention_until?->format('M d, Y') ?? 'Not recorded',
                                         'uploaded_by' => $doc->uploadedBy->name ?? 'System',
                                         'uploaded_at' => $doc->created_at->format('M d, Y h:i A'),
                                         'status' => $doc->status,
@@ -240,7 +240,7 @@
                                                 {{ number_format($doc->file_size_bytes / 1024, 1) }} KB • {{ strtoupper(pathinfo($doc->file_name, PATHINFO_EXTENSION)) }}
                                             </div>
                                             <div class="text-[10px] text-neutral-400 dark:text-neutral-500">
-                                                NAP: Retain until <span class="font-medium text-neutral-600 dark:text-neutral-300">{{ $doc->retention_until?->format('Y-m-d') ?? 'Permanent' }}</span>
+                                                NAP: <span class="font-medium text-neutral-600 dark:text-neutral-300">{{ $doc->retention_until ? 'Retain until '.$doc->retention_until->format('Y-m-d') : 'Retention date not recorded' }}</span>
                                             </div>
                                         </div>
                                     </td>

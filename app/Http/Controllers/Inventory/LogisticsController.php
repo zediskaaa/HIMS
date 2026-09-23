@@ -596,6 +596,8 @@ class LogisticsController extends Controller implements HasMiddleware
             'lines.item',
             'requestingUser',
             'approvedBy',
+            'issuedBy',
+            'acknowledgedBy',
             'costCenter',
         ]);
 

@@ -1,7 +1,7 @@
 <x-app-layout>
     <div class="space-y-6" x-data="{
         newRequisitionModal: {{ ($errors->any() || $preselectedItem) ? 'true' : 'false' }},
-        selectedDepartment: '{{ old('department', (auth()->user()->department && isset($departmentCostCenterMap[auth()->user()->department])) ? auth()->user()->department : 'Emergency') }}',
+        selectedDepartment: {{ Js::from($selectedDepartment) }},
         departmentCostCenterMap: {{ Js::from($departmentCostCenterMap) }},
         assignedCostCenter() {
             if (!this.selectedDepartment) return null;

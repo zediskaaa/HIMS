@@ -157,8 +157,8 @@
                                 <td class="px-5 py-3.5 align-top text-xs">
                                     <div class="flex items-center gap-1.5 font-semibold text-neutral-900 dark:text-neutral-100">
                                         <x-ui.icon name="map-pin" class="h-3.5 w-3.5 shrink-0 text-primary-500 dark:text-primary-400" />
-                                        <span class="truncate" title="{{ $log->destination_location ?? ($log->origin_location ?? 'Facility Dock') }}">
-                                            {{ $log->destination_location ?? ($log->origin_location ?? 'Facility Dock') }}
+                                        <span class="truncate" title="{{ $log->destination_location ?: ($log->origin_location ?: 'Not recorded') }}">
+                                            {{ $log->destination_location ?: ($log->origin_location ?: 'Not recorded') }}
                                         </span>
                                     </div>
                                     @if($log->origin_location && $log->destination_location && $log->origin_location !== $log->destination_location)

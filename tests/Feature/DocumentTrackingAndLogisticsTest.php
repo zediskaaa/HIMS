@@ -1037,5 +1037,54 @@ class DocumentTrackingAndLogisticsTest extends TestCase
         $response->assertSee('Condition: Good Order');
         $response->assertSee('HIMS Dock Handheld Console');
     }
-}
 
+    public function test_missing_logistics_metadata_is_not_presented_as_known_facts(): void
+    {
+        extract($this->createSetup());
+
+        LogisticsDocument::create([
+            'tracking_number' => 'DOC-MISSING-RETENTION-01',
+            'document_type' => DocumentType::DeliveryReceipt,
+            'title' => 'Delivery receipt pending retention review',
+            'file_name' => 'delivery-receipt.pdf',
+            'file_path' => 'logistics/documents/delivery-receipt.pdf',
+            'file_size_bytes' => 1024,
+            'sha256_checksum' => hash('sha256', 'delivery-receipt'),
+            'uploaded_by_id' => $buyer->id,
+        ]);
+        $receipt = GoodsReceiptNote::create([
+            'grn_number' => 'GRN-MISSING-METADATA-01',
+            'supplier_id' => $supplier->id,
+            'received_by_id' => $buyer->id,
+            'received_at' => now(),
+            'receipt_status' => 'received',
+        ]);
+        GoodsReceiptNoteLine::create([
+            'goods_receipt_note_id' => $receipt->id,
+            'item_id' => $item->id,
+            'received_quantity' => 1,
+            'unit_cost' => 1000,
+        ]);
+        ChainOfCustodyLog::create([
+            'custody_number' => 'COC-MISSING-LOCATION-01',
+            'trackable_type' => Supplier::class,
+            'trackable_id' => $supplier->id,
+            'event_type' => 'dock_arrival',
+            'transferred_at' => now(),
+        ]);
+
+        $this->actingAs($buyer)->get(route('inventory.logistics.documents'))
+            ->assertOk()
+            ->assertSee('Retention date not recorded')
+            ->assertDontSee('Permanent');
+        $this->actingAs($buyer)->get(route('inventory.receiving.show', $receipt))
+            ->assertOk()
+            ->assertSee('Not recorded')
+            ->assertDontSee('Internal Logistics')
+            ->assertDontSee('Non-expiring');
+        $this->actingAs($buyer)->get(route('inventory.logistics.chain-of-custody'))
+            ->assertOk()
+            ->assertSee('Not recorded')
+            ->assertDontSee('Facility Dock');
+    }
+}

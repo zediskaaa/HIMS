@@ -58,25 +58,16 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
 
         $items = InventoryItem::active()->orderBy('name')->get();
         $costCenters = CostCenter::where('is_active', true)->orderBy('name')->get();
-        $departments = CostCenter::where('is_active', true)
-            ->whereNotNull('department')
-            ->distinct()
-            ->pluck('department')
-            ->concat([
-                'Emergency',
-                'Operating Room (OR)',
-                'Intensive Care Unit (ICU)',
-                'Pharmacy',
-                'Laboratory',
-                'Central Supply',
-                'Inpatient Ward',
-                'Outpatient Clinic',
-            ])
-            ->filter()
+        $departments = $costCenters->pluck('department')
+            ->filter(fn ($department) => trim((string) $department) !== '')
             ->unique()
+            ->sort()
             ->values();
 
         $departmentCostCenterMap = CostCenter::getDepartmentCostCenterMap($departments);
+        $selectedDepartment = old('department', isset($departmentCostCenterMap[$request->user()->department])
+            ? $request->user()->department
+            : '');
 
         $requisitionMetrics = [
             'total' => MaterialRequisition::count(),
@@ -108,6 +99,7 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
             'costCenters',
             'departments',
             'departmentCostCenterMap',
+            'selectedDepartment',
             'requisitionMetrics',
             'approverRoleLabels',
             'preselectedItem',

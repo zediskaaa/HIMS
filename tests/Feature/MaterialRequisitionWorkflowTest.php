@@ -737,16 +737,27 @@ class MaterialRequisitionWorkflowTest extends TestCase
 
     public function test_department_to_cost_center_map_is_passed_to_index_view(): void
     {
-        $user = $this->createPharmacyUser();
+        $user = User::factory()->pharmacyStaff()->create(['department' => 'Administration']);
         $this->createItem();
+        CostCenter::create([
+            'code' => 'CC-CENTRAL-INACTIVE',
+            'name' => 'Central Supply',
+            'department' => 'Central Supply',
+            'is_active' => false,
+        ]);
 
         $response = $this->actingAs($user)->get(route('inventory.requisitions.index'));
 
         $response->assertOk();
         $response->assertViewHas('departmentCostCenterMap');
+        $this->assertSame('', $response->viewData('selectedDepartment'));
 
         $map = $response->viewData('departmentCostCenterMap');
         $this->assertIsArray($map);
+        $this->assertSame(
+            ['Emergency', 'Laboratory', 'Nursing', 'Pharmacy', 'Surgery'],
+            $response->viewData('departments')->all()
+        );
 
         // Emergency resolves to CC-ER
         $this->assertArrayHasKey('Emergency', $map);
@@ -754,14 +765,8 @@ class MaterialRequisitionWorkflowTest extends TestCase
         $this->assertSame('CC-ER', $map['Emergency']['code']);
         $this->assertStringContainsString('Emergency & Trauma Department', $map['Emergency']['display']);
 
-        // Operating Room (OR) resolves to CC-OR
-        $this->assertArrayHasKey('Operating Room (OR)', $map);
-        $this->assertNotNull($map['Operating Room (OR)']);
-        $this->assertSame('CC-OR', $map['Operating Room (OR)']['code']);
-
-        // Department without Cost Center maps to null
-        $this->assertArrayHasKey('Central Supply', $map);
-        $this->assertNull($map['Central Supply']);
+        $this->assertArrayNotHasKey('Operating Room (OR)', $map);
+        $this->assertArrayNotHasKey('Central Supply', $map);
     }
 
     public function test_backend_rejects_submitting_mismatched_department_and_cost_center(): void
