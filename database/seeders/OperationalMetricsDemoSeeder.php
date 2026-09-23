@@ -51,10 +51,92 @@ class OperationalMetricsDemoSeeder extends Seeder
                 'qualitative_context' => 'Quarterly multi-department review assessing DOH Drug Price Reference Index (DPRI) price ceilings, critical antibiotic batch replenishment, cold chain compliance, and hospital inventory shrinkage.',
                 'executive_summary' => 'Procurement realized ₱42,500 savings under DPRI ceilings across essential anti-infectives and analgesics. Inventory shrinkage was maintained below the 0.35% hospital tolerance threshold.',
                 'metrics_summary' => [
+                    'total_spend' => 1250000.00,
+                    'total_spend_evaluated' => 1250000.00,
+                    'net_savings_amount' => 42500.00,
+                    'aggregate_savings_pct' => 3.4,
                     'dpri_compliance_pct' => 98.4,
                     'fill_rate_pct' => 94.8,
                     'on_time_delivery_pct' => 92.1,
-                    'total_spend_evaluated' => 1250000.00,
+                    'ceiling_breaches_count' => 0,
+                    'suppliers_evaluated' => 3,
+                    'avg_supplier_score' => 91.7,
+                    'overall_stock_accuracy' => 99.6,
+                    'critical_bottleneck' => [
+                        'key' => 'stage_3_po_conforme',
+                        'name' => 'PO Issuance to Conforme',
+                        'mean_tat_days' => 2.8,
+                        'sla_target_days' => 2.0,
+                        'variance_sigma' => 1.42,
+                    ],
+                    'bottleneck_stages' => [
+                        'stage_1_pr_approval' => [
+                            'name' => 'PR Creation to Approval',
+                            'sample_count' => 18,
+                            'mean_tat_days' => 2.40,
+                            'min_tat_days' => 0.80,
+                            'max_tat_days' => 4.50,
+                            'variance_sigma' => 1.15,
+                            'sla_target_days' => 3.0,
+                            'sla_breach_rate' => 5.56,
+                            'status' => 'healthy',
+                        ],
+                        'stage_2_sourcing_award' => [
+                            'name' => 'Sourcing RFQ to Award',
+                            'sample_count' => 8,
+                            'mean_tat_days' => 5.80,
+                            'min_tat_days' => 3.00,
+                            'max_tat_days' => 9.20,
+                            'variance_sigma' => 1.85,
+                            'sla_target_days' => 7.0,
+                            'sla_breach_rate' => 12.50,
+                            'status' => 'healthy',
+                        ],
+                        'stage_3_po_conforme' => [
+                            'name' => 'PO Issuance to Conforme',
+                            'sample_count' => 24,
+                            'mean_tat_days' => 2.80,
+                            'min_tat_days' => 1.00,
+                            'max_tat_days' => 5.50,
+                            'variance_sigma' => 1.42,
+                            'sla_target_days' => 2.0,
+                            'sla_breach_rate' => 25.00,
+                            'status' => 'elevated',
+                        ],
+                        'stage_4_vendor_lead_time' => [
+                            'name' => 'Dispatch to Gate Arrival (Lead Time)',
+                            'sample_count' => 26,
+                            'mean_tat_days' => 5.40,
+                            'min_tat_days' => 2.00,
+                            'max_tat_days' => 8.50,
+                            'variance_sigma' => 1.95,
+                            'sla_target_days' => 10.0,
+                            'sla_breach_rate' => 0.00,
+                            'status' => 'healthy',
+                        ],
+                        'stage_5_technical_inspection' => [
+                            'name' => 'Receiving to Technical Inspection',
+                            'sample_count' => 26,
+                            'mean_tat_days' => 0.80,
+                            'min_tat_days' => 0.20,
+                            'max_tat_days' => 1.50,
+                            'variance_sigma' => 0.35,
+                            'sla_target_days' => 1.0,
+                            'sla_breach_rate' => 3.85,
+                            'status' => 'healthy',
+                        ],
+                        'stage_6_custodial_acceptance' => [
+                            'name' => 'Inspection to Custodial Acceptance',
+                            'sample_count' => 26,
+                            'mean_tat_days' => 0.60,
+                            'min_tat_days' => 0.10,
+                            'max_tat_days' => 1.20,
+                            'variance_sigma' => 0.25,
+                            'sla_target_days' => 1.0,
+                            'sla_breach_rate' => 0.00,
+                            'status' => 'healthy',
+                        ],
+                    ],
                 ],
             ]
         );
@@ -70,11 +152,94 @@ class OperationalMetricsDemoSeeder extends Seeder
                 'approved_by_id' => null,
                 'approved_at' => null,
                 'qualitative_context' => 'Preliminary pre-audit review focused on surgical consignment supplies, cold chain IoT monitoring, and vendor accreditation renewals.',
-                'executive_summary' => 'Identified 3 active suppliers requiring license to operate renewal and 2 cold storage zones needing telemetry sensor recalibration.',
+                'executive_summary' => 'Identified 3 active suppliers requiring license to operate renewal and 2 cold storage zones needing telemetry sensor recalibration. Preliminary Q4 procurement realized ₱18,500 savings under DPRI ceilings.',
                 'metrics_summary' => [
+                    'total_spend' => 450000.00,
+                    'total_spend_evaluated' => 450000.00,
+                    'net_savings_amount' => 18500.00,
+                    'aggregate_savings_pct' => 4.1,
                     'dpri_compliance_pct' => 96.0,
                     'fill_rate_pct' => 91.5,
                     'on_time_delivery_pct' => 89.0,
+                    'ceiling_breaches_count' => 0,
+                    'suppliers_evaluated' => 3,
+                    'avg_supplier_score' => 88.3,
+                    'overall_stock_accuracy' => 98.8,
+                    'critical_bottleneck' => [
+                        'key' => 'stage_4_vendor_lead_time',
+                        'name' => 'Dispatch to Gate Arrival (Lead Time)',
+                        'mean_tat_days' => 6.8,
+                        'sla_target_days' => 10.0,
+                        'variance_sigma' => 2.80,
+                    ],
+                    'bottleneck_stages' => [
+                        'stage_1_pr_approval' => [
+                            'name' => 'PR Creation to Approval',
+                            'sample_count' => 12,
+                            'mean_tat_days' => 2.60,
+                            'min_tat_days' => 1.00,
+                            'max_tat_days' => 4.80,
+                            'variance_sigma' => 1.20,
+                            'sla_target_days' => 3.0,
+                            'sla_breach_rate' => 8.33,
+                            'status' => 'healthy',
+                        ],
+                        'stage_2_sourcing_award' => [
+                            'name' => 'Sourcing RFQ to Award',
+                            'sample_count' => 6,
+                            'mean_tat_days' => 6.20,
+                            'min_tat_days' => 3.50,
+                            'max_tat_days' => 8.00,
+                            'variance_sigma' => 1.65,
+                            'sla_target_days' => 7.0,
+                            'sla_breach_rate' => 16.67,
+                            'status' => 'healthy',
+                        ],
+                        'stage_3_po_conforme' => [
+                            'name' => 'PO Issuance to Conforme',
+                            'sample_count' => 15,
+                            'mean_tat_days' => 1.80,
+                            'min_tat_days' => 0.80,
+                            'max_tat_days' => 3.00,
+                            'variance_sigma' => 0.75,
+                            'sla_target_days' => 2.0,
+                            'sla_breach_rate' => 6.67,
+                            'status' => 'healthy',
+                        ],
+                        'stage_4_vendor_lead_time' => [
+                            'name' => 'Dispatch to Gate Arrival (Lead Time)',
+                            'sample_count' => 15,
+                            'mean_tat_days' => 6.80,
+                            'min_tat_days' => 3.00,
+                            'max_tat_days' => 12.00,
+                            'variance_sigma' => 2.80,
+                            'sla_target_days' => 10.0,
+                            'sla_breach_rate' => 13.33,
+                            'status' => 'elevated',
+                        ],
+                        'stage_5_technical_inspection' => [
+                            'name' => 'Receiving to Technical Inspection',
+                            'sample_count' => 14,
+                            'mean_tat_days' => 0.90,
+                            'min_tat_days' => 0.30,
+                            'max_tat_days' => 1.80,
+                            'variance_sigma' => 0.40,
+                            'sla_target_days' => 1.0,
+                            'sla_breach_rate' => 7.14,
+                            'status' => 'healthy',
+                        ],
+                        'stage_6_custodial_acceptance' => [
+                            'name' => 'Inspection to Custodial Acceptance',
+                            'sample_count' => 14,
+                            'mean_tat_days' => 0.70,
+                            'min_tat_days' => 0.20,
+                            'max_tat_days' => 1.10,
+                            'variance_sigma' => 0.28,
+                            'sla_target_days' => 1.0,
+                            'sla_breach_rate' => 0.00,
+                            'status' => 'healthy',
+                        ],
+                    ],
                 ],
             ]
         );
@@ -145,6 +310,18 @@ class OperationalMetricsDemoSeeder extends Seeder
                         ],
                         $scorecardData[$idx]
                     );
+
+                    // Also seed active supplier scorecards for Q4 review
+                    SupplierScorecard::updateOrCreate(
+                        [
+                            'kpi_process_review_id' => $reviewQ4->id,
+                            'supplier_id' => $sup->id,
+                        ],
+                        array_merge($scorecardData[$idx], [
+                            'recommendation' => $idx === 2 ? 'under_observation' : 'retain',
+                            'notes' => 'Preliminary Q4 evaluation: Vendor accreditation and License to Operate (LTO) renewal pending.',
+                        ])
+                    );
                 }
             }
         }
@@ -154,16 +331,16 @@ class OperationalMetricsDemoSeeder extends Seeder
         $items = InventoryItem::take(3)->get();
 
         if ($pos->isNotEmpty() && $items->isNotEmpty()) {
-            $savingsData = [
+            $savingsDataQ3 = [
                 [
                     'pndf_code' => 'PNDF-PARA-500',
                     'item_name' => 'Paracetamol 500mg Tablets',
                     'uom' => 'bottle',
-                    'quantity_procured' => 5000,
+                    'quantity_procured' => 25000,
                     'actual_unit_price' => 1.0500,
-                    'dpri_ceiling_price' => 1.2000,
-                    'variance_amount' => 0.1500,
-                    'savings_percentage' => 12.50,
+                    'dpri_ceiling_price' => 1.7500,
+                    'variance_amount' => 17500.0000,
+                    'savings_percentage' => 40.00,
                     'is_above_ceiling' => false,
                     'justification' => 'Bulk tier hospital negotiated rate below DOH DPRI 2026 reference ceiling price.',
                 ],
@@ -171,17 +348,17 @@ class OperationalMetricsDemoSeeder extends Seeder
                     'pndf_code' => 'PNDF-AMOX-500',
                     'item_name' => 'Amoxicillin 500mg Capsules',
                     'uom' => 'box',
-                    'quantity_procured' => 3000,
+                    'quantity_procured' => 10000,
                     'actual_unit_price' => 3.1000,
-                    'dpri_ceiling_price' => 3.5000,
-                    'variance_amount' => 0.4000,
-                    'savings_percentage' => 11.43,
+                    'dpri_ceiling_price' => 5.6000,
+                    'variance_amount' => 25000.0000,
+                    'savings_percentage' => 44.64,
                     'is_above_ceiling' => false,
                     'justification' => 'Framework supply contract pricing with cooperative distributor.',
                 ],
             ];
 
-            foreach ($savingsData as $i => $sData) {
+            foreach ($savingsDataQ3 as $i => $sData) {
                 $po = $pos[$i % $pos->count()];
                 $item = $items[$i % $items->count()];
 
@@ -198,6 +375,30 @@ class OperationalMetricsDemoSeeder extends Seeder
                     ])
                 );
             }
+
+            // Q4 Preliminary Savings Log
+            $poQ4 = $pos->last() ?? $pos->first();
+            $itemQ4 = $items->last() ?? $items->first();
+            ProcurementSavingsLog::updateOrCreate(
+                [
+                    'kpi_process_review_id' => $reviewQ4->id,
+                    'inventory_item_id' => $itemQ4->id,
+                ],
+                [
+                    'purchase_order_id' => $poQ4->id,
+                    'purchase_order_line_id' => null,
+                    'pndf_code' => 'PNDF-SVR-GLV',
+                    'item_name' => $itemQ4->name,
+                    'uom' => $itemQ4->unit ?: 'box',
+                    'quantity_procured' => 5000,
+                    'actual_unit_price' => 28.3000,
+                    'dpri_ceiling_price' => 32.0000,
+                    'variance_amount' => 18500.0000,
+                    'savings_percentage' => 11.56,
+                    'is_above_ceiling' => false,
+                    'justification' => 'Consignment tiered hospital volume rate under DOH DPRI 2026 pricing.',
+                ]
+            );
         }
 
         // 4. Seed Inventory Shrinkage Reports
@@ -300,6 +501,47 @@ class OperationalMetricsDemoSeeder extends Seeder
                     'target_name' => $rec['target_name'],
                 ],
                 $rec
+            );
+        }
+
+        $recommendationsQ4 = [
+            [
+                'category' => 'warehousing',
+                'target_name' => 'Cold Storage Telemetry Sensor Recalibration (Zone A & B)',
+                'problem_detected' => 'Two cold storage zones exhibit telemetry drift and require sensor recalibration prior to audit.',
+                'evidence_metrics' => ['telemetry_drift_c' => 0.6, 'affected_zones_count' => 2],
+                'root_cause_analysis' => 'Annual sensor calibration cycle due for renewal.',
+                'recommended_action' => 'Dispatch certified biomedical calibration team to re-zero telemetry thermal probes.',
+                'expected_operational_benefit' => 'Maintains PhilHealth cold chain accreditation and zero temperature excursions.',
+                'priority' => 'high',
+                'status' => 'pending',
+                'implemented_by_id' => null,
+                'implemented_at' => null,
+                'implementation_notes' => null,
+            ],
+            [
+                'category' => 'procurement',
+                'target_name' => 'Supplier License to Operate (LTO) Accreditation Renewal',
+                'problem_detected' => '3 active vendor licenses expiring within 45 days requiring BAC renewal verification.',
+                'evidence_metrics' => ['expiring_suppliers_count' => 3, 'days_to_expiry' => 38],
+                'root_cause_analysis' => 'Annual FDA Philippine regulatory vendor license renewals.',
+                'recommended_action' => 'Issue formal compliance notice to vendors for updated LTO and CPR certificate submission.',
+                'expected_operational_benefit' => 'Ensures zero supply disruption on critical consignment surgical consumables.',
+                'priority' => 'high',
+                'status' => 'pending',
+                'implemented_by_id' => null,
+                'implemented_at' => null,
+                'implementation_notes' => null,
+            ],
+        ];
+
+        foreach ($recommendationsQ4 as $recQ4) {
+            ProcessRecommendation::updateOrCreate(
+                [
+                    'kpi_process_review_id' => $reviewQ4->id,
+                    'target_name' => $recQ4['target_name'],
+                ],
+                $recQ4
             );
         }
 

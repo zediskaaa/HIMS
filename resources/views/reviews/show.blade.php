@@ -119,24 +119,31 @@
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
                     <div class="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Total Spend Evaluated</div>
-                    <div class="mt-1.5 text-xl font-bold text-neutral-900">₱ {{ number_format($review->metrics_summary['total_spend'] ?? 0, 2) }}</div>
+                    <div class="mt-1.5 text-xl font-bold text-neutral-900">₱ {{ number_format($review->metrics_summary['total_spend'] ?? ($review->metrics_summary['total_spend_evaluated'] ?? 0), 2) }}</div>
                     <div class="mt-0.5 text-[11px] text-neutral-500">{{ $review->procurementSavingsLogs->count() }} line items audited</div>
                 </div>
 
                 <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
                     <div class="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">DPRI Net Price Savings</div>
-                    <div class="mt-1.5 text-xl font-bold {{ ($review->metrics_summary['net_savings_amount'] ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
-                        ₱ {{ number_format($review->metrics_summary['net_savings_amount'] ?? 0, 2) }}
+                    @php
+                        $netSavings = $review->net_savings_amount;
+                        $savingsPct = $review->aggregate_savings_pct;
+                    @endphp
+                    <div class="mt-1.5 text-xl font-bold {{ $netSavings > 0 ? 'text-emerald-600' : ($netSavings < 0 ? 'text-rose-600' : 'text-neutral-700') }}">
+                        ₱ {{ number_format($netSavings, 2) }}
                     </div>
                     <div class="mt-0.5 text-[11px] text-neutral-500">
-                        {{ $review->metrics_summary['aggregate_savings_pct'] ?? 0 }}% vs DOH ceiling
+                        {{ $savingsPct }}% vs DOH ceiling
                     </div>
                 </div>
 
                 <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
                     <div class="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Average Supplier Score</div>
                     <div class="mt-1.5 text-xl font-bold text-indigo-600">
-                        {{ $review->metrics_summary['avg_supplier_score'] ? $review->metrics_summary['avg_supplier_score'].'%' : 'N/A' }}
+                        @php
+                            $avgSupplierScore = $review->avg_supplier_score;
+                        @endphp
+                        {{ $avgSupplierScore !== null ? $avgSupplierScore.'%' : 'N/A' }}
                     </div>
                     <div class="mt-0.5 text-[11px] text-neutral-500">{{ $review->supplierScorecards->count() }} active suppliers</div>
                 </div>
@@ -151,12 +158,15 @@
 
                 <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm col-span-2 lg:col-span-1">
                     <div class="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Critical Bottleneck</div>
+                    @php
+                        $critBottleneck = $review->critical_bottleneck;
+                    @endphp
                     <div class="mt-1.5 text-sm font-bold text-amber-600 truncate">
-                        {{ $review->metrics_summary['critical_bottleneck']['name'] ?? 'None Detected' }}
+                        {{ $critBottleneck['name'] ?? 'None Detected' }}
                     </div>
                     <div class="mt-0.5 text-[11px] text-neutral-500">
-                        @if(isset($review->metrics_summary['critical_bottleneck']))
-                            Mean: {{ $review->metrics_summary['critical_bottleneck']['mean_tat_days'] }}d (SLA: {{ $review->metrics_summary['critical_bottleneck']['sla_target_days'] }}d)
+                        @if(!empty($critBottleneck['mean_tat_days']))
+                            Mean: {{ $critBottleneck['mean_tat_days'] }}d (SLA: {{ $critBottleneck['sla_target_days'] ?? '-' }}d)
                         @else
                             Operations within SLA
                         @endif
@@ -356,36 +366,42 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-neutral-200">
-                                @foreach($review->metrics_summary['bottleneck_stages'] ?? [] as $key => $stage)
+                                @forelse($review->bottleneck_stages as $key => $stage)
                                     <tr class="hover:bg-neutral-50/70 transition">
                                         <td class="px-4 py-3 font-semibold text-neutral-800">{{ $stage['name'] }}</td>
                                         <td class="px-4 py-3 text-neutral-600">{{ $stage['sample_count'] }} transactions</td>
                                         <td class="px-4 py-3 font-mono font-medium text-neutral-900">{{ $stage['mean_tat_days'] }} days</td>
                                         <td class="px-4 py-3 font-mono text-xs text-neutral-500">{{ $stage['min_tat_days'] }}d / {{ $stage['max_tat_days'] }}d</td>
                                         <td class="px-4 py-3 font-mono">
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $stage['variance_sigma'] > 3.0 ? 'bg-amber-100 text-amber-800' : 'bg-neutral-100 text-neutral-700' }}">
-                                                &sigma; = {{ $stage['variance_sigma'] }}d
-                                            </span>
+                                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $stage['variance_sigma'] > 3.0 ? 'bg-amber-100 text-amber-800' : 'bg-neutral-100 text-neutral-700' }}">
+                                                 &sigma; = {{ $stage['variance_sigma'] }}d
+                                             </span>
                                         </td>
                                         <td class="px-4 py-3 font-mono text-xs text-neutral-600">{{ $stage['sla_target_days'] }} days</td>
                                         <td class="px-4 py-3">
-                                            <span class="text-xs font-semibold {{ $stage['sla_breach_rate'] > 20 ? 'text-rose-600' : 'text-neutral-700' }}">
-                                                {{ $stage['sla_breach_rate'] }}%
-                                            </span>
+                                             <span class="text-xs font-semibold {{ $stage['sla_breach_rate'] > 20 ? 'text-rose-600' : 'text-neutral-700' }}">
+                                                 {{ $stage['sla_breach_rate'] }}%
+                                             </span>
                                         </td>
                                         <td class="px-4 py-3">
-                                            @if($stage['status'] === 'critical')
-                                                <span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800">Critical Bottleneck</span>
-                                            @elseif($stage['status'] === 'elevated')
-                                                <span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">Elevated Variance</span>
-                                            @elseif($stage['status'] === 'healthy')
-                                                <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">Within SLA</span>
-                                            @else
-                                                <span class="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs text-neutral-500">Insufficient Data</span>
-                                            @endif
+                                             @if($stage['status'] === 'critical')
+                                                 <span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800">Critical Bottleneck</span>
+                                             @elseif($stage['status'] === 'elevated')
+                                                 <span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">Elevated Variance</span>
+                                             @elseif($stage['status'] === 'healthy')
+                                                 <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">Within SLA</span>
+                                             @else
+                                                 <span class="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs text-neutral-500">Insufficient Data</span>
+                                             @endif
                                         </td>
                                     </tr>
-                                @endforeach
+                                @empty
+                                    <tr>
+                                        <td colspan="8" class="px-4 py-8 text-center text-xs text-neutral-500">
+                                            No supply chain turnaround time transactions recorded for this review interval.
+                                        </td>
+                                    </tr>
+                                @endforelse
                             </tbody>
                         </table>
                     </div>
@@ -674,47 +690,166 @@
 
             {{-- TAB 6: QUALITATIVE CONTEXT & NARRATIVE --}}
             <div x-show="activeTab === 'context'" class="space-y-6">
-                @can(\App\Enums\Permission::CreateProcessReview->value)
-                <form action="{{ route('reviews.update', $review) }}" method="POST" class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm space-y-5">
-                    @csrf
-                    @method('PUT')
-
-                    <div>
-                        <label for="title" class="block text-sm font-semibold text-neutral-800">Review Title</label>
-                        <input type="text" name="title" id="title" value="{{ old('title', $review->title) }}"
-                               @disabled(!$review->isDraft())
-                               class="mt-1 block w-full rounded-lg border-neutral-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-neutral-100 disabled:text-neutral-500">
+                @if($review->isDraft() && auth()->user()?->can(\App\Enums\Permission::CreateProcessReview->value))
+                    {{-- DRAFT MODE: Fully Editable Form --}}
+                    <div class="rounded-xl border border-indigo-200 bg-indigo-50/70 p-4 text-xs text-indigo-900 flex items-start gap-3 shadow-sm">
+                        <div class="p-1 rounded-lg bg-indigo-100 text-indigo-700 shrink-0 mt-0.5">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        </div>
+                        <div class="flex-1">
+                            <span class="font-bold text-sm block text-indigo-950">Draft Mode Active &mdash; Qualitative Editing Enabled</span>
+                            <p class="mt-0.5 text-indigo-800 leading-relaxed">
+                                You are editing this unsubmitted process review. You can update the title, qualitative and operational factors, and executive narrative before submitting to BAC for official sign-off.
+                            </p>
+                        </div>
                     </div>
 
-                    <div>
-                        <label for="qualitative_context" class="block text-sm font-semibold text-neutral-800">Qualitative &amp; Environmental Factors</label>
-                        <textarea name="qualitative_context" id="qualitative_context" rows="4"
-                                  @disabled(!$review->isDraft())
-                                  class="mt-1 block w-full rounded-lg border-neutral-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-neutral-100 disabled:text-neutral-500">{{ old('qualitative_context', $review->qualitative_context) }}</textarea>
-                    </div>
+                    <form action="{{ route('reviews.update', $review) }}" method="POST" class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm space-y-5">
+                        @csrf
+                        @method('PUT')
 
-                    <div>
-                        <label for="executive_summary" class="block text-sm font-semibold text-neutral-800">Executive Summary Narrative</label>
-                        <textarea name="executive_summary" id="executive_summary" rows="4"
-                                  @disabled(!$review->isDraft())
-                                  class="mt-1 block w-full rounded-lg border-neutral-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-neutral-100 disabled:text-neutral-500">{{ old('executive_summary', $review->executive_summary) }}</textarea>
-                    </div>
+                        <div>
+                            <label for="title" class="block text-sm font-semibold text-neutral-800">Review Title</label>
+                            <input type="text" name="title" id="title" value="{{ old('title', $review->title) }}" required
+                                   class="mt-1 block w-full rounded-lg border-neutral-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
 
-                    @if($review->isDraft())
-                        <div class="flex justify-end pt-3 border-t border-neutral-200">
+                        <div>
+                            <label for="qualitative_context" class="block text-sm font-semibold text-neutral-800">Qualitative &amp; Environmental Factors</label>
+                            <textarea name="qualitative_context" id="qualitative_context" rows="4"
+                                      placeholder="Describe relevant operational conditions, cold chain integrity, weather disruptions, or supplier dynamics..."
+                                      class="mt-1 block w-full rounded-lg border-neutral-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ old('qualitative_context', $review->qualitative_context) }}</textarea>
+                        </div>
+
+                        <div>
+                            <label for="executive_summary" class="block text-sm font-semibold text-neutral-800">Executive Summary Narrative</label>
+                            <textarea name="executive_summary" id="executive_summary" rows="4"
+                                      placeholder="Summary of savings realized, vendor performance, shrinkage rate compliance, and critical findings..."
+                                      class="mt-1 block w-full rounded-lg border-neutral-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ old('executive_summary', $review->executive_summary) }}</textarea>
+                        </div>
+
+                        <div class="flex items-center justify-between pt-3 border-t border-neutral-200">
+                            <span class="text-xs text-neutral-500">Changes will be logged in the immutable audit trail.</span>
                             <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-neutral-900 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-neutral-800 transition">
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                                 Save Narrative Changes
                             </button>
                         </div>
-                    @endif
-                </form>
+                    </form>
                 @else
-                    <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm space-y-5">
-                        <div><p class="text-sm font-semibold text-neutral-800">Review Title</p><p class="mt-1 text-sm text-neutral-700">{{ $review->title }}</p></div>
-                        <div><p class="text-sm font-semibold text-neutral-800">Qualitative &amp; Environmental Factors</p><p class="mt-1 whitespace-pre-line text-sm text-neutral-700">{{ $review->qualitative_context ?: 'No qualitative context recorded.' }}</p></div>
-                        <div><p class="text-sm font-semibold text-neutral-800">Executive Summary Narrative</p><p class="mt-1 whitespace-pre-line text-sm text-neutral-700">{{ $review->executive_summary ?: 'No executive summary recorded.' }}</p></div>
+                    {{-- LOCKED / IMMUTABLE RECORD VIEW (Submitted, Approved, Implemented, or Viewer) --}}
+                    @if($review->isApproved())
+                        <div class="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-xs text-emerald-900 flex items-start gap-3 shadow-sm">
+                            <div class="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-sm text-emerald-950">Official Record Locked (Immutable)</span>
+                                    <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Approved</span>
+                                </div>
+                                <p class="mt-1 text-emerald-800 leading-relaxed">
+                                    This review was officially signed off and approved by <strong>{{ $review->approver?->name ?? 'BAC / Hospital Administration' }}</strong> on {{ $review->approved_at?->format('F d, Y \a\t h:i A') ?? 'sign-off' }}. Under Maker-Checker governance and COA Circular No. 2020-006, approved review narratives are permanently immutable to preserve the evidentiary audit trail.
+                                </p>
+                            </div>
+                        </div>
+                    @elseif($review->isSubmitted())
+                        <div class="rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-xs text-amber-900 flex items-start gap-3 shadow-sm">
+                            <div class="p-1.5 rounded-lg bg-amber-100 text-amber-700 shrink-0 mt-0.5">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-sm text-amber-950">Under BAC Review &mdash; Editing Locked</span>
+                                    <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 uppercase tracking-wider">Submitted</span>
+                                </div>
+                                <p class="mt-1 text-amber-800 leading-relaxed">
+                                    This review has been submitted for Maker-Checker review and is currently pending evaluation by the Bids and Awards Committee (BAC). Narrative editing is locked to prevent unauthorized tampering. If modifications are required, an authorized BAC reviewer can return this review to Draft using the <strong>Reject / Return</strong> action above.
+                                </p>
+                            </div>
+                        </div>
+                    @elseif($review->isRejected())
+                        <div class="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-xs text-rose-900 flex items-start gap-3 shadow-sm">
+                            <div class="p-1.5 rounded-lg bg-rose-100 text-rose-700 shrink-0 mt-0.5">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-sm text-rose-950">Returned by Administration</span>
+                                    <span class="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800 uppercase tracking-wider">Rejected</span>
+                                </div>
+                                <p class="mt-1 text-rose-800 leading-relaxed">
+                                    Reason for return: {{ $review->rejection_reason ?? 'Please review and adjust findings.' }}
+                                </p>
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- Institutional Clean Document Presentation --}}
+                    <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm space-y-6">
+                        {{-- Header / Title Section --}}
+                        <div class="border-b border-neutral-200 pb-4">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Official Review Title</span>
+                                <span class="inline-flex items-center gap-1 rounded bg-neutral-100 px-2.5 py-0.5 text-[11px] font-medium text-neutral-600">
+                                    <svg class="h-3 w-3 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                    Read-Only Record
+                                </span>
+                            </div>
+                            <h2 class="mt-1 text-lg font-bold text-neutral-900">{{ $review->title }}</h2>
+                            <p class="mt-0.5 text-xs text-neutral-500 font-mono">{{ $review->review_number }} &bull; Period: {{ $review->period_start->format('F d, Y') }} &mdash; {{ $review->period_end->format('F d, Y') }}</p>
+                        </div>
+
+                        {{-- Qualitative Context Section --}}
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-2">
+                                <svg class="h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <h3 class="text-sm font-bold text-neutral-900">Qualitative &amp; Environmental Factors</h3>
+                            </div>
+                            <div class="rounded-xl border border-neutral-200 bg-neutral-50/70 p-4 text-sm text-neutral-700 leading-relaxed whitespace-pre-line">
+                                {{ $review->qualitative_context ?: 'No qualitative context was recorded for this review interval.' }}
+                            </div>
+                        </div>
+
+                        {{-- Executive Summary Narrative Section --}}
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-2">
+                                <svg class="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                <h3 class="text-sm font-bold text-neutral-900">Executive Summary Narrative</h3>
+                            </div>
+                            <div class="rounded-xl border border-emerald-100 bg-emerald-50/30 p-4 text-sm text-neutral-800 leading-relaxed whitespace-pre-line">
+                                {{ $review->executive_summary ?: 'No executive summary narrative was recorded for this review interval.' }}
+                            </div>
+                        </div>
+
+                        {{-- Attribution & Sign-Off Metadata --}}
+                        <div class="pt-4 border-t border-neutral-200 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                            <div class="rounded-lg bg-neutral-50 p-3 border border-neutral-100">
+                                <span class="font-semibold text-neutral-500 block uppercase tracking-wider text-[10px]">Evaluator / Author</span>
+                                <div class="mt-1 font-semibold text-neutral-900 flex items-center gap-1.5">
+                                    <svg class="h-3.5 w-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                    {{ $review->evaluator->name }}
+                                </div>
+                                <span class="text-[11px] text-neutral-500">Created: {{ $review->created_at->format('M d, Y h:i A') }}</span>
+                            </div>
+
+                            <div class="rounded-lg bg-neutral-50 p-3 border border-neutral-100">
+                                <span class="font-semibold text-neutral-500 block uppercase tracking-wider text-[10px]">BAC Sign-off / Approver</span>
+                                <div class="mt-1 font-semibold text-neutral-900 flex items-center gap-1.5">
+                                    <svg class="h-3.5 w-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                                    {{ $review->approver?->name ?? 'Pending BAC Approval' }}
+                                </div>
+                                <span class="text-[11px] text-neutral-500">
+                                    @if($review->approved_at)
+                                        Approved: {{ $review->approved_at->format('M d, Y h:i A') }}
+                                    @else
+                                        Status: {{ ucfirst($review->status) }}
+                                    @endif
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                @endcan
+                @endif
             </div>
 
             {{-- Rejection Modal --}}

@@ -151,9 +151,22 @@
                                             <svg class="h-3 w-3 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                                             {{ $review->supplier_scorecards_count }} Vendors
                                         </span>
-                                        <span title="DPRI Price Savings Logs" class="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-emerald-800 border border-emerald-200">
-                                            ₱ {{ number_format($review->metrics_summary['net_savings_amount'] ?? 0, 0) }}
-                                        </span>
+                                        @php
+                                            $savings = $review->net_savings_amount;
+                                        @endphp
+                                        @if($savings > 0)
+                                            <span title="DPRI Price Savings: ₱ {{ number_format($savings, 2) }}" class="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-emerald-800 border border-emerald-200 font-medium">
+                                                ₱ {{ number_format($savings, 0) }}
+                                            </span>
+                                        @elseif($savings < 0)
+                                            <span title="DPRI Price Exceedance: ₱ {{ number_format(abs($savings), 2) }}" class="inline-flex items-center gap-1 rounded bg-rose-50 px-2 py-0.5 text-rose-800 border border-rose-200 font-medium">
+                                                -₱ {{ number_format(abs($savings), 0) }}
+                                            </span>
+                                        @else
+                                            <span title="No DPRI price savings recorded" class="inline-flex items-center gap-1 rounded bg-neutral-100 px-2 py-0.5 text-neutral-600 border border-neutral-200">
+                                                ₱ 0
+                                            </span>
+                                        @endif
                                         <span title="Actionable Interventions" class="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-indigo-700 border border-indigo-200">
                                             {{ $review->process_recommendations_count }} Actions
                                         </span>

@@ -30,9 +30,17 @@ class BottleneckAnalysisService
         // 2. Stage 2: Sourcing RFQ to Award
         $rfqs = SourcingRfq::query()
             ->whereBetween('created_at', [$start, $end])
-            ->whereNotNull('awarded_at')
+            ->where(function ($q) {
+                $q->where('status', \App\Enums\RfqStatus::Awarded->value)
+                    ->orWhere('status', 'awarded');
+            })
             ->get();
-        $stage2Durations = $rfqs->map(fn ($rfq) => max(0.1, $rfq->created_at->floatDiffInDays($rfq->awarded_at)))->values()->all();
+        $stage2Durations = $rfqs->map(function ($rfq) {
+            $awardDate = $rfq->evaluations()->max('completed_at') ?? $rfq->updated_at;
+            $awardDate = $awardDate ? Carbon::parse($awardDate) : $rfq->updated_at;
+
+            return max(0.1, $rfq->created_at->floatDiffInDays($awardDate));
+        })->values()->all();
 
         // 3. Stage 3: PO Issuance to Supplier Conforme
         $posWithConforme = PurchaseOrder::query()
