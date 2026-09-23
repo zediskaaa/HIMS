@@ -239,10 +239,13 @@ class OperationalMetricsDemoSeeder extends Seeder
             ]
         );
 
-        // 2. Seed Supplier Scorecards
+        // 2. Seed the operational records used to calculate lifecycle metrics.
+        $this->call(SupplyChainTurnaroundDemoSeeder::class);
+
+        // 3. Seed Supplier Scorecards
         $this->call(SupplierScorecardDemoSeeder::class);
 
-        // 3. Seed Procurement Savings Logs
+        // 4. Seed Procurement Savings Logs
         $pos = PurchaseOrder::where('status', '!=', 'cancelled')->take(3)->get();
         $items = InventoryItem::take(3)->get();
 

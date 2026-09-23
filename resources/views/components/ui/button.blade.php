@@ -7,7 +7,7 @@
 ])
 
 @php
-    $base = 'inline-flex items-center justify-center gap-2 font-medium rounded-md border transition-colors '
+    $base = 'inline-flex items-center justify-center gap-2 font-medium rounded-md border transition-colors shrink-0 whitespace-nowrap '
         .'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-neutral-900 '
         .'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none';
 

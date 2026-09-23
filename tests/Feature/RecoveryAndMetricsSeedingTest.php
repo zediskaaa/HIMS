@@ -15,6 +15,7 @@ use App\Models\SupplierScorecard;
 use App\Models\SystemRecoveryAttempt;
 use App\Models\SystemRecoveryRecord;
 use App\Models\User;
+use App\Services\Analytics\BottleneckAnalysisService;
 use App\Services\Analytics\SupplierScoringService;
 use App\Services\Import\ImportStagingService;
 use Database\Seeders\ErrorRecoveryDemoSeeder;
@@ -158,9 +159,21 @@ class RecoveryAndMetricsSeedingTest extends TestCase
         $submittedReview = KpiProcessReview::where('review_number', 'REV-2026-Q4')->firstOrFail();
 
         $this->assertSame($reviewedSuppliers->count(), $approvedReview->supplierScorecards()->count());
-        $this->assertSame(0, $submittedReview->supplierScorecards()->count());
+        $this->assertSame($reviewedSuppliers->count(), $submittedReview->supplierScorecards()->count());
         $this->assertSame($reviewedSuppliers->count(), $approvedReview->metrics_summary['suppliers_evaluated']);
-        $this->assertSame(0, $submittedReview->metrics_summary['suppliers_evaluated']);
+        $this->assertSame($reviewedSuppliers->count(), $submittedReview->metrics_summary['suppliers_evaluated']);
+
+        foreach ([$approvedReview, $submittedReview] as $review) {
+            $calculatedBottlenecks = app(BottleneckAnalysisService::class)
+                ->evaluate($review->period_start, $review->period_end);
+
+            $this->assertEquals($calculatedBottlenecks['stages'], $review->metrics_summary['bottleneck_stages']);
+            $this->assertEquals($calculatedBottlenecks['critical_bottleneck'], $review->metrics_summary['critical_bottleneck']);
+            $this->assertNotContains(
+                0,
+                collect($calculatedBottlenecks['stages'])->pluck('sample_count')->all()
+            );
+        }
 
         $calculatedScores = app(SupplierScoringService::class)
             ->evaluate($approvedReview->period_start, $approvedReview->period_end)
@@ -208,6 +221,10 @@ class RecoveryAndMetricsSeedingTest extends TestCase
         $reviewCount = KpiProcessReview::count();
         $scorecardCount = SupplierScorecard::count();
         $purchaseOrderCount = DB::table('purchase_orders')->count();
+        $purchaseRequestCount = DB::table('purchase_requests')->count();
+        $rfqCount = DB::table('sourcing_rfqs')->count();
+        $goodsReceiptCount = DB::table('goods_receipt_notes')->count();
+        $inspectionReportCount = DB::table('inspection_acceptance_reports')->count();
         $adjustmentCount = InventoryAdjustment::count();
 
         // Second run
@@ -219,6 +236,10 @@ class RecoveryAndMetricsSeedingTest extends TestCase
         $this->assertSame($reviewCount, KpiProcessReview::count());
         $this->assertSame($scorecardCount, SupplierScorecard::count());
         $this->assertSame($purchaseOrderCount, DB::table('purchase_orders')->count());
+        $this->assertSame($purchaseRequestCount, DB::table('purchase_requests')->count());
+        $this->assertSame($rfqCount, DB::table('sourcing_rfqs')->count());
+        $this->assertSame($goodsReceiptCount, DB::table('goods_receipt_notes')->count());
+        $this->assertSame($inspectionReportCount, DB::table('inspection_acceptance_reports')->count());
         $this->assertSame($adjustmentCount, InventoryAdjustment::count());
     }
 

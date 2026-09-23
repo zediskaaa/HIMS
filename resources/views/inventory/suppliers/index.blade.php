@@ -115,15 +115,15 @@
                  supplier column ~40% of the row because the truncating name
                  still reported its full width as a minimum, which pushed the
                  table past the card and drew a horizontal scrollbar. --}}
-            <div class="hidden md:block [&_.hims-table-scroll]:overflow-x-hidden">
+            <div class="hidden md:block">
                 <x-ui.table :sticky-header="false" class="w-full table-fixed supplier-directory-table">
                     <colgroup>
-                        <col class="w-[33%]">
-                        <col class="w-[18%]">
-                        <col class="w-[11%]">
+                        <col class="w-[27%]">
+                        <col class="w-[17%]">
+                        <col class="w-[9%]">
                         <col class="w-[15%]">
                         <col class="w-[12%]">
-                        <col class="w-[11%]">
+                        <col class="w-[20%]">
                     </colgroup>
                     <x-ui.table.head>
                         <x-ui.table.th>Supplier</x-ui.table.th>
@@ -131,7 +131,7 @@
                         <x-ui.table.th class="!px-2.5">Lead time</x-ui.table.th>
                         <x-ui.table.th>Score</x-ui.table.th>
                         <x-ui.table.th class="!pr-2">Status</x-ui.table.th>
-                        <x-ui.table.th align="right" class="!pr-4 !pl-1">Action</x-ui.table.th>
+                        <x-ui.table.th align="right" class="!pr-4 !pl-1 whitespace-nowrap min-w-[8.5rem]">Action</x-ui.table.th>
                     </x-ui.table.head>
                     <tbody>
                         @forelse ($suppliers as $supplier)
@@ -165,30 +165,38 @@
                                     <span class="block truncate text-xs text-neutral-500">{{ $supplier->active_products_count }} active {{ str('item')->plural($supplier->active_products_count) }}</span>
                                 </x-ui.table.td>
                                 <x-ui.table.td class="!px-2.5">{{ $supplier->standard_lead_time_days !== null ? $supplier->standard_lead_time_days.' days' : 'Not set' }}</x-ui.table.td>
-                                <x-ui.table.td>
+                                <x-ui.table.td class="whitespace-nowrap">
                                     @if ($score !== null)
                                         <div class="flex items-center gap-2">
-                                            <span class="w-9 shrink-0 font-semibold tabular-nums">{{ number_format($score, 0) }}%</span>
-                                            <span class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-neutral-200"><span class="block h-full rounded-full bg-primary-600" style="width: {{ $score }}%"></span></span>
+                                            <span class="w-11 shrink-0 font-semibold tabular-nums whitespace-nowrap">{{ number_format($score, 0) }}%</span>
+                                            <span class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700"><span class="block h-full rounded-full bg-primary-600" style="width: {{ $score }}%"></span></span>
                                         </div>
-                                        <span class="block whitespace-nowrap text-xs text-neutral-500">Reviewed score</span>
+                                        <span class="block whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400">Reviewed score</span>
                                     @else
-                                        <span class="block whitespace-nowrap text-xs text-neutral-500">Not reviewed</span>
+                                        <span class="block whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400">Not reviewed</span>
                                     @endif
                                 </x-ui.table.td>
                                 <x-ui.table.td class="!pr-2">
                                     <x-ui.badge :status="$supplier->status->value" dot>{{ $supplier->status->label() }}</x-ui.badge>
                                     <span class="mt-1 block truncate text-xs text-neutral-500">{{ $supplier->effectiveAccreditationStatus()->label() }}</span>
                                 </x-ui.table.td>
-                                <x-ui.table.td align="right" class="!pr-4 !pl-1" onclick="event.stopPropagation()">
-                                    <div class="flex items-center justify-end gap-1.5">
-                                        <x-ui.button size="sm" variant="secondary" :href="route('inventory.suppliers.show', $supplier)" icon="eye">View</x-ui.button>
+                                <x-ui.table.td align="right" class="!pr-4 !pl-1 whitespace-nowrap min-w-[8.5rem]" onclick="event.stopPropagation()">
+                                    <div class="inline-flex items-center justify-end gap-1.5 shrink-0 whitespace-nowrap">
+                                        <x-ui.button
+                                            size="sm"
+                                            variant="secondary"
+                                            :href="route('inventory.suppliers.show', $supplier)"
+                                            icon="eye"
+                                            class="shrink-0 whitespace-nowrap text-xs shadow-2xs"
+                                        >
+                                            View
+                                        </x-ui.button>
                                         @can(\App\Enums\Permission::ManageArchive->value)
                                             <x-ui.button
                                                 type="button"
                                                 size="sm"
                                                 variant="ghost"
-                                                class="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                                class="shrink-0 whitespace-nowrap text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                                                 @click="$dispatch('open-archive-modal', {
                                                     actionUrl: '{{ route('inventory.suppliers.archive', $supplier) }}',
                                                     title: '{{ addslashes($supplier->name) }}',
@@ -215,39 +223,75 @@
                 </x-ui.table>
             </div>
 
-            <div class="divide-y divide-neutral-100 md:hidden">
+            <div class="divide-y divide-neutral-100 dark:divide-neutral-800 md:hidden">
                 @forelse ($suppliers as $supplier)
                     @php
                         $categories = $supplier->supplierProducts->pluck('item.category.name')->filter()->unique();
                         $scorecard = $supplier->latestApprovedScorecard;
                         $selectUrl = route('inventory.suppliers', array_merge(request()->query(), ['supplier' => $supplier->id])).'#supplier-summary';
                     @endphp
-                    <a href="{{ $selectUrl }}" @class(['block p-4 transition-colors hover:bg-neutral-50', 'bg-primary-50/70 ring-1 ring-inset ring-primary-500/20' => $selectedSupplier?->is($supplier)])>
+                    <div @class(['p-4 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/50', 'bg-primary-50/70 dark:bg-primary-950/40 ring-1 ring-inset ring-primary-500/20' => $selectedSupplier?->is($supplier)])>
                         <div class="flex items-start gap-3">
                             <x-ui.supplier-logo :supplier="$supplier" size="lg" />
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-start justify-between gap-3">
-                                    <div>
+                                    <div class="min-w-0">
                                         <div class="flex items-center gap-2">
-                                            <p class="truncate font-semibold text-neutral-900">{{ $supplier->name }}</p>
+                                            <a href="{{ $selectUrl }}" class="truncate font-semibold text-neutral-900 dark:text-white hover:text-primary-700 hover:underline">
+                                                {{ $supplier->name }}
+                                            </a>
                                             @if ($selectedSupplier?->is($supplier))
-                                                <span class="inline-flex items-center rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold text-primary-800">Selected</span>
+                                                <span class="inline-flex items-center rounded bg-primary-100 dark:bg-primary-900/60 px-1.5 py-0.5 text-[10px] font-semibold text-primary-800 dark:text-primary-300">Selected</span>
                                             @endif
                                         </div>
-                                        <p class="text-xs text-neutral-500">SUP-{{ str_pad((string) $supplier->id, 4, '0', STR_PAD_LEFT) }}</p>
+                                        <p class="text-xs text-neutral-500 dark:text-neutral-400">SUP-{{ str_pad((string) $supplier->id, 4, '0', STR_PAD_LEFT) }}{{ $supplier->trade_name ? ' · '.$supplier->trade_name : '' }}</p>
                                     </div>
                                     <x-ui.badge :status="$supplier->status->value" dot>{{ $supplier->status->label() }}</x-ui.badge>
                                 </div>
                                 <dl class="mt-3 grid grid-cols-3 gap-2 text-xs">
-                                    <div><dt class="text-neutral-500">Category</dt><dd class="mt-0.5 truncate font-medium text-neutral-800">{{ $categories->first() ?: 'Not linked' }}</dd></div>
-                                    <div><dt class="text-neutral-500">Lead time</dt><dd class="mt-0.5 font-medium text-neutral-800">{{ $supplier->standard_lead_time_days !== null ? $supplier->standard_lead_time_days.' days' : 'Not set' }}</dd></div>
-                                    <div><dt class="text-neutral-500">Score</dt><dd class="mt-0.5 font-medium text-neutral-800">{{ $scorecard ? number_format((float) $scorecard->total_score, 0).'%' : 'Not reviewed' }}</dd></div>
+                                    <div><dt class="text-neutral-500 dark:text-neutral-400">Category</dt><dd class="mt-0.5 truncate font-medium text-neutral-800 dark:text-neutral-200">{{ $categories->first() ?: 'Not linked' }}</dd></div>
+                                    <div><dt class="text-neutral-500 dark:text-neutral-400">Lead time</dt><dd class="mt-0.5 font-medium text-neutral-800 dark:text-neutral-200">{{ $supplier->standard_lead_time_days !== null ? $supplier->standard_lead_time_days.' days' : 'Not set' }}</dd></div>
+                                    <div><dt class="text-neutral-500 dark:text-neutral-400">Score</dt><dd class="mt-0.5 font-medium text-neutral-800 dark:text-neutral-200">{{ $scorecard ? number_format((float) $scorecard->total_score, 0).'%' : 'Not reviewed' }}</dd></div>
                                 </dl>
+
+                                {{-- Responsive Mobile Action Row --}}
+                                <div class="mt-3.5 flex items-center justify-between gap-2 border-t border-neutral-100 dark:border-neutral-800/80 pt-2.5">
+                                    <a href="{{ $selectUrl }}" class="text-xs font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">
+                                        Summary &darr;
+                                    </a>
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        <x-ui.button size="sm" variant="secondary" :href="route('inventory.suppliers.show', $supplier)" icon="eye" class="text-xs shrink-0">
+                                            View
+                                        </x-ui.button>
+                                        @can(\App\Enums\Permission::ManageArchive->value)
+                                            <x-ui.button
+                                                type="button"
+                                                size="sm"
+                                                variant="ghost"
+                                                class="text-xs shrink-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                                @click="$dispatch('open-archive-modal', {
+                                                    actionUrl: '{{ route('inventory.suppliers.archive', $supplier) }}',
+                                                    title: '{{ addslashes($supplier->name) }}',
+                                                    identifier: 'SUP-{{ str_pad((string) $supplier->id, 4, '0', STR_PAD_LEFT) }}',
+                                                    context: 'Tax ID: {{ addslashes($supplier->tax_number ?? 'N/A') }}',
+                                                    type: 'Supplier',
+                                                    presets: [
+                                                        'Vendor business ceased operations / bankruptcy',
+                                                        'Procurement contract concluded / terminated',
+                                                        'Failed compliance / accreditation standards',
+                                                        'Duplicate vendor listing'
+                                                    ]
+                                                })">
+                                                Archive
+                                            </x-ui.button>
+                                        @endcan
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </a>
+                    </div>
                 @empty
-                    <div class="p-8 text-center"><x-ui.icon name="truck" class="mx-auto h-8 w-8 text-neutral-300" /><p class="mt-2 text-sm font-semibold text-neutral-800">No matching suppliers</p><p class="mt-1 text-xs text-neutral-500">Adjust the filters or add a supplier record.</p></div>
+                    <div class="p-8 text-center"><x-ui.icon name="truck" class="mx-auto h-8 w-8 text-neutral-300 dark:text-neutral-600" /><p class="mt-2 text-sm font-semibold text-neutral-800 dark:text-neutral-200">No matching suppliers</p><p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Adjust the filters or add a supplier record.</p></div>
                 @endforelse
             </div>
 

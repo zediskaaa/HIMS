@@ -312,7 +312,7 @@
     }
 
     .hims-table-scroll:has(.supplier-directory-table) {
-        overflow-x: hidden;
+        overflow-x: auto;
     }
 
     /* Audit logs table fits desktop and tablet layouts; suppress persistent horizontal scrollbar */
