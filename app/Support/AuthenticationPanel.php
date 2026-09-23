@@ -107,6 +107,24 @@ enum AuthenticationPanel: string
         };
     }
 
+    public function loginMfaContinueRoute(): string
+    {
+        return match ($this) {
+            self::Staff => 'login.mfa.continue',
+            self::Admin => 'admin.login.mfa.continue',
+            self::SuperAdmin => 'super-admin.login.mfa.continue',
+        };
+    }
+
+    public function loginMfaCancelRoute(): string
+    {
+        return match ($this) {
+            self::Staff => 'login.mfa.cancel',
+            self::Admin => 'admin.login.mfa.cancel',
+            self::SuperAdmin => 'super-admin.login.mfa.cancel',
+        };
+    }
+
     public function passwordRequestRoute(): string
     {
         return match ($this) {

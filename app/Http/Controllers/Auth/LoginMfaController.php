@@ -16,8 +16,10 @@ use App\Services\Sms\SmsMfaChallengeService;
 use App\Services\Sms\SmsOtpDelivery;
 use App\Support\AuthenticationPanel;
 use App\Support\MfaSession;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
@@ -31,7 +33,7 @@ class LoginMfaController extends Controller
         LoginMfaService $mfa,
         LoginLockoutService $lockouts,
         AuthenticatorSetupService $authenticatorSetup,
-    ): View|RedirectResponse {
+    ): View|Response|RedirectResponse {
         $panel = $this->panel($request);
         $user = $mfa->pendingUser($request, $panel->guard());
 
@@ -61,19 +63,39 @@ class LoginMfaController extends Controller
                 ->withErrors(['email' => $lockouts->message($restriction)]);
         }
 
-        return view('auth.login-mfa', [
-            'panel' => $panel,
-            'method' => $method,
-            'authenticatorSetup' => $recoverySetup,
-            'maskedEmail' => $this->maskEmail($user->email),
-            'maskedPhone' => $method === LoginMfaService::METHOD_SMS
-                ? substr((string) $user->phone, 0, 2).'******'.substr((string) $user->phone, -3)
-                : null,
-            'expiresInMinutes' => $mfa->expiresInMinutes(),
-            'expired' => $mfa->isExpired($request, $panel->guard()),
-            'exhausted' => $mfa->isExhausted($request, $panel->guard()),
-            'resendAvailableIn' => $mfa->resendAvailableIn($request, $panel->guard()),
-        ]);
+        $isAuthenticator = $mfa->challengeUsesAuthenticator($request, $panel->guard());
+        $statePayload = $mfa->statePayload($request, $panel->guard());
+        $isExpired = $mfa->isExpired($request, $panel->guard());
+        $expiresAt = $statePayload['expires_at'] ?? now()->getTimestamp();
+        $serverNow = now()->getTimestamp();
+        $remainingSeconds = max(0, $expiresAt - $serverNow);
+
+        return response()
+            ->view('auth.login-mfa', [
+                'panel' => $panel,
+                'method' => $method,
+                'isAuthenticator' => $isAuthenticator,
+                'authenticatorSetup' => $recoverySetup,
+                'maskedEmail' => $this->maskEmail($user->email),
+                'maskedPhone' => $method === LoginMfaService::METHOD_SMS
+                    ? substr((string) $user->phone, 0, 2).'******'.substr((string) $user->phone, -3)
+                    : null,
+                'expiresInMinutes' => $mfa->expiresInMinutes(),
+                'expired' => $isExpired,
+                'exhausted' => $mfa->isExhausted($request, $panel->guard()),
+                'resendAvailableIn' => $mfa->resendAvailableIn($request, $panel->guard()),
+                'expiresAt' => $expiresAt,
+                'serverNow' => $serverNow,
+                'remainingSeconds' => $remainingSeconds,
+                'warningSeconds' => $mfa->warningThresholdSeconds(),
+                'totalDurationSeconds' => $mfa->authenticatorTimeoutSeconds(),
+                'continueUrl' => route($panel->loginMfaContinueRoute()),
+                'cancelUrl' => route($panel->loginMfaCancelRoute()),
+                'loginUrl' => route($panel->loginRoute()),
+            ])
+            ->header('Cache-Control', 'no-cache, no-store, max-age=0, must-revalidate')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', '0');
     }
 
     public function verify(
@@ -255,6 +277,64 @@ class LoginMfaController extends Controller
         }
 
         return back()->with('status', 'A new verification code has been sent.');
+    }
+
+    public function continueSession(Request $request, LoginMfaService $mfa): JsonResponse|RedirectResponse
+    {
+        $panel = $this->panel($request);
+        $result = $mfa->extendAuthenticatorSession($request, $panel->guard());
+
+        if ($request->expectsJson() || $request->isJson() || $request->ajax()) {
+            $statusCode = match ($result['status']) {
+                LoginMfaService::SUCCESS => 200,
+                LoginMfaService::MISSING => 401,
+                LoginMfaService::EXPIRED => 410,
+                'cooldown' => 429,
+                default => 422,
+            };
+
+            return response()->json([
+                'success' => $result['status'] === LoginMfaService::SUCCESS,
+                'status' => $result['status'],
+                'message' => $result['message'] ?? null,
+                'expires_at' => $result['expires_at'] ?? null,
+                'remaining_seconds' => $result['remaining_seconds'] ?? null,
+                'warning_seconds' => $result['warning_seconds'] ?? null,
+                'extensions_remaining' => $result['extensions_remaining'] ?? null,
+                'retry_after' => $result['retry_after'] ?? null,
+                'redirect_url' => in_array($result['status'], [LoginMfaService::MISSING, LoginMfaService::EXPIRED], true)
+                    ? route($panel->loginRoute())
+                    : null,
+            ], $statusCode);
+        }
+
+        if ($result['status'] === LoginMfaService::MISSING || $result['status'] === LoginMfaService::EXPIRED) {
+            return redirect()->route($panel->loginRoute())
+                ->withErrors(['email' => $result['message']]);
+        }
+
+        if ($result['status'] !== LoginMfaService::SUCCESS) {
+            return back()->withErrors(['otp' => $result['message']]);
+        }
+
+        return back()->with('status', 'Verification session has been extended.');
+    }
+
+    public function cancel(Request $request, LoginMfaService $mfa): JsonResponse|RedirectResponse
+    {
+        $panel = $this->panel($request);
+        $mfa->clear($request);
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        if ($request->expectsJson() || $request->isJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'redirect_url' => route($panel->loginRoute()),
+            ]);
+        }
+
+        return redirect()->route($panel->loginRoute());
     }
 
     private function panel(Request $request): AuthenticationPanel

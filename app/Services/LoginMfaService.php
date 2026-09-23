@@ -31,6 +31,16 @@ class LoginMfaService
 
     public const MISSING = 'missing';
 
+    public const AUTHENTICATOR_TIMEOUT_SECONDS = 120;
+
+    public const WARNING_THRESHOLD_SECONDS = 30;
+
+    public const MAX_EXTENSIONS = 3;
+
+    public const EXTENSION_DURATION_SECONDS = 120;
+
+    public const EXTENSION_COOLDOWN_SECONDS = 5;
+
     public function __construct(
         private readonly AuthenticatorService $authenticator,
         private readonly AuthenticatorSecretService $authenticatorSecrets,
@@ -174,6 +184,8 @@ class LoginMfaService
         }
 
         if ($state['expires_at'] <= now()->getTimestamp()) {
+            $this->clear($request);
+
             return ['status' => self::EXPIRED, 'method' => $state['method']];
         }
 
@@ -336,6 +348,134 @@ class LoginMfaService
         ));
     }
 
+    public function authenticatorTimeoutSeconds(): int
+    {
+        return max(30, (int) config('auth.authenticator.verification_timeout', self::AUTHENTICATOR_TIMEOUT_SECONDS));
+    }
+
+    public function warningThresholdSeconds(): int
+    {
+        return self::WARNING_THRESHOLD_SECONDS;
+    }
+
+    public function maxExtensions(): int
+    {
+        return self::MAX_EXTENSIONS;
+    }
+
+    public function extensionDurationSeconds(): int
+    {
+        return self::EXTENSION_DURATION_SECONDS;
+    }
+
+    public function remainingSeconds(Request $request, string $guard): int
+    {
+        $state = $this->state($request, $guard);
+
+        if ($state === null) {
+            return 0;
+        }
+
+        return max(0, $state['expires_at'] - now()->getTimestamp());
+    }
+
+    /**
+     * @return array{
+     *     status: string,
+     *     message?: string,
+     *     expires_at?: int,
+     *     remaining_seconds?: int,
+     *     warning_seconds?: int,
+     *     extensions_remaining?: int,
+     *     retry_after?: int
+     * }
+     */
+    public function extendAuthenticatorSession(Request $request, string $guard): array
+    {
+        $state = $this->state($request, $guard);
+        $user = $this->pendingUser($request, $guard);
+
+        if ($state === null || $user === null) {
+            return [
+                'status' => self::MISSING,
+                'message' => 'Your verification session is no longer valid. Please sign in again.',
+            ];
+        }
+
+        if (! $this->challengeUsesAuthenticator($request, $guard)) {
+            return [
+                'status' => 'unsupported',
+                'message' => 'Session extension is only supported for Authenticator verification.',
+            ];
+        }
+
+        $now = now()->getTimestamp();
+
+        // 1. Verify not already expired
+        if ($state['expires_at'] <= $now) {
+            $this->clear($request);
+
+            return [
+                'status' => self::EXPIRED,
+                'message' => 'Your verification session has expired. Please sign in again.',
+            ];
+        }
+
+        // 2. Prevent rapid repeated clicks (cooldown)
+        if ($state['last_extended_at'] !== null
+            && ($now - $state['last_extended_at']) < self::EXTENSION_COOLDOWN_SECONDS) {
+            $retryAfter = self::EXTENSION_COOLDOWN_SECONDS - ($now - $state['last_extended_at']);
+
+            return [
+                'status' => 'cooldown',
+                'message' => 'Please wait '.$retryAfter.' seconds before extending your session again.',
+                'retry_after' => $retryAfter,
+            ];
+        }
+
+        // 3. Cap at maximum extensions
+        if (($state['extensions_count'] ?? 0) >= self::MAX_EXTENSIONS) {
+            return [
+                'status' => 'max_extensions',
+                'message' => 'Maximum session extensions reached ('.self::MAX_EXTENSIONS.'/'.self::MAX_EXTENSIONS.'). Please complete verification.',
+                'extensions_remaining' => 0,
+            ];
+        }
+
+        $remainingSeconds = $state['expires_at'] - $now;
+
+        // 4. Only allow extension when 30 seconds or less remain
+        if ($remainingSeconds > self::WARNING_THRESHOLD_SECONDS) {
+            return [
+                'status' => 'not_in_warning_window',
+                'message' => 'Session can only be extended when '.self::WARNING_THRESHOLD_SECONDS.' seconds or less remain.',
+                'remaining_seconds' => $remainingSeconds,
+            ];
+        }
+
+        // Extend the session server-side
+        $newExpiresAt = $now + self::EXTENSION_DURATION_SECONDS;
+        $state['expires_at'] = $newExpiresAt;
+        $state['extensions_count'] = ($state['extensions_count'] ?? 0) + 1;
+        $state['last_extended_at'] = $now;
+
+        $request->session()->put(self::SESSION_KEY, $state);
+
+        return [
+            'status' => self::SUCCESS,
+            'expires_at' => $newExpiresAt,
+            'remaining_seconds' => self::EXTENSION_DURATION_SECONDS,
+            'warning_seconds' => self::WARNING_THRESHOLD_SECONDS,
+            'extensions_remaining' => max(0, self::MAX_EXTENSIONS - $state['extensions_count']),
+        ];
+    }
+
+    /** @return array{user_id: int, guard: string, method: string, expires_at: int, started_at: int, extensions_count: int, last_extended_at: ?int}|null */
+    public function statePayload(Request $request, string $guard): ?array
+    {
+        return $this->state($request, $guard);
+    }
+
     public function resendCooldownSeconds(): int
     {
         return max(1, (int) config('auth.login_mfa.resend_cooldown', 60));
@@ -352,6 +492,14 @@ class LoginMfaService
         ?string $authenticatorFingerprint = null,
     ): void {
         $now = now()->getTimestamp();
+        $isAuthenticator = in_array($method, [
+            self::METHOD_AUTHENTICATOR,
+            self::METHOD_AUTHENTICATOR_RECOVERY,
+        ], true);
+
+        $expiresAt = $isAuthenticator
+            ? $now + $this->authenticatorTimeoutSeconds()
+            : $now + ($this->expiresInMinutes() * 60);
 
         $request->session()->put(self::SESSION_KEY, [
             'user_id' => $user->getKey(),
@@ -359,7 +507,10 @@ class LoginMfaService
             'method' => $method,
             'otp_hash' => $otpHash,
             'authenticator_fingerprint' => $authenticatorFingerprint,
-            'expires_at' => $now + ($this->expiresInMinutes() * 60),
+            'expires_at' => $expiresAt,
+            'started_at' => $now,
+            'extensions_count' => 0,
+            'last_extended_at' => null,
             'attempts_remaining' => $this->maxAttempts(),
             'resend_available_at' => $now + $this->resendCooldownSeconds(),
             'remember' => $remember,
@@ -402,6 +553,15 @@ class LoginMfaService
                 ? $state['authenticator_fingerprint']
                 : null,
             'expires_at' => (int) $state['expires_at'],
+            'started_at' => is_numeric($state['started_at'] ?? null)
+                ? (int) $state['started_at']
+                : (int) $state['expires_at'] - self::AUTHENTICATOR_TIMEOUT_SECONDS,
+            'extensions_count' => is_numeric($state['extensions_count'] ?? null)
+                ? (int) $state['extensions_count']
+                : 0,
+            'last_extended_at' => is_numeric($state['last_extended_at'] ?? null)
+                ? (int) $state['last_extended_at']
+                : null,
             'attempts_remaining' => (int) $state['attempts_remaining'],
             'resend_available_at' => (int) $state['resend_available_at'],
             'remember' => $state['remember'],

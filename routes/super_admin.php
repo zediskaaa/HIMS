@@ -34,6 +34,13 @@ Route::prefix('super-admin')->name('super-admin.')->group(function () {
             ->defaults('auth_panel', AuthenticationPanel::SuperAdmin->value)
             ->middleware('throttle:3,1')
             ->name('login.mfa.resend');
+        Route::post('login/mfa/continue', [LoginMfaController::class, 'continueSession'])
+            ->defaults('auth_panel', AuthenticationPanel::SuperAdmin->value)
+            ->middleware('throttle:10,1')
+            ->name('login.mfa.continue');
+        Route::post('login/mfa/cancel', [LoginMfaController::class, 'cancel'])
+            ->defaults('auth_panel', AuthenticationPanel::SuperAdmin->value)
+            ->name('login.mfa.cancel');
         Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
             ->defaults('auth_panel', AuthenticationPanel::SuperAdmin->value)
             ->name('password.request');

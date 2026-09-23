@@ -23,8 +23,12 @@ use Throwable;
 
 class AuthenticatedSessionController extends Controller
 {
-    public function create(Request $request, LoginLockoutService $lockouts): View
+    public function create(Request $request, LoginLockoutService $lockouts, LoginMfaService $mfa): View
     {
+        if ($mfa->isExpired($request, AuthenticationContext::ADMIN_GUARD)) {
+            $mfa->clear($request);
+        }
+
         return view('admin.auth.login', [
             'loginRestriction' => $lockouts->sessionRestriction($request, AuthenticationContext::ADMIN_GUARD),
         ]);
@@ -42,7 +46,8 @@ class AuthenticatedSessionController extends Controller
             $pendingUser = $mfa->pendingUser($request, AuthenticationContext::ADMIN_GUARD);
 
             if ($pendingUser?->is($user)
-                && $mfa->challengeUsesAuthenticator($request, AuthenticationContext::ADMIN_GUARD)) {
+                && $mfa->challengeUsesAuthenticator($request, AuthenticationContext::ADMIN_GUARD)
+                && ! $mfa->isExpired($request, AuthenticationContext::ADMIN_GUARD)) {
                 return redirect()->route('admin.login.mfa');
             }
 

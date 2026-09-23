@@ -124,6 +124,7 @@ return [
         'issuer' => env('AUTH_AUTHENTICATOR_ISSUER', 'HIMS'),
         'window' => (int) env('AUTH_AUTHENTICATOR_WINDOW', 1),
         'setup_expire' => (int) env('AUTH_AUTHENTICATOR_SETUP_EXPIRE', 10),
+        'verification_timeout' => (int) env('AUTH_AUTHENTICATOR_VERIFICATION_TIMEOUT', 120),
     ],
 
     'password_expiration' => [

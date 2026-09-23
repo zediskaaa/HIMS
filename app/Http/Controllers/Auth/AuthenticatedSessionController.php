@@ -26,8 +26,12 @@ class AuthenticatedSessionController extends Controller
     /**
      * Display the login view.
      */
-    public function create(Request $request, LoginLockoutService $lockouts): View
+    public function create(Request $request, LoginLockoutService $lockouts, LoginMfaService $mfa): View
     {
+        if ($mfa->isExpired($request, AuthenticationContext::WEB_GUARD)) {
+            $mfa->clear($request);
+        }
+
         return view('auth.login', [
             'loginRestriction' => $lockouts->sessionRestriction($request, AuthenticationContext::WEB_GUARD),
         ]);
@@ -48,7 +52,8 @@ class AuthenticatedSessionController extends Controller
             $pendingUser = $mfa->pendingUser($request, AuthenticationContext::WEB_GUARD);
 
             if ($pendingUser?->is($user)
-                && $mfa->challengeUsesAuthenticator($request, AuthenticationContext::WEB_GUARD)) {
+                && $mfa->challengeUsesAuthenticator($request, AuthenticationContext::WEB_GUARD)
+                && ! $mfa->isExpired($request, AuthenticationContext::WEB_GUARD)) {
                 return redirect()->route('login.mfa');
             }
 

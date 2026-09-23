@@ -44,6 +44,13 @@ Route::middleware(['guest:web', 'guest:admin', 'guest:super_admin'])->group(func
         ->defaults('auth_panel', AuthenticationPanel::Staff->value)
         ->middleware('throttle:3,1')
         ->name('login.mfa.resend');
+    Route::post('login/mfa/continue', [LoginMfaController::class, 'continueSession'])
+        ->defaults('auth_panel', AuthenticationPanel::Staff->value)
+        ->middleware('throttle:10,1')
+        ->name('login.mfa.continue');
+    Route::post('login/mfa/cancel', [LoginMfaController::class, 'cancel'])
+        ->defaults('auth_panel', AuthenticationPanel::Staff->value)
+        ->name('login.mfa.cancel');
 
     Route::get('password-expired', [ExpiredPasswordController::class, 'show'])
         ->defaults('auth_panel', AuthenticationPanel::Staff->value)
