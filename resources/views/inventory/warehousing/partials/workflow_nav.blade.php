@@ -80,11 +80,13 @@
         @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
             <div class="pt-1">
                 <a
-                    href="{{ route('inventory.warehousing.scan-station') }}"
+                    href="{{ route('inventory.warehousing.scan-station', ['camera' => 1]) }}"
+                    @click="if (window.location.pathname.includes('/inventory/warehousing/scan-station')) { $event.preventDefault(); window.dispatchEvent(new CustomEvent('open-camera-scanner-camera-scanner-standby')); }"
+                    title="Scan Workstation"
                     class="flex items-center justify-center gap-2 w-full rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary-700"
                 >
                     <x-ui.icon name="qr-code" class="w-4 h-4" />
-                    <span>Launch Scan Workstation</span>
+                    <span>Launch Scanner</span>
                 </a>
             </div>
         @endcan
@@ -293,15 +295,17 @@
             </div>
         @endcanany
 
-        {{-- Quick Action: Scan Workstation --}}
+        {{-- Quick Action: Launch Scanner --}}
         @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
             <div class="sm:ml-auto">
                 <a
-                    href="{{ route('inventory.warehousing.scan-station') }}"
+                    href="{{ route('inventory.warehousing.scan-station', ['camera' => 1]) }}"
+                    @click="if (window.location.pathname.includes('/inventory/warehousing/scan-station')) { $event.preventDefault(); window.dispatchEvent(new CustomEvent('open-camera-scanner-camera-scanner-standby')); }"
+                    title="Scan Workstation"
                     class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-3.5 py-2 font-semibold text-white shadow-2xs hover:bg-primary-700 transition focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1"
                 >
                     <x-ui.icon name="qr-code" class="w-4 h-4" />
-                    <span>Scan Workstation</span>
+                    <span>Launch Scanner</span>
                 </a>
             </div>
         @endcan

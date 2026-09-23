@@ -381,7 +381,18 @@ class CameraScanWorkflowTest extends TestCase
         $response = $this->actingAs($operator)->get(route('inventory.warehousing.dashboard'));
         $response->assertOk()
             ->assertSee('Smart Warehousing System (SWS)')
-            ->assertSee($source->barcode_value);
+            ->assertSee($source->barcode_value)
+            ->assertDontSee('View All (', false);
+    }
+
+    public function test_smart_warehousing_dashboard_hides_view_all_when_tasks_are_zero_or_few(): void
+    {
+        $operator = User::factory()->warehouseStaff()->create();
+
+        // 0 tasks: should not display "View All (0)"
+        $response = $this->actingAs($operator)->get(route('inventory.warehousing.dashboard'));
+        $response->assertOk();
+        $response->assertDontSee('View All (', false);
     }
 
     public function test_unauthorized_user_cannot_perform_barcode_lookup(): void
@@ -516,5 +527,23 @@ class CameraScanWorkflowTest extends TestCase
                 'success' => false,
                 'status' => 'not_found',
             ]);
+    }
+
+    public function test_scan_station_supports_direct_camera_launch_and_nav_link(): void
+    {
+        $operator = User::factory()->warehouseStaff()->create();
+
+        // 1. Dashboard displays Launch Scanner action with direct camera query param
+        $dashboardResponse = $this->actingAs($operator)->get(route('inventory.warehousing.dashboard'));
+        $dashboardResponse->assertOk()
+            ->assertSee(route('inventory.warehousing.scan-station', ['camera' => 1]))
+            ->assertSee('Launch Scanner');
+
+        // 2. Scan station handles direct camera parameter and includes auto-lookup on scan
+        $scanResponse = $this->actingAs($operator)->get(route('inventory.warehousing.scan-station', ['camera' => 1]));
+        $scanResponse->assertOk()
+            ->assertSee('camera-scanner-standby')
+            ->assertSee('@hims-code-scanned.window', false)
+            ->assertSee('lookupBarcode', false);
     }
 }

@@ -11,6 +11,7 @@
     'title' => 'Barcode & 2D QR Scanner',
     'hint' => 'Point camera at a barcode label (Bin, Shelf, SKU, or GS1 DataMatrix).',
     'showTrigger' => true,
+    'autostart' => false,
 ])
 
 <div
@@ -22,6 +23,8 @@
         eventName: '{{ $eventName }}',
         validateFormat: '{{ $validateFormat }}'
     })"
+    @open-camera-scanner-{{ $id }}.window="open()"
+    x-init="if ({{ $autostart ? 'true' : 'false' }} || ((new URLSearchParams(window.location.search).has('camera') || new URLSearchParams(window.location.search).has('scan')) && '{{ $id }}' === 'camera-scanner-standby')) { $nextTick(() => open()); }"
     class="inline-block"
 >
     @if($showTrigger)

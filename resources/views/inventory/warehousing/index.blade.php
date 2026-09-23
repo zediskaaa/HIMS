@@ -73,9 +73,11 @@
                     <div class="flex items-center justify-between border-b border-neutral-100 px-6 py-4">
                         <h3 class="text-base font-semibold text-neutral-900">Recent Warehouse Tasks</h3>
                         @can(\App\Enums\Permission::ViewWarehouseTasks->value)
-                        <a href="{{ route('inventory.warehouse-tasks.index') }}" class="text-xs font-semibold text-primary-600 hover:text-primary-800">
-                            View All ({{ $metrics['open_tasks'] }}) &rarr;
-                        </a>
+                            @if($metrics['open_tasks'] > 5 && $metrics['open_tasks'] > $recentTasks->count())
+                                <a href="{{ route('inventory.warehouse-tasks.index') }}" class="text-xs font-semibold text-primary-600 hover:text-primary-800">
+                                    View All ({{ $metrics['open_tasks'] }}) &rarr;
+                                </a>
+                            @endif
                         @endcan
                     </div>
                     <div class="divide-y divide-neutral-100 overflow-hidden">
@@ -128,11 +130,6 @@
                             <h3 class="text-base font-semibold text-neutral-900">Real-Time Scan Log</h3>
                             <p class="text-xs text-neutral-500">GS1 DataMatrix and location barcode verification events.</p>
                         </div>
-                        @can(\App\Enums\Permission::ExecuteWarehouseTasks->value)
-                        <a href="{{ route('inventory.warehousing.scan-station') }}" class="text-xs font-semibold text-primary-600 hover:text-primary-800">
-                            Launch Scanner &rarr;
-                        </a>
-                        @endcan
                     </div>
                     <div class="divide-y divide-neutral-100 overflow-hidden">
                         @forelse($recentScans as $scan)

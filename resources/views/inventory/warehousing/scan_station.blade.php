@@ -14,7 +14,10 @@
         </div>
     </x-slot>
 
-    <div class="space-y-6" x-data="{
+    <div
+        class="space-y-6"
+        @hims-code-scanned.window="if ($event.detail.targetInputId === 'standby_scan_input') { scanInput = $event.detail.code; lookupBarcode($event.detail.code); }"
+        x-data="{
         selectedTaskId: '{{ $activeTasks->first()?->id ?? '' }}',
         scanInput: '',
         lookupLoading: false,
