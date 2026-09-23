@@ -30,6 +30,7 @@ use App\Http\Controllers\Inventory\WarehouseTaskController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PrivacyRequestController;
+use App\Http\Controllers\Privacy\DsarDownloadController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
@@ -303,6 +304,8 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     // Data Subject Requests under RA 10173
     Route::post('/privacy/requests', [PrivacyRequestController::class, 'store'])
         ->name('privacy.requests.store');
+    Route::get('/privacy/requests/{privacyRequest}/download', [DsarDownloadController::class, 'download'])
+        ->name('privacy.requests.download');
 });
 
 /*
@@ -341,9 +344,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
     // Data Privacy Act (RA 10173) & ISO/IEC 27001 Security & Privacy Governance
     Route::get('/privacy', [PrivacyGovernanceController::class, 'index'])->name('privacy.index');
+    Route::post('/privacy/requests/{privacyRequest}/approve', [PrivacyGovernanceController::class, 'approveRequest'])->name('privacy.requests.approve');
+    Route::post('/privacy/requests/{privacyRequest}/under-review', [PrivacyGovernanceController::class, 'markUnderReview'])->name('privacy.requests.under-review');
     Route::post('/privacy/requests/{privacyRequest}/fulfill', [PrivacyGovernanceController::class, 'fulfillRequest'])->name('privacy.requests.fulfill');
     Route::post('/privacy/requests/{privacyRequest}/reject', [PrivacyGovernanceController::class, 'rejectRequest'])->name('privacy.requests.reject');
+    Route::post('/privacy/requests/{privacyRequest}/regenerate', [PrivacyGovernanceController::class, 'regeneratePackage'])->name('privacy.requests.regenerate');
     Route::get('/privacy/requests/{privacyRequest}/export', [PrivacyGovernanceController::class, 'exportUserData'])->name('privacy.requests.export');
+    Route::get('/privacy/requests/{privacyRequest}/download', [DsarDownloadController::class, 'download'])->name('privacy.requests.download-package');
     Route::post('/privacy/incidents', [PrivacyGovernanceController::class, 'storeIncident'])->name('privacy.incidents.store');
     Route::put('/privacy/incidents/{incident}', [PrivacyGovernanceController::class, 'updateIncident'])->name('privacy.incidents.update');
     Route::post('/privacy/retention/sweep', [PrivacyGovernanceController::class, 'sweepRetention'])->name('privacy.retention.sweep');

@@ -195,4 +195,206 @@ class DataSubjectRequestTest extends TestCase
         $this->assertArrayNotHasKey('password', $data['account_profile']);
         $this->assertArrayNotHasKey('two_factor_secret', $data['account_profile']);
     }
+
+    public function test_dpo_approval_triggers_full_fulfillment_and_generates_zip_package(): void
+    {
+        $admin = User::factory()->superAdministrator()->create();
+        $user = User::factory()->create([
+            'name' => 'Pharmacist Juan Dela Cruz',
+            'email' => 'juan.delacruz@hospital.gov.ph',
+            'employee_id' => 'EMP-PHARM-1001',
+        ]);
+
+        $dsr = PrivacyRequest::create([
+            'ticket_number' => 'DSR-20260924-8888',
+            'user_id' => $user->id,
+            'request_type' => 'access',
+            'status' => 'pending',
+            'details' => 'Full access and data portability export request.',
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->post(route('admin.privacy.requests.approve', $dsr), [
+                'resolution_notes' => 'Approved by DPO. Disclosure authorized under RA 10173 Section 16(c).',
+            ]);
+
+        $response->assertSessionHas('status');
+
+        $dsr->refresh();
+        $this->assertSame('fulfilled', $dsr->status);
+        $this->assertNotNull($dsr->approved_at);
+        $this->assertSame($admin->id, $dsr->approved_by_user_id);
+        $this->assertNotNull($dsr->fulfilled_at);
+        $this->assertNotNull($dsr->package_filename);
+        $this->assertNotNull($dsr->package_path);
+        $this->assertNotNull($dsr->package_hash);
+        $this->assertGreaterThan(0, $dsr->package_size_bytes);
+        $this->assertTrue($dsr->isDownloadable());
+
+        // Verify package file exists on private storage disk
+        $fullPath = storage_path("app/private/{$dsr->package_path}");
+        $this->assertFileExists($fullPath);
+
+        // Verify ZIP contents
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($fullPath));
+        $this->assertNotFalse($zip->locateName('account-profile-and-roles.json'));
+        $this->assertNotFalse($zip->locateName('activity-metadata.csv'));
+        $this->assertNotFalse($zip->locateName('data-access-and-processing-transparency-report.pdf'));
+        $this->assertNotFalse($zip->locateName('dpo-resolution.pdf'));
+        $this->assertNotFalse($zip->locateName('manifest.json'));
+        $this->assertNotFalse($zip->locateName('README.txt'));
+
+        // Inspect JSON artifact
+        $jsonContent = $zip->getFromName('account-profile-and-roles.json');
+        $this->assertIsString($jsonContent);
+        $jsonData = json_decode($jsonContent, true);
+        $this->assertSame('Pharmacist Juan Dela Cruz', $jsonData['data_subject']['name']);
+        $this->assertSame('EMP-PHARM-1001', $jsonData['data_subject']['employee_id']);
+        $this->assertArrayNotHasKey('password', $jsonData['account_profile']['personal_identity']);
+        $this->assertArrayNotHasKey('authenticator_secret', $jsonData['account_profile']['security_settings']);
+
+        // Inspect Manifest and Checksums
+        $manifestContent = $zip->getFromName('manifest.json');
+        $this->assertIsString($manifestContent);
+        $manifest = json_decode($manifestContent, true);
+        $this->assertSame("HIMS-DSAR-{$dsr->ticket_number}.zip", $manifest['package_reference']);
+        $this->assertCount(5, $manifest['files']);
+
+        $zip->close();
+    }
+
+    public function test_activity_metadata_redacts_patient_identifying_information(): void
+    {
+        $admin = User::factory()->superAdministrator()->create();
+        $user = User::factory()->create();
+
+        // Create an audit log record with patient info
+        \App\Models\AuditLog::create([
+            'event_id' => 'EVT-TEST-001',
+            'user_id' => $user->id,
+            'actor_name' => $user->name,
+            'actor_employee_id' => $user->employee_id,
+            'actor_role' => $user->role->value,
+            'action' => \App\Enums\AuditAction::CreatedMaterialRequisition,
+            'event_category' => 'Store Requisitions',
+            'module' => 'Store Requisitions',
+            'description' => 'Issued 50 ampoules Paracetamol for Patient ID: PAT-99944 at Ward 3.',
+            'target_name' => 'Patient: John Doe Room 102',
+            'business_reason' => 'Emergency clinical requisition for patient MRN: 888771.',
+            'outcome' => 'success',
+            'occurred_at_utc' => now()->toIso8601String(),
+        ]);
+
+        $dsr = PrivacyRequest::create([
+            'ticket_number' => 'DSR-20260924-7777',
+            'user_id' => $user->id,
+            'request_type' => 'access',
+            'status' => 'pending',
+            'details' => 'Export my activity records.',
+        ]);
+
+        $this->actingAs($admin)->post(route('admin.privacy.requests.approve', $dsr));
+
+        $dsr->refresh();
+        $fullPath = storage_path("app/private/{$dsr->package_path}");
+        $zip = new \ZipArchive();
+        $zip->open($fullPath);
+        $csvContent = $zip->getFromName('activity-metadata.csv');
+        $zip->close();
+
+        $this->assertStringContainsString('[REDACTED - PATIENT PRIVACY]', $csvContent);
+        $this->assertStringNotContainsString('PAT-99944', $csvContent);
+        $this->assertStringNotContainsString('888771', $csvContent);
+    }
+
+    public function test_authenticated_user_can_download_their_own_fulfilled_package(): void
+    {
+        $admin = User::factory()->superAdministrator()->create();
+        $user = User::factory()->create();
+
+        $dsr = PrivacyRequest::create([
+            'ticket_number' => 'DSR-20260924-6666',
+            'user_id' => $user->id,
+            'request_type' => 'access',
+            'status' => 'pending',
+            'details' => 'Access and portability request.',
+        ]);
+
+        // Fulfill the request
+        $this->actingAs($admin)->post(route('admin.privacy.requests.approve', $dsr));
+        $dsr->refresh();
+
+        // User downloads their own package
+        $response = $this->actingAs($user)
+            ->get(route('privacy.requests.download', $dsr));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/zip');
+        $this->assertStringContainsString('attachment;', (string) $response->headers->get('Content-Disposition'));
+
+        $dsr->refresh();
+        $this->assertSame(1, $dsr->download_count);
+        $this->assertNotNull($dsr->last_downloaded_at);
+
+        // Verify audit log recorded
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => \App\Enums\AuditAction::DownloadedPrivacyPackage->value,
+            'target_id' => (string) $dsr->id,
+            'user_id' => $user->id,
+        ]);
+    }
+
+    public function test_unauthorized_user_cannot_download_another_users_package(): void
+    {
+        $admin = User::factory()->superAdministrator()->create();
+        $userA = User::factory()->create();
+        $userB = User::factory()->create();
+
+        $dsr = PrivacyRequest::create([
+            'ticket_number' => 'DSR-20260924-5555',
+            'user_id' => $userA->id,
+            'request_type' => 'access',
+            'status' => 'pending',
+            'details' => 'Data access request.',
+        ]);
+
+        $this->actingAs($admin)->post(route('admin.privacy.requests.approve', $dsr));
+        $dsr->refresh();
+
+        // User B tries to download User A's package
+        $response = $this->actingAs($userB)
+            ->get(route('privacy.requests.download', $dsr));
+
+        $response->assertForbidden();
+
+        $dsr->refresh();
+        $this->assertSame(0, $dsr->download_count);
+    }
+
+    public function test_expired_package_cannot_be_downloaded(): void
+    {
+        $admin = User::factory()->superAdministrator()->create();
+        $user = User::factory()->create();
+
+        $dsr = PrivacyRequest::create([
+            'ticket_number' => 'DSR-20260924-4444',
+            'user_id' => $user->id,
+            'request_type' => 'access',
+            'status' => 'pending',
+            'details' => 'Data access request.',
+        ]);
+
+        $this->actingAs($admin)->post(route('admin.privacy.requests.approve', $dsr));
+        $dsr->refresh();
+
+        // Force expiration
+        $dsr->update(['package_expires_at' => now()->subDay()]);
+
+        $response = $this->actingAs($user)
+            ->get(route('privacy.requests.download', $dsr));
+
+        $response->assertStatus(410);
+    }
 }
+

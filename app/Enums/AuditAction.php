@@ -115,6 +115,9 @@ enum AuditAction: string
     case AnalyzedAiChatAttachment = 'analyzed_ai_chat_attachment';
     case FailedAiChatAttachment = 'failed_ai_chat_attachment';
     case SubmittedPrivacyRequest = 'submitted_privacy_request';
+    case ApprovedPrivacyRequest = 'approved_privacy_request';
+    case FulfilledPrivacyRequest = 'fulfilled_privacy_request';
+    case DownloadedPrivacyPackage = 'downloaded_privacy_package';
     case ResolvedPrivacyRequest = 'resolved_privacy_request';
     case RecordedSecurityIncident = 'recorded_security_incident';
     case UpdatedSecurityIncident = 'updated_security_incident';
@@ -235,6 +238,9 @@ enum AuditAction: string
             self::AnalyzedAiChatAttachment => 'Analyzed AI Chat Attachment',
             self::FailedAiChatAttachment => 'Failed AI Chat Attachment',
             self::SubmittedPrivacyRequest => 'Submitted Privacy Request',
+            self::ApprovedPrivacyRequest => 'Approved Privacy Request',
+            self::FulfilledPrivacyRequest => 'Fulfilled Privacy Request',
+            self::DownloadedPrivacyPackage => 'Downloaded Privacy Export Package',
             self::ResolvedPrivacyRequest => 'Resolved Privacy Request',
             self::RecordedSecurityIncident => 'Recorded Security Incident',
             self::UpdatedSecurityIncident => 'Updated Security Incident',
@@ -258,6 +264,7 @@ enum AuditAction: string
             ], true) => 'Authentication',
             in_array($this, [self::CreatedUser, self::UpdatedUser, self::DeletedUser, self::ArchivedUser, self::UnarchivedUser], true) => 'User Administration',
             str_contains($this->value, 'privacy_request')
+                || str_contains($this->value, 'privacy_package')
                 || str_contains($this->value, 'security_incident')
                 || $this === self::ExecutedDataRetention => 'Privacy & Security Governance',
             $this === self::ExportedSystemReport => 'Reports & Analytics',

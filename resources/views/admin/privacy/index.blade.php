@@ -348,8 +348,8 @@
                                     <th class="px-4 py-3">Requester</th>
                                     <th class="px-4 py-3">Type</th>
                                     <th class="px-4 py-3">Status</th>
-                                    <th class="px-4 py-3">Details / Request</th>
-                                    <th class="px-4 py-3">Submitted</th>
+                                    <th class="px-4 py-3">SLA / Deadline</th>
+                                    <th class="px-4 py-3">Fulfillment Package</th>
                                     <th class="px-4 py-3 text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -360,88 +360,257 @@
                                             #{{ $requestItem->ticket_number }}
                                         </td>
                                         <td class="px-4 py-3.5 whitespace-nowrap">
-                                            <div class="font-medium text-neutral-900 dark:text-neutral-100">{{ $requestItem->user?->name ?? 'External / Deleted User' }}</div>
-                                            <div class="text-[11px] text-neutral-500 font-mono">{{ $requestItem->user?->employee_id ?? 'N/A' }}</div>
+                                            <div class="font-medium text-neutral-900 dark:text-neutral-100">{{ $requestItem->user?->name ?? $requestItem->requestor_name }}</div>
+                                            <div class="text-[11px] text-neutral-500 font-mono">{{ $requestItem->user?->employee_id ?? 'External / System' }}</div>
                                         </td>
                                         <td class="px-4 py-3.5 whitespace-nowrap">
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
                                                 {{ $requestItem->type_label }}
                                             </span>
                                         </td>
                                         <td class="px-4 py-3.5 whitespace-nowrap">
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold
-                                                {{ $requestItem->status === 'fulfilled' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' :
-                                                   ($requestItem->status === 'rejected' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300' :
-                                                   'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300') }}">
-                                                {{ $requestItem->status_label }}
+                                            @php
+                                                $badge = $requestItem->statusBadge();
+                                                $toneClasses = match ($badge['tone']) {
+                                                    'success' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
+                                                    'primary' => 'bg-primary-100 text-primary-800 dark:bg-primary-950/60 dark:text-primary-300',
+                                                    'danger' => 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300',
+                                                    'warning' => 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300',
+                                                    default => 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-300',
+                                                };
+                                            @endphp
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold {{ $toneClasses }}">
+                                                {{ $badge['label'] }}
                                             </span>
                                         </td>
-                                        <td class="px-4 py-3.5 text-neutral-600 dark:text-neutral-300 max-w-xs break-words">
-                                            <p class="line-clamp-2">{{ $requestItem->details }}</p>
-                                            @if ($requestItem->resolution_notes)
-                                                <div class="mt-1 text-[11px] text-neutral-500 italic">
-                                                    <strong>Resolution:</strong> {{ $requestItem->resolution_notes }}
-                                                </div>
+                                        <td class="px-4 py-3.5 whitespace-nowrap text-[11px]">
+                                            @if ($requestItem->target_completion_date)
+                                                @php $daysRemaining = $requestItem->daysRemaining(); @endphp
+                                                @if (in_array($requestItem->status, ['fulfilled', 'released']))
+                                                    <span class="text-emerald-600 dark:text-emerald-400 font-medium">Fulfilled</span>
+                                                @elseif ($requestItem->isOverdue())
+                                                    <span class="text-rose-600 dark:text-rose-400 font-semibold">Overdue ({{ abs($daysRemaining) }}d ago)</span>
+                                                @else
+                                                    <span class="text-neutral-600 dark:text-neutral-300">{{ $daysRemaining }}d remaining</span>
+                                                @endif
+                                                <div class="text-[10px] text-neutral-400">{{ $requestItem->target_completion_date->format('M d, Y') }}</div>
+                                            @else
+                                                <span class="text-neutral-400">—</span>
                                             @endif
                                         </td>
-                                        <td class="px-4 py-3.5 whitespace-nowrap text-neutral-500 text-[11px]">
-                                            {{ $requestItem->created_at->format('M d, Y H:i') }}
+                                        <td class="px-4 py-3.5 whitespace-nowrap text-[11px]">
+                                            @if ($requestItem->isDownloadable())
+                                                <div class="flex items-center gap-1.5">
+                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-mono text-[10px] font-semibold">
+                                                        ZIP · {{ $requestItem->formattedPackageSize() }}
+                                                    </span>
+                                                    <span class="text-[10px] text-neutral-400">Exp: {{ $requestItem->package_expires_at?->format('M d') }}</span>
+                                                </div>
+                                            @elseif ($requestItem->status === 'approved' || $requestItem->status === 'processing')
+                                                <span class="text-primary-600 dark:text-primary-400 animate-pulse font-medium">Assembling package...</span>
+                                            @elseif ($requestItem->status === 'rejected')
+                                                <span class="text-rose-600 dark:text-rose-400 italic">Refused under Sec. 16</span>
+                                            @else
+                                                <span class="text-neutral-400 italic">Awaiting Approval</span>
+                                            @endif
                                         </td>
                                         <td class="px-4 py-3.5 whitespace-nowrap text-right space-x-1">
-                                            @if ($requestItem->user)
+                                            @if ($requestItem->isDownloadable())
                                                 <a
-                                                    href="{{ route('admin.privacy.requests.export', $requestItem) }}"
-                                                    data-hims-download
-                                                    data-loading-text="Preparing export..."
-                                                    data-download-name="personal-data-export-{{ $requestItem->ticket_number }}.json"
-                                                    class="inline-flex items-center px-2 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 rounded transition"
-                                                    title="Download Sanitized Personal Data Export (JSON)"
+                                                    href="{{ route('admin.privacy.requests.download-package', $requestItem) }}"
+                                                    class="inline-flex items-center px-2.5 py-1 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded transition shadow-2xs"
+                                                    title="Download Complete DSAR Package (ZIP)"
                                                 >
                                                     <x-ui.icon name="arrow-down-tray" class="h-3.5 w-3.5 mr-1" />
-                                                    Export
+                                                    Download
                                                 </a>
                                             @endif
 
-                                            @if ($requestItem->status !== 'fulfilled' && $requestItem->status !== 'rejected')
-                                                <button
-                                                    type="button"
-                                                    x-data
-                                                    x-on:click="$dispatch('open-modal', 'fulfill-dsr-modal-{{ $requestItem->id }}')"
-                                                    class="inline-flex items-center px-2 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 hover:bg-emerald-100 rounded transition"
-                                                >
-                                                    Fulfill
-                                                </button>
-
-                                                <button
-                                                    type="button"
-                                                    x-data
-                                                    x-on:click="$dispatch('open-modal', 'reject-dsr-modal-{{ $requestItem->id }}')"
-                                                    class="inline-flex items-center px-2 py-1 text-xs font-medium text-rose-700 bg-rose-50 dark:bg-rose-950/60 dark:text-rose-300 hover:bg-rose-100 rounded transition"
-                                                >
-                                                    Refuse (DPA Sec. 16)
-                                                </button>
-                                            @endif
+                                            <button
+                                                type="button"
+                                                x-data
+                                                x-on:click="$dispatch('open-modal', 'dsr-details-modal-{{ $requestItem->id }}')"
+                                                class="inline-flex items-center px-2.5 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 rounded transition"
+                                            >
+                                                Details &amp; Actions
+                                            </button>
                                         </td>
                                     </tr>
 
-                                    {{-- Fulfill Modal --}}
-                                    <x-ui.modal name="fulfill-dsr-modal-{{ $requestItem->id }}" title="Fulfill Data Subject Request #{{ $requestItem->ticket_number }}" maxWidth="md">
-                                        <form method="POST" action="{{ route('admin.privacy.requests.fulfill', $requestItem) }}" class="space-y-4">
-                                            @csrf
-                                            <p class="text-xs text-neutral-600 dark:text-neutral-400">
-                                                Confirm fulfillment of this request. The requester will be notified of the resolution and portable data export availability.
-                                            </p>
-
-                                            <div>
-                                                <label class="block text-xs font-semibold text-neutral-700 dark:text-neutral-300">Resolution Notes (Optional)</label>
-                                                <textarea name="resolution_notes" rows="3" class="mt-1 block w-full rounded-md border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs shadow-sm" placeholder="Actions taken (e.g. data verified, export generated)..."></textarea>
+                                    {{-- Comprehensive DSR Details & Review Modal --}}
+                                    <x-ui.modal name="dsr-details-modal-{{ $requestItem->id }}" title="Data Subject Request #{{ $requestItem->ticket_number }}" maxWidth="2xl">
+                                        <div class="space-y-4">
+                                            {{-- Status Pipeline Indicator --}}
+                                            <div class="rounded-xl border border-neutral-200 bg-neutral-50/70 p-3.5 dark:border-neutral-800 dark:bg-neutral-800/40">
+                                                <p class="text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2">Request Lifecycle Progression</p>
+                                                <div class="flex items-center justify-between text-[11px] font-semibold">
+                                                    @php
+                                                        $statusOrder = ['submitted', 'under_review', 'approved', 'processing', 'fulfilled'];
+                                                        $currKey = match ($requestItem->status) {
+                                                            'pending' => 'submitted',
+                                                            'released' => 'fulfilled',
+                                                            default => $requestItem->status,
+                                                        };
+                                                        $currIndex = array_search($currKey, $statusOrder, true);
+                                                        if ($currIndex === false) $currIndex = -1;
+                                                    @endphp
+                                                    <span class="{{ $currIndex >= 0 ? 'text-primary-600 dark:text-primary-400 font-bold' : 'text-neutral-400' }}">1. Submitted</span>
+                                                    <span class="text-neutral-300 dark:text-neutral-600">→</span>
+                                                    <span class="{{ $currIndex >= 1 ? 'text-primary-600 dark:text-primary-400 font-bold' : 'text-neutral-400' }}">2. Under Review</span>
+                                                    <span class="text-neutral-300 dark:text-neutral-600">→</span>
+                                                    <span class="{{ $currIndex >= 2 ? 'text-primary-600 dark:text-primary-400 font-bold' : 'text-neutral-400' }}">3. Approved</span>
+                                                    <span class="text-neutral-300 dark:text-neutral-600">→</span>
+                                                    <span class="{{ $currIndex >= 3 ? 'text-primary-600 dark:text-primary-400 font-bold' : 'text-neutral-400' }}">4. Processing</span>
+                                                    <span class="text-neutral-300 dark:text-neutral-600">→</span>
+                                                    <span class="{{ $currIndex >= 4 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-neutral-400' }}">5. Released</span>
+                                                </div>
                                             </div>
 
-                                            <div class="flex justify-end gap-2 pt-3 border-t border-neutral-200 dark:border-neutral-800">
-                                                <button type="button" x-on:click="$dispatch('close-modal', 'fulfill-dsr-modal-{{ $requestItem->id }}')" class="px-3 py-1.5 text-xs rounded border border-neutral-300">Cancel</button>
-                                                <button type="submit" class="px-3 py-1.5 text-xs rounded bg-emerald-600 text-white font-semibold">Mark as Fulfilled</button>
+                                            {{-- Request Information Grid --}}
+                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                                <div class="p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 space-y-1.5">
+                                                    <p class="font-bold text-neutral-800 dark:text-neutral-200">Request Information</p>
+                                                    <div class="flex justify-between"><span class="text-neutral-500">Ticket Reference:</span> <span class="font-mono font-semibold">#{{ $requestItem->ticket_number }}</span></div>
+                                                    <div class="flex justify-between"><span class="text-neutral-500">Request Type:</span> <span class="font-medium">{{ $requestItem->type_label }}</span></div>
+                                                    <div class="flex justify-between"><span class="text-neutral-500">Date Submitted:</span> <span>{{ $requestItem->created_at->format('M d, Y H:i') }}</span></div>
+                                                    <div class="flex justify-between"><span class="text-neutral-500">Current Status:</span> <span class="font-semibold">{{ $requestItem->status_label }}</span></div>
+                                                    @if ($requestItem->approved_at)
+                                                        <div class="flex justify-between"><span class="text-neutral-500">Approved Date:</span> <span>{{ $requestItem->approved_at->format('M d, Y') }}</span></div>
+                                                        <div class="flex justify-between"><span class="text-neutral-500">Reviewing DPO:</span> <span>{{ $requestItem->approvedBy?->name ?? 'DPO Authorized' }}</span></div>
+                                                    @endif
+                                                </div>
+
+                                                <div class="p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 space-y-1.5">
+                                                    <p class="font-bold text-neutral-800 dark:text-neutral-200">Data Subject Profile</p>
+                                                    <div class="flex justify-between"><span class="text-neutral-500">Full Name:</span> <span class="font-medium">{{ $requestItem->user?->name ?? $requestItem->requestor_name }}</span></div>
+                                                    <div class="flex justify-between"><span class="text-neutral-500">Employee ID:</span> <span class="font-mono">{{ $requestItem->user?->employee_id ?? 'N/A' }}</span></div>
+                                                    <div class="flex justify-between"><span class="text-neutral-500">Department:</span> <span>{{ $requestItem->user?->department?->value ?? (string) $requestItem->user?->department ?? 'General' }}</span></div>
+                                                    <div class="flex justify-between"><span class="text-neutral-500">Official Email:</span> <span class="truncate max-w-[150px]">{{ $requestItem->user?->email ?? $requestItem->requestor_email }}</span></div>
+                                                    <div class="flex justify-between"><span class="text-neutral-500">System Role:</span> <span>{{ $requestItem->user?->role?->label() ?? 'Standard User' }}</span></div>
+                                                </div>
                                             </div>
-                                        </form>
+
+                                            {{-- Details & Specific Grounds --}}
+                                            <div class="rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 text-xs bg-white dark:bg-neutral-900">
+                                                <p class="font-bold text-neutral-800 dark:text-neutral-200 mb-1">Requester Petition &amp; Specific Grounds</p>
+                                                <p class="text-neutral-600 dark:text-neutral-300 leading-relaxed">{{ $requestItem->details }}</p>
+                                            </div>
+
+                                            {{-- Requested Categories Checklist --}}
+                                            <div class="rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 text-xs bg-white dark:bg-neutral-900">
+                                                <p class="font-bold text-neutral-800 dark:text-neutral-200 mb-2">Scope of Personal Data Disclosure</p>
+                                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                    <div class="flex items-center gap-1.5 text-neutral-700 dark:text-neutral-300">
+                                                        <x-ui.icon name="check-circle" class="h-4 w-4 text-emerald-500 shrink-0" />
+                                                        <span>Account Profile</span>
+                                                    </div>
+                                                    <div class="flex items-center gap-1.5 text-neutral-700 dark:text-neutral-300">
+                                                        <x-ui.icon name="check-circle" class="h-4 w-4 text-emerald-500 shrink-0" />
+                                                        <span>Role &amp; RBAC Access</span>
+                                                    </div>
+                                                    <div class="flex items-center gap-1.5 text-neutral-700 dark:text-neutral-300">
+                                                        <x-ui.icon name="check-circle" class="h-4 w-4 text-emerald-500 shrink-0" />
+                                                        <span>Personal Activity Logs</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {{-- Package Manifest Details if Available --}}
+                                            @if ($requestItem->package_manifest)
+                                                <div class="rounded-xl border border-emerald-200 bg-emerald-50/40 dark:border-emerald-900/60 dark:bg-emerald-950/20 p-3.5 text-xs space-y-2.5">
+                                                    <div class="flex items-center justify-between">
+                                                        <p class="font-bold text-emerald-900 dark:text-emerald-200">Fulfillment Package Artifacts (SHA-256 Verified)</p>
+                                                        <span class="font-mono text-[11px] text-emerald-700 dark:text-emerald-300">Size: {{ $requestItem->formattedPackageSize() }}</span>
+                                                    </div>
+                                                    <div class="divide-y divide-emerald-200/60 dark:divide-emerald-900/60 font-mono text-[11px]">
+                                                        @foreach ($requestItem->package_manifest['files'] ?? [] as $file)
+                                                            <div class="py-1.5 flex items-center justify-between">
+                                                                <span class="text-neutral-800 dark:text-neutral-200 font-semibold">{{ $file['filename'] }}</span>
+                                                                <span class="text-neutral-500 dark:text-neutral-400 text-[10px]">{{ number_format($file['size_bytes']) }} B</span>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                    <div class="pt-2 border-t border-emerald-200/60 dark:border-emerald-900/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-[10px] text-neutral-600 dark:text-neutral-400">
+                                                        <div>
+                                                            <span>Archive SHA-256: </span>
+                                                            <span class="font-mono font-semibold">{{ substr($requestItem->package_hash ?? '', 0, 24) }}...</span>
+                                                        </div>
+                                                        <div>
+                                                            <span>Expires: </span>
+                                                            <span class="font-semibold">{{ $requestItem->package_expires_at?->format('M d, Y H:i') }}</span>
+                                                            <span> · Downloads: {{ $requestItem->download_count }}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endif
+
+                                            {{-- Resolution Notes / Refusal Justification --}}
+                                            @if ($requestItem->resolution_notes)
+                                                <div class="rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 text-xs bg-neutral-50 dark:bg-neutral-800/50">
+                                                    <p class="font-bold text-neutral-800 dark:text-neutral-200 mb-1">
+                                                        {{ $requestItem->status === 'rejected' ? 'Statutory Refusal Justification (RA 10173 Sec. 16)' : 'Resolution Notes' }}
+                                                    </p>
+                                                    <p class="text-neutral-600 dark:text-neutral-300 leading-relaxed">{{ $requestItem->resolution_notes }}</p>
+                                                </div>
+                                            @endif
+
+                                            {{-- Actions Footer --}}
+                                            <div class="flex flex-col sm:flex-row items-center justify-between gap-2 pt-3 border-t border-neutral-200 dark:border-neutral-800">
+                                                <div>
+                                                    @if ($requestItem->status === 'pending')
+                                                        <form method="POST" action="{{ route('admin.privacy.requests.under-review', $requestItem) }}" class="inline">
+                                                            @csrf
+                                                            <button type="submit" class="px-2.5 py-1.5 text-xs rounded border border-neutral-300 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 transition">
+                                                                Mark Under Review
+                                                            </button>
+                                                        </form>
+                                                    @elseif ($requestItem->isDownloadable())
+                                                        <form method="POST" action="{{ route('admin.privacy.requests.regenerate', $requestItem) }}" class="inline">
+                                                            @csrf
+                                                            <button type="submit" class="px-2.5 py-1.5 text-xs rounded border border-neutral-300 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 transition">
+                                                                Regenerate Package
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                </div>
+
+                                                <div class="flex items-center gap-2">
+                                                    @if ($requestItem->isDownloadable())
+                                                        <a
+                                                            href="{{ route('admin.privacy.requests.download-package', $requestItem) }}"
+                                                            class="px-3 py-1.5 text-xs rounded bg-primary-600 hover:bg-primary-700 text-white font-semibold transition"
+                                                        >
+                                                            Download ZIP Archive
+                                                        </a>
+                                                    @endif
+
+                                                    @if (! in_array($requestItem->status, ['fulfilled', 'released', 'rejected', 'closed']))
+                                                        <form method="POST" action="{{ route('admin.privacy.requests.approve', $requestItem) }}" class="inline">
+                                                            @csrf
+                                                            <button
+                                                                type="submit"
+                                                                class="px-3 py-1.5 text-xs rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition"
+                                                                data-loading-text="Generating package..."
+                                                            >
+                                                                Approve &amp; Fulfill
+                                                            </button>
+                                                        </form>
+
+                                                        <button
+                                                            type="button"
+                                                            x-on:click="$dispatch('close-modal', 'dsr-details-modal-{{ $requestItem->id }}'); $nextTick(() => { $dispatch('open-modal', 'reject-dsr-modal-{{ $requestItem->id }}') })"
+                                                            class="px-3 py-1.5 text-xs rounded bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 hover:bg-rose-100 font-semibold transition"
+                                                        >
+                                                            Refuse (Sec. 16)
+                                                        </button>
+                                                    @endif
+
+                                                    <button type="button" x-on:click="$dispatch('close-modal', 'dsr-details-modal-{{ $requestItem->id }}')" class="px-3 py-1.5 text-xs rounded border border-neutral-300 text-neutral-700 dark:text-neutral-300">
+                                                        Close
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </x-ui.modal>
 
                                     {{-- Reject Modal --}}
