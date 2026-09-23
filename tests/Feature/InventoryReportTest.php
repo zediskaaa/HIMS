@@ -17,6 +17,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Services\InventoryReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -41,6 +42,33 @@ class InventoryReportTest extends TestCase
     private function reports(): InventoryReportService
     {
         return app(InventoryReportService::class);
+    }
+
+    public function test_stock_status_uses_one_aggregate_query_as_the_catalogue_grows(): void
+    {
+        for ($i = 0; $i < 50; $i++) {
+            InventoryItem::create([
+                'name' => "Load item {$i}",
+                'sku' => "LOAD-{$i}",
+                'quantity_on_hand' => $i,
+                'reorder_level' => 10,
+                'unit_cost' => 2,
+            ]);
+        }
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+
+        try {
+            $buckets = $this->reports()->stockStatus();
+            $this->assertCount(1, DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+        }
+
+        $this->assertSame(50, array_sum(array_column($buckets, 'items')));
+        $this->assertSame(1, $buckets['out_of_stock']['items']);
+        $this->assertSame(10, $buckets['low_stock']['items']);
     }
 
     private function location(string $name = 'Main Store', string $code = 'MAIN-01', ?int $capacity = null): StorageLocation

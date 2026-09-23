@@ -16,6 +16,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -234,19 +235,47 @@ class InventoryReportService
             'out_of_stock' => ['items' => 0, 'units' => 0, 'reserved' => 0, 'value' => 0.0],
         ];
 
-        $this->inventorySnapshot($categoryId, $locationId)
-            ->each(function (object $item) use (&$buckets, $statusFilter) {
-                $key = $this->stockStatusKey((int) $item->quantity_on_hand, (int) $item->reorder_level);
+        $query = DB::table('inventory_items as items')
+            ->when($categoryId, fn ($builder) => $builder->where('items.category_id', $categoryId));
 
-                if ($statusFilter && $statusFilter !== $key) {
-                    return;
-                }
+        if ($locationId) {
+            $levels = DB::table('item_stock_levels')
+                ->where('storage_location_id', $locationId)
+                ->select('item_id')
+                ->selectRaw('sum(quantity) as quantity, sum(reserved_quantity) as reserved')
+                ->groupBy('item_id');
+            $query->joinSub($levels, 'levels', 'levels.item_id', '=', 'items.id');
+            $quantity = 'levels.quantity';
+            $reserved = 'levels.reserved';
+        } else {
+            $quantity = 'items.quantity_on_hand';
+            $reserved = 'items.reserved_quantity';
+        }
 
-                $buckets[$key]['items']++;
-                $buckets[$key]['units'] += (int) $item->quantity_on_hand;
-                $buckets[$key]['reserved'] += (int) $item->reserved_quantity;
-                $buckets[$key]['value'] += (int) $item->quantity_on_hand * (float) $item->unit_cost;
-            });
+        // Keep the same three-way rule as InventoryItem::stockStatusFor().
+        $status = "case when {$quantity} <= 0 then 'out_of_stock' "
+            ."when items.reorder_level > 0 and {$quantity} <= items.reorder_level then 'low_stock' "
+            ."else 'in_stock' end";
+
+        $rows = $query
+            ->selectRaw("{$status} as stock_status")
+            ->selectRaw("count(*) as items, sum({$quantity}) as units, sum({$reserved}) as reserved")
+            ->selectRaw("sum({$quantity} * items.unit_cost) as value")
+            ->groupByRaw($status)
+            ->get();
+
+        foreach ($rows as $row) {
+            if ($statusFilter && $statusFilter !== $row->stock_status) {
+                continue;
+            }
+
+            $buckets[$row->stock_status] = [
+                'items' => (int) $row->items,
+                'units' => (int) $row->units,
+                'reserved' => (int) $row->reserved,
+                'value' => (float) $row->value,
+            ];
+        }
 
         return $buckets;
     }

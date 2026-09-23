@@ -4,15 +4,19 @@ namespace Tests\Feature;
 
 use App\Enums\AuditAction;
 use App\Enums\MovementType;
+use App\Enums\UserStatus;
+use App\Jobs\WarmAiDemandForecast;
 use App\Models\AuditLog;
 use App\Models\InventoryItem;
 use App\Models\ItemCategory;
 use App\Models\StockMovement;
 use App\Models\User;
+use App\Services\AiDemandForecastService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class AiDemandForecastTest extends TestCase
@@ -875,6 +879,40 @@ class AiDemandForecastTest extends TestCase
         // recorded-consumption summary while the Gemini pass is still queued.
         Http::assertNothingSent();
         $this->assertSame('statistical', Cache::get('demand-forecast:v3:90:30')['source']);
+    }
+
+    public function test_concurrent_page_views_enqueue_only_one_forecast_warmup(): void
+    {
+        Queue::fake();
+        $manager = User::factory()->inventoryManager()->create();
+        $item = $this->item();
+        $this->consume($item, 12, 5);
+        Http::fake();
+
+        $this->actingAs($manager)->get(route('dashboard'))->assertOk();
+        $this->actingAs($manager)->get(route('dashboard'))->assertOk();
+
+        Queue::assertPushed(WarmAiDemandForecast::class, 1);
+        Http::assertNothingSent();
+        $this->assertTrue(Cache::get('demand-forecast:v3:90:30')['pending']);
+    }
+
+    public function test_queued_warmup_skips_a_deactivated_account(): void
+    {
+        Queue::fake();
+        $manager = User::factory()->inventoryManager()->create();
+        $item = $this->item();
+        $this->consume($item, 12, 5);
+        Http::fake();
+
+        $this->actingAs($manager)->get(route('dashboard'))->assertOk();
+        $job = Queue::pushed(WarmAiDemandForecast::class)->first();
+        $manager->update(['status' => UserStatus::Inactive]);
+
+        $job->handle(app(AiDemandForecastService::class));
+
+        Http::assertNothingSent();
+        $this->assertTrue(Cache::get('demand-forecast:v3:90:30')['pending']);
     }
 
     public function test_a_forecast_generated_from_a_page_view_is_audited_as_generated_not_refreshed(): void

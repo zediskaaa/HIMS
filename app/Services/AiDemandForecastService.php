@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\AlertType;
 use App\Enums\AuditAction;
 use App\Enums\DemandTrend;
+use App\Jobs\WarmAiDemandForecast;
 use App\Models\InventoryItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderLine;
@@ -20,8 +21,6 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
-
-use function defer;
 
 class AiDemandForecastService
 {
@@ -48,11 +47,10 @@ class AiDemandForecastService
      * for a forecast that is advisory and read by everyone. This returns a
      * usable result on the very first request: recorded consumption is
      * summarised to a statistical forecast in the same request (database work
-     * only, no network call), and the Gemini pass that replaces it is deferred
-     * until after the response has been sent, so nobody waits on the model to
-     * see the screen.
+     * only, no network call), and the Gemini pass that replaces it is queued,
+     * so nobody waits on the model to see the screen.
      *
-     * The deferred pass is claimed under a lock and retried no more often than
+     * The queued pass is claimed under a lock and retried no more often than
      * the fallback TTL, because a page anyone can open must not turn into one
      * Gemini request per page view when the model is unavailable.
      *
@@ -85,7 +83,7 @@ class AiDemandForecastService
         }
 
         // Shorter than the AI result's lifetime on purpose: it is a placeholder
-        // that keeps the screen useful until the deferred pass replaces it, and
+        // that keeps the screen useful until the queued pass replaces it, and
         // a stale one must not outlive the demand it describes. It doubles as
         // the backoff window for a Gemini that keeps failing.
         Cache::put(
@@ -272,7 +270,7 @@ class AiDemandForecastService
     }
 
     /**
-     * Queue the Gemini pass for after the response has been sent.
+     * Queue the Gemini pass outside the web worker.
      *
      * The lock is what keeps a burst of page views on an empty cache down to a
      * single model call: whoever claims it runs the warm-up, and the rest of
@@ -286,15 +284,13 @@ class AiDemandForecastService
             return;
         }
 
-        defer(function () use ($actor, $analysisDays, $forecastDays): void {
-            try {
-                $this->generate($actor, $analysisDays, $forecastDays);
-            } catch (Throwable $exception) {
-                // The screen already has the statistical forecast, so a failed
-                // warm-up costs the next visitor nothing.
-                report($exception);
-            }
-        });
+        try {
+            WarmAiDemandForecast::dispatch($actor->getKey(), $analysisDays, $forecastDays, $claim->owner())
+                ->afterCommit();
+        } catch (Throwable $exception) {
+            $claim->release();
+            report($exception);
+        }
     }
 
     /**

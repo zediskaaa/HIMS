@@ -3072,6 +3072,7 @@ Alpine.data('demandForecastDashboard', ({ initialForecast, endpoint }) => ({
  */
 Alpine.data('dashboardLive', (endpoint) => ({
     intervalId: null,
+    polling: false,
     statusLabel: '',
 
     start() {
@@ -3106,6 +3107,9 @@ Alpine.data('dashboardLive', (endpoint) => ({
     },
 
     async poll() {
+        if (this.polling || document.hidden) return;
+        this.polling = true;
+
         try {
             const response = await fetch(endpoint, {
                 headers: {
@@ -3149,6 +3153,8 @@ Alpine.data('dashboardLive', (endpoint) => ({
             this.statusLabel = `— refreshed ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         } catch (error) {
             console.error('Dashboard poll failed:', error);
+        } finally {
+            this.polling = false;
         }
     }
 }));
