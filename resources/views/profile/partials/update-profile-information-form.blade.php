@@ -1,78 +1,45 @@
 <section>
-    @php
-        $nameComponents = $user->nameComponents();
-        $profileSuccess = session()->pull('profile_success');
-    @endphp
+    @php($nameComponents = $user->nameComponents())
 
-    <header class="flex items-center gap-4 pb-4 border-b border-neutral-100">
-        {{-- Interactive Avatar Trigger with hover overlay and pencil-square badge --}}
-        <div
-            x-data
-            x-on:click="$dispatch('open-modal', 'update-profile-picture')"
-            class="relative group cursor-pointer shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            title="{{ __('Click to change profile picture') }}"
-            role="button"
-            tabindex="0"
-            x-on:keydown.enter="$dispatch('open-modal', 'update-profile-picture')"
-            x-on:keydown.space.prevent="$dispatch('open-modal', 'update-profile-picture')"
-        >
-            <x-ui.avatar :user="$user" size="lg" class="ring-2 ring-primary-500/20 shadow-xs group-hover:ring-primary-500 transition-all" />
-
-            {{-- Hover overlay on avatar image --}}
-            <div class="absolute inset-0 rounded-full bg-neutral-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity" aria-hidden="true">
-                <x-ui.icon name="camera" class="h-5 w-5 text-white drop-shadow-xs" />
+    <x-ui.card :padding="false">
+        <div class="p-4 sm:p-5">
+            <div class="flex min-w-0 items-center gap-3">
+                <button type="button" x-data x-on:click="$dispatch('open-modal', 'update-profile-picture')"
+                        class="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                        aria-label="{{ $user->hasAvatar() ? __('Change profile photo') : __('Upload profile photo') }}">
+                    <x-ui.avatar :user="$user" size="lg" class="ring-2 ring-primary-500/20" />
+                </button>
+                <div class="min-w-0">
+                    <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ __('Profile Information') }}</h2>
+                    <p class="mt-1 break-words text-sm font-medium text-neutral-800 dark:text-neutral-200">{{ $user->name }}</p>
+                    <p class="break-all text-xs text-neutral-600 dark:text-neutral-300">{{ $user->email }}</p>
+                </div>
             </div>
-
-            {{-- Floating pencil-square badge at bottom-right corner --}}
-            <span class="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-white text-neutral-600 shadow-sm ring-1 ring-neutral-300 group-hover:bg-primary-50 group-hover:text-primary-600 group-hover:ring-primary-400 transition-all">
-                <x-ui.icon name="pencil-square" class="h-3.5 w-3.5" />
-            </span>
+            <div class="mt-4 flex flex-wrap gap-2">
+                <x-ui.button type="button" size="sm" x-data x-on:click="$dispatch('open-modal', 'edit-profile')">{{ __('Edit profile') }}</x-ui.button>
+                <x-ui.button type="button" size="sm" variant="secondary" x-data x-on:click="$dispatch('open-modal', 'update-profile-picture')">
+                    {{ $user->hasAvatar() ? __('Change photo') : __('Upload photo') }}
+                </x-ui.button>
+            </div>
         </div>
+    </x-ui.card>
 
-        <div class="min-w-0">
-            <h2 class="text-base font-bold text-neutral-900">
-                {{ __('Profile Information') }}
-            </h2>
-
-            <p class="mt-0.5 text-xs text-neutral-500">
-                {{ __("Update your account's profile information and email address.") }}
-            </p>
-
-            <button
-                type="button"
-                x-data
-                x-on:click="$dispatch('open-modal', 'update-profile-picture')"
-                class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:text-primary-700 hover:underline"
-            >
-                <x-ui.icon name="camera" class="w-3.5 h-3.5" />
-                <span>{{ $user->hasAvatar() ? __('Change photo') : __('Upload photo') }}</span>
-            </button>
-        </div>
-    </header>
-
-    @if ($profileSuccess)
-        <x-ui.alert
-            variant="success"
-            :title="$profileSuccess === 'Email updated successfully.' ? 'Email updated' : 'Profile updated'"
-            dismissible
-            class="mt-6"
-        >
-            {{ $profileSuccess }}
-        </x-ui.alert>
-    @endif
-
+    <div x-data @if ($errors->hasAny(['surname', 'first_name', 'middle_name', 'email', 'current_password']))
+        x-init="$nextTick(() => $dispatch('open-modal', 'edit-profile'))"
+    @endif>
+    <x-ui.modal name="edit-profile" :title="__('Edit profile')" maxWidth="xl">
     <form id="send-verification" method="post" action="{{ route('verification.send') }}">
         @csrf
     </form>
 
-    <form method="post" action="{{ route('profile.update') }}" class="mt-6 space-y-6"
+    <form method="post" action="{{ route('profile.update') }}" class="space-y-4"
           autocomplete="off"
           data-confirm-email-change
           data-original-email="{{ $user->email }}">
         @csrf
         @method('patch')
 
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
                 <x-input-label for="surname" :value="__('Last Name')" />
                 <x-text-input
@@ -84,7 +51,6 @@
                     placeholder="e.g. Dela Cruz"
                     maxlength="80"
                     required
-                    autofocus
                     autocomplete="off"
                 />
                 <x-input-error class="mt-2" :messages="$errors->get('surname')" />
@@ -106,7 +72,7 @@
                 <x-input-error class="mt-2" :messages="$errors->get('first_name')" />
             </div>
 
-            <div class="sm:col-span-2 xl:col-span-1">
+            <div class="sm:col-span-2">
                 <x-input-label for="middle_name" :value="__('Middle Name')" />
                 <x-text-input
                     id="middle_name"
@@ -131,16 +97,16 @@
 
             @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
                 <div>
-                    <p class="text-sm mt-2 text-gray-800">
+                    <p class="mt-2 text-sm text-neutral-700 dark:text-neutral-300">
                         {{ __('Your email address is unverified.') }}
 
-                        <button form="send-verification" class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <button form="send-verification" class="rounded-md text-sm text-primary-700 underline hover:text-primary-800 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-primary-300">
                             {{ __('Click here to re-send the verification email.') }}
                         </button>
                     </p>
 
                     @if (session('status') === 'verification-link-sent')
-                        <p class="mt-2 font-medium text-sm text-green-600">
+                        <p class="mt-2 text-sm font-medium text-success-700 dark:text-success-300">
                             {{ __('A new verification link has been sent to your email address.') }}
                         </p>
                     @endif
@@ -167,14 +133,17 @@
                 x-init="$el.value = ''; setTimeout(() => { $el.value = ''; currentPassword = ''; }, 50); setTimeout(() => { $el.value = ''; currentPassword = ''; }, 200)"
                 value=""
             />
-            <p class="mt-2 text-sm text-gray-600">
+            <p class="mt-1 text-xs text-neutral-600 dark:text-neutral-300">
                 {{ __('Required only when changing your email address.') }}
             </p>
             <x-input-error class="mt-2" :messages="$errors->get('current_password')" />
         </div>
 
-        <div class="flex items-center pt-2">
+        <div class="flex flex-wrap items-center justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+            <x-ui.button type="button" variant="secondary" x-data x-on:click="$dispatch('close-modal', 'edit-profile')">{{ __('Cancel') }}</x-ui.button>
             <x-ui.button type="submit" data-loading-text="Saving profile...">{{ __('Save') }}</x-ui.button>
         </div>
     </form>
+    </x-ui.modal>
+    </div>
 </section>

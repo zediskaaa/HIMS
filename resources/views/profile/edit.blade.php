@@ -7,57 +7,43 @@
         ]"
     />
 
-    @if (session('avatar_success'))
-        <x-ui.alert variant="success" title="{{ __('Profile picture updated') }}" dismissible class="mb-6">
-            {{ session('avatar_success') }}
-        </x-ui.alert>
-    @endif
+    @php
+        $settingsNotifications = collect([
+            'avatar_success',
+            'profile_success',
+            'password_success',
+            'sms_mfa_success',
+            'mfa_success',
+            'session_reminder_success',
+        ])->map(fn ($key) => session()->pull($key))->filter();
+    @endphp
+    @foreach ($settingsNotifications as $message)
+        <div x-data x-init="$nextTick(() => window.dispatchEvent(new CustomEvent('notify', { detail: { type: 'success', title: 'Success', message: $el.textContent.trim() } })))" class="sr-only" role="status">{{ $message }}</div>
+    @endforeach
 
+    <div class="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div class="min-w-0 space-y-4">
+            @include('profile.partials.update-profile-information-form')
+            @include('profile.partials.update-theme-form')
+            @include('profile.partials.account-retention-notice')
+        </div>
 
-    {{-- Two-column responsive layout for settings --}}
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 items-start">
-        {{-- Column 1: Personal Details & Password --}}
-        <div class="space-y-6">
-            <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
-                @include('profile.partials.update-profile-information-form')
-            </div>
-
-            <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
+        <x-ui.card
+            title="Sign-in & Security"
+            subtitle="Manage how you sign in and protect your account."
+        >
+            <div class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                @include('profile.partials.update-authenticator-form')
+                @include('profile.partials.update-sms-mfa-form')
+                @if ($user->isAdministrator())
+                    @include('profile.partials.update-mfa-form')
+                @endif
+                @include('profile.partials.update-session-timeout-reminder-form')
                 @include('profile.partials.update-password-form')
             </div>
-
-            @include('profile.partials.update-theme-form')
-        </div>
-
-        {{-- Column 2: Security & Session Preferences --}}
-        <div class="space-y-6">
-            <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
-                @include('profile.partials.update-authenticator-form')
-            </div>
-
-            <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
-                @include('profile.partials.update-sms-mfa-form')
-            </div>
-
-            @if ($user->isAdministrator())
-                <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
-                    @include('profile.partials.update-mfa-form')
-                </div>
-            @endif
-
-            <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
-                @include('profile.partials.update-session-timeout-reminder-form')
-            </div>
-
-            <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
-                @include('profile.partials.account-retention-notice')
-            </div>
-        </div>
+        </x-ui.card>
     </div>
 
-    {{-- Profile Picture Modal --}}
     @include('profile.partials.update-profile-picture-modal')
-
-    {{-- Privacy Data Subject Request Modal --}}
     @include('profile.partials.privacy-request-modal')
 </x-app-layout>

@@ -129,6 +129,11 @@ class SmsMfaTest extends TestCase
         $user = User::factory()->warehouseStaff()->create(['phone' => null]);
         $this->actingAs($user);
 
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSeeInOrder(['SMS Authentication', 'Setup required', 'Configure'])
+            ->assertSee('A valid registered mobile number is required.');
+
         $this->patch(route('profile.sms-mfa.update'), [
             'sms_mfa_enabled' => '1', 'current_password' => 'password',
         ])->assertSessionHasErrors('sms_mfa_enabled', errorBag: 'smsMfa');
@@ -139,11 +144,22 @@ class SmsMfaTest extends TestCase
             'sms_mfa_enabled' => '1', 'current_password' => 'wrong',
         ])->assertSessionHasErrors('current_password', errorBag: 'smsMfa');
 
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee("open-modal', 'configure-sms-mfa'", false)
+            ->assertSee('x-init="$nextTick(() => $dispatch(\'open-modal\', \'configure-sms-mfa\'))"', false)
+            ->assertSee('data-original-sms-mfa="0"', false);
+
         $this->patch(route('profile.sms-mfa.update'), [
             'sms_mfa_enabled' => '1', 'current_password' => 'password',
         ])->assertRedirect(route('profile.edit'));
         $this->assertTrue($user->fresh()->sms_mfa_enabled);
         $this->assertSame('09171234567', $user->sms_mfa_phone);
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSeeInOrder(['SMS Authentication', 'Enabled', 'Manage'])
+            ->assertSee('data-original-sms-mfa="1"', false);
 
         $this->patch(route('profile.sms-mfa.update'), [
             'sms_mfa_enabled' => '0', 'current_password' => 'password',
@@ -151,6 +167,11 @@ class SmsMfaTest extends TestCase
         $this->assertFalse($user->fresh()->sms_mfa_enabled);
         $this->assertNull($user->sms_mfa_phone);
         $this->assertSame(2, AuditLog::query()->where('action', AuditAction::ChangedMfa)->count());
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSeeInOrder(['SMS Authentication', 'Disabled', 'Configure'])
+            ->assertSee('data-original-sms-mfa="0"', false);
     }
 
     public function test_sms_cannot_be_enabled_before_a_provider_is_configured(): void

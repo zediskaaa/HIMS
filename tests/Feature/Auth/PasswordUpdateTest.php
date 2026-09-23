@@ -52,6 +52,12 @@ class PasswordUpdateTest extends TestCase
         $response
             ->assertSessionHasErrorsIn('updatePassword', 'current_password')
             ->assertRedirect('/profile');
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee("open-modal', 'change-password'", false)
+            ->assertSee("=== 'change-password'", false)
+            ->assertSee('x-init="$nextTick(() => $dispatch(\'open-modal\', \'change-password\'))"', false);
     }
 
     public function test_current_password_cannot_be_reused_as_the_new_password(): void

@@ -33,13 +33,13 @@
 
                 <div>
                     <label for="request_type" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        {{ __('Request Category') }} <span class="text-danger-600">*</span>
+                        {{ __('Request Category') }} <span class="text-danger-600 dark:text-danger-400">*</span>
                     </label>
                     <select
                         id="request_type"
                         name="request_type"
                         x-model="requestType"
-                        class="mt-1.5 block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm text-neutral-900 dark:text-neutral-100 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                        class="mt-1.5 block w-full rounded-lg border-neutral-300 bg-white pl-3 pr-10 text-sm text-neutral-900 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
                         required
                     >
                         <option value="access">Right to Access &amp; Data Portability (Sec. 16c)</option>
@@ -48,38 +48,40 @@
                         <option value="objection">Right to Object / Restrict Processing (Sec. 16b)</option>
                     </select>
 
-                    <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-800/60 p-2.5 rounded border border-neutral-200 dark:border-neutral-700" x-text="descriptions[requestType]"></p>
+                    <p class="mt-2 rounded border border-neutral-200 bg-neutral-50 p-2.5 text-xs leading-normal text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-300" x-text="descriptions[requestType]"></p>
                 </div>
 
                 <div>
                     <label for="details" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        {{ __('Specific Details or Request Ground') }} <span class="text-danger-600">*</span>
+                        {{ __('Specific Details or Request Ground') }} <span class="text-danger-600 dark:text-danger-400">*</span>
                     </label>
                     <textarea
                         id="details"
                         name="details"
                         rows="4"
-                        class="mt-1.5 block w-full rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm text-neutral-900 dark:text-neutral-100 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                        class="mt-1.5 block w-full rounded-lg border-neutral-300 bg-white text-sm text-neutral-900 shadow-sm placeholder:text-neutral-500 focus:border-primary-500 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:placeholder:text-neutral-400"
                         placeholder="Please describe the specific data elements, corrections needed, or grounds for your request..."
                         required
                     >{{ old('details') }}</textarea>
-                    <p class="mt-1 text-xs text-neutral-400">Minimum 10 characters. Your request will be securely logged and reviewed by the Data Protection Officer.</p>
+                    <p class="mt-1 text-xs leading-normal text-neutral-600 dark:text-neutral-300">Minimum 10 characters. Your request will be securely logged and reviewed by the Data Protection Officer.</p>
                 </div>
 
-                <div class="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                    <button
+                <div class="flex flex-col gap-2 border-t border-neutral-200 pt-4 dark:border-neutral-800 sm:flex-row sm:items-center sm:justify-end">
+                    <x-ui.button
                         type="button"
+                        variant="secondary"
                         x-on:click="$dispatch('close-modal', 'submit-privacy-request')"
-                        class="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition"
+                        class="w-full sm:w-auto"
                     >
                         {{ __('Cancel') }}
-                    </button>
-                    <button
+                    </x-ui.button>
+                    <x-ui.button
                         type="submit"
-                        class="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-lg shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition"
+                        class="w-full sm:w-auto"
+                        data-loading-text="Submitting request..."
                     >
                         {{ __('Submit Request to DPO') }}
-                    </button>
+                    </x-ui.button>
                 </div>
             </form>
         </div>

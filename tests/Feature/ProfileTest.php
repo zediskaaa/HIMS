@@ -36,6 +36,57 @@ class ProfileTest extends TestCase
             ->assertDontSee('name="name"', false);
     }
 
+    public function test_profile_editor_opens_from_summary_and_reopens_after_validation_error(): void
+    {
+        $user = User::factory()->create(['email' => 'original@example.com']);
+
+        $this->actingAs($user)
+            ->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee("open-modal', 'edit-profile'", false)
+            ->assertSee("=== 'edit-profile'", false);
+
+        $this->from(route('profile.edit'))
+            ->patch(route('profile.update'), [
+                'surname' => $user->surname,
+                'first_name' => $user->first_name,
+                'middle_name' => $user->middle_name,
+                'email' => 'invalid-email',
+                'current_password' => 'password',
+            ])
+            ->assertRedirect(route('profile.edit'))
+            ->assertSessionHasErrors('email');
+
+        $this->assertSame('original@example.com', $user->fresh()->email);
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('x-init="$nextTick(() => $dispatch(\'open-modal\', \'edit-profile\'))"', false);
+    }
+
+    public function test_administrator_settings_expose_the_configuration_dialogs(): void
+    {
+        $admin = User::factory()->administrator()->create();
+
+        $response = $this->actingAs($admin)
+            ->get(route('profile.edit'))
+            ->assertOk();
+
+        foreach ([
+            'edit-profile',
+            'update-profile-picture',
+            'change-password',
+            'manage-authenticator',
+            'configure-sms-mfa',
+            'configure-email-mfa',
+            'configure-session-reminder',
+            'submit-privacy-request',
+        ] as $dialog) {
+            $response->assertSee("open-modal', '".$dialog."'", false);
+            $response->assertSee("=== '".$dialog."'", false);
+        }
+    }
+
     public function test_session_timeout_reminder_can_be_turned_off_and_on(): void
     {
         $user = User::factory()->create([
@@ -58,6 +109,7 @@ class ProfileTest extends TestCase
         $this->get('/profile')
             ->assertOk()
             ->assertSee('Session timeout reminders are now OFF. Automatic logout remains active.')
+            ->assertSeeInOrder(['Session Timeout Reminder', 'Disabled', 'Configure'])
             ->assertSee('data-session-warning-enabled="false"', false)
             ->assertSee('preload="none"', false);
 
@@ -68,6 +120,10 @@ class ProfileTest extends TestCase
             ->assertRedirect('/profile');
 
         $this->assertTrue($user->refresh()->session_timeout_reminder_enabled);
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSeeInOrder(['Session Timeout Reminder', 'Enabled', 'Manage']);
     }
 
     public function test_invalid_session_timeout_reminder_value_is_rejected(): void
@@ -86,6 +142,11 @@ class ProfileTest extends TestCase
             ->assertSessionMissing('session_reminder_success');
 
         $this->assertTrue($user->refresh()->session_timeout_reminder_enabled);
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('x-init="$nextTick(() => $dispatch(\'open-modal\', \'configure-session-reminder\'))"', false)
+            ->assertSeeInOrder(['Session Timeout Reminder', 'Enabled', 'Manage']);
     }
 
     public function test_profile_information_can_be_updated(): void

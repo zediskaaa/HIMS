@@ -54,6 +54,10 @@ class DataSubjectRequestTest extends TestCase
             ]);
 
         $response->assertSessionHasErrors(['request_type', 'details']);
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('x-init="$nextTick(() => { $dispatch(\'open-modal\', \'submit-privacy-request\') })"', false);
     }
 
     public function test_staff_without_permission_cannot_access_governance_panel(): void

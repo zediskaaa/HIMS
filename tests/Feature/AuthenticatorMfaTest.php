@@ -60,6 +60,8 @@ class AuthenticatorMfaTest extends TestCase
 
         $this->get(route('profile.edit'))
             ->assertOk()
+            ->assertSee('Verification pending')
+            ->assertSee('showSetup: true', false)
             ->assertSee('Scan this QR code using your authenticator app.')
             ->assertSee('data:image/svg+xml;base64,', false)
             ->assertSee($secret)
@@ -95,6 +97,11 @@ class AuthenticatorMfaTest extends TestCase
         $this->assertSame($secret, $user->authenticator_secret);
         $this->assertNotSame($secret, DB::table('users')->where('id', $user->id)->value('authenticator_secret'));
         $this->assertNull(session(AuthenticatorSetupService::SESSION_KEY));
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('Enabled')
+            ->assertSee('showSetup: false', false);
     }
 
     public function test_setup_requires_current_password_and_can_be_cancelled_without_enabling(): void
@@ -277,6 +284,12 @@ class AuthenticatorMfaTest extends TestCase
         ])->assertSessionHasErrors('code', errorBag: 'authenticatorDisable');
         $this->assertTrue($user->fresh()->authenticatorMfaEnabled());
 
+        $settings = $this->get(route('profile.edit'))->assertOk();
+        $this->assertMatchesRegularExpression(
+            '/x-init="[^"]*open-modal[^"]*manage-authenticator/',
+            $settings->getContent(),
+        );
+
         $this->delete(route('profile.authenticator.disable'), [
             'current_password' => 'password',
             'code' => (new Google2FA)->getCurrentOtp($secret),
@@ -286,6 +299,11 @@ class AuthenticatorMfaTest extends TestCase
         $this->assertFalse($user->authenticatorMfaEnabled());
         $this->assertNull($user->authenticator_secret);
         $this->assertNull($user->authenticator_enabled_at);
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('Disabled')
+            ->assertSee('showSetup: false', false);
 
         $this->post(route('logout'));
         $this->post(route('login'), $this->credentials($user))
@@ -399,8 +417,9 @@ class AuthenticatorMfaTest extends TestCase
 
         $this->get(route('profile.edit'))
             ->assertOk()
-            ->assertSee('REPAIR REQUIRED')
-            ->assertSee('Reconfigure Authenticator App');
+            ->assertSee('Repair required')
+            ->assertSee('recoveryRequired: true', false)
+            ->assertSee('Reconfigure');
 
         $this->delete(route('profile.authenticator.disable'), [
             'current_password' => 'password',

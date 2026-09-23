@@ -167,6 +167,10 @@ class ProfilePictureTest extends TestCase
 
             $this->assertNull($user->refresh()->avatar_path);
         }
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('x-init="$nextTick(() => { $dispatch(\'open-modal\', \'update-profile-picture\') })"', false);
     }
 
     public function test_oversized_image_files_are_rejected(): void

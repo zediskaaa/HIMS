@@ -24,7 +24,12 @@ class LoginMfaTest extends TestCase
         $this->assertFalse($admin->mfa_enabled);
 
         $this->actingAs($admin, AuthenticationContext::ADMIN_GUARD)
-            ->patch(route('profile.mfa.update'), ['mfa_enabled' => true])
+            ->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSeeInOrder(['Email Multi-Factor Authentication', 'Disabled', 'Configure'])
+            ->assertSee('data-original-mfa="0"', false);
+
+        $this->patch(route('profile.mfa.update'), ['mfa_enabled' => true])
             ->assertRedirect(route('profile.edit'))
             ->assertSessionHas('mfa_success');
 
@@ -32,11 +37,17 @@ class LoginMfaTest extends TestCase
         $this->get(route('profile.edit'))
             ->assertOk()
             ->assertSee('Multi-Factor Authentication')
-            ->assertSee('ON');
+            ->assertSeeInOrder(['Email Multi-Factor Authentication', 'Enabled', 'Manage'])
+            ->assertSee('data-original-mfa="1"', false);
 
         $this->patch(route('profile.mfa.update'), ['mfa_enabled' => false])
             ->assertRedirect(route('profile.edit'));
         $this->assertFalse($admin->fresh()->mfa_enabled);
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSeeInOrder(['Email Multi-Factor Authentication', 'Disabled', 'Configure'])
+            ->assertSee('data-original-mfa="0"', false);
 
         $superAdmin = User::factory()->superAdministrator()->create();
         $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
@@ -52,11 +63,31 @@ class LoginMfaTest extends TestCase
         $this->actingAs($staff, AuthenticationContext::WEB_GUARD)
             ->get(route('profile.edit'))
             ->assertOk()
-            ->assertDontSee('Multi-Factor Authentication');
+            ->assertDontSee('Multi-Factor Authentication')
+            ->assertDontSee('configure-email-mfa', false);
 
         $this->patch(route('profile.mfa.update'), ['mfa_enabled' => true])
             ->assertForbidden();
         $this->assertFalse($staff->fresh()->mfa_enabled);
+    }
+
+    public function test_invalid_email_mfa_setting_reopens_configuration_with_saved_status(): void
+    {
+        $admin = User::factory()->administrator()->create();
+
+        $this->actingAs($admin, AuthenticationContext::ADMIN_GUARD)
+            ->from(route('profile.edit'))
+            ->patch(route('profile.mfa.update'), ['mfa_enabled' => 'invalid'])
+            ->assertRedirect(route('profile.edit'))
+            ->assertSessionHasErrors('mfa_enabled');
+
+        $this->assertFalse($admin->fresh()->mfa_enabled);
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('x-init="$nextTick(() => $dispatch(\'open-modal\', \'configure-email-mfa\'))"', false)
+            ->assertSeeInOrder(['Email Multi-Factor Authentication', 'Disabled', 'Configure'])
+            ->assertSee('data-original-mfa="0"', false);
     }
 
     public function test_admin_with_mfa_off_logs_in_without_an_otp(): void
