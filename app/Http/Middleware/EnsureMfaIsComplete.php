@@ -23,7 +23,7 @@ class EnsureMfaIsComplete
         $guard = Auth::guard($guardName);
         $user = $guard->user();
         $requiresMfa = $user instanceof User
-            && ($user->authenticatorMfaEnabled() || $user->mfa_enabled);
+            && ($user->authenticatorMfaEnabled() || $user->mfa_enabled || $user->sms_mfa_enabled);
 
         if (! $requiresMfa) {
             return $next($request);

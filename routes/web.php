@@ -276,6 +276,9 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
         ->middleware('throttle:10,1')
         ->name('profile.audit-location.store');
     Route::patch('/profile/mfa', [ProfileController::class, 'updateMfa'])->name('profile.mfa.update');
+    Route::patch('/profile/sms-mfa', [ProfileController::class, 'updateSmsMfa'])
+        ->middleware('throttle:6,1')
+        ->name('profile.sms-mfa.update');
     Route::post('/profile/authenticator/setup', [AuthenticatorController::class, 'setup'])
         ->middleware('throttle:5,1')
         ->name('profile.authenticator.setup');

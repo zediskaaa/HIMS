@@ -1,29 +1,34 @@
 <x-guest-layout
     :title="$panel->label().' Login Verification'"
-    portal="{{ $panel === \App\Support\AuthenticationPanel::SuperAdmin ? 'super-admin' : 'admin' }}"
+    portal="{{ $panel->value }}"
 >
     <div class="space-y-7">
         <header>
-            <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
+            <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 dark:border-primary-800 dark:bg-primary-950 dark:text-primary-300">
                 <x-ui.icon name="shield-check" class="h-3.5 w-3.5" />
                 {{ $panel->label() }} login security
             </div>
-            <h1 class="text-3xl font-semibold tracking-tight text-neutral-900">
+            <h1 class="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
                 @if ($method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR_RECOVERY)
                     Reconfigure Authenticator App
                 @elseif ($method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR)
                     Authenticator Verification
+                @elseif ($method === \App\Services\LoginMfaService::METHOD_SMS)
+                    Verification Code
                 @else
                     Verify your sign-in
                 @endif
             </h1>
-            <p class="mt-3 text-sm leading-6 text-neutral-500">
+            <p class="mt-3 text-sm leading-6 text-neutral-600 dark:text-neutral-400">
                 @if ($method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR_RECOVERY)
                     Your saved authenticator setup can no longer be verified. Scan the new setup code below, then enter its current 6-digit code. Your existing setup remains enforced until verification succeeds.
                 @elseif ($method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR)
                     Enter the 6-digit code from your authenticator app.
+                @elseif ($method === \App\Services\LoginMfaService::METHOD_SMS)
+                    Enter the 6-digit code sent to <span class="font-medium text-neutral-800 dark:text-neutral-200">{{ $maskedPhone }}</span>.
+                    It expires in {{ $expiresInMinutes }} {{ Str::plural('minute', $expiresInMinutes) }}.
                 @else
-                    Enter the 6-digit code sent to <span class="font-medium text-neutral-700">{{ $maskedEmail }}</span>.
+                    Enter the 6-digit code sent to <span class="font-medium text-neutral-700 dark:text-neutral-200">{{ $maskedEmail }}</span>.
                     Each code expires in {{ $expiresInMinutes }} {{ Str::plural('minute', $expiresInMinutes) }}.
                 @endif
             </p>
@@ -31,9 +36,15 @@
 
         @if ($expired)
             <x-ui.alert variant="warning" title="Code expired">
-                {{ $method === \App\Services\LoginMfaService::METHOD_EMAIL
+                {{ in_array($method, [\App\Services\LoginMfaService::METHOD_EMAIL, \App\Services\LoginMfaService::METHOD_SMS], true)
                     ? 'This code has expired. Request a new code to continue this sign-in.'
                     : 'This authenticator verification session has expired. Return to login and sign in again.' }}
+            </x-ui.alert>
+        @endif
+
+        @if ($exhausted)
+            <x-ui.alert variant="warning" title="Verification attempts used">
+                Too many incorrect attempts. Return to login and sign in again.
             </x-ui.alert>
         @endif
 
@@ -73,10 +84,10 @@
             @csrf
 
             <div>
-                <x-input-label for="otp" :value="__('Verification code')" class="text-neutral-700" />
+                <x-input-label for="otp" :value="__('Verification code')" class="text-neutral-700 dark:text-neutral-300" />
                 <x-text-input
                     id="otp"
-                    class="mt-2 block h-12 w-full rounded-lg border-neutral-300 bg-white px-3.5 text-center font-mono text-xl tracking-[0.45em] shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                    class="mt-2 block h-12 w-full rounded-lg border-neutral-300 bg-neutral-50 px-3.5 text-center font-mono text-xl tracking-[0.45em] text-neutral-900 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-primary-400 dark:focus:ring-primary-500"
                     type="text"
                     name="otp"
                     required
@@ -96,21 +107,20 @@
             </x-ui.button>
         </form>
 
-        @if ($method === \App\Services\LoginMfaService::METHOD_EMAIL)
-            <form method="POST" action="{{ route($panel->loginMfaResendRoute()) }}" class="text-center">
+        @if (! $exhausted && in_array($method, [\App\Services\LoginMfaService::METHOD_EMAIL, \App\Services\LoginMfaService::METHOD_SMS], true))
+            <form method="POST" action="{{ route($panel->loginMfaResendRoute()) }}" class="text-center"
+                  x-data="{ remaining: {{ $resendAvailableIn }} }"
+                  x-init="const timer = setInterval(() => { if (remaining > 0) remaining--; else clearInterval(timer) }, 1000)">
                 @csrf
-                <button type="submit" data-loading-text="Sending..." class="inline-flex items-center justify-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700">
-                    Send a new code
+                <button type="submit" data-loading-text="Sending..." :disabled="remaining > 0"
+                        class="inline-flex items-center justify-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700 focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-primary-400 dark:hover:text-primary-300">
+                    Resend code
                 </button>
-                @if ($resendAvailableIn > 0)
-                    <p class="mt-1 text-xs text-neutral-500">
-                        A new code can be requested after the {{ $resendAvailableIn }}-second cooldown.
-                    </p>
-                @endif
+                <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400" x-show="remaining > 0" x-text="'Available in ' + remaining + ' seconds'"></p>
             </form>
         @endif
 
-        <p class="border-t border-neutral-200 pt-5 text-xs leading-5 text-neutral-500">
+        <p class="border-t border-neutral-200 pt-5 text-xs leading-5 text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
             Never share this code. HIMS support will not ask you for it.
         </p>
 

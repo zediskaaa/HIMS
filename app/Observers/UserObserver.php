@@ -61,6 +61,7 @@ class UserObserver
         $changes = $user->getChanges();
         $passwordChanged = array_key_exists('password', $changes);
         $mfaChanged = array_key_exists('mfa_enabled', $changes)
+            || array_key_exists('sms_mfa_enabled', $changes)
             || array_key_exists('authenticator_enabled_at', $changes);
         $changedFields = array_values(array_intersect(self::AUDITABLE_FIELDS, array_keys($changes)));
 
@@ -123,15 +124,21 @@ class UserObserver
         }
 
         if ($mfaChanged) {
-            $factor = array_key_exists('authenticator_enabled_at', $changes)
-                ? 'Authenticator app MFA'
-                : 'Email MFA';
-            $wasEnabled = array_key_exists('authenticator_enabled_at', $changes)
-                ? filled($user->getRawOriginal('authenticator_enabled_at'))
-                : (bool) $user->getRawOriginal('mfa_enabled');
-            $enabled = array_key_exists('authenticator_enabled_at', $changes)
-                ? $user->authenticator_enabled_at !== null
-                : (bool) $user->mfa_enabled;
+            $factor = match (true) {
+                array_key_exists('authenticator_enabled_at', $changes) => 'Authenticator app MFA',
+                array_key_exists('sms_mfa_enabled', $changes) => 'SMS MFA',
+                default => 'Email MFA',
+            };
+            $wasEnabled = match ($factor) {
+                'Authenticator app MFA' => filled($user->getRawOriginal('authenticator_enabled_at')),
+                'SMS MFA' => (bool) $user->getRawOriginal('sms_mfa_enabled'),
+                default => (bool) $user->getRawOriginal('mfa_enabled'),
+            };
+            $enabled = match ($factor) {
+                'Authenticator app MFA' => $user->authenticator_enabled_at !== null,
+                'SMS MFA' => (bool) $user->sms_mfa_enabled,
+                default => (bool) $user->mfa_enabled,
+            };
             $state = $enabled ? 'enabled' : 'disabled';
 
             $auditLog = $this->audit->log(

@@ -35,6 +35,10 @@ return [
         ],
     ],
 
+    'sms' => [
+        'api_token' => env('SMS_API_TOKEN'),
+    ],
+
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_MODEL', 'gemini-3.6-flash'),

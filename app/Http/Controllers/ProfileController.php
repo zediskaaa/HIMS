@@ -7,6 +7,7 @@ use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\User;
 use App\Services\AuthenticatorSecretService;
 use App\Services\AuthenticatorSetupService;
+use App\Services\Sms\SmsOtpDelivery;
 use App\Support\AuditBrowserLocation;
 use App\Support\AuthenticationContext;
 use App\Support\MfaSession;
@@ -98,6 +99,48 @@ class ProfileController extends Controller
         return Redirect::route('profile.edit');
     }
 
+    public function updateSmsMfa(Request $request, SmsOtpDelivery $sms): RedirectResponse
+    {
+        $guard = AuthenticationContext::authenticatedGuard() ?? AuthenticationContext::WEB_GUARD;
+        $user = $request->user($guard);
+        abort_unless($user instanceof User, 401);
+
+        $validated = $request->validateWithBag('smsMfa', [
+            'sms_mfa_enabled' => ['required', 'boolean'],
+            'current_password' => ['required', 'current_password:'.$guard],
+        ]);
+
+        $enabled = (bool) $validated['sms_mfa_enabled'];
+        if ($enabled === (bool) $user->sms_mfa_enabled) {
+            return Redirect::route('profile.edit');
+        }
+
+        if ($enabled && preg_match('/^09[0-9]{9}$/D', (string) $user->phone) !== 1) {
+            return Redirect::route('profile.edit')->withErrors([
+                'sms_mfa_enabled' => 'A valid registered 11-digit mobile number is required. Ask an administrator to update your contact number.',
+            ], 'smsMfa');
+        }
+
+        if ($enabled && ! $sms->available()) {
+            return Redirect::route('profile.edit')->withErrors([
+                'sms_mfa_enabled' => 'SMS verification is currently unavailable. Please contact an administrator.',
+            ], 'smsMfa');
+        }
+
+        $user->forceFill([
+            'sms_mfa_enabled' => $enabled,
+            'sms_mfa_phone' => $enabled ? $user->phone : null,
+        ])->save();
+
+        if ($enabled) {
+            MfaSession::mark($request, $user, $guard);
+        }
+
+        return Redirect::route('profile.edit')->with('sms_mfa_success', $enabled
+            ? 'SMS authentication is on. Future sign-ins will require a code sent to your registered mobile number.'
+            : 'SMS authentication is off.');
+    }
+
     public function updateSessionTimeoutReminder(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -163,16 +206,19 @@ class ProfileController extends Controller
             $imageInfo = @getimagesize($file->getRealPath());
             if ($imageInfo === false || empty($imageInfo[0]) || empty($imageInfo[1])) {
                 $validator->errors()->add('avatar', 'The uploaded file is corrupted or not a valid image.');
+
                 return;
             }
 
             if (! in_array($imageInfo['mime'], ['image/jpeg', 'image/png'], true)) {
                 $validator->errors()->add('avatar', 'The uploaded image must be a valid JPG, JPEG, or PNG format.');
+
                 return;
             }
 
             if ($imageInfo[0] > 4096 || $imageInfo[1] > 4096) {
                 $validator->errors()->add('avatar', 'The image dimensions cannot exceed 4096x4096 pixels.');
+
                 return;
             }
         });

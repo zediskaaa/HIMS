@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Contracts\SmsGateway;
 use App\Enums\AuditAction;
 use App\Enums\NotificationDestination;
 use App\Enums\NotificationPriority;
@@ -11,6 +12,7 @@ use App\Observers\UserObserver;
 use App\Services\AuditLogger;
 use App\Services\HimsNotificationService;
 use App\Services\Recovery\QueueJobRecoveryService;
+use App\Services\Sms\IprogSmsGateway;
 use App\Support\AuditBrowserLocation;
 use App\Support\AuthenticationPanel;
 use App\View\Composers\NotificationComposer;
@@ -33,7 +35,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(SmsGateway::class, IprogSmsGateway::class);
     }
 
     /**

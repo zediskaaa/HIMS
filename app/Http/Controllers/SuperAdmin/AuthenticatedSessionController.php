@@ -9,6 +9,8 @@ use App\Notifications\LoginMfaOtp;
 use App\Services\LoginLockoutService;
 use App\Services\LoginMfaService;
 use App\Services\PasswordExpirationService;
+use App\Services\Sms\SmsMfaChallengeService;
+use App\Services\Sms\SmsOtpDelivery;
 use App\Support\AuthenticationContext;
 use App\Support\AuthenticationPanel;
 use Illuminate\Http\RedirectResponse;
@@ -32,6 +34,7 @@ class AuthenticatedSessionController extends Controller
         SuperAdminLoginRequest $request,
         LoginMfaService $mfa,
         PasswordExpirationService $expiration,
+        SmsMfaChallengeService $sms,
     ): RedirectResponse {
         $user = $request->validateCredentials();
 
@@ -88,6 +91,22 @@ class AuthenticatedSessionController extends Controller
             }
 
             return redirect()->route('super-admin.login.mfa');
+        }
+
+        if ($user->sms_mfa_enabled) {
+            $pendingUser = $mfa->pendingUser($request, AuthenticationContext::SUPER_ADMIN_GUARD);
+            if ($pendingUser?->is($user) && $mfa->challengeMethod($request, AuthenticationContext::SUPER_ADMIN_GUARD) === LoginMfaService::METHOD_SMS) {
+                return redirect()->route('super-admin.login.mfa');
+            }
+
+            $request->session()->regenerate();
+            $status = $sms->begin($request, $user, AuthenticationContext::SUPER_ADMIN_GUARD, $request->boolean('remember'), $request->progressiveThrottleKey());
+
+            return $status === SmsOtpDelivery::SENT
+                ? redirect()->route('super-admin.login.mfa')
+                : back()->withErrors(['email' => $status === SmsOtpDelivery::RATE_LIMITED
+                    ? 'Too many SMS code requests. Please wait before trying again.'
+                    : 'We could not send a verification code. Please try again.'])->onlyInput('email');
         }
 
         if ($user->passwordHasExpired()) {

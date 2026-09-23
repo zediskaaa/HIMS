@@ -35,6 +35,10 @@
                 @include('profile.partials.update-authenticator-form')
             </div>
 
+            <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
+                @include('profile.partials.update-sms-mfa-form')
+            </div>
+
             @if ($user->isAdministrator())
                 <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm sm:p-6">
                     @include('profile.partials.update-mfa-form')

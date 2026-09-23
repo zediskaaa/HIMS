@@ -594,6 +594,22 @@ const startDecisionConfirmations = () => {
     let processing = false;
 
     const decisionFor = (form, submitter = null) => {
+        if (form.matches('[data-confirm-sms-mfa]')) {
+            const enabled = form.querySelector('input[name="sms_mfa_enabled"][type="checkbox"]')?.checked ?? false;
+            const originallyEnabled = form.dataset.originalSmsMfa === '1';
+
+            if (enabled === originallyEnabled) return null;
+
+            return {
+                title: 'Confirm SMS authentication change',
+                message: enabled
+                    ? 'Future sign-ins will require an SMS code sent to your registered mobile number.'
+                    : 'Disable SMS verification for future sign-ins?',
+                label: enabled ? 'Enable SMS' : 'Disable SMS',
+                variant: enabled ? 'primary' : 'warning',
+            };
+        }
+
         if (form.matches('[data-confirm-mfa]')) {
             const enabled = form.querySelector('input[name="mfa_enabled"][type="checkbox"]')?.checked ?? false;
             const originallyEnabled = form.dataset.originalMfa === '1';
@@ -689,6 +705,15 @@ const startDecisionConfirmations = () => {
 
             if (checkbox instanceof HTMLInputElement) {
                 checkbox.checked = form.dataset.originalMfa === '1';
+                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        if (form instanceof HTMLFormElement && form.matches('[data-confirm-sms-mfa]')) {
+            const checkbox = form.querySelector('input[name="sms_mfa_enabled"][type="checkbox"]');
+
+            if (checkbox instanceof HTMLInputElement) {
+                checkbox.checked = form.dataset.originalSmsMfa === '1';
                 checkbox.dispatchEvent(new Event('change', { bubbles: true }));
             }
         }

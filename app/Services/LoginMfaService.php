@@ -17,6 +17,8 @@ class LoginMfaService
 
     public const METHOD_EMAIL = 'email';
 
+    public const METHOD_SMS = 'sms';
+
     public const METHOD_AUTHENTICATOR = 'authenticator';
 
     public const METHOD_AUTHENTICATOR_RECOVERY = 'authenticator_recovery';
@@ -97,6 +99,34 @@ class LoginMfaService
         );
     }
 
+    public function issueSms(
+        Request $request,
+        User $user,
+        string $guard,
+        bool $remember,
+        ?string $loginThrottleKey = null,
+    ): string {
+        $previousState = $this->state($request, $guard);
+
+        do {
+            $otp = $this->generateOtp();
+        } while ($previousState !== null
+            && is_string($previousState['otp_hash'])
+            && Hash::check($otp, $previousState['otp_hash']));
+
+        $this->putState(
+            $request,
+            $user,
+            $guard,
+            $remember,
+            $loginThrottleKey,
+            self::METHOD_SMS,
+            Hash::make($otp),
+        );
+
+        return $otp;
+    }
+
     public function pendingUser(Request $request, string $guard): ?User
     {
         $state = $this->state($request, $guard);
@@ -119,6 +149,9 @@ class LoginMfaService
                 )
                 && $this->authenticatorSetup->secret($request, $user) !== null,
             self::METHOD_EMAIL => (bool) $user->mfa_enabled,
+            self::METHOD_SMS => (bool) $user->sms_mfa_enabled
+                && preg_match('/^09[0-9]{9}$/D', (string) $user->phone) === 1
+                && hash_equals((string) $user->sms_mfa_phone, (string) $user->phone),
         };
 
         if ($user === null || ! $user->isActive() || ! $methodStillEnabled || ! $panel->accepts($user->role)) {
@@ -156,6 +189,8 @@ class LoginMfaService
                     $recoverySecret = $this->authenticatorSetup->secret($request, $user),
                 ) && $this->authenticator->verify($recoverySecret, $otp),
                 self::METHOD_EMAIL => is_string($state['otp_hash'])
+                    && Hash::check($otp, $state['otp_hash']),
+                self::METHOD_SMS => is_string($state['otp_hash'])
                     && Hash::check($otp, $state['otp_hash']),
             };
         } catch (InvalidAuthenticatorSecretException) {
@@ -211,8 +246,14 @@ class LoginMfaService
             return ['status' => self::MISSING];
         }
 
-        if ($state['method'] !== self::METHOD_EMAIL) {
+        if (! in_array($state['method'], [self::METHOD_EMAIL, self::METHOD_SMS], true)) {
             return ['status' => 'unsupported'];
+        }
+
+        if ($state['method'] === self::METHOD_SMS && $state['attempts_remaining'] < 1) {
+            $this->clear($request);
+
+            return ['status' => 'exhausted'];
         }
 
         $retryAfter = max(0, $state['resend_available_at'] - now()->getTimestamp());
@@ -221,16 +262,21 @@ class LoginMfaService
             return ['status' => 'cooldown', 'retry_after' => $retryAfter];
         }
 
+        $otp = $state['method'] === self::METHOD_SMS
+            ? $this->issueSms($request, $user, $guard, $state['remember'], $state['login_throttle_key'])
+            : $this->issue($request, $user, $guard, $state['remember'], $state['login_throttle_key']);
+
+        if ($state['method'] === self::METHOD_SMS) {
+            $nextState = $this->state($request, $guard);
+            $nextState['attempts_remaining'] = $state['attempts_remaining'];
+            $request->session()->put(self::SESSION_KEY, $nextState);
+        }
+
         return [
             'status' => self::SUCCESS,
-            'otp' => $this->issue(
-                $request,
-                $user,
-                $guard,
-                $state['remember'],
-                $state['login_throttle_key'],
-            ),
+            'otp' => $otp,
             'user' => $user,
+            'method' => $state['method'],
         ];
     }
 
@@ -254,11 +300,19 @@ class LoginMfaService
         return $state !== null && $state['expires_at'] <= now()->getTimestamp();
     }
 
+    public function isExhausted(Request $request, string $guard): bool
+    {
+        $state = $this->state($request, $guard);
+
+        return $state !== null && $state['method'] === self::METHOD_SMS
+            && $state['attempts_remaining'] < 1;
+    }
+
     public function resendAvailableIn(Request $request, string $guard): int
     {
         $state = $this->state($request, $guard);
 
-        return $state === null || $state['method'] !== self::METHOD_EMAIL
+        return $state === null || ! in_array($state['method'], [self::METHOD_EMAIL, self::METHOD_SMS], true)
             ? 0
             : max(0, $state['resend_available_at'] - now()->getTimestamp());
     }
@@ -322,6 +376,7 @@ class LoginMfaService
             || ($state['guard'] ?? null) !== $guard
             || ! in_array($state['method'] ?? null, [
                 self::METHOD_EMAIL,
+                self::METHOD_SMS,
                 self::METHOD_AUTHENTICATOR,
                 self::METHOD_AUTHENTICATOR_RECOVERY,
             ], true)
