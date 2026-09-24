@@ -10,7 +10,8 @@
     ];
     $dimension = $sizeClasses[$size] ?? $sizeClasses['md'];
 
-    $logoUrl = $supplier?->logoUrl();
+    $canViewLogo = auth()->check() && auth()->user()->can(\App\Enums\Permission::ViewSuppliers->value);
+    $logoUrl = $canViewLogo ? $supplier?->logoUrl() : null;
     $name = $supplier?->name ?? '';
     $initials = str($name)->explode(' ')->filter()->take(2)->map(fn ($word) => mb_strtoupper(mb_substr($word, 0, 1)))->implode('') ?: '?';
 @endphp

@@ -111,7 +111,7 @@ class LogisticsController extends Controller implements HasMiddleware
             ->take(8)
             ->get();
 
-        $recentDocuments = LogisticsDocument::with(['uploadedBy', 'verifiedBy'])
+        $recentDocuments = LogisticsDocument::with(['uploadedBy', 'verifiedBy', 'supplier', 'purchaseOrder.supplier'])
             ->where('status', '!=', 'archived')
             ->latest()
             ->take(6)
@@ -131,7 +131,7 @@ class LogisticsController extends Controller implements HasMiddleware
      */
     public function documents(Request $request): View
     {
-        $query = LogisticsDocument::with(['uploadedBy', 'verifiedBy', 'purchaseOrder', 'goodsReceiptNote']);
+        $query = LogisticsDocument::with(['uploadedBy', 'verifiedBy', 'purchaseOrder', 'goodsReceiptNote', 'supplier']);
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {

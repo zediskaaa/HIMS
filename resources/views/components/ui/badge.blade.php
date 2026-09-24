@@ -12,6 +12,7 @@
         'in_stock' => 'success', 'active' => 'success', 'approved' => 'success',
         'fulfilled' => 'success', 'received' => 'success', 'completed' => 'success',
         'resolved' => 'success', 'delivered' => 'success', 'healthy' => 'success',
+        'accepted' => 'success', 'arrived_at_dock' => 'success',
 
         // amber — needs attention, in flight
         'low_stock' => 'warning', 'pending' => 'warning', 'submitted' => 'warning',
@@ -19,11 +20,12 @@
         'acknowledged' => 'warning', 'under_review' => 'warning',
         'pending_review' => 'warning', 'action_required' => 'danger',
         'warning' => 'warning', 'degraded' => 'warning',
+        'pending_inspection' => 'warning', 'customs_hold' => 'warning',
 
         // red — blocked, failed, critical
         'out_of_stock' => 'danger', 'expired' => 'danger', 'rejected' => 'danger',
         'cancelled' => 'danger', 'critical' => 'danger', 'open' => 'danger',
-        'unhealthy' => 'danger',
+        'unhealthy' => 'danger', 'inspected_failed' => 'danger',
 
         // recovery incidents — a failure is red, work in flight is amber, a
         // verified recovery is green, and "no retry exists" is simply inert
@@ -37,6 +39,9 @@
         'current' => 'success', 'suspended' => 'danger',
         'converted' => 'primary',
         'info' => 'primary',
+        'inspected_passed' => 'primary',
+        'in_transit' => 'primary',
+        'dispatched' => 'primary',
 
         // movement types — direction of stock, not health
         'stock_in' => 'success', 'stock_out' => 'primary', 'transfer' => 'primary',

@@ -1107,4 +1107,73 @@ class DocumentTrackingAndLogisticsTest extends TestCase
             ->assertSee('Not recorded')
             ->assertDontSee('Facility Dock');
     }
+
+    public function test_recent_documents_card_renders_supplier_logo_or_initials(): void
+    {
+        extract($this->createSetup());
+        Storage::fake('local');
+
+        // Document 1: linked to supplier with uploaded logo
+        $logoPath = 'supplier-logos/'.$supplier->id.'/test-logo.png';
+        Storage::disk('local')->put($logoPath, 'fake-image-data');
+        $supplier->forceFill(['logo_path' => $logoPath])->save();
+
+        $docWithLogo = LogisticsDocument::create([
+            'tracking_number' => 'DOC-SI-TEST-001',
+            'document_type' => DocumentType::SalesInvoice,
+            'title' => 'Zuellig Pharma Test Sales Invoice',
+            'reference_number' => 'SI-TEST-001',
+            'supplier_id' => $supplier->id,
+            'status' => 'verified',
+            'file_path' => 'logistics_documents/doc1.pdf',
+            'file_name' => 'doc1.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 1024,
+            'disk' => 'local',
+            'sha256_checksum' => hash('sha256', 'content'),
+            'uploaded_by_id' => $buyer->id,
+            'version_number' => 1,
+        ]);
+
+        // Document 2: linked to supplier without logo
+        $supplierNoLogo = Supplier::create([
+            'name' => 'Metro Drug Inc',
+            'status' => \App\Enums\SupplierStatus::Active,
+        ]);
+
+        $docNoLogo = LogisticsDocument::create([
+            'tracking_number' => 'DOC-DR-TEST-002',
+            'document_type' => DocumentType::DeliveryReceipt,
+            'title' => 'Metro Drug Delivery Receipt',
+            'reference_number' => 'DR-TEST-002',
+            'supplier_id' => $supplierNoLogo->id,
+            'status' => 'submitted',
+            'file_path' => 'logistics_documents/doc2.pdf',
+            'file_name' => 'doc2.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 2048,
+            'disk' => 'local',
+            'sha256_checksum' => hash('sha256', 'content2'),
+            'uploaded_by_id' => $buyer->id,
+            'version_number' => 1,
+        ]);
+
+        $response = $this->actingAs($buyer)->get(route('inventory.logistics'));
+        $response->assertOk();
+
+        // Document 1 displays the supplier logo image endpoint
+        $response->assertSee(route('inventory.suppliers.logo', $supplier), false);
+
+        // Document 2 displays the supplier initials "MD"
+        $response->assertSee('MD');
+
+        // Supplier names are attributed
+        $response->assertSee($supplier->name);
+        $response->assertSee($supplierNoLogo->name);
+
+        // Document types are rendered
+        $response->assertSee('SI');
+        $response->assertSee('DR');
+    }
 }
+
