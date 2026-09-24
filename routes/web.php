@@ -165,6 +165,7 @@ Route::middleware('auth:web,admin,super_admin')->group(function () {
     Route::get('/inventory/receiving', [GoodsReceiptController::class, 'index'])->name('inventory.receiving.index');
     Route::post('/inventory/receiving', [GoodsReceiptController::class, 'storeReceipt'])->name('inventory.receiving.store');
     Route::get('/inventory/receiving/{goodsReceiptNote}', [GoodsReceiptController::class, 'show'])->name('inventory.receiving.show');
+    Route::post('/inventory/receiving/{goodsReceiptNote}/lines/{line}/return', [GoodsReceiptController::class, 'returnRejected'])->name('inventory.receiving.return');
     Route::get('/inventory/qc', [GoodsReceiptController::class, 'qcQueue'])->name('inventory.qc.index');
     Route::post('/inventory/qc/{inspection}/release', [GoodsReceiptController::class, 'releaseQc'])->name('inventory.qc.release');
     Route::post('/inventory/qc/{inspection}/reject', [GoodsReceiptController::class, 'rejectQc'])->name('inventory.qc.reject');

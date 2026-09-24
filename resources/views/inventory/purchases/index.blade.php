@@ -1723,14 +1723,11 @@
                                             @endif
                                             @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
                                                 @if($canReceiveThisPo)
-                                                    <form method="POST" action="{{ route('inventory.purchases.receive', $po) }}" data-confirm-title="Receive Purchase Order" data-confirm-message="Confirm that this delivery is physically present at the dock before posting into inventory." data-confirm-label="Receive delivery">
-                                                        @csrf
-                                                        <x-ui.button type="submit" size="sm" icon="check-circle">Receive delivery</x-ui.button>
-                                                    </form>
+                                                    <x-ui.button :href="route('inventory.receiving.index', ['purchase_order_id' => $po->id])" size="sm" icon="check-circle">Record delivery</x-ui.button>
                                                 @elseif(in_array($po->status, ['received', 'fulfilled'], true))
                                                     <span class="inline-flex items-center gap-1 text-xs font-semibold text-success-700 dark:text-success-400">
                                                         <svg class="h-3.5 w-3.5 text-success-600 dark:text-success-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                                        Stock posted
+                                                    Delivery recorded
                                                     </span>
                                                 @endif
                                             @endcan
@@ -1971,10 +1968,7 @@
                                 @endcan
                                 @can(\App\Enums\Permission::ReceivePurchaseOrder->value)
                                     <template x-if="selectedPo.can_receive">
-                                        <form method="POST" x-bind:action="selectedPo.receive_url" data-confirm-title="Receive Purchase Order" data-confirm-message="Confirm that this delivery is physically present before posting it into stock." data-confirm-label="Receive delivery">
-                                            @csrf
-                                            <x-ui.button type="submit" size="sm">Receive delivery</x-ui.button>
-                                        </form>
+                                        <a x-bind:href="selectedPo.receiving_url + '?purchase_order_id=' + selectedPo.id" class="inline-flex min-h-9 items-center rounded-md bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700">Record delivery</a>
                                     </template>
                                 @endcan
                             </div>

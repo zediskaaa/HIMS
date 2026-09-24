@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Enums\MovementType;
 use App\Enums\Permission;
 use App\Models\InventoryItem;
+use App\Models\GoodsReceiptNoteLine;
+use App\Models\QualityInspection;
 use App\Models\ItemBatch;
 use App\Models\ItemCategory;
 use App\Models\ItemStockLevel;
@@ -62,7 +64,7 @@ class InventoryReportService
         'expiry_exposure' => 'Expiry Exposure',
         'movement_history' => 'Movement History',
         'procurement_expense' => 'Procurement Expense',
-        'spend_by_supplier' => 'Spend by Supplier',
+        'spend_by_supplier' => 'PO Commitments by Supplier',
         'most_consumed' => 'Most Consumed Items',
         'movements_by_type' => 'Activity by Movement Type',
     ];
@@ -124,6 +126,7 @@ class InventoryReportService
             'stockByLocation' => $this->stockByLocation($categoryId, $locationId, $stockStatusFilter),
             'spend' => $this->procurementSpend($since, $until, $supplierId),
             'spendBySupplier' => $this->spendBySupplier($since, $until, $supplierId),
+            'receivingReconciliation' => $this->receivingReconciliation($since, $until, $supplierId),
             'movementsByType' => $movementsByType,
             'movementTotals' => $this->movementTotals($movementsByType),
             'topConsumedItems' => $this->topConsumedItems($since, $until, $categoryId, $locationId),
@@ -419,31 +422,87 @@ class InventoryReportService
             ->where('requested_at', '>=', $since)
             ->when($supplierId, fn ($query) => $query->where('supplier_id', $supplierId))
             ->when($until, fn ($q) => $q->where('requested_at', '<=', $until)));
-        $received = $totals(PurchaseOrder::query()
+        $legacyReceived = $totals(PurchaseOrder::query()
             ->where('status', 'received')
             ->where('received_at', '>=', $since)
             ->when($supplierId, fn ($query) => $query->where('supplier_id', $supplierId))
             ->when($until, fn ($q) => $q->where('received_at', '<=', $until)));
-        $outstanding = $totals(PurchaseOrder::query()
+        $accepted = DB::table('stock_movements')
+            ->join('quality_inspections', 'quality_inspections.id', '=', 'stock_movements.reference_id')
+            ->join('grn_line_items', 'grn_line_items.id', '=', 'quality_inspections.grn_line_item_id')
+            ->join('purchase_orders', 'purchase_orders.id', '=', 'stock_movements.purchase_order_id')
+            ->where('stock_movements.reference_type', QualityInspection::class)
+            ->where('stock_movements.movement_type', MovementType::QualityRelease->value)
+            ->where('stock_movements.moved_at', '>=', $since)
+            ->when($until, fn ($query) => $query->where('stock_movements.moved_at', '<=', $until))
+            ->when($supplierId, fn ($query) => $query->where('purchase_orders.supplier_id', $supplierId))
+            ->selectRaw('count(distinct stock_movements.purchase_order_id) as orders')
+            ->selectRaw('coalesce(sum(stock_movements.purchase_quantity * grn_line_items.unit_cost), 0) as value')
+            ->first();
+        $outstandingOrders = PurchaseOrder::with('lines')
             ->when($supplierId, fn ($query) => $query->where('supplier_id', $supplierId))
-            ->whereNotIn('status', ['received', 'cancelled']));
+            ->whereNotIn('status', ['received', 'fulfilled', 'cancelled'])->get();
+        $outstandingValue = $outstandingOrders->sum(fn ($po) => $po->lines->isNotEmpty()
+            ? $po->lines->sum(fn ($line) => $line->outstandingQuantity() * (float) $line->unit_price)
+            : (float) $po->total_amount);
 
         $orderCount = (int) ($ordered->orders ?? 0);
 
         return [
             'ordered' => ['orders' => $orderCount, 'value' => (float) ($ordered->value ?? 0)],
             'received' => [
-                'orders' => (int) ($received->orders ?? 0),
-                'value' => (float) ($received->value ?? 0),
+                'orders' => (int) ($legacyReceived->orders ?? 0) + (int) ($accepted->orders ?? 0),
+                'value' => (float) ($legacyReceived->value ?? 0) + (float) ($accepted->value ?? 0),
             ],
             'outstanding' => [
-                'orders' => (int) ($outstanding->orders ?? 0),
-                'value' => (float) ($outstanding->value ?? 0),
+                'orders' => $outstandingOrders->count(),
+                'value' => (float) $outstandingValue,
             ],
             'average_order_value' => $orderCount > 0
                 ? round((float) ($ordered->value ?? 0) / $orderCount, 2)
                 : 0.0,
         ];
+    }
+
+    /** @return Collection<int, array<string, mixed>> */
+    public function receivingReconciliation(Carbon $since, ?Carbon $until = null, ?int $supplierId = null): Collection
+    {
+        return GoodsReceiptNoteLine::query()
+            ->with(['goodsReceiptNote.purchaseOrder', 'goodsReceiptNote.receivedBy', 'purchaseOrderLine', 'item.stockLevels', 'batch.stockLevels'])
+            ->whereHas('goodsReceiptNote', fn ($query) => $query
+                ->where('received_at', '>=', $since)
+                ->when($until, fn ($dateQuery) => $dateQuery->where('received_at', '<=', $until))
+                ->when($supplierId, fn ($supplierQuery) => $supplierQuery->where('supplier_id', $supplierId)))
+            ->latest('id')->limit(100)->get()
+            ->map(function (GoodsReceiptNoteLine $line): array {
+                $factor = $line->conversionFactor();
+                $poLine = $line->purchaseOrderLine;
+
+                return [
+                    'grn' => $line->goodsReceiptNote,
+                    'po' => $line->goodsReceiptNote?->purchaseOrder,
+                    'item' => $line->item,
+                    'receiver' => $line->goodsReceiptNote?->receivedBy?->name,
+                    'batch' => $line->batch_number,
+                    'expiry' => $line->expiry_date,
+                    'purchase_unit' => $line->purchase_unit ?: $line->item?->unit,
+                    'base_unit' => $line->item?->unit,
+                    'factor' => $factor,
+                    'ordered' => $poLine?->ordered_quantity ?? $line->ordered_quantity,
+                    'delivered' => $poLine?->received_quantity ?? $line->received_quantity,
+                    'receipt_quantity' => $line->received_quantity,
+                    'accepted' => $line->accepted_quantity,
+                    'rejected' => $line->rejected_quantity,
+                    'pending_qc' => $line->quarantined_quantity,
+                    'awaiting_put_away_base' => $line->pending_put_away_quantity,
+                    'put_away_base' => max(0, (int) round($line->accepted_quantity * $factor) - $line->pending_put_away_quantity),
+                    'available_base' => (int) ($line->batch?->stockLevels->sum('quantity')
+                        ?? $line->item?->stockLevels->sum('quantity') ?? 0),
+                    'remaining' => $poLine?->remainingQuantity() ?? 0,
+                    'outstanding' => $poLine?->outstandingQuantity() ?? 0,
+                    'returned_base' => $line->returned_quantity,
+                ];
+            });
     }
 
     /**
@@ -461,7 +520,7 @@ class InventoryReportService
             ->selectRaw('purchase_orders.supplier_id as supplier_id')
             ->selectRaw("coalesce(suppliers.name, 'Unassigned') as supplier")
             ->selectRaw('count(*) as orders')
-            ->selectRaw("coalesce(sum(case when purchase_orders.status = 'received' then 1 else 0 end), 0) as received_orders")
+            ->selectRaw("coalesce(sum(case when purchase_orders.status in ('received', 'fulfilled') then 1 else 0 end), 0) as received_orders")
             ->selectRaw('coalesce(sum(purchase_orders.total_amount), 0) as value')
             ->groupBy('purchase_orders.supplier_id', 'suppliers.id', 'suppliers.name')
             ->orderByDesc('value')
@@ -1197,7 +1256,7 @@ class InventoryReportService
         }
 
         $query = PurchaseOrder::query()
-            ->with(['supplier', 'item'])
+            ->with(['supplier', 'item', 'lines'])
             ->where('requested_at', '>=', $from)
             ->where('requested_at', '<=', $to)
             ->when($supplierId, fn ($q) => $q->where('supplier_id', $supplierId))
@@ -1209,6 +1268,12 @@ class InventoryReportService
             $qty = (int) $po->quantity;
             $cost = (float) $po->unit_cost;
             $amount = (float) $po->total_amount;
+            $acceptedValue = $po->lines->isNotEmpty()
+                ? (float) $po->lines->sum(fn ($line) => $line->accepted_quantity * (float) $line->unit_price)
+                : (in_array($po->status, ['received', 'fulfilled'], true) ? $amount : 0.0);
+            $outstandingValue = $po->lines->isNotEmpty()
+                ? (float) $po->lines->sum(fn ($line) => $line->outstandingQuantity() * (float) $line->unit_price)
+                : (in_array($po->status, ['received', 'fulfilled', 'cancelled'], true) ? 0.0 : $amount);
 
             return [
                 'po_number' => $po->po_number,
@@ -1219,6 +1284,8 @@ class InventoryReportService
                 'quantity' => $qty,
                 'unit_cost' => $cost,
                 'total_amount' => $amount,
+                'accepted_value' => $acceptedValue,
+                'outstanding_value' => $outstandingValue,
                 'status' => ucwords(str_replace('_', ' ', (string) $po->status)),
                 'received_at' => $po->received_at ? $po->received_at->format('M d, Y') : 'Pending',
             ];
@@ -1232,16 +1299,12 @@ class InventoryReportService
             default => $sortDir === 'asc' ? $rows->sortBy('timestamp') : $rows->sortByDesc('timestamp'),
         })->values();
 
-        $received = $orders->where('status', 'received');
-        $outstanding = PurchaseOrder::query()
-            ->whereNotIn('status', ['received', 'cancelled'])
-            ->when($supplierId, fn ($query) => $query->where('supplier_id', $supplierId))
-            ->get();
+        $spend = $this->procurementSpend($from, $to, $supplierId);
 
         $totalOrdersCount = $orders->count();
         $totalOrderedVal = (float) $orders->sum('total_amount');
-        $receivedVal = (float) $received->sum('total_amount');
-        $outstandingVal = (float) $outstanding->sum('total_amount');
+        $receivedVal = (float) $spend['received']['value'];
+        $outstandingVal = (float) $spend['outstanding']['value'];
         $avgOrderVal = $totalOrdersCount > 0 ? round($totalOrderedVal / $totalOrdersCount, 2) : 0.0;
 
         $columns = [
@@ -1252,15 +1315,17 @@ class InventoryReportService
             'quantity' => 'Quantity',
             'unit_cost' => 'Unit Cost (₱)',
             'total_amount' => 'Total Amount (₱)',
+            'accepted_value' => 'QC Accepted Value (₱)',
+            'outstanding_value' => 'Outstanding Value (₱)',
             'status' => 'Status',
-            'received_at' => 'Date Received',
+            'received_at' => 'Date Fully Accepted',
         ];
 
         $summary = [
             'Purchase Orders Placed' => $totalOrdersCount,
             'Total Ordered Amount' => '₱'.number_format($totalOrderedVal, 2),
-            'Total Landed / Received' => '₱'.number_format($receivedVal, 2),
-            'Outstanding Commitments' => '₱'.number_format($outstandingVal, 2).' ('.$outstanding->count().' POs)',
+            'QC Accepted / Legacy Received' => '₱'.number_format($receivedVal, 2),
+            'Outstanding Commitments' => '₱'.number_format($outstandingVal, 2).' ('.$spend['outstanding']['orders'].' POs)',
             'Average Order Value' => '₱'.number_format($avgOrderVal, 2),
         ];
 
@@ -1272,6 +1337,8 @@ class InventoryReportService
             'quantity' => (int) $rows->sum('quantity'),
             'unit_cost' => '-',
             'total_amount' => '₱'.number_format($totalOrderedVal, 2),
+            'accepted_value' => '₱'.number_format((float) $rows->sum('accepted_value'), 2),
+            'outstanding_value' => '₱'.number_format((float) $rows->sum('outstanding_value'), 2),
             'status' => '-',
             'received_at' => '-',
         ];
@@ -1303,7 +1370,7 @@ class InventoryReportService
             ->when($supplierId, fn ($q) => $q->where('purchase_orders.supplier_id', $supplierId))
             ->selectRaw("coalesce(suppliers.name, 'Unassigned') as supplier")
             ->selectRaw('count(*) as orders')
-            ->selectRaw("coalesce(sum(case when purchase_orders.status = 'received' then 1 else 0 end), 0) as received_orders")
+            ->selectRaw("coalesce(sum(case when purchase_orders.status in ('received', 'fulfilled') then 1 else 0 end), 0) as received_orders")
             ->selectRaw('coalesce(sum(purchase_orders.total_amount), 0) as value')
             ->groupBy('suppliers.id', 'suppliers.name')
             ->toBase();
@@ -1342,14 +1409,14 @@ class InventoryReportService
             'orders' => 'Orders Placed',
             'received_orders' => 'Fulfilled Orders',
             'fulfilment_rate' => 'Fulfilment Rate (%)',
-            'value' => 'Total Procurement Spend (₱)',
+            'value' => 'PO Commitments (₱)',
         ];
 
         $summary = [
             'Active Vendors' => $rows->count(),
             'Total POs Placed' => $totalOrders,
             'Overall Fulfilment Rate' => $overallRate.'%',
-            'Total Spend' => '₱'.number_format($totalSpend, 2),
+            'Total Committed' => '₱'.number_format($totalSpend, 2),
         ];
 
         $totals = [

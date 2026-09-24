@@ -18,9 +18,12 @@ use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Models\WarehouseTask;
 use App\Services\Inventory\GoodsReceiptService;
+use App\Services\Inventory\QualityControlService;
 use App\Services\Inventory\IssuanceEngine;
 use App\Services\InventoryAutomationService;
+use App\Services\Warehouse\WarehouseTaskService;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -862,12 +865,30 @@ class PurchaseOrderFifoWorkflowTest extends TestCase
         $item->refresh();
         $this->assertEquals(200, $item->quantity_on_hand);
 
-        // 3. Receive delivery via PurchaseOrderController@receive (or GoodsReceiptService)
-        // Creating Batch B received on Sept 20
+        // 3. Legacy action directs to GRN; delivery remains unavailable until QC and put-away.
         $response = $this->actingAs($this->warehouseStaff)
             ->post(route('inventory.purchases.receive', $po));
 
-        $response->assertRedirect(route('inventory.purchases'));
+        $response->assertRedirect(route('inventory.receiving.index', ['purchase_order_id' => $po->id]));
+        $this->assertEquals(200, $item->fresh()->quantity_on_hand);
+
+        $grn = app(GoodsReceiptService::class)->receiveOrder($po, [
+            'lines' => [[
+                'po_line_id' => $poLine->id,
+                'received_quantity' => 4,
+                'batch_number' => 'BATCH-B-SEPT-20',
+            ]],
+        ], $this->warehouseStaff);
+        $inspection = $grn->lines()->firstOrFail()->inspections()->firstOrFail();
+        app(QualityControlService::class)->releaseLot($inspection, 4, $this->mainLocation->id, $this->manager);
+        $this->assertEquals(200, $item->fresh()->quantity_on_hand);
+        $task = WarehouseTask::where('item_id', $item->id)->firstOrFail();
+        $tasks = app(WarehouseTaskService::class);
+        $tasks->start($task, $this->warehouseStaff);
+        $tasks->scan($task, 'LOC-STAGING', $this->warehouseStaff);
+        $tasks->scan($task, $item->sku, $this->warehouseStaff);
+        $tasks->scan($task, $this->mainLocation->code, $this->warehouseStaff);
+        $tasks->complete($task, 400, $this->warehouseStaff);
 
         $item->refresh();
         // 200 existing + 400 received = 600 units
@@ -941,7 +962,7 @@ class PurchaseOrderFifoWorkflowTest extends TestCase
             'created_by' => $this->manager->id,
         ]);
 
-        PurchaseOrderLine::create([
+        $poLine = PurchaseOrderLine::create([
             'purchase_order_id' => $po->id,
             'item_id' => $item->id,
             'line_number' => 1,
@@ -987,7 +1008,7 @@ class PurchaseOrderFifoWorkflowTest extends TestCase
             'created_by' => $this->manager->id,
         ]);
 
-        PurchaseOrderLine::create([
+        $poLine = PurchaseOrderLine::create([
             'purchase_order_id' => $po->id,
             'item_id' => $item->id,
             'line_number' => 1,
@@ -999,8 +1020,15 @@ class PurchaseOrderFifoWorkflowTest extends TestCase
             'line_status' => 'ordered',
         ]);
 
-        $this->actingAs($this->warehouseStaff)
-            ->post(route('inventory.purchases.receive', $po));
+        $grn = app(GoodsReceiptService::class)->receiveOrder($po, [
+            'received_at' => Carbon::today()->toDateString(),
+            'lines' => [[
+                'po_line_id' => $poLine->id,
+                'received_quantity' => 10,
+                'batch_number' => 'BATCH-DATE-TEST',
+            ]],
+        ], $this->warehouseStaff);
+        $this->assertSame(10, $grn->lines()->firstOrFail()->received_quantity);
 
         $batch = ItemBatch::where('item_id', $item->id)->first();
         $this->assertNotNull($batch);
@@ -1033,7 +1061,7 @@ class PurchaseOrderFifoWorkflowTest extends TestCase
             'created_by' => $this->manager->id,
         ]);
 
-        PurchaseOrderLine::create([
+        $poLine = PurchaseOrderLine::create([
             'purchase_order_id' => $po->id,
             'item_id' => $item->id,
             'line_number' => 1,
@@ -1045,18 +1073,18 @@ class PurchaseOrderFifoWorkflowTest extends TestCase
             'line_status' => 'ordered',
         ]);
 
-        // First receive
-        $this->actingAs($this->warehouseStaff)
-            ->post(route('inventory.purchases.receive', $po));
-
-        $this->assertEquals(10, $item->fresh()->quantity_on_hand);
-
-        // Second receive attempt must be rejected and not add stock
-        $secondResponse = $this->actingAs($this->warehouseStaff)
-            ->post(route('inventory.purchases.receive', $po));
-
-        $secondResponse->assertSessionHas('info');
-        $this->assertEquals(10, $item->fresh()->quantity_on_hand);
+        $payload = [
+            'receipt_key' => 'dup-date-test',
+            'waybill_number' => 'WB-DUP-TEST',
+            'lines' => [['po_line_id' => $poLine->id, 'received_quantity' => 10,
+                'batch_number' => 'LOT-TAPE-DUP', 'expiry_date' => now()->addYear()->toDateString()]],
+        ];
+        $first = app(GoodsReceiptService::class)->receiveOrder($po, $payload, $this->warehouseStaff);
+        $replayed = app(GoodsReceiptService::class)->receiveOrder($po, $payload, $this->warehouseStaff);
+        $this->assertSame($first->id, $replayed->id);
+        $this->assertSame(10, $po->lines()->firstOrFail()->received_quantity);
+        $this->assertSame(10, ItemStockLevel::where('item_id', $item->id)->sum('quarantined_quantity'));
+        $this->assertSame(0, $item->fresh()->quantity_on_hand);
     }
 
     /**
@@ -1625,4 +1653,3 @@ class PurchaseOrderFifoWorkflowTest extends TestCase
         $resAll->assertSee('PO-PAGINATED-001');
     }
 }
-

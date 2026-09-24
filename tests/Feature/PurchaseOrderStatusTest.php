@@ -8,6 +8,7 @@ use App\Models\GoodsReceiptNote;
 use App\Models\GoodsReceiptNoteLine;
 use App\Models\InventoryItem;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderLine;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Models\User;
@@ -141,6 +142,17 @@ class PurchaseOrderStatusTest extends TestCase
             'status' => PurchaseOrderStatus::Approved->value,
             'created_by_user_id' => $buyer->id,
         ]);
+        $poLine = PurchaseOrderLine::create([
+            'purchase_order_id' => $order->id,
+            'item_id' => $item->id,
+            'line_number' => 1,
+            'ordered_quantity' => 20,
+            'received_quantity' => 10,
+            'accepted_quantity' => 10,
+            'unit_price' => 1000,
+            'total_line_amount' => 20000,
+        ]);
+        $order->syncReceivingStatus();
 
         $receipt = GoodsReceiptNote::create([
             'grn_number' => 'GRN-PARTIAL-001',
@@ -154,6 +166,7 @@ class PurchaseOrderStatusTest extends TestCase
         // Ten of the twenty ordered units, so the order stays open.
         GoodsReceiptNoteLine::create([
             'goods_receipt_note_id' => $receipt->id,
+            'po_line_id' => $poLine->id,
             'item_id' => $item->id,
             'ordered_quantity' => 20,
             'received_quantity' => 10,
@@ -210,7 +223,13 @@ class PurchaseOrderStatusTest extends TestCase
         // backfill removed that spelling and the IA path no longer writes it,
         // so the attention tone became unreachable and a half-delivered order
         // looked exactly like an untouched one.
-        $this->purchaseOrder(PurchaseOrderStatus::PartiallyFulfilled);
+        $po = $this->purchaseOrder(PurchaseOrderStatus::PartiallyFulfilled);
+        PurchaseOrderLine::create([
+            'purchase_order_id' => $po->id, 'item_id' => $po->item_id, 'line_number' => 1,
+            'ordered_quantity' => 5, 'received_quantity' => 2, 'accepted_quantity' => 2,
+            'unit_price' => 2.5, 'total_line_amount' => 12.5,
+            'purchase_unit' => 'piece', 'conversion_factor' => 1,
+        ]);
 
         $this->actingAs(User::factory()->role(UserRole::InventoryManager)->create())
             ->get(route('inventory.receiving.index'))
@@ -222,7 +241,13 @@ class PurchaseOrderStatusTest extends TestCase
 
     public function test_the_dock_receiving_list_keeps_the_plain_tone_for_an_unstarted_delivery(): void
     {
-        $this->purchaseOrder(PurchaseOrderStatus::Approved);
+        $po = $this->purchaseOrder(PurchaseOrderStatus::Approved);
+        PurchaseOrderLine::create([
+            'purchase_order_id' => $po->id, 'item_id' => $po->item_id, 'line_number' => 1,
+            'ordered_quantity' => 5, 'received_quantity' => 0,
+            'unit_price' => 2.5, 'total_line_amount' => 12.5,
+            'purchase_unit' => 'piece', 'conversion_factor' => 1,
+        ]);
 
         $this->actingAs(User::factory()->role(UserRole::InventoryManager)->create())
             ->get(route('inventory.receiving.index'))

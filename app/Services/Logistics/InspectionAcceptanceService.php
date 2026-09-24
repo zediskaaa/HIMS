@@ -3,19 +3,10 @@
 namespace App\Services\Logistics;
 
 use App\Enums\AuditAction;
-use App\Enums\MovementType;
-use App\Enums\PurchaseOrderStatus;
 use App\Models\GoodsReceiptNote;
-use App\Models\GoodsReceiptNoteLine;
 use App\Models\InspectionAcceptanceReport;
-use App\Models\InventoryItem;
-use App\Models\ItemBatch;
-use App\Models\PurchaseOrder;
-use App\Models\StockMovement;
-use App\Models\StorageLocation;
 use App\Models\User;
 use App\Services\AuditLogger;
-use App\Services\InventoryAutomationService;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +16,6 @@ use Illuminate\Validation\ValidationException;
 class InspectionAcceptanceService
 {
     public function __construct(
-        private readonly InventoryAutomationService $automationService,
         private readonly AuditLogger $auditLogger,
         private readonly ChainOfCustodyService $custodyService,
     ) {}
@@ -181,151 +171,74 @@ class InspectionAcceptanceService
 
     /**
      * Conduct and sign the Custodial Acceptance section (COA GAM Appendix 50 Section B).
-     * This legally transfers inventory ownership to the hospital and increments stock levels.
+     * This documents ownership acceptance after QC has disposed of every unit.
+     * Inventory quantities are posted only by QC and physical put-away.
      *
      * @param  array<string, mixed>  $data
      */
     public function performCustodialAcceptance(InspectionAcceptanceReport $iar, array $data, User $custodian): InspectionAcceptanceReport
     {
         return DB::transaction(function () use ($iar, $data, $custodian): InspectionAcceptanceReport {
-            $locked = InspectionAcceptanceReport::lockForUpdate()->with([
-                'goodsReceiptNote.lines.item',
-                'purchaseOrder.lines',
-            ])->findOrFail($iar->id);
-
+            $locked = InspectionAcceptanceReport::lockForUpdate()
+                ->with(['goodsReceiptNote.lines', 'purchaseOrder'])
+                ->findOrFail($iar->id);
             if ($locked->status !== 'inspected_passed') {
-                throw new DomainException("Cannot accept IAR #{$locked->iar_number}: Technical inspection has not been passed (current status: {$locked->status}).");
+                throw new DomainException("IAR {$locked->iar_number} has not passed technical inspection or was already accepted.");
             }
-
-            // Segregation of Duties: Inspector cannot also sign the acceptance as Property Custodian
             if ($locked->inspected_by_id === $custodian->id) {
-                throw new DomainException('Segregation of duties: The technical inspection officer cannot accept their own inspection as property custodian.');
+                throw new DomainException('Segregation of duties: the technical inspector cannot sign custodial acceptance.');
             }
-
-            // Segregation of Duties: Buyer cannot accept delivery into inventory
-            $poBuyerId = $locked->purchaseOrder?->created_by_user_id ?? $locked->purchaseOrder?->purchaseRequest?->requester_id;
-            if ($poBuyerId && (int) $poBuyerId === (int) $custodian->id) {
-                throw new DomainException('Segregation of duties: The purchasing officer cannot accept physical inventory deliveries.');
+            $buyerId = $locked->purchaseOrder?->created_by_user_id
+                ?? $locked->purchaseOrder?->purchaseRequest?->requester_id;
+            if ($buyerId && (int) $buyerId === (int) $custodian->id) {
+                throw new DomainException('Segregation of duties: the purchasing officer cannot sign custodial acceptance.');
             }
 
             $grn = $locked->goodsReceiptNote;
-            $quarantineLoc = StorageLocation::firstOrCreate(
-                ['code' => 'LOC-QUARANTINE'],
-                ['name' => 'Receiving Quarantine Holding Area', 'type' => 'zone', 'status' => 'active']
-            );
-
-            $stagingLoc = StorageLocation::firstOrCreate(
-                ['code' => 'LOC-STAGING'],
-                ['name' => 'Central Receiving Staging Area', 'type' => 'zone', 'status' => 'active']
-            );
-
-            // Increment central inventory and post stock movements
-            foreach ($grn->lines as $line) {
-                $qty = (int) $line->received_quantity;
-                if ($qty <= 0) {
-                    continue;
-                }
-
-                $baseQty = $line->calculatedReceivedBaseQuantity();
-
-                // 1. Decrement quarantined stock by base quantity
-                $this->automationService->adjustQuarantinedStock($line->item_id, $quarantineLoc->id, $line->item_batch_id, -$baseQty);
-
-                // 2. Increment active receiving staging by base quantity
-                $this->automationService->adjustStockLevel($line->item_id, $stagingLoc->id, $line->item_batch_id, $baseQty);
-
-                // 3. Mark batch active if present
-                if ($line->item_batch_id) {
-                    ItemBatch::where('id', $line->item_batch_id)->update(['status' => 'active']);
-                }
-
-                // 4. Ensure PO line reflects received quantity without double counting
-                if ($line->po_line_id) {
-                    $poLine = $line->purchaseOrderLine;
-                    if ($poLine && (int) $poLine->received_quantity < $qty) {
-                        $poLine->received_quantity = $qty;
-                        $poLine->save();
-                    }
-                }
-
-                // 5. Post immutable StockMovement
-                $pUnit = $line->purchase_unit ?: $line->item->unit ?: 'unit';
-                $bUnit = $line->item->unit ?: 'unit';
-                $unitDisplay = $baseQty !== $qty
-                    ? "{$qty} {$pUnit} ({$baseQty} {$bUnit})"
-                    : "{$baseQty} {$bUnit}";
-
-                StockMovement::create([
-                    'item_id' => $line->item_id,
-                    'item_batch_id' => $line->item_batch_id,
-                    'movement_type' => MovementType::StockIn,
-                    'quantity' => $baseQty,
-                    'unit_cost' => $line->unit_cost ?? $line->item->unit_cost,
-                    'from_location_id' => $quarantineLoc->id,
-                    'to_location_id' => $stagingLoc->id,
-                    'reference_type' => InspectionAcceptanceReport::class,
-                    'reference_id' => $locked->id,
-                    'remarks' => "IAR Acceptance {$locked->iar_number} signed by Property Custodian {$custodian->name}: {$unitDisplay}",
-                    'moved_at' => now(),
-                    'user_id' => $custodian->id,
-                ]);
-
-                $line->accepted_quantity = $qty;
-                $line->status = 'accepted';
-                $line->save();
-
-                // 6. Synchronize cached item totals
-                $this->automationService->syncItemTotals($line->item);
+            if (! $grn || $grn->lines->isEmpty()) {
+                throw new DomainException('The IAR has no receiving lines to reconcile.');
             }
-
-            // Update PO status if fully fulfilled
-            $po = $locked->purchaseOrder;
-            if ($po) {
-                if ($po->isFullyReceived()) {
-                    $po->status = PurchaseOrderStatus::Fulfilled->value;
-                    $po->received_at = now();
-                    $po->save();
-                } else {
-                    $po->status = PurchaseOrderStatus::PartiallyFulfilled->value;
-                    $po->save();
+            if ($grn->lines->contains(fn ($line) => $line->quarantined_quantity > 0)) {
+                throw new DomainException('QC must resolve every received unit before IAR acceptance.');
+            }
+            $accepted = (int) $grn->lines->sum('accepted_quantity');
+            $rejected = (int) $grn->lines->sum('rejected_quantity');
+            if ($accepted === 0) {
+                throw new DomainException('The delivery was fully rejected by QC and cannot be accepted on the IAR.');
+            }
+            foreach ($grn->lines as $line) {
+                if ($line->accepted_quantity + $line->rejected_quantity !== $line->received_quantity) {
+                    throw new DomainException('The GRN and QC disposition quantities do not reconcile.');
                 }
             }
 
             $locked->acceptance_date = now();
             $locked->accepted_by_id = $custodian->id;
+            $locked->delivery_status = $rejected > 0 ? 'partial' : 'complete';
             $locked->status = 'accepted';
             $locked->save();
 
-            // Mark GRN posted
-            $grn->receipt_status = 'posted';
-            $grn->save();
-
-            // Record Chain of Custody
             $this->custodyService->recordTransfer($locked, [
                 'event_type' => 'acceptance_custody',
                 'releasing_user_id' => $locked->inspected_by_id,
                 'releasing_party_name' => $locked->inspectedBy?->name ?? 'Inspection Officer',
                 'receiving_user_id' => $custodian->id,
-                'receiving_party_name' => $custodian->name . ' (Property Custodian)',
+                'receiving_party_name' => $custodian->name.' (Property Custodian)',
                 'origin_location' => 'Technical Inspection Holding Area',
-                'destination_location' => 'Central Warehouse Inventory Master',
-                'package_condition' => 'good_order',
+                'destination_location' => 'Property Custodian Acceptance Office',
+                'package_condition' => $rejected > 0 ? 'partially_rejected' : 'good_order',
                 'verification_method' => 'credential_auth',
-                'notes' => "Formal custodial acceptance executed. Stock quantities posted to general inventory ledger. Liquidated damages assessed: PHP {$locked->liquidated_damages_amount}.",
+                'notes' => "IAR reconciled to QC: {$accepted} accepted and {$rejected} rejected purchase units. No inventory was posted by IAR.",
             ], $custodian);
 
             $this->auditLogger->record(
                 AuditAction::ApprovedIarAcceptance,
                 actor: $custodian,
                 target: $locked,
-                description: "Signed custodial acceptance on IAR {$locked->iar_number}. Inventory quantities posted to ledger.",
-                newValues: [
-                    'status' => 'accepted',
-                    'acceptance_date' => $locked->acceptance_date,
-                    'liquidated_damages_amount' => $locked->liquidated_damages_amount,
-                ],
+                description: "Signed custodial acceptance on IAR {$locked->iar_number} using existing QC disposition.",
+                newValues: ['status' => 'accepted', 'accepted_quantity' => $accepted,
+                    'rejected_quantity' => $rejected, 'acceptance_date' => $locked->acceptance_date],
             );
-
             return $locked;
         });
     }

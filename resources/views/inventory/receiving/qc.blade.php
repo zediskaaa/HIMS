@@ -4,7 +4,7 @@
             <div>
                 <div class="flex items-center gap-2">
                     <span class="rounded-md bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">Quality Control</span>
-                    <span class="text-xs text-neutral-500">• Quarantine Assay &amp; Partitioning Protocol</span>
+                    <span class="text-xs text-neutral-500">Quarantine Assay &amp; Partitioning Protocol</span>
                 </div>
                 <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">QC Inspection &amp; Release Queue</h2>
             </div>
@@ -18,12 +18,15 @@
         releaseModalOpen: false,
         rejectModalOpen: false,
         selectedInspection: null,
+        decisionKey: '',
         openReleaseModal(inspection) {
             this.selectedInspection = inspection;
+            this.decisionKey = crypto.randomUUID();
             this.releaseModalOpen = true;
         },
         openRejectModal(inspection) {
             this.selectedInspection = inspection;
+            this.decisionKey = crypto.randomUUID();
             this.rejectModalOpen = true;
         }
     }">
@@ -104,6 +107,11 @@
                                     <td class="px-6 py-4">
                                         <p class="font-semibold text-neutral-900">{{ $insp->item->name ?? 'Item #' . $insp->inventory_item_id }}</p>
                                         <p class="text-xs text-neutral-500">SKU: {{ $insp->item->sku ?? 'N/A' }} | Class: {{ $insp->item->abc_class ?? 'Standard' }}</p>
+                                        @if($insp->grnLine?->item_condition && $insp->grnLine->item_condition !== 'good')
+                                            <span class="inline-flex items-center gap-1 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200 mt-1">
+                                                Dock Intake: {{ ucfirst(str_replace('_', ' ', $insp->grnLine->item_condition)) }}
+                                            </span>
+                                        @endif
                                     </td>
                                     <td class="px-6 py-4">
                                         <p class="text-xs font-semibold text-neutral-800">{{ $insp->grnLine->goodsReceiptNote->grn_number ?? 'Direct Intake' }}</p>
@@ -123,7 +131,7 @@
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 text-right font-bold text-amber-600">
-                                        {{ number_format($insp->sample_size) }}
+                                        {{ number_format($insp->grnLine?->quarantined_quantity ?? 0) }}
                                     </td>
                                     <td class="px-6 py-4 text-xs text-neutral-500">
                                         {{ $insp->inspection_date ? $insp->inspection_date->format('M d, Y') : 'N/A' }}
@@ -136,8 +144,9 @@
                                                     'id' => $insp->id,
                                                     'item_name' => $insp->item->name ?? 'Item',
                                                     'sku' => $insp->item->sku ?? '',
-                                                    'quantity' => $insp->sample_size,
+                                                    'quantity' => $insp->grnLine?->quarantined_quantity ?? 0,
                                                     'batch_number' => $insp->batch->batch_number ?? $insp->grnLine->batch_number ?? 'N/A',
+                                                    'target_location_id' => $insp->grnLine?->destination_location_id ?? '',
                                                 ]) }})"
                                                 class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
                                                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -149,7 +158,7 @@
                                                 @click="openRejectModal({{ Js::from([
                                                     'id' => $insp->id,
                                                     'item_name' => $insp->item->name ?? 'Item',
-                                                    'quantity' => $insp->sample_size,
+                                                    'quantity' => $insp->grnLine?->quarantined_quantity ?? 0,
                                                 ]) }})"
                                                 class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-100 transition">
                                                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -203,9 +212,10 @@
                 <div class="inline-block w-full max-w-lg transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:align-middle">
                     <form :action="'{{ url('/inventory/qc') }}/' + (selectedInspection ? selectedInspection.id : '') + '/release'" method="POST"
                           data-confirm-title="Release QC inspected goods"
-                          data-confirm-message="Are you sure you want to approve and release these inspected items into active warehouse stock?"
+                          data-confirm-message="Accept these goods for put-away? Stock remains unavailable until put-away is completed."
                           data-confirm-label="Approve &amp; Release">
                         @csrf
+                        <input type="hidden" name="decision_key" :value="decisionKey">
                         <div class="bg-white px-6 pt-6 pb-4">
                             <div class="flex items-center gap-3">
                                 <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
@@ -214,8 +224,8 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 class="text-lg font-bold text-neutral-900">QC Release: Quarantine to Unrestricted Stock</h3>
-                                    <p class="text-xs text-neutral-500">Select the compatible final destination; configured warehouses route released stock through receiving staging first.</p>
+                                    <h3 class="text-lg font-bold text-neutral-900">QC Acceptance: Quarantine to Put-Away Queue</h3>
+                                    <p class="text-xs text-neutral-500">Accepted stock remains unavailable in staging until warehouse put-away is complete.</p>
                                 </div>
                             </div>
 
@@ -234,7 +244,7 @@
 
                                 <div>
                                     <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700">Target Unrestricted Storage Location</label>
-                                    <select name="target_location_id" required class="mt-1 block w-full rounded-lg border-neutral-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                                    <select name="target_location_id" x-model="selectedInspection.target_location_id" required class="mt-1 block w-full rounded-lg border-neutral-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
                                         <option value="">-- Select Destination Storage Location --</option>
                                         @foreach($storageLocations as $loc)
                                             <option value="{{ $loc->id }}">{{ $loc->name }} ({{ $loc->code }}) &bull; {{ $loc->zone ?? 'Unrestricted' }}</option>
@@ -256,7 +266,7 @@
                                 Cancel
                             </button>
                             <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700">
-                                Confirm Stock Release
+                                Accept for Put-Away
                             </button>
                         </div>
                     </form>
@@ -282,6 +292,7 @@
                           data-confirm-label="Reject &amp; Quarantine"
                           data-confirm-variant="danger">
                         @csrf
+                        <input type="hidden" name="decision_key" :value="decisionKey">
                         <div class="bg-white px-6 pt-6 pb-4">
                             <div class="flex items-center gap-3">
                                 <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-100 text-rose-600">

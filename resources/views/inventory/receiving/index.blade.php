@@ -3,7 +3,7 @@
         <div>
             <div class="flex items-center gap-2">
                 <span class="rounded-md bg-primary-100 px-2.5 py-0.5 text-xs font-semibold text-primary-800">Inbound Receiving</span>
-                <span class="text-xs text-neutral-500">• Three-Way Matching &amp; DOH GSDP Quarantine Protocol</span>
+                <span class="text-xs text-neutral-500">Three-Way Matching &amp; DOH GSDP Quarantine Protocol</span>
             </div>
             <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Dock Receiving &amp; Goods Receipt Notes</h2>
         </div>
@@ -12,18 +12,21 @@
     <div class="space-y-6" x-data="{
         showReceiveModal: false,
         selectedPo: null,
+        actualSupplierId: '',
         poLines: [],
         openOrders: {{ Js::from($openPurchaseOrders) }},
         selectPo(poId) {
             this.selectedPo = this.openOrders.find(p => p.id == poId);
+            this.actualSupplierId = '';
             if (!this.selectedPo) {
                 this.poLines = [];
                 return;
             }
+            let raw = [];
             if (Array.isArray(this.selectedPo.lines) && this.selectedPo.lines.length > 0) {
-                this.poLines = this.selectedPo.lines;
+                raw = this.selectedPo.lines;
             } else if (this.selectedPo.item_id) {
-                this.poLines = [{
+                raw = [{
                     id: this.selectedPo.id,
                     po_line_id: this.selectedPo.id,
                     item_id: this.selectedPo.item_id,
@@ -35,11 +38,28 @@
                     purchase_unit: this.selectedPo.purchase_unit,
                     conversion_factor: this.selectedPo.conversion_factor,
                 }];
-            } else {
-                this.poLines = [];
             }
+            this.poLines = raw.filter(l => ((l.ordered_quantity || 0) - (l.received_quantity || 0) + (l.rejected_quantity || 0)) > 0).map(l => {
+                const open = Math.max(0, (l.ordered_quantity || 0) - (l.received_quantity || 0) + (l.rejected_quantity || 0));
+                return {
+                    ...l,
+                    open_quantity: open,
+                    received_quantity: open,
+                    item_condition: 'good',
+                    discrepancy_type: '',
+                    discrepancy_action: 'quarantine',
+                    discrepancy_notes: '',
+                    batch_number: '',
+                    lot_number: '',
+                    expiry_date: '',
+                    manufactured_date: '',
+                    serial_number: '',
+                    actual_sku: '',
+                    actual_purchase_unit: '',
+                };
+            });
         }
-    }">
+    }" x-init="if ({{ Js::from(request()->query('purchase_order_id')) }}) { selectPo({{ Js::from(request()->query('purchase_order_id')) }}); showReceiveModal = !!selectedPo; }">
 
             {{-- SWS Consolidated Workflow Navigation --}}
             @include('inventory.warehousing.partials.workflow_nav')
@@ -81,9 +101,9 @@
                     <p class="mt-1 text-xs text-neutral-500">Documented delivery intake</p>
                 </div>
                 <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
-                    <p class="text-xs font-medium text-neutral-500 uppercase tracking-wider">Tolerance Ceiling</p>
-                    <p class="mt-2 text-2xl font-bold text-emerald-600">+5.0%</p>
-                    <p class="mt-1 text-xs text-neutral-500">Contractual over-delivery cap</p>
+                    <p class="text-xs font-medium text-neutral-500 uppercase tracking-wider">Receipt Limit</p>
+                    <p class="mt-2 text-2xl font-bold text-emerald-600">PO balance</p>
+                    <p class="mt-1 text-xs text-neutral-500">Replacements permitted after QC rejection</p>
                 </div>
                 <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
                     <p class="text-xs font-medium text-neutral-500 uppercase tracking-wider">Default Inbound Route</p>
@@ -233,7 +253,7 @@
                                         {{ $grn->receivedBy?->name ?? 'Staff' }}
                                     </td>
                                     <td class="px-6 py-4">
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ $grn->receipt_status === 'posted' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
+                                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ in_array($grn->receipt_status, ['stored', 'posted']) ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
                                             {{ ucfirst(str_replace('_', ' ', $grn->receipt_status)) }}
                                         </span>
                                     </td>
@@ -282,12 +302,13 @@
                       data-confirm-message="Are you sure you want to finalize this receiving intake? Received items will be placed into the inspection buffer."
                       data-confirm-label="Finalize Receipt">
                     @csrf
+                    <input type="hidden" name="receipt_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
                     <input type="hidden" name="purchase_order_id" :value="selectedPo ? selectedPo.id : ''">
 
                     <div class="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/80 px-6 py-4 flex items-center justify-between">
                         <div>
                             <h3 class="text-lg font-bold text-neutral-900 dark:text-neutral-100">Dock Receiving &amp; Goods Receipt Note</h3>
-                            <p class="text-xs text-neutral-500 dark:text-neutral-400">Capture carrier bill of lading, verify line quantities (+5% max tolerance), and place in Quarantine.</p>
+                            <p class="text-xs text-neutral-500 dark:text-neutral-400">Verify supplier, identifiers, and PO line balances before placing the delivery in quarantine.</p>
                         </div>
                         <button type="button" @click="showReceiveModal = false" class="rounded-lg p-1.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
                             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -312,7 +333,19 @@
                         </div>
 
                         {{-- Carrier & Logistics Inputs --}}
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="actual_supplier_id" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Supplier shown on the delivery documents</label>
+                                <select id="actual_supplier_id" name="actual_supplier_id" x-model="actualSupplierId" required class="mt-1 block w-full rounded-lg border border-neutral-300 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100">
+                                    <option value="">Select the delivering supplier</option>
+                                    @foreach($suppliers as $supplier)
+                                        <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <p class="self-end text-xs text-neutral-600 dark:text-neutral-300">Check the supplier, SKU and UOM on the delivered goods against the approved PO before submission.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
                                 <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Carrier / Logistics Provider</label>
                                 <input type="text" name="carrier_name" placeholder="e.g. LBC Express, 2GO" class="mt-1 block w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 shadow-xs focus:border-primary-500 focus:ring-primary-500 text-sm">
@@ -325,84 +358,181 @@
                                 <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Packing Slip / Delivery Receipt</label>
                                 <input type="text" name="packing_slip_number" placeholder="e.g. DR-2026-881" class="mt-1 block w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 shadow-xs focus:border-primary-500 focus:ring-primary-500 text-sm">
                             </div>
+                            <div>
+                                <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Target Storage Destination</label>
+                                <select name="destination_location_id" class="mt-1 block w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-xs focus:border-primary-500 focus:ring-primary-500 text-sm">
+                                    <option value="">-- Select at QC --</option>
+                                    @foreach($storageLocations as $loc)
+                                        <option value="{{ $loc->id }}">{{ $loc->name }} ({{ $loc->code }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
                         </div>
 
-                        {{-- Line Items Table --}}
+                        {{-- Line Items Table with Expected PO vs Received Comparison --}}
                         <div class="w-full overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
-                            <table class="min-w-[62rem] w-full text-left text-xs text-neutral-700 dark:text-neutral-300 divide-y divide-neutral-200 dark:divide-neutral-800">
+                            <table class="min-w-[76rem] w-full text-left text-xs text-neutral-700 dark:text-neutral-300 divide-y divide-neutral-200 dark:divide-neutral-800">
                                 <thead class="bg-neutral-100/90 dark:bg-neutral-800/90 text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700">
                                     <tr>
-                                        <th class="px-4 py-3.5 min-w-[15rem]">Item Description</th>
-                                        <th class="px-3.5 py-3.5 whitespace-nowrap min-w-[7.5rem]">Ordered / Unit</th>
-                                        <th class="px-3.5 py-3.5 text-right whitespace-nowrap min-w-[7.5rem]">Price / Unit</th>
-                                        <th class="px-3.5 py-3.5 text-right whitespace-nowrap min-w-[8rem]">Total Price</th>
-                                        <th class="px-3.5 py-3.5 min-w-[8.5rem]">Receiving Qty</th>
-                                        <th class="px-3.5 py-3.5 min-w-[12rem]">Batch / Lot No.</th>
-                                        <th class="px-3.5 py-3.5 min-w-[12rem]">Expiry Date</th>
+                                        <th class="px-4 py-3.5 min-w-[14rem]">Item &amp; PO Expectation</th>
+                                        <th class="px-3.5 py-3.5 min-w-[11rem]">Actual Delivered Qty</th>
+                                        <th class="px-3.5 py-3.5 min-w-[11rem]">Condition &amp; Discrepancy</th>
+                                        <th class="px-3.5 py-3.5 min-w-[12rem]">Batch / Lot &amp; Serial</th>
+                                        <th class="px-3.5 py-3.5 min-w-[11rem]">Shelf Life / Expiry</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-neutral-200 dark:divide-neutral-800">
                                     <template x-for="(line, index) in poLines" :key="line.id">
-                                        <tr class="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 transition-colors">
+                                        <tr class="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 transition-colors align-top">
+                                            {{-- Expected PO Info --}}
                                             <td class="px-4 py-3.5">
                                                 <input type="hidden" :name="`lines[${index}][po_line_id]`" :value="line.id">
                                                 <p class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 leading-snug" x-text="line.item ? line.item.name : 'Item'"></p>
                                                 <p class="text-xs font-mono text-neutral-500 dark:text-neutral-400 mt-0.5" x-text="line.item ? line.item.sku : ''"></p>
-                                                <template x-if="line.conversion_factor && Number(line.conversion_factor) > 1">
-                                                    <span class="inline-block mt-1 rounded bg-primary-50 dark:bg-primary-950/60 px-2 py-0.5 text-[11px] font-mono font-medium text-primary-700 dark:text-primary-300 ring-1 ring-inset ring-primary-200 dark:ring-primary-800" x-text="`1 ${line.purchase_unit || (line.item ? line.item.unit : 'unit')} = ${Number(line.conversion_factor)} ${line.item ? line.item.unit : 'units'}`"></span>
-                                                </template>
+                                                <label class="mt-2 block text-[10px] font-bold uppercase tracking-wider text-neutral-500">Actual delivered SKU</label>
+                                                <input type="text" :name="`lines[${index}][actual_sku]`" x-model="line.actual_sku" required class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100">
+                                                <label class="mt-2 block text-[10px] font-bold uppercase tracking-wider text-neutral-500">Actual delivered UOM</label>
+                                                <input type="text" :name="`lines[${index}][actual_purchase_unit]`" x-model="line.actual_purchase_unit" required class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100">
+                                                <div class="mt-2 space-y-1 text-[11px] text-neutral-600 dark:text-neutral-400">
+                                                    <div>Ordered: <strong class="font-mono text-neutral-900 dark:text-neutral-200" x-text="line.ordered_quantity"></strong> <span x-text="line.purchase_unit || (line.item ? line.item.unit : 'unit')"></span></div>
+                                                    <div>Open to Receive: <strong class="font-mono text-primary-700 dark:text-primary-300" x-text="line.open_quantity"></strong></div>
+                                                    <div>Price: <strong class="font-mono" x-text="'₱' + Number(line.unit_price || 0).toFixed(2)"></strong></div>
+                                                    <template x-if="line.conversion_factor && Number(line.conversion_factor) > 1">
+                                                        <span class="inline-block mt-1 rounded bg-primary-50 dark:bg-primary-950/60 px-2 py-0.5 text-[10px] font-mono font-medium text-primary-700 dark:text-primary-300 ring-1 ring-inset ring-primary-200 dark:ring-primary-800" x-text="`1 ${line.purchase_unit || 'pack'} = ${Number(line.conversion_factor)} ${line.item ? line.item.unit : 'units'}`"></span>
+                                                    </template>
+                                                </div>
                                             </td>
-                                            <td class="px-3.5 py-3.5 whitespace-nowrap font-mono">
-                                                <span class="text-sm font-bold text-neutral-900 dark:text-neutral-100" x-text="line.ordered_quantity"></span>
-                                                <span class="capitalize text-xs text-neutral-600 dark:text-neutral-300 ml-0.5" x-text="line.purchase_unit || (line.item ? line.item.unit : 'units')"></span>
-                                                <p class="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 font-medium" x-text="`Open: ${Math.max(0, line.ordered_quantity - line.received_quantity)}`"></p>
-                                            </td>
-                                            <td class="px-3.5 py-3.5 text-right whitespace-nowrap font-mono text-neutral-700 dark:text-neutral-300">
-                                                <span class="text-xs font-semibold" x-text="'₱' + Number(line.unit_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
-                                                <span class="block text-[11px] text-neutral-400 dark:text-neutral-500" x-text="`/${line.purchase_unit || (line.item ? line.item.unit : 'unit')}`"></span>
-                                            </td>
-                                            <td class="px-3.5 py-3.5 text-right whitespace-nowrap font-mono font-bold text-neutral-900 dark:text-neutral-100 text-xs">
-                                                <span x-text="'₱' + Number(line.total_line_amount || ((line.ordered_quantity || 0) * (line.unit_price || 0))).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
-                                            </td>
+
+                                            {{-- Delivered Qty with Live Conversion & Tolerance Alert --}}
                                             <td class="px-3.5 py-3.5">
-                                                <input
-                                                    type="number"
-                                                    :name="`lines[${index}][received_quantity]`"
-                                                    :value="Math.max(0, line.ordered_quantity - line.received_quantity)"
-                                                    :max="Math.ceil(Math.max(1, line.ordered_quantity - line.received_quantity) * 1.05)"
-                                                    min="1"
-                                                    step="1"
-                                                    required
-                                                    class="w-full max-w-[7.5rem] rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs font-mono font-semibold py-2 px-3 focus:ring-primary-500 focus:border-primary-500 shadow-xs"
-                                                >
-                                                <span class="block text-[11px] text-neutral-500 dark:text-neutral-400 mt-1 font-medium">Max +5%: <span x-text="Math.ceil(Math.max(1, line.ordered_quantity - line.received_quantity) * 1.05)"></span></span>
+                                                <div class="space-y-1.5">
+                                                    <div class="flex items-center gap-1.5">
+                                                        <input
+                                                            type="number"
+                                                            :name="`lines[${index}][received_quantity]`"
+                                                            x-model.number="line.received_quantity"
+                                                            :max="line.open_quantity"
+                                                            min="1"
+                                                            step="1"
+                                                            required
+                                                            class="w-24 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs font-mono font-semibold py-2 px-3 focus:ring-primary-500 focus:border-primary-500 shadow-xs"
+                                                        >
+                                                        <span class="text-xs font-medium text-neutral-600 dark:text-neutral-400 capitalize" x-text="line.purchase_unit || (line.item ? line.item.unit : 'unit')"></span>
+                                                    </div>
+
+                                                    {{-- Pack to Base Unit Conversion Display --}}
+                                                    <div class="rounded-md bg-neutral-50 dark:bg-neutral-800/80 p-1.5 text-[11px] font-mono text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
+                                                        <span>= <strong class="text-primary-700 dark:text-primary-400" x-text="Math.round((line.received_quantity || 0) * (line.conversion_factor || 1))"></strong> <span x-text="line.item ? line.item.unit : 'units'"></span> stock</span>
+                                                    </div>
+
+                                                    {{-- Discrepancy Badges --}}
+                                                    <template x-if="line.received_quantity < line.open_quantity">
+                                                        <span class="inline-flex items-center gap-1 rounded bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                                            Short Delivery (<span x-text="line.open_quantity - line.received_quantity"></span> remaining)
+                                                        </span>
+                                                    </template>
+                                                </div>
                                             </td>
+
+                                            {{-- Condition & Discrepancy Resolution --}}
                                             <td class="px-3.5 py-3.5">
-                                                <input
-                                                    type="text"
-                                                    :name="`lines[${index}][batch_number]`"
-                                                    placeholder="e.g. LOT-2026-X1"
-                                                    class="w-full min-w-[10.5rem] rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 text-xs font-mono py-2 px-3 focus:ring-primary-500 focus:border-primary-500 shadow-xs"
-                                                    :required="line.item && line.item.is_batch_tracked"
-                                                >
+                                                <div class="space-y-2">
+                                                    <div>
+                                                        <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-500">Condition</label>
+                                                        <select
+                                                            :name="`lines[${index}][item_condition]`"
+                                                            x-model="line.item_condition"
+                                                            class="mt-0.5 block w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs py-1.5 px-2 text-neutral-900 dark:text-neutral-100 focus:border-primary-500 focus:ring-primary-500"
+                                                        >
+                                                            <option value="good">Good / Pristine</option>
+                                                            <option value="damaged">Damaged Package</option>
+                                                            <option value="compromised">Compromised / Seal Broken</option>
+                                                            <option value="wrong_item">Wrong Item / Spec</option>
+                                                            <option value="expired">Expired / Spoiled</option>
+                                                        </select>
+                                                    </div>
+
+                                                    {{-- Discrepancy Resolution Action (revealed if condition != good or quantity differs) --}}
+                                                    <template x-if="line.item_condition !== 'good' || line.received_quantity !== line.open_quantity">
+                                                        <div class="p-2 rounded-lg bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 space-y-1.5">
+                                                            <label class="block text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">Discrepancy Action</label>
+                                                            <select
+                                                                :name="`lines[${index}][discrepancy_action]`"
+                                                                x-model="line.discrepancy_action"
+                                                                class="block w-full rounded border border-amber-300 dark:border-amber-700 bg-white dark:bg-neutral-800 text-[11px] py-1 px-1.5 text-neutral-900 dark:text-neutral-100"
+                                                            >
+                                                                <option value="quarantine">Hold in Quarantine for QA Assay</option>
+                                                                <option value="reject">Reject &amp; Mark for Return</option>
+                                                                <option value="return_to_supplier">Return to Supplier</option>
+                                                                <option value="hold">Hold on Dock for Buyer Review</option>
+                                                            </select>
+                                                            <input
+                                                                type="text"
+                                                                :name="`lines[${index}][discrepancy_notes]`"
+                                                                placeholder="Note discrepancy details..."
+                                                                class="block w-full rounded border border-amber-300 dark:border-amber-700 bg-white dark:bg-neutral-800 text-[11px] py-1 px-1.5 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400"
+                                                            >
+                                                        </div>
+                                                    </template>
+                                                </div>
                                             </td>
+
+                                            {{-- Batch, Lot & Serial Numbers --}}
                                             <td class="px-3.5 py-3.5">
-                                                <input
-                                                    type="date"
-                                                    :name="`lines[${index}][expiry_date]`"
-                                                    class="w-full min-w-[10.5rem] rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs font-mono py-2 px-3 focus:ring-primary-500 focus:border-primary-500 shadow-xs"
-                                                    :min="new Date().toISOString().split('T')[0]"
-                                                    :required="line.item && line.item.expiry_alert_days > 0"
-                                                >
+                                                <div class="space-y-1.5">
+                                                    <div>
+                                                        <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-500">Batch / Lot No.</label>
+                                                        <input
+                                                            type="text"
+                                                            :name="`lines[${index}][batch_number]`"
+                                                            placeholder="e.g. LOT-2026-X1"
+                                                            class="mt-0.5 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 text-xs font-mono py-1.5 px-2 focus:ring-primary-500 focus:border-primary-500"
+                                                            :required="line.item && line.item.is_batch_tracked"
+                                                        >
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-500">Serial No. (Optional)</label>
+                                                        <input
+                                                            type="text"
+                                                            :name="`lines[${index}][serial_number]`"
+                                                            placeholder="e.g. SN-098234"
+                                                            class="mt-0.5 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 text-xs font-mono py-1.5 px-2 focus:ring-primary-500 focus:border-primary-500"
+                                                        >
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            {{-- Expiry & Manufacturing Dates --}}
+                                            <td class="px-3.5 py-3.5">
+                                                <div class="space-y-1.5">
+                                                    <div>
+                                                        <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-500">Expiration Date</label>
+                                                        <input
+                                                            type="date"
+                                                            :name="`lines[${index}][expiry_date]`"
+                                                            class="mt-0.5 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs font-mono py-1.5 px-2 focus:ring-primary-500 focus:border-primary-500"
+                                                            :min="new Date().toISOString().split('T')[0]"
+                                                            :required="line.item && line.item.expiry_alert_days > 0"
+                                                        >
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-500">Manufacturing Date</label>
+                                                        <input
+                                                            type="date"
+                                                            :name="`lines[${index}][manufactured_date]`"
+                                                            class="mt-0.5 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs font-mono py-1.5 px-2 focus:ring-primary-500 focus:border-primary-500"
+                                                            :max="new Date().toISOString().split('T')[0]"
+                                                        >
+                                                    </div>
+                                                </div>
                                             </td>
                                         </tr>
                                     </template>
                                 </tbody>
                                 <tfoot class="border-t border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/70 font-semibold text-neutral-900 dark:text-neutral-100">
                                     <tr>
-                                        <td colspan="3" class="px-4 py-3.5 text-right text-xs">Total Purchase Order Commitment:</td>
-                                        <td class="px-4 py-3.5 text-right font-mono font-bold text-sm text-primary-700 dark:text-primary-400" x-text="selectedPo ? '₱' + Number(selectedPo.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '₱0.00'"></td>
-                                        <td colspan="3"></td>
+                                        <td class="px-4 py-3.5 text-xs text-neutral-500">Total Purchase Order Commitment:</td>
+                                        <td class="px-4 py-3.5 font-mono font-bold text-sm text-primary-700 dark:text-primary-400" colspan="4" x-text="selectedPo ? '₱' + Number(selectedPo.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '₱0.00'"></td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -411,7 +541,7 @@
                         {{-- Delivery Notes --}}
                         <div>
                             <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Dock Intake Notes / Packaging Observations</label>
-                            <textarea name="notes" rows="2" placeholder="Document packaging integrity, seal numbers, or delivery notes..." class="mt-1 block w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 shadow-xs focus:border-primary-500 focus:ring-primary-500 text-xs"></textarea>
+                            <textarea name="notes" rows="2" placeholder="Document packaging integrity, seal numbers, cold-chain indicators, or delivery notes..." class="mt-1 block w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 shadow-xs focus:border-primary-500 focus:ring-primary-500 text-xs"></textarea>
                         </div>
                     </div>
 

@@ -4,11 +4,15 @@ namespace App\Services\Warehouse;
 
 use App\Enums\AuditAction;
 use App\Enums\MovementType;
+use App\Enums\NotificationDestination;
+use App\Enums\NotificationPriority;
 use App\Enums\Permission;
 use App\Enums\WarehouseTaskStatus;
 use App\Enums\WarehouseTaskType;
 use App\Models\InventoryItem;
 use App\Models\InventorySerial;
+use App\Models\QualityInspection;
+use App\Models\StockMovement;
 use App\Models\MaterialRequisition;
 use App\Models\MaterialRequisitionLine;
 use App\Models\StorageLocation;
@@ -18,6 +22,7 @@ use App\Models\WarehouseScanEvent;
 use App\Models\WarehouseTask;
 use App\Models\WarehouseTaskEvent;
 use App\Services\AuditLogger;
+use App\Services\HimsNotificationService;
 use App\Services\InventoryAutomationService;
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
@@ -32,6 +37,7 @@ class WarehouseTaskService
         private readonly InventoryAutomationService $inventory,
         private readonly AuditLogger $auditLogger,
         private readonly LedgerIntegrityService $ledgerIntegrity,
+        private readonly HimsNotificationService $notifications,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -243,6 +249,18 @@ class WarehouseTaskService
                 description: "Completed {$quantity} units on warehouse task {$locked->task_number}",
                 newValues: ['completed_quantity' => $locked->completed_quantity, 'status' => $locked->status->value]);
 
+            if ($locked->task_type === WarehouseTaskType::PutAway && $locked->reference instanceof QualityInspection) {
+                $grn = $locked->reference->grnLine?->goodsReceiptNote;
+                if ($grn) {
+                    $this->notifications->sendToPermission(
+                        Permission::ViewProcurement, 'grn-putaway-'.$locked->id.'-'.$locked->completed_quantity,
+                        'Put-Away Completed: '.$locked->task_number,
+                        "{$quantity} base units from GRN {$grn->grn_number} are now available in final storage.",
+                        NotificationPriority::Info, NotificationDestination::GoodsReceipt, ['grn' => $grn->id],
+                    );
+                }
+            }
+
             if ($locked->status === WarehouseTaskStatus::Completed) {
                 $this->createDependentTask($locked, $actor);
             }
@@ -255,6 +273,9 @@ class WarehouseTaskService
     {
         return DB::transaction(function () use ($task, $reason, $actor): WarehouseTask {
             $locked = WarehouseTask::lockForUpdate()->findOrFail($task->id);
+            if ($locked->task_type === WarehouseTaskType::PutAway && $locked->reference instanceof QualityInspection) {
+                throw new DomainException('QC put-away tasks cannot be cancelled while accepted stock awaits placement.');
+            }
             if (in_array($locked->status, [WarehouseTaskStatus::Completed, WarehouseTaskStatus::Cancelled], true)) {
                 throw new DomainException('This task can no longer be cancelled.');
             }
@@ -310,6 +331,53 @@ class WarehouseTaskService
 
     private function completeStockMovement(WarehouseTask $task, int $quantity, User $actor): void
     {
+        if ($task->task_type === WarehouseTaskType::PutAway && $task->reference instanceof QualityInspection) {
+            $inspection = QualityInspection::lockForUpdate()->findOrFail($task->reference->id);
+            $line = $inspection->grnLine()->lockForUpdate()->with('goodsReceiptNote.purchaseOrder')->firstOrFail();
+            if ($line->staging_location_id !== $task->source_location_id
+                || $line->pending_put_away_quantity < $quantity) {
+                throw new DomainException('The put-away task does not match stock awaiting placement.');
+            }
+            $this->inventory->adjustInTransitStock($task->item_id, $task->source_location_id, $task->item_batch_id, -$quantity);
+            $this->inventory->adjustStockLevel($task->item_id, $task->destination_location_id, $task->item_batch_id, $quantity);
+            $line->pending_put_away_quantity -= $quantity;
+            if ($line->pending_put_away_quantity === 0 && $line->quarantined_quantity === 0) {
+                $line->status = 'stored';
+            }
+            $line->save();
+            $grn = $line->goodsReceiptNote;
+            if (! $grn->lines()->where('pending_put_away_quantity', '>', 0)->exists()
+                && ! $grn->lines()->where('quarantined_quantity', '>', 0)->exists()) {
+                $grn->receipt_status = $grn->lines()->where('accepted_quantity', '>', 0)->exists() ? 'stored' : 'rejected';
+                $grn->save();
+            }
+            $factor = $line->conversionFactor();
+            $movement = StockMovement::create([
+                'item_id' => $task->item_id,
+                'item_batch_id' => $task->item_batch_id,
+                'purchase_order_id' => $grn->purchase_order_id,
+                'goods_receipt_note_id' => $grn->id,
+                'purchase_unit' => $line->purchase_unit,
+                'purchase_quantity' => $factor > 0 && fmod((float) $quantity, $factor) === 0.0 ? (int) ($quantity / $factor) : null,
+                'base_unit' => $task->item->unit,
+                'serial_number' => $line->serial_number,
+                'movement_type' => MovementType::Transfer,
+                'quantity' => $quantity,
+                'unit_cost' => round((float) $line->unit_cost / $factor, 4),
+                'from_location_id' => $task->source_location_id,
+                'to_location_id' => $task->destination_location_id,
+                'reference_type' => $task->getMorphClass(),
+                'reference_id' => $task->id,
+                'remarks' => "Put-away of QC-accepted stock on task {$task->task_number}",
+                'moved_at' => now(),
+                'user_id' => $actor->id,
+            ]);
+            $this->ledgerIntegrity->sealMovement($movement);
+            $this->inventory->syncItemTotals($task->item);
+            $this->moveSerializedUnit($task);
+            return;
+        }
+
         if ($task->task_type === WarehouseTaskType::Pick && $task->reference instanceof MaterialRequisitionLine) {
             $line = MaterialRequisitionLine::lockForUpdate()->findOrFail($task->reference->id);
             $reserved = min($quantity, $line->reserved_quantity);
@@ -599,6 +667,10 @@ class WarehouseTaskService
         }
         if ($task->assigned_to_id !== null && $task->assigned_to_id !== $actor->id) {
             throw new DomainException('This task is assigned to another operator.');
+        }
+        if ($task->destinationLocation?->is_narcotics_vault
+            && ! $actor->hasPermission(Permission::AccessNarcoticsVault)) {
+            throw new DomainException('You are not authorized to access the narcotics vault.');
         }
     }
 

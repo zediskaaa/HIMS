@@ -16,6 +16,10 @@ class GoodsReceiptNote extends Model
         'dr_number',
         'sales_invoice_number',
         'purchase_order_id',
+        'quarantine_location_id',
+        'receipt_key',
+        'packing_slip_key',
+        'waybill_key',
         'supplier_id',
         'carrier_name',
         'waybill_number',
@@ -51,6 +55,11 @@ class GoodsReceiptNote extends Model
         return $this->belongsTo(Supplier::class);
     }
 
+    public function quarantineLocation(): BelongsTo
+    {
+        return $this->belongsTo(StorageLocation::class, 'quarantine_location_id');
+    }
+
     public function receivedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'received_by_id');
@@ -83,12 +92,12 @@ class GoodsReceiptNote extends Model
 
     public function isPosted(): bool
     {
-        return $this->receipt_status === 'posted';
+        return in_array($this->receipt_status, ['stored', 'posted'], true);
     }
 
     public function isQuarantined(): bool
     {
-        return in_array($this->receipt_status, ['under_qc', 'quarantined'], true);
+        return in_array($this->receipt_status, ['under_qc', 'quarantined', 'under_inspection'], true);
     }
 
     public function getStatusAttribute(): string

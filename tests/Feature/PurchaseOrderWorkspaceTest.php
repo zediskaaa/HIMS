@@ -8,6 +8,7 @@ use App\Models\CostCenter;
 use App\Models\CostCenterBudget;
 use App\Models\InventoryItem;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderLine;
 use App\Models\Supplier;
 use App\Models\SupplierPrice;
 use App\Models\SupplierProduct;
@@ -512,6 +513,12 @@ class PurchaseOrderWorkspaceTest extends TestCase
             'status' => 'dispatched',
             'requested_at' => now(),
         ]);
+        PurchaseOrderLine::create([
+            'purchase_order_id' => $po->id, 'item_id' => $item->id, 'line_number' => 1,
+            'ordered_quantity' => 10, 'received_quantity' => 0,
+            'unit_price' => 100, 'total_line_amount' => 1000,
+            'purchase_unit' => 'piece', 'conversion_factor' => 1,
+        ]);
 
         $receiveResponse = $this->actingAs($manager)->get('/inventory/receiving');
         $receiveResponse->assertOk()
@@ -521,4 +528,3 @@ class PurchaseOrderWorkspaceTest extends TestCase
             ->assertSee('Confirm Dock Receipt &amp; Quarantine Stock', false);
     }
 }
-

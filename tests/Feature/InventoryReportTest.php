@@ -11,11 +11,16 @@ use App\Models\ItemBatch;
 use App\Models\ItemCategory;
 use App\Models\ItemStockLevel;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderLine;
+use App\Models\WarehouseTask;
 use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Services\InventoryReportService;
+use App\Services\Inventory\GoodsReceiptService;
+use App\Services\Inventory\QualityControlService;
+use App\Services\Warehouse\WarehouseTaskService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -553,16 +558,50 @@ class InventoryReportTest extends TestCase
             'status' => PurchaseOrderStatus::Approved->value,
             'requested_at' => now(),
         ]);
+        $poLine = PurchaseOrderLine::create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'item_id' => $item->id,
+            'line_number' => 1,
+            'ordered_quantity' => 500,
+            'received_quantity' => 0,
+            'unit_price' => 41.50,
+            'total_line_amount' => 20750,
+            'purchase_unit' => $item->unit,
+            'conversion_factor' => 1,
+        ]);
+        $operator = $this->reader();
 
-        $this->actingAs($this->reader())
+        $this->actingAs($operator)
             ->post("/inventory/purchases/{$purchaseOrder->id}/receive")
-            ->assertRedirect('/inventory/purchases');
+            ->assertRedirect(route('inventory.receiving.index', ['purchase_order_id' => $purchaseOrder->id]));
+        $this->assertSame(0, $item->fresh()->quantity_on_hand);
+
+        $grn = app(GoodsReceiptService::class)->receiveOrder($purchaseOrder, [
+            'lines' => [['po_line_id' => $poLine->id, 'received_quantity' => 500,
+                'batch_number' => 'LOT-N95-REPORT', 'expiry_date' => now()->addYear()->toDateString()]],
+        ], $operator);
+        $line = $grn->lines()->firstOrFail();
+        $reportBeforeQc = $this->reports()->build(30);
+        $this->assertSame(0, $reportBeforeQc['summary']['units_on_hand']);
+        $this->assertSame(500, $reportBeforeQc['receivingReconciliation']->first()['pending_qc']);
+
+        app(QualityControlService::class)->releaseLot($line->inspections()->firstOrFail(), 500, $location->id, $operator);
+        $reportBeforePutAway = $this->reports()->build(30);
+        $this->assertSame(0, $reportBeforePutAway['summary']['units_on_hand']);
+        $this->assertSame(500, $reportBeforePutAway['receivingReconciliation']->first()['awaiting_put_away_base']);
+        $task = WarehouseTask::where('item_id', $item->id)->firstOrFail();
+        $tasks = app(WarehouseTaskService::class);
+        $tasks->start($task, $operator);
+        $tasks->scan($task, 'LOC-STAGING', $operator);
+        $tasks->scan($task, $item->sku, $operator);
+        $tasks->scan($task, $location->code, $operator);
+        $tasks->complete($task, 500, $operator);
 
         $report = $this->reports()->build(30);
 
         $this->assertSame(500, $report['summary']['units_on_hand']);
         $this->assertSame(500, $report['stockStatus']['in_stock']['units']);
-        $this->assertSame(500, $report['movementTotals']['units_in']);
+        $this->assertSame(500, $report['receivingReconciliation']->first()['available_base']);
         $this->assertSame(20750.0, $report['spend']['received']['value']);
         // Delivered, so nothing is left owing on it.
         $this->assertSame(0, $report['spend']['outstanding']['orders']);

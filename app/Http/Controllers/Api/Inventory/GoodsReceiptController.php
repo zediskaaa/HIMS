@@ -44,15 +44,27 @@ class GoodsReceiptController extends Controller implements HasMiddleware
 
     public function store(Request $request): JsonResponse
     {
+        $request->merge(['receipt_key' => $request->input('receipt_key', $request->header('Idempotency-Key'))]);
         $validated = $request->validate([
             'purchase_order_id' => ['required', 'exists:purchase_orders,id'],
+            'receipt_key' => ['nullable', 'string', 'max:100'],
+            'actual_supplier_id' => ['required', 'exists:suppliers,id'],
+            'destination_location_id' => ['nullable', 'exists:storage_locations,id'],
             'carrier_name' => ['nullable', 'string', 'max:100'],
             'waybill_number' => ['nullable', 'string', 'max:100'],
             'packing_slip_number' => ['nullable', 'string', 'max:100'],
             'received_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:500'],
-            'lines' => ['nullable', 'array'],
+            'lines' => ['required', 'array', 'min:1'],
             'lines.*.po_line_id' => ['required', 'exists:po_line_items,id'],
+            'lines.*.actual_item_id' => ['nullable', 'exists:inventory_items,id'],
+            'lines.*.actual_sku' => ['required', 'string', 'max:100'],
+            'lines.*.actual_purchase_unit' => ['required', 'string', 'max:50'],
+            'lines.*.destination_location_id' => ['nullable', 'exists:storage_locations,id'],
+            'lines.*.item_condition' => ['nullable', 'in:good,damaged,compromised,wrong_item,expired'],
+            'lines.*.discrepancy_type' => ['nullable', 'in:shortage,overage,damage,wrong_item,expired,near_expiry,missing_lot,other'],
+            'lines.*.discrepancy_action' => ['nullable', 'in:quarantine,accept,reject,return_to_supplier,hold'],
+            'lines.*.discrepancy_notes' => ['nullable', 'string', 'max:500'],
             'lines.*.received_quantity' => ['required', 'integer', 'min:1'],
             'lines.*.batch_number' => ['nullable', 'string', 'max:50'],
             'lines.*.lot_number' => ['nullable', 'string', 'max:50'],

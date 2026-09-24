@@ -8,9 +8,14 @@ use App\Enums\PurchaseOrderStatus;
 use App\Models\InventoryItem;
 use App\Models\ItemStockLevel;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderLine;
+use App\Models\WarehouseTask;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Services\Inventory\GoodsReceiptService;
+use App\Services\Inventory\QualityControlService;
+use App\Services\Warehouse\WarehouseTaskService;
 use Database\Seeders\InventoryDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -209,24 +214,52 @@ class InventoryModuleTest extends TestCase
             'total_amount' => 12.5,
             'status' => PurchaseOrderStatus::Approved->value,
         ]);
+        $line = PurchaseOrderLine::create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'item_id' => $item->id,
+            'line_number' => 1,
+            'ordered_quantity' => 5,
+            'unit_price' => 2.5,
+            'total_line_amount' => 12.5,
+            'purchase_unit' => $item->unit,
+            'conversion_factor' => 1,
+        ]);
 
         $response = $this->actingAs($user)->post('/inventory/purchases/'.$purchaseOrder->id.'/receive');
 
-        $response->assertRedirect('/inventory/purchases');
-        $this->assertSame('received', $purchaseOrder->fresh()->status);
+        $response->assertRedirect(route('inventory.receiving.index', ['purchase_order_id' => $purchaseOrder->id]));
+        $this->assertSame(10, $item->fresh()->quantity_on_hand);
+        $grn = app(GoodsReceiptService::class)->receiveOrder($purchaseOrder, [
+            'lines' => [['po_line_id' => $line->id, 'received_quantity' => 5,
+                'batch_number' => 'LOT-BAND-001', 'expiry_date' => now()->addYear()->toDateString()]],
+        ], $user);
+        $this->assertSame(PurchaseOrderStatus::UnderInspection->value, $purchaseOrder->fresh()->status);
+        $this->assertSame(10, $item->fresh()->quantity_on_hand);
+        $inspection = $grn->lines()->firstOrFail()->inspections()->firstOrFail();
+        $qcActor = User::factory()->inventoryManager()->create();
+        app(QualityControlService::class)->releaseLot($inspection, 5, $location->id, $qcActor);
+        $this->assertSame(10, $item->fresh()->quantity_on_hand);
+        $task = WarehouseTask::where('reference_type', $inspection->getMorphClass())->where('reference_id', $inspection->id)->firstOrFail();
+        $tasks = app(WarehouseTaskService::class);
+        $tasks->start($task, $user);
+        $tasks->scan($task, 'LOC-STAGING', $user);
+        $tasks->scan($task, $item->sku, $user);
+        $tasks->scan($task, $location->code, $user);
+        $tasks->complete($task, 5, $user);
+        $this->assertSame(PurchaseOrderStatus::Fulfilled->value, $purchaseOrder->fresh()->status);
         $this->assertSame(15, $item->fresh()->quantity_on_hand);
 
         // The balance the rollup is derived from, not just the rollup itself.
         $this->assertSame(15, (int) ItemStockLevel::where('item_id', $item->id)
             ->where('storage_location_id', $location->id)
-            ->value('quantity'));
+            ->sum('quantity'));
 
         $this->assertDatabaseHas('stock_movements', [
             'item_id' => $item->id,
-            'movement_type' => 'stock_in',
+            'movement_type' => 'transfer',
             'quantity' => 5,
             'to_location_id' => $location->id,
-            'reference_id' => $purchaseOrder->id,
+            'goods_receipt_note_id' => $grn->id,
         ]);
     }
 
@@ -263,11 +296,7 @@ class InventoryModuleTest extends TestCase
 
         $response = $this->actingAs($user)->post('/inventory/purchases/'.$purchaseOrder->id.'/receive');
 
-        // Receivable, so the request reaches the storage-location guard rather
-        // than being turned away by the approval guard.
-        $response->assertSessionHasErrors([
-            'receive' => 'No storage location exists to receive this order into.',
-        ]);
+        $response->assertRedirect(route('inventory.receiving.index', ['purchase_order_id' => $purchaseOrder->id]));
         $this->assertSame(PurchaseOrderStatus::Approved->value, $purchaseOrder->fresh()->status);
         $this->assertDatabaseCount('stock_movements', 0);
     }

@@ -409,7 +409,7 @@
                                 @if ($canViewFinancialData)
                                 <optgroup label="Procurement & Financial (Protected)">
                                     <option value="procurement_expense">Procurement Expense Breakdown</option>
-                                    <option value="spend_by_supplier">Spend by Supplier & Fulfilment</option>
+                                    <option value="spend_by_supplier">PO Commitments by Supplier & Fulfilment</option>
                                 </optgroup>
                                 @endif
                             </select>
@@ -1037,11 +1037,11 @@
                     </div>
 
                     <div class="rounded-md border border-success-200 bg-success-50 px-4 py-3">
-                        <p class="text-xs font-medium uppercase tracking-wide text-success-700">Received</p>
+                        <p class="text-xs font-medium uppercase tracking-wide text-success-700">QC Accepted</p>
                         <p class="mt-1.5 text-xl font-semibold tabular-nums text-success-800">
                             ₱{{ number_format($spend['received']['value'], 2) }}
                         </p>
-                        <p class="mt-0.5 text-xs text-success-700">{{ $spend['received']['orders'] }} booked into stock</p>
+                        <p class="mt-0.5 text-xs text-success-700">{{ $spend['received']['orders'] }} purchase orders with accepted goods</p>
                     </div>
 
                     <div class="rounded-md border border-warning-200 bg-warning-50 px-4 py-3">
@@ -1050,7 +1050,7 @@
                             ₱{{ number_format($spend['outstanding']['value'], 2) }}
                         </p>
                         <p class="mt-0.5 text-xs text-warning-700">
-                            {{ $spend['outstanding']['orders'] }} awaiting delivery, all time
+                            {{ $spend['outstanding']['orders'] }} awaiting acceptance, all time
                         </p>
                     </div>
 
@@ -1064,12 +1064,41 @@
                 </div>
 
                 <p class="mt-4 text-xs text-neutral-500">
-                    Ordered is dated by when the order was raised, Received by when the delivery was booked in.
-                    Outstanding covers every order not yet received or cancelled, regardless of date.
+                    Ordered is dated by order creation. QC accepted value is dated by disposition; legacy completed orders use their receipt date.
+                    Outstanding is the value still awaiting acceptance across open orders.
                 </p>
             </x-ui.card>
 
-            <x-ui.card title="Procurement Spend by Supplier" :subtitle="$period['description'].' Select a bar to inspect its purchase orders.'">
+            <x-ui.card title="Receiving Reconciliation" subtitle="Latest 100 GRN lines in the selected period. Purchase quantities use the shown UOM; warehouse quantities use base units. Current available is the shared lot or item balance and may include other receipts.">
+                <div class="overflow-x-auto">
+                    <table class="min-w-[80rem] w-full text-left text-xs">
+                        <thead class="border-b border-neutral-200 text-neutral-600"><tr>
+                            <th class="p-2">PO / GRN / Receiver</th><th class="p-2">Item / Batch / Expiry</th>
+                            <th class="p-2">Conversion</th><th class="p-2">Ordered</th><th class="p-2">Delivered</th>
+                            <th class="p-2">This GRN</th><th class="p-2">Accepted</th><th class="p-2">Rejected</th>
+                            <th class="p-2">Pending QC</th><th class="p-2">Awaiting put-away</th><th class="p-2">Put away from GRN</th><th class="p-2">Current available</th>
+                            <th class="p-2">Remaining receivable</th><th class="p-2">Outstanding</th><th class="p-2">Returned</th>
+                        </tr></thead>
+                        <tbody class="divide-y divide-neutral-100">
+                            @forelse($receivingReconciliation as $row)
+                                <tr>
+                                    <td class="p-2"><a class="font-semibold text-primary-700 hover:underline" href="{{ route('inventory.receiving.show', $row['grn']) }}">{{ $row['grn']->grn_number }}</a><br>{{ $row['po']?->po_number ?? 'Legacy' }}<br>{{ $row['receiver'] ?? 'Unknown' }}</td>
+                                    <td class="p-2">{{ $row['item']?->name }}<br>{{ $row['batch'] ?? 'No batch' }}<br>{{ $row['expiry']?->format('Y-m-d') ?? 'No expiry' }}</td>
+                                    <td class="p-2">1 {{ $row['purchase_unit'] }} = {{ $row['factor'] }} {{ $row['base_unit'] }}</td>
+                                    <td class="p-2">{{ $row['ordered'] }}</td><td class="p-2">{{ $row['delivered'] }}</td><td class="p-2">{{ $row['receipt_quantity'] }}</td>
+                                    <td class="p-2">{{ $row['accepted'] }}</td><td class="p-2">{{ $row['rejected'] }}</td><td class="p-2">{{ $row['pending_qc'] }}</td>
+                                    <td class="p-2">{{ $row['awaiting_put_away_base'] }}</td><td class="p-2">{{ $row['put_away_base'] }}</td><td class="p-2">{{ $row['available_base'] }}</td>
+                                    <td class="p-2">{{ $row['remaining'] }}</td><td class="p-2">{{ $row['outstanding'] }}</td><td class="p-2">{{ $row['returned_base'] }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="15" class="p-4 text-center text-neutral-500">No receiving lines in this period.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </x-ui.card>
+
+            <x-ui.card title="PO Commitments by Supplier" :subtitle="$period['description'].' Select a bar to inspect its purchase orders.'">
                 @php $supplierSpendMax = max(1, (float) $spendBySupplier->max('value')); @endphp
                 <div class="space-y-2">
                     @forelse ($spendBySupplier as $row)
@@ -1815,7 +1844,7 @@
                         case 'most_consumed': return 'Usage velocity analysis ranking items with highest consumption quantity.';
                         case 'movements_by_type': return 'Transaction volume and value aggregated by operational movement classification.';
                         case 'procurement_expense': return 'Purchase order spending breakdown with received and outstanding obligations.';
-                        case 'spend_by_supplier': return 'Supplier procurement expenditure analysis with delivery fulfilment rates.';
+                        case 'spend_by_supplier': return 'Supplier purchase order commitments with delivery fulfilment rates.';
                         default: return 'Configure parameters and generate the report.';
                     }
                 },

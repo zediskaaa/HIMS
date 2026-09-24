@@ -3,6 +3,7 @@
 namespace App\Enums;
 
 use App\Models\MaterialRequisition;
+use App\Models\WarehouseTask;
 use App\Models\SystemRecoveryRecord;
 use App\Models\User;
 use App\Support\AuthenticationPanel;
@@ -21,6 +22,9 @@ enum NotificationDestination: string
     case Import = 'import';
     case RecoveryRecord = 'recovery_record';
     case Profile = 'profile';
+    case QualityControl = 'quality_control';
+    case GoodsReceipt = 'goods_receipt';
+    case WarehouseTask = 'warehouse_task';
 
     public function isAuthorizedFor(User $user): bool
     {
@@ -36,6 +40,10 @@ enum NotificationDestination: string
                 || $user->hasPermission(Permission::ManageSuppliers),
             self::RecoveryRecord => $user->isSuperAdministrator()
                 && $user->hasPermission(Permission::ManageSystemRecovery),
+            self::QualityControl => $user->hasPermission(Permission::InspectStock),
+            self::GoodsReceipt => $user->hasPermission(Permission::ViewInventory)
+                || $user->hasPermission(Permission::ReceivePurchaseOrder),
+            self::WarehouseTask => $user->hasPermission(Permission::ViewWarehouseTasks),
         };
     }
 
@@ -49,6 +57,8 @@ enum NotificationDestination: string
             self::RecoveryRecord => SystemRecoveryRecord::query()
                 ->whereKey((int) ($parameters['record'] ?? 0))
                 ->exists(),
+            self::WarehouseTask => WarehouseTask::query()
+                ->whereKey((int) ($parameters['task'] ?? 0))->exists(),
             default => true,
         };
     }
@@ -69,6 +79,13 @@ enum NotificationDestination: string
                 'record' => (int) ($parameters['record'] ?? 0),
             ]),
             self::Profile => route('profile.edit'),
+            self::QualityControl => route('inventory.qc.index'),
+            self::GoodsReceipt => ! empty($parameters['grn'])
+                ? route('inventory.receiving.show', ['goodsReceiptNote' => (int) $parameters['grn']])
+                : route('inventory.receiving.index'),
+            self::WarehouseTask => route('inventory.warehouse-tasks.show', [
+                'warehouseTask' => (int) ($parameters['task'] ?? 0),
+            ]),
         };
     }
 }

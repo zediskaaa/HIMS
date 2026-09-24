@@ -140,6 +140,28 @@ class PurchaseOrder extends Model
         return $this->status === 'received' || $this->status === PurchaseOrderStatus::Fulfilled->value;
     }
 
+    public function isFullyAccepted(): bool
+    {
+        return $this->lines()->exists()
+            && ! $this->lines()->whereRaw('accepted_quantity < ordered_quantity')->exists();
+    }
+
+    public function syncReceivingStatus(): void
+    {
+        if ($this->isFullyAccepted()) {
+            $this->status = PurchaseOrderStatus::Fulfilled->value;
+            $this->received_at ??= now();
+        } elseif ($this->lines()->where('accepted_quantity', '>', 0)->exists()) {
+            $this->status = PurchaseOrderStatus::PartiallyFulfilled->value;
+        } elseif ($this->lines()->whereRaw('received_quantity > accepted_quantity + rejected_quantity')->exists()) {
+            $this->status = PurchaseOrderStatus::UnderInspection->value;
+        } elseif ($this->lines()->where('rejected_quantity', '>', 0)->exists()) {
+            $this->status = PurchaseOrderStatus::RejectedDelivery->value;
+        }
+
+        $this->save();
+    }
+
     public function conversionFactor(): float
     {
         $factor = (float) ($this->conversion_factor ?? 1);
@@ -169,6 +191,10 @@ class PurchaseOrder extends Model
 
     public function remainingBaseQuantity(): int
     {
+        if ($this->lines()->exists()) {
+            return (int) $this->lines()->with('item')->get()->sum(fn ($line) => $line->remainingBaseQuantity());
+        }
+
         return max(0, $this->orderedBaseQuantity() - $this->receivedBaseQuantity());
     }
 

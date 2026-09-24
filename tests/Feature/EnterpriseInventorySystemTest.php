@@ -87,7 +87,7 @@ class EnterpriseInventorySystemTest extends TestCase
     }
 
     /**
-     * Inbound Receiving against PO with +5% tolerance limit and Quarantine placement.
+     * Inbound Receiving against the approved PO balance and Quarantine placement.
      */
     public function test_inbound_dock_receiving_against_po_enforces_tolerance_and_routes_to_quarantine(): void
     {
@@ -136,10 +136,10 @@ class EnterpriseInventorySystemTest extends TestCase
             ], $staff);
             $this->fail('Expected over-delivery > +5% to throw exception.');
         } catch (\Throwable $e) {
-            $this->assertStringContainsString('+5% over-delivery tolerance', $e->getMessage());
+            $this->assertStringContainsString('remaining receivable quantity', $e->getMessage());
         }
 
-        // 2. Acceptance of delivery within +5% tolerance cap (ordered 100, receiving 105)
+        // 2. Delivery within the approved balance (ordered 100, receiving 100)
         $grn = $receiptService->receiveOrder($po, [
             'carrier_name' => 'Air21 Logistics',
             'waybill_number' => 'WB-99881',
@@ -148,7 +148,7 @@ class EnterpriseInventorySystemTest extends TestCase
             'lines' => [
                 [
                     'po_line_id' => $poLine->id,
-                    'received_quantity' => 105,
+                    'received_quantity' => 100,
                     'batch_number' => 'BATCH-PROP-2026A',
                     'lot_number' => 'LOT-ZUE-998',
                     'expiry_date' => now()->addMonths(18)->format('Y-m-d'),
@@ -161,19 +161,19 @@ class EnterpriseInventorySystemTest extends TestCase
         $this->assertDatabaseHas('goods_receipt_notes', ['id' => $grn->id]);
         $this->assertDatabaseHas('grn_line_items', [
             'goods_receipt_note_id' => $grn->id,
-            'received_quantity' => 105,
+            'received_quantity' => 100,
         ]);
 
         // Verify Quality Inspection was automatically scheduled
         $inspection = QualityInspection::where('item_id', $item->id)->first();
         $this->assertNotNull($inspection);
         $this->assertEquals('pending_sample', $inspection->inspection_status);
-        $this->assertEquals(105, $inspection->sample_size);
+        $this->assertEquals(100, $inspection->sample_size);
 
         // Verify stock is placed in Quarantined status and NOT in unrestricted ATP or on-hand
         $item->refresh();
         $this->assertEquals(0, $item->quantity_on_hand); // Unrestricted cached QOH remains 0
-        $this->assertEquals(105, $item->quarantinedQuantity());
+        $this->assertEquals(100, $item->quarantinedQuantity());
         $this->assertEquals(0, $item->availableToPromise());
     }
 
@@ -237,8 +237,9 @@ class EnterpriseInventorySystemTest extends TestCase
         );
 
         $item->refresh();
-        $this->assertEquals(80, $item->quantity_on_hand);
-        $this->assertEquals(80, $item->availableToPromise());
+        $this->assertEquals(0, $item->quantity_on_hand);
+        $this->assertEquals(0, $item->availableToPromise());
+        $this->assertEquals(80, ItemStockLevel::where('item_id', $item->id)->sum('in_transit_quantity'));
         $this->assertEquals(20, $item->quarantinedQuantity());
 
         // Verify StockMovement recorded for QualityRelease
@@ -257,7 +258,8 @@ class EnterpriseInventorySystemTest extends TestCase
         );
 
         $item->refresh();
-        $this->assertEquals(80, $item->quantity_on_hand); // Unrestricted QOH unchanged
+        $this->assertEquals(0, $item->quantity_on_hand); // Put-away is still pending
+        $this->assertEquals(80, ItemStockLevel::where('item_id', $item->id)->sum('in_transit_quantity'));
         $this->assertEquals(0, $item->quarantinedQuantity()); // Quarantine fully cleared
         $this->assertEquals(20, $item->blockedQuantity()); // Moved to blocked status
 

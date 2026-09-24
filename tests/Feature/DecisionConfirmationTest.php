@@ -109,7 +109,7 @@ class DecisionConfirmationTest extends TestCase
             ->assertSee('Are you sure you want to approve this procurement request?')
             // The redesign moved the stock-posting consequence onto the receive
             // confirmation it belongs to.
-            ->assertSee('Confirm that this delivery is physically present before posting it into stock.');
+            ->assertSee('Record delivery');
 
         $this->get(route('inventory.transfers.index'))
             ->assertOk()

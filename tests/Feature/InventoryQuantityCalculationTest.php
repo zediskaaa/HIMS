@@ -18,9 +18,11 @@ use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Models\WarehouseTask;
 use App\Services\Inventory\GoodsReceiptService;
 use App\Services\Inventory\QualityControlService;
 use App\Services\Logistics\InspectionAcceptanceService;
+use App\Services\Warehouse\WarehouseTaskService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -141,7 +143,9 @@ class InventoryQuantityCalculationTest extends TestCase
         // Perform receiving through web controller action
         $this->actingAs($this->manager)
             ->post(route('inventory.purchases.receive', $po))
-            ->assertRedirect(route('inventory.purchases'));
+            ->assertRedirect(route('inventory.receiving.index', ['purchase_order_id' => $po->id]));
+        $this->assertEquals(200, $item->fresh()->quantity_on_hand);
+        $this->receiveAndStore($po);
 
         $item->refresh();
         $po->refresh();
@@ -160,11 +164,11 @@ class InventoryQuantityCalculationTest extends TestCase
         $this->assertEquals(4, $poLine->received_quantity);
         $this->assertEquals(400, $poLine->receivedBaseQuantity());
         $this->assertEquals(0, $poLine->remainingQuantity());
-        $this->assertContains($poLine->line_status, ['received', 'fully_received']);
-        $this->assertEquals('received', $po->status);
+        $this->assertSame('accepted', $poLine->line_status);
+        $this->assertEquals(PurchaseOrderStatus::Fulfilled->value, $po->status);
 
         // Verify StockMovement audit row
-        $movement = StockMovement::where('item_id', $item->id)->latest('id')->first();
+        $movement = StockMovement::where('item_id', $item->id)->where('movement_type', MovementType::Quarantine->value)->latest('id')->first();
         $this->assertNotNull($movement);
         $this->assertEquals(400, $movement->quantity, 'Stock movement must record +400 base units, not +4.');
         $this->assertStringContainsString('4 pack', $movement->remarks);
@@ -184,8 +188,7 @@ class InventoryQuantityCalculationTest extends TestCase
 
         $po = $this->createApprovedPO($item, 5, 'piece', 1);
 
-        $this->actingAs($this->manager)
-            ->post(route('inventory.purchases.receive', $po));
+        $this->receiveAndStore($po);
 
         $this->assertEquals(25, $item->fresh()->quantity_on_hand);
     }
@@ -205,8 +208,7 @@ class InventoryQuantityCalculationTest extends TestCase
 
         $po = $this->createApprovedPO($item, 2, 'box', 25);
 
-        $this->actingAs($this->manager)
-            ->post(route('inventory.purchases.receive', $po));
+        $this->receiveAndStore($po);
 
         $this->assertEquals(100, $item->fresh()->quantity_on_hand);
     }
@@ -221,8 +223,7 @@ class InventoryQuantityCalculationTest extends TestCase
 
         $po = $this->createApprovedPO($item, 6, 'bottle', 1);
 
-        $this->actingAs($this->manager)
-            ->post(route('inventory.purchases.receive', $po));
+        $this->receiveAndStore($po);
 
         $this->assertEquals(16, $item->fresh()->quantity_on_hand);
     }
@@ -242,8 +243,7 @@ class InventoryQuantityCalculationTest extends TestCase
 
         $po = $this->createApprovedPO($item, 2, 'case', 24);
 
-        $this->actingAs($this->manager)
-            ->post(route('inventory.purchases.receive', $po));
+        $this->receiveAndStore($po);
 
         $this->assertEquals(148, $item->fresh()->quantity_on_hand);
     }
@@ -303,8 +303,10 @@ class InventoryQuantityCalculationTest extends TestCase
         $poLine->refresh();
         $this->assertEquals(1, $poLine->received_quantity);
         $this->assertEquals(3, $poLine->remainingQuantity());
-        $this->assertEquals('partially_received', $poLine->line_status);
+        $this->assertEquals('partially_delivered', $poLine->line_status);
         $this->assertEquals(100, $item->quarantinedQuantity());
+
+        $this->finishReceipt($grn1);
 
         // Perform custodial acceptance of GRN 1 into active stock
         $iarService = app(InspectionAcceptanceService::class);
@@ -329,6 +331,8 @@ class InventoryQuantityCalculationTest extends TestCase
         $this->assertEquals(3, $poLine->received_quantity);
         $this->assertEquals(1, $poLine->remainingQuantity());
 
+        $this->finishReceipt($grn2);
+
         $iar2 = $iarService->createFromReceipt($grn2, [], $this->manager);
         $iarService->performTechnicalInspection($iar2, ['inspection_status' => 'in_order'], $inspector);
         $iarService->performCustodialAcceptance($iar2, [], $custodian);
@@ -346,7 +350,10 @@ class InventoryQuantityCalculationTest extends TestCase
         $poLine->refresh();
         $this->assertEquals(4, $poLine->received_quantity);
         $this->assertEquals(0, $poLine->remainingQuantity());
-        $this->assertEquals('fully_received', $poLine->line_status);
+        $this->assertEquals('awaiting_inspection', $poLine->line_status);
+
+        $this->finishReceipt($grn3);
+        $this->assertSame(PurchaseOrderStatus::Fulfilled, $po->refresh()->statusEnum());
 
         $iar3 = $iarService->createFromReceipt($grn3, [], $this->manager);
         $iarService->performTechnicalInspection($iar3, ['inspection_status' => 'in_order'], $inspector);
@@ -400,10 +407,18 @@ class InventoryQuantityCalculationTest extends TestCase
         $po->status = PurchaseOrderStatus::Cancelled->value;
         $po->save();
 
-        // Attempting to receive must fail
+        // A direct action cannot post stock, and the GRN service rejects a cancelled order.
         $this->actingAs($this->manager)
             ->post(route('inventory.purchases.receive', $po))
-            ->assertSessionHasErrors('receive');
+            ->assertRedirect(route('inventory.receiving.index', ['purchase_order_id' => $po->id]));
+        try {
+            app(GoodsReceiptService::class)->receiveOrder($po, [
+                'lines' => [['po_line_id' => $po->lines()->firstOrFail()->id, 'received_quantity' => 4]],
+            ], $this->manager);
+            $this->fail('Cancelled purchase order was received.');
+        } catch (\DomainException $exception) {
+            $this->assertStringContainsString('approved', $exception->getMessage());
+        }
 
         $this->assertEquals(200, $item->fresh()->quantity_on_hand);
     }
@@ -422,21 +437,17 @@ class InventoryQuantityCalculationTest extends TestCase
 
         $po = $this->createApprovedPO($item, 4, 'pack', 100);
 
-        // First receive succeeds: 200 + 400 = 600
-        $this->actingAs($this->manager)
-            ->post(route('inventory.purchases.receive', $po))
-            ->assertRedirect(route('inventory.purchases'));
-
+        $line = $po->lines()->firstOrFail();
+        $payload = ['receipt_key' => 'blood-lancet-delivery', 'lines' => [[
+            'po_line_id' => $line->id, 'received_quantity' => 4,
+        ]]];
+        $first = app(GoodsReceiptService::class)->receiveOrder($po, $payload, $this->manager);
+        $same = app(GoodsReceiptService::class)->receiveOrder($po, $payload, $this->manager);
+        $this->assertSame($first->id, $same->id);
+        $this->assertSame(400, $item->quarantinedQuantity());
+        $this->finishReceipt($first);
         $this->assertEquals(600, $item->fresh()->quantity_on_hand);
-
-        // Duplicate receive attempt is blocked
-        $this->actingAs($this->manager)
-            ->post(route('inventory.purchases.receive', $po))
-            ->assertRedirect(route('inventory.purchases'))
-            ->assertSessionHas('info', 'This purchase order has already been received.');
-
-        // Stock remains exactly 600, NOT 1,000!
-        $this->assertEquals(600, $item->fresh()->quantity_on_hand);
+        $this->assertEquals(1, GoodsReceiptNote::where('purchase_order_id', $po->id)->count());
     }
 
     /**
@@ -453,12 +464,12 @@ class InventoryQuantityCalculationTest extends TestCase
 
         // PO 1: 2 packs × 100 = 200 units
         $po1 = $this->createApprovedPO($item, 2, 'pack', 100, 'PO-MULTI-001');
-        $this->actingAs($this->manager)->post(route('inventory.purchases.receive', $po1));
+        $this->receiveAndStore($po1);
         $this->assertEquals(400, $item->fresh()->quantity_on_hand, '200 existing + 200 from PO1 = 400.');
 
         // PO 2: 3 packs × 100 = 300 units
         $po2 = $this->createApprovedPO($item, 3, 'pack', 100, 'PO-MULTI-002');
-        $this->actingAs($this->manager)->post(route('inventory.purchases.receive', $po2));
+        $this->receiveAndStore($po2);
         $this->assertEquals(700, $item->fresh()->quantity_on_hand, '400 + 300 from PO2 = 700.');
     }
 
@@ -483,12 +494,12 @@ class InventoryQuantityCalculationTest extends TestCase
 
         // Order 1: 2 boxes × 50 = 100 pieces
         $po1 = $this->createApprovedPO($item, 2, 'box', 50, 'PO-DIFF-001');
-        $this->actingAs($this->manager)->post(route('inventory.purchases.receive', $po1));
+        $this->receiveAndStore($po1);
         $this->assertEquals(300, $item->fresh()->quantity_on_hand, '200 + 100 (2 boxes) = 300.');
 
         // Order 2: 3 packs × 100 = 300 pieces
         $po2 = $this->createApprovedPO($item, 3, 'pack', 100, 'PO-DIFF-002');
-        $this->actingAs($this->manager)->post(route('inventory.purchases.receive', $po2));
+        $this->receiveAndStore($po2);
         $this->assertEquals(600, $item->fresh()->quantity_on_hand, '300 + 300 (3 packs) = 600.');
     }
 
@@ -546,7 +557,9 @@ class InventoryQuantityCalculationTest extends TestCase
         $qcService = app(QualityControlService::class);
         $qcService->releaseLot($inspection, 5, $this->location->id, $this->manager, 'QC Passed');
 
-        $this->assertEquals(100, $item->fresh()->quantity_on_hand, '50 existing + 50 received = 100.');
+        $this->assertEquals(50, $item->fresh()->quantity_on_hand, 'QC acceptance awaits put-away.');
+        $this->finishAcceptedReceipt($grn);
+        $this->assertEquals(100, $item->fresh()->quantity_on_hand, '50 existing + 50 put away = 100.');
     }
 
     /**
@@ -569,6 +582,46 @@ class InventoryQuantityCalculationTest extends TestCase
     }
 
     // --- Helper Methods ---
+
+    private function receiveAndStore(PurchaseOrder $po, ?int $quantity = null): GoodsReceiptNote
+    {
+        $line = $po->lines()->firstOrFail();
+        $item = $line->item;
+        $quantity ??= $line->remainingQuantity();
+        $grn = app(GoodsReceiptService::class)->receiveOrder($po, [
+            'lines' => [[
+                'po_line_id' => $line->id,
+                'received_quantity' => $quantity,
+                'batch_number' => $item->is_batch_tracked ? 'LOT-'.$po->id.'-'.uniqid() : null,
+                'expiry_date' => $item->is_expiry_tracked ? now()->addYear()->toDateString() : null,
+            ]],
+        ], $this->manager);
+        $this->finishReceipt($grn);
+
+        return $grn;
+    }
+
+    private function finishReceipt(GoodsReceiptNote $grn): void
+    {
+        $line = $grn->lines()->firstOrFail();
+        $inspection = $line->inspections()->firstOrFail();
+        app(QualityControlService::class)->releaseLot($inspection, $line->received_quantity, $this->location->id, $this->manager);
+        $this->finishAcceptedReceipt($grn);
+    }
+
+    private function finishAcceptedReceipt(GoodsReceiptNote $grn): void
+    {
+        $line = $grn->lines()->firstOrFail();
+        $inspection = $line->inspections()->firstOrFail();
+        $task = WarehouseTask::where('reference_type', $inspection->getMorphClass())
+            ->where('reference_id', $inspection->id)->latest('id')->firstOrFail();
+        $tasks = app(WarehouseTaskService::class);
+        $tasks->start($task, $this->manager);
+        $tasks->scan($task, 'LOC-STAGING', $this->manager);
+        $tasks->scan($task, $line->item->sku, $this->manager);
+        $tasks->scan($task, $this->location->code, $this->manager);
+        $tasks->complete($task, $line->calculatedReceivedBaseQuantity(), $this->manager);
+    }
 
     private function createItemWithStock(string $name, string $unit, int $initialStock, float $unitCost): InventoryItem
     {

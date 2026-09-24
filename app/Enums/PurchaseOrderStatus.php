@@ -10,9 +10,11 @@ enum PurchaseOrderStatus: string
     case Approved = 'approved';
     case Dispatched = 'dispatched';
     case Acknowledged = 'acknowledged';
+    case UnderInspection = 'under_inspection';
+    case RejectedDelivery = 'rejected_delivery';
     case PartiallyFulfilled = 'partially_fulfilled';
     case Fulfilled = 'fulfilled';
-    /** Written by the receive action once the ordered stock is posted. */
+    /** Legacy completed status retained for historical purchase orders. */
     case Received = 'received';
     case Amended = 'amended';
     case Cancelled = 'cancelled';
@@ -26,6 +28,8 @@ enum PurchaseOrderStatus: string
             self::Approved => 'Approved',
             self::Dispatched => 'Dispatched',
             self::Acknowledged => 'Acknowledged by Vendor',
+            self::UnderInspection => 'Delivered / Under Inspection',
+            self::RejectedDelivery => 'Delivery Rejected / Awaiting Replacement',
             self::PartiallyFulfilled => 'Partially Fulfilled',
             self::Fulfilled => 'Fulfilled / Closed',
             self::Received => 'Received',
@@ -45,10 +49,12 @@ enum PurchaseOrderStatus: string
             self::Draft => [self::PendingApproval, self::Submitted, self::Cancelled],
             self::Submitted => [self::PendingApproval, self::Approved, self::Draft, self::Cancelled],
             self::PendingApproval => [self::Approved, self::Draft, self::Cancelled],
-            self::Approved => [self::Dispatched, self::Acknowledged, self::PartiallyFulfilled, self::Fulfilled, self::Amended, self::Cancelled],
-            self::Dispatched => [self::Acknowledged, self::PartiallyFulfilled, self::Fulfilled, self::Amended, self::Cancelled],
-            self::Acknowledged => [self::PartiallyFulfilled, self::Fulfilled, self::Amended, self::Cancelled],
-            self::PartiallyFulfilled => [self::PartiallyFulfilled, self::Fulfilled, self::Amended, self::Cancelled],
+            self::Approved => [self::Dispatched, self::Acknowledged, self::UnderInspection, self::RejectedDelivery, self::PartiallyFulfilled, self::Fulfilled, self::Amended, self::Cancelled],
+            self::Dispatched => [self::Acknowledged, self::UnderInspection, self::RejectedDelivery, self::PartiallyFulfilled, self::Fulfilled, self::Amended, self::Cancelled],
+            self::Acknowledged => [self::UnderInspection, self::RejectedDelivery, self::PartiallyFulfilled, self::Fulfilled, self::Amended, self::Cancelled],
+            self::UnderInspection => [self::UnderInspection, self::RejectedDelivery, self::PartiallyFulfilled, self::Fulfilled, self::Amended, self::Cancelled],
+            self::RejectedDelivery => [self::UnderInspection, self::RejectedDelivery, self::PartiallyFulfilled, self::Fulfilled, self::Amended, self::Cancelled],
+            self::PartiallyFulfilled => [self::UnderInspection, self::RejectedDelivery, self::PartiallyFulfilled, self::Fulfilled, self::Amended, self::Cancelled],
             self::Fulfilled, self::Received, self::Amended, self::Cancelled => [],
         };
     }
@@ -63,7 +69,7 @@ enum PurchaseOrderStatus: string
      */
     public function canReceiveStock(): bool
     {
-        return in_array($this, [self::Approved, self::Dispatched, self::Acknowledged, self::PartiallyFulfilled], true);
+        return in_array($this, [self::Approved, self::Dispatched, self::Acknowledged, self::UnderInspection, self::RejectedDelivery, self::PartiallyFulfilled], true);
     }
 
     public function isOpen(): bool

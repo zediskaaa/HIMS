@@ -4,6 +4,9 @@ namespace App\Services\Inventory;
 
 use App\Enums\AuditAction;
 use App\Enums\MovementType;
+use App\Enums\NotificationDestination;
+use App\Enums\NotificationPriority;
+use App\Enums\Permission;
 use App\Enums\PurchaseOrderStatus;
 use App\Models\GoodsReceiptNote;
 use App\Models\GoodsReceiptNoteLine;
@@ -16,8 +19,8 @@ use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\HimsNotificationService;
 use App\Services\InventoryAutomationService;
-use App\Services\Procurement\BudgetEncumbranceService;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -28,8 +31,8 @@ class GoodsReceiptService
 {
     public function __construct(
         private readonly InventoryAutomationService $automationService,
-        private readonly BudgetEncumbranceService $budgetService,
-        private readonly AuditLogger $auditLogger
+        private readonly AuditLogger $auditLogger,
+        private readonly HimsNotificationService $notifications,
     ) {}
 
     /**
@@ -43,13 +46,41 @@ class GoodsReceiptService
             // Lock PO to avoid race condition on concurrent receiving
             $po = PurchaseOrder::lockForUpdate()->with(['lines.item', 'supplier'])->findOrFail($purchaseOrder->id);
 
+            if (! empty($data['receipt_key'])) {
+                $existing = GoodsReceiptNote::with('lines')->where('receipt_key', $data['receipt_key'])->first();
+                if ($existing) {
+                    if ((int) $existing->purchase_order_id !== (int) $po->id) {
+                        throw ValidationException::withMessages(['receipt_key' => ['This receiving key belongs to another purchase order.']]);
+                    }
+                    $submitted = collect($data['lines'] ?? [])->map(fn ($line) => (int) $line['po_line_id'].':'.(int) $line['received_quantity'])->sort()->values()->all();
+                    $recorded = $existing->lines->map(fn ($line) => $line->po_line_id.':'.$line->received_quantity)->sort()->values()->all();
+                    if ($submitted !== $recorded
+                        || ($data['waybill_number'] ?? null) !== $existing->waybill_number
+                        || ($data['packing_slip_number'] ?? null) !== $existing->packing_slip_number) {
+                        throw ValidationException::withMessages(['receipt_key' => ['This receiving key was already used for a different delivery.']]);
+                    }
+                    return $existing;
+                }
+            }
+
             $status = PurchaseOrderStatus::tryFrom((string) $po->status);
             if (! ($status?->canReceiveStock() ?? in_array($po->status, ['approved', 'dispatched', 'acknowledged', 'partially_fulfilled', 'partially_received', 'issued'], true))) {
                 throw new DomainException("Purchase Order {$po->po_number} must be approved before receiving.");
             }
 
-            if ($po->isFullyReceived()) {
-                throw new DomainException("Purchase Order {$po->po_number} is already fully received.");
+            if ($po->isFullyAccepted()) {
+                throw new DomainException("Purchase Order {$po->po_number} is already fully accepted.");
+            }
+
+            foreach (['packing_slip_number', 'waybill_number'] as $referenceField) {
+                if (filled($data[$referenceField] ?? null) && GoodsReceiptNote::where('purchase_order_id', $po->id)
+                    ->whereRaw('lower('.$referenceField.') = ?', [mb_strtolower(trim((string) $data[$referenceField]))])->exists()) {
+                    throw ValidationException::withMessages([$referenceField => ['This delivery reference was already received for the purchase order.']]);
+                }
+            }
+
+            if (isset($data['actual_supplier_id']) && (int) $data['actual_supplier_id'] !== (int) $po->supplier_id) {
+                throw ValidationException::withMessages(['actual_supplier_id' => ['The delivering supplier does not match the approved purchase order.']]);
             }
 
             // Ensure Quarantine location exists
@@ -60,6 +91,7 @@ class GoodsReceiptService
                     'type' => 'zone',
                     'zone' => 'Quarantine',
                     'status' => 'active',
+                    'is_quarantine' => true,
                     'description' => 'Designated holding zone for inbound receipts awaiting QA/QC inspection.',
                 ]
             );
@@ -67,12 +99,22 @@ class GoodsReceiptService
             if ($quarantineLocation->status !== 'active') {
                 throw new DomainException("Receiving location {$quarantineLocation->name} ({$quarantineLocation->code}) is inactive and cannot receive new inventory.");
             }
+            if (! $quarantineLocation->is_quarantine) {
+                $quarantineLocation->is_quarantine = true;
+                $quarantineLocation->save();
+            }
 
             $grnNumber = 'GRN-'.now()->format('Ymd').'-'.Str::ulid();
 
             $grn = GoodsReceiptNote::create([
                 'grn_number' => $grnNumber,
                 'purchase_order_id' => $po->id,
+                'quarantine_location_id' => $quarantineLocation->id,
+                'receipt_key' => $data['receipt_key'] ?? null,
+                'packing_slip_key' => filled($data['packing_slip_number'] ?? null)
+                    ? $po->id.':'.hash('sha256', mb_strtolower(trim((string) $data['packing_slip_number']))) : null,
+                'waybill_key' => filled($data['waybill_number'] ?? null)
+                    ? $po->id.':'.hash('sha256', mb_strtolower(trim((string) $data['waybill_number']))) : null,
                 'supplier_id' => $po->supplier_id,
                 'carrier_name' => $data['carrier_name'] ?? null,
                 'waybill_number' => $data['waybill_number'] ?? null,
@@ -92,6 +134,7 @@ class GoodsReceiptService
             }
 
             $totalReceivedValue = 0.00;
+            $hasDiscrepancies = false;
 
             foreach ($linesData as $lineInput) {
                 $poLine = $po->lines()->where('id', $lineInput['po_line_id'])->first();
@@ -102,19 +145,28 @@ class GoodsReceiptService
                 }
 
                 $item = InventoryItem::lockForUpdate()->findOrFail($poLine->item_id);
+                if (filled($lineInput['actual_sku'] ?? null)
+                    && strcasecmp(trim((string) $lineInput['actual_sku']), (string) $item->sku) !== 0) {
+                    throw ValidationException::withMessages(['lines' => ["Delivered SKU does not match PO line #{$poLine->line_number}."]]);
+                }
+                if (isset($lineInput['actual_item_id']) && (int) $lineInput['actual_item_id'] !== (int) $item->id) {
+                    throw ValidationException::withMessages(['lines' => ["Delivered item does not match PO line #{$poLine->line_number}. Record the wrong item separately; it cannot be booked as {$item->name}."]]);
+                }
+                if (filled($lineInput['actual_purchase_unit'] ?? null)
+                    && strcasecmp((string) $lineInput['actual_purchase_unit'], (string) ($poLine->purchase_unit ?: $item->unit)) !== 0) {
+                    throw ValidationException::withMessages(['lines' => ["Delivered UOM does not match PO line #{$poLine->line_number}."]]);
+                }
                 $receivedQty = (int) ($lineInput['received_quantity'] ?? 0);
 
                 if ($receivedQty <= 0) {
                     continue;
                 }
 
-                // Tolerance check: max 5% over-delivery allowed
+                // Receipt capacity includes replacement of quantities rejected by QC.
                 $openQty = $poLine->remainingQuantity();
-                $maxAllowedQty = (int) ceil($openQty * 1.05);
-
-                if ($receivedQty > $maxAllowedQty) {
+                if ($receivedQty > $openQty) {
                     throw ValidationException::withMessages([
-                        'lines' => ["Line for {$item->name} exceeds the allowable +5% over-delivery tolerance. Open: {$openQty}, Max Allowed: {$maxAllowedQty}, Received: {$receivedQty}."],
+                        'lines' => ["Line for {$item->name} exceeds the remaining receivable quantity. Open: {$openQty}, Received: {$receivedQty}."],
                     ]);
                 }
 
@@ -135,12 +187,6 @@ class GoodsReceiptService
                     ]);
                 }
 
-                if ($expiryDate && $expiryDate->isPast()) {
-                    throw ValidationException::withMessages([
-                        'lines' => ["Expiration date for {$item->name} cannot be in the past."],
-                    ]);
-                }
-
                 if ($manufacturedDate && $manufacturedDate->isFuture()) {
                     throw ValidationException::withMessages([
                         'lines' => ["Manufacturing date for {$item->name} cannot be in the future."],
@@ -148,17 +194,62 @@ class GoodsReceiptService
                 }
 
                 $serialNumber = trim((string) ($lineInput['serial_number'] ?? ''));
-                if ($item->is_serial_tracked && ($receivedQty !== 1 || $serialNumber === '')) {
-                    throw ValidationException::withMessages([
-                        'lines' => ["Serial-tracked item {$item->name} must be received one unit per line with its manufacturer serial number."],
-                    ]);
+                if ($item->is_serial_tracked) {
+                    if ($receivedQty !== 1 || $serialNumber === '') {
+                        throw ValidationException::withMessages([
+                            'lines' => ["Serial-tracked item {$item->name} must be received one base unit per line with its manufacturer serial number."],
+                        ]);
+                    }
+
+                    if (InventorySerial::where('item_id', $item->id)->where('serial_number', $serialNumber)->exists()) {
+                        throw ValidationException::withMessages([
+                            'lines' => ["Serial number '{$serialNumber}' for item {$item->name} has already been registered in the system."],
+                        ]);
+                    }
+                }
+
+                // Discrepancy & Item Condition Detection
+                $itemCondition = $lineInput['item_condition'] ?? 'good';
+                $discrepancyType = $lineInput['discrepancy_type'] ?? null;
+                if ($itemCondition !== 'good' && empty($discrepancyType)) {
+                    $discrepancyType = $itemCondition === 'damaged' || $itemCondition === 'compromised' ? 'damage' : $itemCondition;
+                } elseif ($expiryDate && $expiryDate->isPast() && empty($discrepancyType)) {
+                    $discrepancyType = 'expired';
+                } elseif ($receivedQty < $openQty && empty($discrepancyType)) {
+                    $discrepancyType = 'shortage';
+                } elseif ($receivedQty > $openQty && empty($discrepancyType)) {
+                    $discrepancyType = 'overage';
+                } elseif ($expiryDate && ! $expiryDate->isPast() && now()->diffInDays($expiryDate) < 30 && empty($discrepancyType)) {
+                    $discrepancyType = 'near_expiry';
+                }
+
+                $discrepancyAction = $lineInput['discrepancy_action'] ?? ($discrepancyType ? 'quarantine' : null);
+                $discrepancyNotes = $lineInput['discrepancy_notes'] ?? null;
+
+                if ($discrepancyType) {
+                    $hasDiscrepancies = true;
+                }
+
+                $destLocationId = $lineInput['destination_location_id'] ?? $data['destination_location_id'] ?? null;
+                if ($destLocationId) {
+                    $targetLoc = StorageLocation::find($destLocationId);
+                    if ($targetLoc && $targetLoc->status !== 'active') {
+                        throw ValidationException::withMessages([
+                            'lines' => ["Destination storage location {$targetLoc->name} ({$targetLoc->code}) is inactive."],
+                        ]);
+                    }
                 }
 
                 $conversionFactor = $poLine->conversionFactor();
                 if ($conversionFactor <= 1.0 && filled($poLine->purchase_unit)) {
                     $conversionFactor = $item->conversionFactorFor($poLine->purchase_unit);
                 }
+                if ($item->is_serial_tracked && $conversionFactor !== 1.0) {
+                    throw ValidationException::withMessages(['lines' => ["Serial-tracked item {$item->name} must use one base unit per serial number."]]);
+                }
                 $receivedBaseQty = (int) round($receivedQty * $conversionFactor);
+                $baseUnitCost = ($poLine->unit_price && $conversionFactor > 0)
+                    ? round((float) $poLine->unit_price / $conversionFactor, 4) : (float) $item->unit_cost;
 
                 $batch = null;
                 if ($batchNumber) {
@@ -168,12 +259,22 @@ class GoodsReceiptService
                             'lot_number' => $lineInput['lot_number'] ?? null,
                             'manufactured_date' => $manufacturedDate,
                             'expiry_date' => $expiryDate,
-                            'received_at' => now()->toDateString(),
-                            'unit_cost' => ($poLine->unit_price && $conversionFactor > 0) ? round($poLine->unit_price / $conversionFactor, 4) : $item->unit_cost,
+                            'received_at' => $grn->received_at->toDateString(),
+                            'unit_cost' => $baseUnitCost,
                             'initial_quantity' => $receivedBaseQty,
                             'status' => 'quarantine',
                         ]
                     );
+                    if (($expiryDate?->toDateString() !== $batch->expiry_date?->toDateString())
+                        || ($manufacturedDate?->toDateString() !== $batch->manufactured_date?->toDateString())
+                        || (filled($lineInput['lot_number'] ?? null) && $batch->lot_number !== $lineInput['lot_number'])
+                        || abs((float) $batch->unit_cost - $baseUnitCost) > 0.01) {
+                        throw ValidationException::withMessages(['lines' => ["Existing batch {$batchNumber} has different expiry, manufacturing, lot, or cost metadata."]]);
+                    }
+                    if (! $batch->wasRecentlyCreated) {
+                        $batch->initial_quantity += $receivedBaseQty;
+                        $batch->save();
+                    }
                 }
 
                 $grnLine = GoodsReceiptNoteLine::create([
@@ -191,13 +292,17 @@ class GoodsReceiptService
                     'accepted_quantity' => 0,
                     'rejected_quantity' => 0,
                     'unit_cost' => $poLine->unit_price ?? $item->unit_cost,
-                    'destination_location_id' => $quarantineLocation->id,
+                    'destination_location_id' => $destLocationId ?: $quarantineLocation->id,
                     'batch_number' => $batchNumber,
                     'lot_number' => $lineInput['lot_number'] ?? null,
                     'expiry_date' => $expiryDate,
                     'manufactured_date' => $manufacturedDate,
                     'serial_number' => $serialNumber ?: null,
                     'status' => 'quarantined',
+                    'item_condition' => $itemCondition,
+                    'discrepancy_type' => $discrepancyType,
+                    'discrepancy_action' => $discrepancyAction,
+                    'discrepancy_notes' => $discrepancyNotes,
                     'notes' => $lineInput['notes'] ?? null,
                 ]);
 
@@ -226,9 +331,15 @@ class GoodsReceiptService
                 StockMovement::create([
                     'item_id' => $item->id,
                     'item_batch_id' => $batch?->id,
+                    'purchase_order_id' => $po->id,
+                    'goods_receipt_note_id' => $grn->id,
+                    'purchase_unit' => $pUnit,
+                    'purchase_quantity' => $receivedQty,
+                    'base_unit' => $bUnit,
+                    'serial_number' => $serialNumber ?: null,
                     'movement_type' => MovementType::Quarantine,
                     'quantity' => $receivedBaseQty,
-                    'unit_cost' => ($poLine->unit_price && $conversionFactor > 0) ? round($poLine->unit_price / $conversionFactor, 4) : $item->unit_cost,
+                    'unit_cost' => $baseUnitCost,
                     'from_location_id' => null,
                     'to_location_id' => $quarantineLocation->id,
                     'reference_type' => GoodsReceiptNote::class,
@@ -253,30 +364,18 @@ class GoodsReceiptService
 
                 // Update PO Line received quantity
                 $poLine->received_quantity += $receivedQty;
-                if ($poLine->received_quantity >= $poLine->ordered_quantity) {
-                    $poLine->line_status = 'fully_received';
-                } else {
-                    $poLine->line_status = 'partially_received';
-                }
+                $poLine->line_status = $poLine->remainingQuantity() === 0 ? 'awaiting_inspection' : 'partially_delivered';
                 $poLine->save();
 
                 $totalReceivedValue += ($receivedQty * (float) ($poLine->unit_price ?? 0));
             }
 
-            // Update Purchase Order fulfillment status
-            $po->refresh();
-            if ($po->isFullyReceived()) {
-                $po->status = PurchaseOrderStatus::Fulfilled->value;
-                $po->received_at = now();
-            } else {
-                $po->status = PurchaseOrderStatus::PartiallyFulfilled->value;
+            if (! $grn->lines()->exists()) {
+                throw ValidationException::withMessages(['lines' => ['At least one line must have a positive delivered quantity.']]);
             }
-            $po->save();
 
-            // Record budget fulfillment spent
-            if ($totalReceivedValue > 0) {
-                $this->budgetService->recordFulfillmentSpent($po, $totalReceivedValue);
-            }
+            // Update Purchase Order fulfillment status
+            $po->syncReceivingStatus();
 
             $this->auditLogger->record(
                 AuditAction::CreatedGoodsReceipt,
@@ -289,6 +388,44 @@ class GoodsReceiptService
                     'received_value' => $totalReceivedValue,
                 ]
             );
+
+            // Real-time notifications
+            $this->notifications->sendToPermission(
+                Permission::InspectStock,
+                "grn-qc-pending-{$grn->id}",
+                "Inbound Delivery Awaiting QC",
+                "Goods Receipt Note {$grn->grn_number} for PO {$po->po_number} has been received into Quarantine and is awaiting QC inspection.",
+                NotificationPriority::Info,
+                NotificationDestination::QualityControl,
+            );
+
+            if ($hasDiscrepancies) {
+                $this->notifications->sendToPermission(
+                    Permission::ViewProcurement,
+                    "grn-discrepancy-{$grn->id}",
+                    "Delivery Discrepancy Flagged",
+                    "Discrepancies were noted during dock intake for PO {$po->po_number} (GRN: {$grn->grn_number}).",
+                    NotificationPriority::Warning,
+                    NotificationDestination::GoodsReceipt,
+                    ['grn' => $grn->id],
+                );
+            }
+
+            if ($po->created_by_user_id) {
+                $buyer = User::find($po->created_by_user_id);
+                if ($buyer) {
+                    $isFull = $po->isFullyReceived();
+                    $this->notifications->sendToUser(
+                        $buyer,
+                        "po-receipt-status-{$grn->id}",
+                        $isFull ? "PO {$po->po_number} Delivery Recorded" : "PO {$po->po_number} Partial Delivery Recorded",
+                        $isFull ? "Purchase Order {$po->po_number} has been delivered to quarantine for QC." : "A partial delivery was recorded for Purchase Order {$po->po_number}; QC is pending.",
+                        NotificationPriority::Info,
+                        NotificationDestination::GoodsReceipt,
+                        ['grn' => $grn->id],
+                    );
+                }
+            }
 
             return $grn;
         });

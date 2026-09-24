@@ -29,12 +29,19 @@ class GoodsReceiptNoteLine extends Model
         'quarantined_quantity',
         'unit_cost',
         'destination_location_id',
+        'staging_location_id',
+        'pending_put_away_quantity',
+        'returned_quantity',
         'batch_number',
         'lot_number',
         'expiry_date',
         'manufactured_date',
         'serial_number',
         'status',
+        'item_condition',
+        'discrepancy_type',
+        'discrepancy_action',
+        'discrepancy_notes',
         'notes',
     ];
 
@@ -47,6 +54,9 @@ class GoodsReceiptNoteLine extends Model
         'accepted_quantity' => 'integer',
         'rejected_quantity' => 'integer',
         'quarantined_quantity' => 'integer',
+        'pending_put_away_quantity' => 'integer',
+        'staging_location_id' => 'integer',
+        'returned_quantity' => 'integer',
         'unit_cost' => 'decimal:2',
         'expiry_date' => 'date',
         'manufactured_date' => 'date',
@@ -91,6 +101,11 @@ class GoodsReceiptNoteLine extends Model
     public function destinationLocation(): BelongsTo
     {
         return $this->belongsTo(StorageLocation::class, 'destination_location_id');
+    }
+
+    public function stagingLocation(): BelongsTo
+    {
+        return $this->belongsTo(StorageLocation::class, 'staging_location_id');
     }
 
     public function inspections(): HasMany

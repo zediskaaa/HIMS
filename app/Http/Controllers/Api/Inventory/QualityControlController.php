@@ -28,22 +28,18 @@ class QualityControlController extends Controller implements HasMiddleware
 
     public function releaseByBatch(Request $request, int $batchId): JsonResponse
     {
+        $request->merge(['decision_key' => $request->input('decision_key', $request->header('Idempotency-Key'))]);
         $validated = $request->validate([
             'accepted_quantity' => ['required', 'integer', 'min:1'],
+            'decision_key' => ['nullable', 'string', 'max:100'],
             'target_location_id' => ['required', 'exists:storage_locations,id'],
             'findings' => ['nullable', 'string', 'max:500'],
         ]);
 
         $batch = ItemBatch::findOrFail($batchId);
         $inspection = QualityInspection::where('item_batch_id', $batch->id)
-            ->where('inspection_status', 'pending_sample')
-            ->first();
-
-        if (!$inspection) {
-            $inspection = QualityInspection::where('item_id', $batch->item_id)
-                ->where('inspection_status', 'pending_sample')
-                ->firstOrFail();
-        }
+            ->whereIn('inspection_status', ['pending_sample', 'partially_disposed'])
+            ->firstOrFail();
 
         try {
             $released = $this->qcService->releaseLot(
@@ -51,11 +47,12 @@ class QualityControlController extends Controller implements HasMiddleware
                 (int) $validated['accepted_quantity'],
                 (int) $validated['target_location_id'],
                 $request->user(),
-                $validated['findings'] ?? null
+                $validated['findings'] ?? null,
+                $validated['decision_key'] ?? null
             );
 
             return response()->json([
-                'message' => 'Stock released from quarantine to unrestricted inventory.',
+                'message' => 'QC accepted stock is awaiting put-away.',
                 'data' => $released->load(['item', 'batch']),
             ]);
         } catch (DomainException $e) {
@@ -65,8 +62,10 @@ class QualityControlController extends Controller implements HasMiddleware
 
     public function releaseInspection(Request $request, QualityInspection $inspection): JsonResponse
     {
+        $request->merge(['decision_key' => $request->input('decision_key', $request->header('Idempotency-Key'))]);
         $validated = $request->validate([
             'accepted_quantity' => ['required', 'integer', 'min:1'],
+            'decision_key' => ['nullable', 'string', 'max:100'],
             'target_location_id' => ['required', 'exists:storage_locations,id'],
             'findings' => ['nullable', 'string', 'max:500'],
         ]);
@@ -77,11 +76,12 @@ class QualityControlController extends Controller implements HasMiddleware
                 (int) $validated['accepted_quantity'],
                 (int) $validated['target_location_id'],
                 $request->user(),
-                $validated['findings'] ?? null
+                $validated['findings'] ?? null,
+                $validated['decision_key'] ?? null
             );
 
             return response()->json([
-                'message' => 'Inspection approved and stock released to unrestricted inventory.',
+                'message' => 'QC accepted stock is awaiting put-away.',
                 'data' => $released->load(['item', 'batch']),
             ]);
         } catch (DomainException $e) {
@@ -91,8 +91,10 @@ class QualityControlController extends Controller implements HasMiddleware
 
     public function rejectInspection(Request $request, QualityInspection $inspection): JsonResponse
     {
+        $request->merge(['decision_key' => $request->input('decision_key', $request->header('Idempotency-Key'))]);
         $validated = $request->validate([
             'rejected_quantity' => ['required', 'integer', 'min:1'],
+            'decision_key' => ['nullable', 'string', 'max:100'],
             'rejection_reason' => ['required', 'string', 'max:500'],
         ]);
 
@@ -101,7 +103,8 @@ class QualityControlController extends Controller implements HasMiddleware
                 $inspection,
                 (int) $validated['rejected_quantity'],
                 $validated['rejection_reason'],
-                $request->user()
+                $request->user(),
+                $validated['decision_key'] ?? null
             );
 
             return response()->json([

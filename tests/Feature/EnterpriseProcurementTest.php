@@ -30,6 +30,10 @@ use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Models\SupplierQuote;
 use App\Models\User;
+use App\Models\WarehouseTask;
+use App\Services\Inventory\GoodsReceiptService;
+use App\Services\Inventory\QualityControlService;
+use App\Services\Warehouse\WarehouseTaskService;
 use App\Services\Procurement\ApprovalRoutingEngine;
 use App\Services\Procurement\EvaluationEngine;
 use App\Services\Procurement\POConversionService;
@@ -782,17 +786,43 @@ class EnterpriseProcurementTest extends TestCase
         $this->actingAs($manager)->post("/inventory/purchases/{$po->id}/receive", [
             'storage_location_id' => $location->id,
             'notes' => 'Shipment received at main warehouse dock',
-        ])->assertRedirect('/inventory/purchases');
+        ])->assertRedirect(route('inventory.receiving.index', ['purchase_order_id' => $po->id]));
+
+        $this->assertSame(0, (int) $itemA->fresh()->quantity_on_hand);
+        $this->assertSame(0, (int) $itemB->fresh()->quantity_on_hand);
+        $grn = app(GoodsReceiptService::class)->receiveOrder($po, [
+            'lines' => [
+                ['po_line_id' => $lineA->id, 'received_quantity' => 50,
+                    'batch_number' => 'LOT-ALPHA-50', 'expiry_date' => now()->addYear()->toDateString()],
+                ['po_line_id' => $lineB->id, 'received_quantity' => 100,
+                    'batch_number' => 'LOT-BETA-100', 'expiry_date' => now()->addYear()->toDateString()],
+            ],
+        ], $manager);
+        $this->assertSame(PurchaseOrderStatus::UnderInspection->value, $po->fresh()->status);
+        $qc = app(QualityControlService::class);
+        $tasks = app(WarehouseTaskService::class);
+        foreach ($grn->lines as $receivedLine) {
+            $inspection = $receivedLine->inspections()->firstOrFail();
+            $qc->releaseLot($inspection, $receivedLine->received_quantity, $location->id, $manager);
+            $this->assertSame(0, (int) $receivedLine->item->fresh()->quantity_on_hand);
+            $task = WarehouseTask::where('reference_type', $inspection->getMorphClass())
+                ->where('reference_id', $inspection->id)->firstOrFail();
+            $tasks->start($task, $manager);
+            $tasks->scan($task, 'LOC-STAGING', $manager);
+            $tasks->scan($task, $receivedLine->item->sku, $manager);
+            $tasks->scan($task, $location->code, $manager);
+            $tasks->complete($task, $receivedLine->calculatedReceivedBaseQuantity(), $manager);
+        }
 
         $lineA->refresh();
         $lineB->refresh();
         $po->refresh();
 
         $this->assertEquals(50, $lineA->received_quantity);
-        $this->assertSame('received', $lineA->line_status);
+        $this->assertSame('accepted', $lineA->line_status);
         $this->assertEquals(100, $lineB->received_quantity);
-        $this->assertSame('received', $lineB->line_status);
-        $this->assertSame('received', $po->status);
+        $this->assertSame('accepted', $lineB->line_status);
+        $this->assertSame(PurchaseOrderStatus::Fulfilled->value, $po->status);
         $this->assertNotNull($po->received_at);
 
         // Verify stock ledgers updated via InventoryAutomationService
@@ -812,12 +842,12 @@ class EnterpriseProcurementTest extends TestCase
 
         $this->assertDatabaseHas('stock_movements', [
             'item_id' => $itemA->id,
-            'movement_type' => 'stock_in',
+            'movement_type' => 'quarantine',
             'quantity' => 50,
         ]);
         $this->assertDatabaseHas('stock_movements', [
             'item_id' => $itemB->id,
-            'movement_type' => 'stock_in',
+            'movement_type' => 'quarantine',
             'quantity' => 100,
         ]);
     }

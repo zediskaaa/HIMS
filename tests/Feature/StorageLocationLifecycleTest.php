@@ -19,6 +19,10 @@ use App\Models\StockTransfer;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Models\WarehouseTask;
+use App\Services\Inventory\GoodsReceiptService;
+use App\Services\Inventory\QualityControlService;
+use App\Services\Warehouse\WarehouseTaskService;
 use App\Services\InventoryAutomationService;
 use App\Services\Inventory\TransferService;
 use Carbon\Carbon;
@@ -37,6 +41,26 @@ class StorageLocationLifecycleTest extends TestCase
     private User $staff;
     private InventoryAutomationService $automationService;
     private TransferService $transferService;
+
+    private function receiveInto(PurchaseOrder $po, StorageLocation $destination, int $quantity): void
+    {
+        $line = $po->lines()->firstOrFail();
+        $grn = app(GoodsReceiptService::class)->receiveOrder($po, [
+            'destination_location_id' => $destination->id,
+            'lines' => [['po_line_id' => $line->id, 'received_quantity' => $quantity,
+                'batch_number' => 'LOT-'.$po->id, 'expiry_date' => now()->addYear()->toDateString()]],
+        ], $this->staff);
+        $this->assertSame(0, $line->item->fresh()->quantity_on_hand);
+        $inspection = $grn->lines()->firstOrFail()->inspections()->firstOrFail();
+        app(QualityControlService::class)->releaseLot($inspection, $quantity, $destination->id, $this->manager);
+        $task = WarehouseTask::where('reference_type', $inspection->getMorphClass())->where('reference_id', $inspection->id)->firstOrFail();
+        $tasks = app(WarehouseTaskService::class);
+        $tasks->start($task, $this->staff);
+        $tasks->scan($task, 'LOC-STAGING', $this->staff);
+        $tasks->scan($task, $line->item->sku, $this->staff);
+        $tasks->scan($task, $destination->code, $this->staff);
+        $tasks->complete($task, $quantity, $this->staff);
+    }
 
     protected function setUp(): void
     {
@@ -264,20 +288,24 @@ class StorageLocationLifecycleTest extends TestCase
             'purchase_order_id' => $po->id,
             'line_number' => 1,
             'item_id' => $item->id,
-            'quantity_ordered' => 20,
+            'ordered_quantity' => 20,
             'received_quantity' => 0,
             'unit_cost' => 50.00,
             'subtotal' => 1000.00,
             'line_status' => 'pending',
         ]);
 
-        // Receiving PO targeting the inactive location must be rejected
-        $response = $this->actingAs($this->staff)
-            ->post(route('inventory.purchases.receive', $po), [
-                'location_id' => $inactiveLoc->id,
-            ]);
-
-        $response->assertSessionHasErrors('receive');
+        // A GRN cannot nominate an inactive final destination.
+        try {
+            app(GoodsReceiptService::class)->receiveOrder($po, [
+                'destination_location_id' => $inactiveLoc->id,
+                'lines' => [['po_line_id' => $po->lines()->firstOrFail()->id, 'received_quantity' => 20,
+                    'batch_number' => 'LOT-INACTIVE-20', 'expiry_date' => now()->addYear()->toDateString()]],
+            ], $this->staff);
+            $this->fail('Inactive destination was accepted.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('lines', $exception->errors());
+        }
         $this->assertNotSame('received', $po->fresh()->status);
         $this->assertEquals(0, ItemStockLevel::where('storage_location_id', $inactiveLoc->id)->where('item_id', $item->id)->value('quantity') ?? 0);
     }
@@ -462,13 +490,8 @@ class StorageLocationLifecycleTest extends TestCase
             'line_status' => 'pending',
         ]);
 
-        $response = $this->actingAs($this->staff)
-            ->post(route('inventory.purchases.receive', $po), [
-                'location_id' => $activeLoc->id,
-            ]);
-
-        $response->assertSessionHas('success');
-        $this->assertContains($po->fresh()->status, ['received', PurchaseOrderStatus::Fulfilled->value]);
+        $this->receiveInto($po, $activeLoc, 10);
+        $this->assertSame(PurchaseOrderStatus::Fulfilled->value, $po->fresh()->status);
         $this->assertEquals(10, ItemStockLevel::where('storage_location_id', $activeLoc->id)->where('item_id', $item->id)->value('quantity'));
     }
 
@@ -510,12 +533,7 @@ class StorageLocationLifecycleTest extends TestCase
         ]);
 
         // Receiving now succeeds into reactivated location
-        $response = $this->actingAs($this->staff)
-            ->post(route('inventory.purchases.receive', $po), [
-                'location_id' => $location->id,
-            ]);
-
-        $response->assertSessionHas('success');
+        $this->receiveInto($po, $location, 16);
         $this->assertEquals(16, ItemStockLevel::where('storage_location_id', $location->id)->where('item_id', $item->id)->value('quantity'));
     }
 
@@ -633,13 +651,17 @@ class StorageLocationLifecycleTest extends TestCase
         $this->assertDatabaseHas('purchase_orders', ['id' => $po->id, 'po_number' => 'PO-PENDING-001']);
         $this->assertDatabaseHas('po_line_items', ['purchase_order_id' => $po->id, 'ordered_quantity' => 24]);
 
-        // Receiving into the inactive location is blocked
-        $response = $this->actingAs($this->staff)
-            ->post(route('inventory.purchases.receive', $po), [
-                'location_id' => $location->id,
-            ]);
-
-        $response->assertSessionHasErrors('receive');
+        // Receiving into the inactive location is blocked without changing the PO.
+        try {
+            app(GoodsReceiptService::class)->receiveOrder($po, [
+                'destination_location_id' => $location->id,
+                'lines' => [['po_line_id' => $po->lines()->firstOrFail()->id, 'received_quantity' => 24,
+                    'batch_number' => 'LOT-INACTIVE-24', 'expiry_date' => now()->addYear()->toDateString()]],
+            ], $this->staff);
+            $this->fail('Inactive destination was accepted.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('lines', $exception->errors());
+        }
         $this->assertSame(PurchaseOrderStatus::Approved->value, $po->fresh()->status);
     }
 

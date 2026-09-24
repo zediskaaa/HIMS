@@ -61,6 +61,11 @@ class QualityInspection extends Model
         return $this->inspection_status === 'rejected';
     }
 
+    public function warehouseTasks(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(WarehouseTask::class, 'reference');
+    }
+
     public function getSampleSizeAttribute(): int
     {
         return (int) ($this->sample_quantity ?? 0);

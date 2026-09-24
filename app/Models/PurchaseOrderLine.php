@@ -22,6 +22,8 @@ class PurchaseOrderLine extends Model
         'conversion_factor',
         'ordered_quantity',
         'received_quantity',
+        'accepted_quantity',
+        'rejected_quantity',
         'invoiced_quantity',
         'unit_price',
         'total_line_amount',
@@ -33,6 +35,8 @@ class PurchaseOrderLine extends Model
         'conversion_factor' => 'decimal:4',
         'ordered_quantity' => 'integer',
         'received_quantity' => 'integer',
+        'accepted_quantity' => 'integer',
+        'rejected_quantity' => 'integer',
         'invoiced_quantity' => 'integer',
         'unit_price' => 'decimal:2',
         'total_line_amount' => 'decimal:2',
@@ -60,7 +64,12 @@ class PurchaseOrderLine extends Model
 
     public function remainingQuantity(): int
     {
-        return max(0, $this->ordered_quantity - $this->received_quantity);
+        return max(0, $this->ordered_quantity - $this->received_quantity + $this->rejected_quantity);
+    }
+
+    public function outstandingQuantity(): int
+    {
+        return max(0, $this->ordered_quantity - $this->accepted_quantity);
     }
 
     public function conversionFactor(): float
@@ -82,7 +91,7 @@ class PurchaseOrderLine extends Model
 
     public function remainingBaseQuantity(): int
     {
-        return max(0, $this->orderedBaseQuantity() - $this->receivedBaseQuantity());
+        return (int) round($this->remainingQuantity() * $this->conversionFactor());
     }
 
     public function lineTotal(): float

@@ -284,7 +284,7 @@ class DocumentTrackingAndLogisticsTest extends TestCase
         $this->assertEquals($custodian->id, $iar->fresh()->accepted_by_id);
     }
 
-    public function test_custodial_acceptance_posts_inventory_movements_and_updates_stock(): void
+    public function test_custodial_acceptance_records_qc_disposition_without_posting_stock(): void
     {
         extract($this->createSetup());
 
@@ -330,13 +330,12 @@ class DocumentTrackingAndLogisticsTest extends TestCase
             'delivery_status' => 'complete',
         ], $custodian);
 
-        $this->assertDatabaseHas('stock_movements', [
+        $this->assertDatabaseMissing('stock_movements', [
             'item_id' => $item->id,
             'movement_type' => MovementType::StockIn->value,
-            'quantity' => 20,
         ]);
-
-        $this->assertEquals('posted', $grn->fresh()->receipt_status);
+        $this->assertEquals('received', $grn->fresh()->receipt_status);
+        $this->assertEquals('accepted', $iar->fresh()->status);
     }
 
     public function test_logistics_document_upload_calculates_sha256_and_sets_nap_retention(): void
