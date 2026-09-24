@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Str;
 
 class ChainOfCustodyService
@@ -42,8 +41,7 @@ class ChainOfCustodyService
                 'package_condition' => $data['package_condition'] ?? 'good_order',
                 'verification_method' => $data['verification_method'] ?? 'credential_auth',
                 'notes' => $data['notes'] ?? null,
-                'ip_address' => Request::ip() ?? '127.0.0.1',
-                'user_agent' => Request::userAgent() ?? 'System / Console',
+                'user_agent' => request()->userAgent() ?? 'System / Console',
             ]);
 
             $this->auditLogger->record(

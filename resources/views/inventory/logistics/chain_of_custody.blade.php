@@ -189,9 +189,6 @@
                                         {{ $log->user_agent ?: 'System Console' }}
                                     </div>
                                     <div class="mt-0.5 flex items-center gap-1.5 text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">
-                                        @if($log->ip_address)
-                                            <span>IP: {{ $log->ip_address }}</span>
-                                        @endif
                                         @if($log->verification_method)
                                             <span class="rounded bg-neutral-100 px-1.5 py-0.5 text-[9px] font-sans text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
                                                 {{ ucwords(str_replace('_', ' ', $log->verification_method)) }}

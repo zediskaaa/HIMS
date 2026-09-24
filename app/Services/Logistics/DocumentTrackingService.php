@@ -332,6 +332,19 @@ class DocumentTrackingService
                 'file' => ['Invalid document format. Only PDF, JPG, PNG, and WebP files are permitted.'],
             ]);
         }
+
+        if ($mime === 'application/pdf') {
+            $contents = file_get_contents($file->getRealPath());
+            $hasPdfHeader = is_string($contents) && str_starts_with(ltrim($contents), '%PDF-');
+            $hasPlainPageObject = $hasPdfHeader && preg_match('/\/Type\s*\/Page\b/', $contents) === 1;
+            $hasPageContents = $hasPdfHeader && preg_match('/\/Contents\b/', $contents) === 1;
+
+            if (! $hasPdfHeader || ($hasPlainPageObject && ! $hasPageContents)) {
+                throw ValidationException::withMessages([
+                    'file' => ['The uploaded PDF has no renderable page content. Upload a PDF containing text or images.'],
+                ]);
+            }
+        }
     }
 
     private function determineRetentionClass(DocumentType $type): string

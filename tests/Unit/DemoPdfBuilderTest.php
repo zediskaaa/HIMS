@@ -27,4 +27,14 @@ class DemoPdfBuilderTest extends TestCase
         $this->assertStringContainsString('(VER-2026-881) Tj', $pdf);
         $this->assertStringNotContainsString('('.$longItemName.') Tj', $pdf);
     }
+
+    public function test_generated_pdf_contains_renderable_page_content(): void
+    {
+        $pdf = DemoPdfBuilder::create('Logistics record', [
+            ['heading' => 'DETAILS', 'lines' => ['Reference: TEST-001']],
+        ]);
+
+        $this->assertMatchesRegularExpression('/\/Type\s*\/Page\b/', $pdf);
+        $this->assertStringContainsString('/Contents', $pdf);
+    }
 }

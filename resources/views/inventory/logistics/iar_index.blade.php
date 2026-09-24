@@ -192,14 +192,18 @@
                                             <div class="text-neutral-500">{{ $iar->coa_transmitted_at->format('M d, Y') }}</div>
                                             <div class="font-mono text-[10px] text-neutral-400">Rec: {{ $iar->coa_received_by }}</div>
                                         @elseif($iar->isAccepted())
-                                            @if($iar->isCoaDeadlineUrgent())
+                                            @if(!$iar->coa_transmittal_deadline_at)
+                                                <span class="text-neutral-400">Deadline not recorded</span>
+                                            @elseif($iar->isCoaDeadlineOverdue())
                                                 <span class="inline-flex rounded bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">
-                                                    <x-ui.icon name="exclamation-triangle" class="inline-block h-3.5 w-3.5 align-text-bottom" /> OVERDUE (&gt;5 Days)
+                                                    <x-ui.icon name="exclamation-triangle" class="inline-block h-3.5 w-3.5 align-text-bottom" /> OVERDUE
                                                 </span>
-                                            @else
+                                            @elseif($iar->isCoaDeadlineDueWithin())
                                                 <span class="inline-flex rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
                                                     ⏳ Due within 5 days
                                                 </span>
+                                            @else
+                                                <span class="text-neutral-500">Due {{ $iar->coa_transmittal_deadline_at->format('M d, Y') }}</span>
                                             @endif
                                         @else
                                             <span class="text-neutral-300">N/A</span>

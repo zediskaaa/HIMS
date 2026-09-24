@@ -14,16 +14,16 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // System-owned and idempotent. It is seeded separately from demo data
-        // so production setup can run only SuperAdminSeeder when appropriate.
+        // Production receives system-owned account provisioning only.
         $this->call(SuperAdminSeeder::class);
-
         $this->call(OwnerAdminSeeder::class);
 
-        $this->call(DemoUserSeeder::class);
+        if (app()->environment('production')) {
+            return;
+        }
 
-        $this->call(InventoryDemoSeeder::class);
-        $this->call(DemandForecastDemoSeeder::class);
-        $this->call(SupplierManagementDemoSeeder::class);
+        // Keep one canonical local/demo entry point so a normal db:seed cannot
+        // leave later modules missing while earlier demo modules appear ready.
+        $this->call(ComprehensiveDemoSeeder::class);
     }
 }

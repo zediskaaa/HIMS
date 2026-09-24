@@ -20,37 +20,28 @@ use App\Models\User;
 use App\Support\DemoPdfBuilder;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 class LogisticsDemoSeeder extends Seeder
 {
     public function run(): void
     {
         // 1. Ensure realistic users exist
-        $inventoryManager = User::active()->role(UserRole::InventoryManager)->oldest('id')->first() ?? User::firstOrCreate(
-            ['email' => 'manager.inv@hims.local'],
-            [
-                'name' => 'Dr. Maria Santos, RPh',
-                'password' => bcrypt('Password123!'),
-                'role' => UserRole::InventoryManager,
-                'status' => 'active',
-                'email_verified_at' => now(),
-            ]
-        );
+        $inventoryManager = User::active()->role(UserRole::InventoryManager)->oldest('id')->first();
+        $warehouseStaff = User::active()->role(UserRole::WarehouseStaff)->oldest('id')->first();
 
-        $warehouseStaff = User::active()->role(UserRole::WarehouseStaff)->oldest('id')->first() ?? User::firstOrCreate(
-            ['email' => 'dock.officer@hims.local'],
-            [
-                'name' => 'Eduardo Reyes',
-                'password' => bcrypt('Password123!'),
-                'role' => UserRole::WarehouseStaff,
-                'status' => 'active',
-                'email_verified_at' => now(),
-            ]
-        );
+        if (! $inventoryManager || ! $warehouseStaff) {
+            throw new RuntimeException('Logistics demo data requires configured active Inventory Manager and Warehouse Staff accounts.');
+        }
 
         // 2. Ensure realistic Healthcare Suppliers
-        $zuellig = Supplier::firstOrCreate(
-            ['name' => 'Zuellig Pharma Philippines, Inc.'],
+        $zuellig = InventoryItem::query()->with('supplier')->where('sku', 'VAC-RAB-VER05')->first()?->supplier
+            ?? Supplier::query()->whereIn('name', [
+                'Pan-Island Pharmaceuticals Distribution Corp.',
+                'Zuellig Pharma Philippines, Inc.',
+            ])->first()
+            ?? Supplier::firstOrCreate(
+            ['name' => 'Pan-Island Pharmaceuticals Distribution Corp.'],
             [
                 'contact_person' => 'Roberto Cruz',
                 'email' => 'orders@zuelligpharma.com.ph',
@@ -60,8 +51,13 @@ class LogisticsDemoSeeder extends Seeder
             ]
         );
 
-        $metroDrug = Supplier::firstOrCreate(
-            ['name' => 'Metro Drug, Inc.'],
+        $metroDrug = InventoryItem::query()->with('supplier')->where('sku', 'ANT-MER-1G00')->first()?->supplier
+            ?? Supplier::query()->whereIn('name', [
+                'Archipelago Health Drug Distribution Inc.',
+                'Metro Drug, Inc.',
+            ])->first()
+            ?? Supplier::firstOrCreate(
+            ['name' => 'Archipelago Health Drug Distribution Inc.'],
             [
                 'contact_person' => 'Corazon Ramos',
                 'email' => 'hospital_sales@metrodrug.com.ph',
@@ -154,7 +150,7 @@ class LogisticsDemoSeeder extends Seeder
                 'ors_burs_number' => 'ORS-2026-09-00941',
                 'penalty_clause_rate' => 0.00100,
                 'conforme_date' => now()->subDays(5)->toDateString(),
-                'conforme_signed_by' => 'Roberto Cruz (VP Sales, Zuellig Pharma)',
+                'conforme_signed_by' => $zuellig->contact_person ?: $zuellig->name,
                 'notes' => 'Standard COA GAM App. 61 terms with 1/10 of 1% liquidated damages per calendar day of delay.',
             ]
         );
@@ -176,14 +172,14 @@ class LogisticsDemoSeeder extends Seeder
             [
                 'purchase_order_id' => $poRabies->id,
                 'supplier_id' => $zuellig->id,
-                'carrier_name' => 'Zuellig Pharma Cold Logistics',
+                'carrier_name' => $zuellig->trade_name ?: $zuellig->name,
                 'tracking_number' => 'ZP-CL-8899221',
                 'waybill_number' => 'WB-MNL-00912',
                 'vehicle_plate_number' => 'NDO-9821',
                 'driver_name' => 'Danilo Bautista',
                 'driver_contact' => '+63 917 555 1234',
                 'sscc' => '000123456700000015',
-                'origin_address' => 'Zuellig Pharma National Distribution Center, Santa Rosa, Laguna',
+                'origin_address' => $zuellig->address,
                 'destination_facility' => 'HIMS Central Receiving Dock',
                 'dispatch_date' => now()->subDay()->toDateString(),
                 'estimated_delivery_date' => now()->toDateString(),
@@ -216,7 +212,7 @@ class LogisticsDemoSeeder extends Seeder
                 'transit_temp_min' => 3.4,
                 'transit_temp_max' => 5.6,
                 'temp_excursion' => false,
-                'carrier_name' => 'Zuellig Pharma Cold Logistics',
+                'carrier_name' => $zuellig->trade_name ?: $zuellig->name,
                 'notes' => 'Received at central cold storage loading bay.',
             ]
         );
@@ -259,11 +255,11 @@ class LogisticsDemoSeeder extends Seeder
                 'trackable_type' => Shipment::class,
                 'trackable_id' => $shipmentRabies->id,
                 'event_type' => 'dock_arrival',
-                'releasing_party_name' => 'Danilo Bautista (Zuellig Fleet)',
+                'releasing_party_name' => ($zuellig->contact_person ?: $zuellig->name).' (Supplier Fleet)',
                 'receiving_user_id' => $warehouseStaff->id,
                 'receiving_party_name' => $warehouseStaff->name.' (Receiving Officer)',
                 'transferred_at' => now()->subHours(2),
-                'origin_location' => 'Zuellig Santa Rosa Logistics Hub',
+                'origin_location' => $zuellig->address,
                 'destination_location' => 'HIMS Central Receiving Dock Bay 1',
                 'package_condition' => 'good_order',
                 'verification_method' => 'credential_auth',
@@ -290,7 +286,7 @@ class LogisticsDemoSeeder extends Seeder
                 'ors_burs_number' => 'ORS-2026-08-00812',
                 'penalty_clause_rate' => 0.00100,
                 'conforme_date' => now()->subDays(30)->toDateString(),
-                'conforme_signed_by' => 'Corazon Ramos (Metro Drug Sales)',
+                'conforme_signed_by' => $metroDrug->contact_person ?: $metroDrug->name,
                 'notes' => 'COA GAM App. 61 Liquidated Damages Clause: 1/10 of 1% (0.001) per day of delay on total value.',
             ]
         );
@@ -318,7 +314,7 @@ class LogisticsDemoSeeder extends Seeder
                 'driver_name' => 'Arnel Pineda',
                 'driver_contact' => '+63 918 888 4321',
                 'sscc' => '376123450000100082',
-                'origin_address' => 'Metro Drug Central Distribution Facility, Sta. Rosa',
+                'origin_address' => $metroDrug->address,
                 'destination_facility' => 'HIMS Central Receiving Dock',
                 'dispatch_date' => now()->subDays(5)->toDateString(),
                 'estimated_delivery_date' => now()->subDays(14)->toDateString(),
@@ -387,23 +383,22 @@ class LogisticsDemoSeeder extends Seeder
         // 7. Seed Authentic PDF Records in Storage
         Storage::disk('local')->makeDirectory('logistics_documents');
 
-        $drPdfContent = DemoPdfBuilder::createDeliveryReceipt($grnRabies);
+        if (! LogisticsDocument::where('tracking_number', 'DOC-DR-202609-00001')->exists()) {
+            $drPdfContent = DemoPdfBuilder::createDeliveryReceipt($grnRabies);
+            $docPath1 = 'logistics_documents/demo_dr_889922.pdf';
+            Storage::disk('local')->put($docPath1, $drPdfContent);
 
-        $docPath1 = 'logistics_documents/demo_dr_889922.pdf';
-        Storage::disk('local')->put($docPath1, $drPdfContent);
-
-        $doc1 = LogisticsDocument::updateOrCreate(
-            ['tracking_number' => 'DOC-DR-202609-00001'],
-            [
+            LogisticsDocument::create([
+                'tracking_number' => 'DOC-DR-202609-00001',
                 'document_type' => DocumentType::DeliveryReceipt,
                 'reference_number' => 'DR-ZP-889922',
-                'title' => 'Zuellig Pharma Delivery Receipt DR-ZP-889922',
+                'title' => $zuellig->name.' Delivery Receipt DR-ZP-889922',
                 'purchase_order_id' => $poRabies->id,
                 'goods_receipt_note_id' => $grnRabies->id,
                 'supplier_id' => $zuellig->id,
                 'file_path' => $docPath1,
                 'file_name' => 'demo_dr_889922.pdf',
-                'original_name' => 'Zuellig_DR_889922.pdf',
+                'original_name' => 'DR-ZP-889922_HIMS.pdf',
                 'file_size_bytes' => strlen($drPdfContent),
                 'mime_type' => 'application/pdf',
                 'disk' => 'local',
@@ -416,58 +411,25 @@ class LogisticsDemoSeeder extends Seeder
                 'retention_class' => 'operational_2yr',
                 'retention_until' => now()->addYears(2),
                 'verification_notes' => 'DR matches PO quantities and physical shipment stamp.',
-            ]
-        );
+            ]);
+        }
 
-        $siPdfContent = DemoPdfBuilder::create(
-            title: 'ZUELLIG PHARMA PHILIPPINES, INC. - ELECTRONIC SALES INVOICE',
-            sections: [
-                [
-                    'heading' => 'TAXPAYER & INVOICE DETAILS',
-                    'lines' => [
-                        'Seller: Zuellig Pharma Philippines, Inc. | VAT Reg TIN: 000-123-456-000',
-                        'Customer: Hospital Information Management System | Fund Cluster: 01 Regular Agency Fund',
-                        'Billing Address: Central Medical Logistics & Supply Division, Manila, Philippines',
-                        'Purchase Order Ref: PO-2026-09-0145 | Invoice Date: '.now()->toDateString().' | Terms: Net 30 Days',
-                    ],
-                ],
-                [
-                    'heading' => 'INVOICED LINE ITEMS & VALUES',
-                    'table' => [
-                        'headers' => ['Item Description', 'Qty / Unit', 'Unit Price', 'Tax Status', 'Total (PHP)'],
-                        'rows' => [
-                            ['Verorab Inactivated Rabies Vaccine 0.5mL Vial', '500 vials', '1,450.00', 'VAT-Exempt', '725,000.00'],
-                        ],
-                    ],
-                ],
-                [
-                    'heading' => 'FINANCIAL SUMMARY & BIR CERTIFICATION',
-                    'lines' => [
-                        'Total Net Amount Due: PHP 725,000.00 (Seven Hundred Twenty-Five Thousand Pesos Only)',
-                        'VAT Status: Zero-Rated / Exempt under Republic Act 10963 (TRAIN Law)',
-                        'Payment Terms: Net 30 Calendar Days via Authorized Government Depository Bank (LBP)',
-                        'BIR Digital Certification: Official electronic invoice archived pursuant to RA 11976 regulations.',
-                    ],
-                ],
-            ],
-            subtitle: 'BIR Electronic Invoice (RA 11976 Ease of Paying Taxes Compliant) | SI No: SI-2026-088192'
-        );
+        if (! LogisticsDocument::where('tracking_number', 'DOC-INV-202609-00002')->exists()) {
+            $siPdfContent = DemoPdfBuilder::createSalesInvoice($grnRabies);
+            $docPath2 = 'logistics_documents/demo_si_088192.pdf';
+            Storage::disk('local')->put($docPath2, $siPdfContent);
 
-        $docPath2 = 'logistics_documents/demo_si_088192.pdf';
-        Storage::disk('local')->put($docPath2, $siPdfContent);
-
-        $doc2 = LogisticsDocument::updateOrCreate(
-            ['tracking_number' => 'DOC-INV-202609-00002'],
-            [
+            LogisticsDocument::create([
+                'tracking_number' => 'DOC-INV-202609-00002',
                 'document_type' => DocumentType::SalesInvoice,
                 'reference_number' => 'SI-2026-088192',
-                'title' => 'Zuellig Pharma BIR Electronic Sales Invoice SI-2026-088192',
+                'title' => $zuellig->name.' Sales Invoice SI-2026-088192',
                 'purchase_order_id' => $poRabies->id,
                 'goods_receipt_note_id' => $grnRabies->id,
                 'supplier_id' => $zuellig->id,
                 'file_path' => $docPath2,
                 'file_name' => 'demo_si_088192.pdf',
-                'original_name' => 'Zuellig_SI_088192_BIR_RA11976.pdf',
+                'original_name' => 'SI-2026-088192_HIMS.pdf',
                 'file_size_bytes' => strlen($siPdfContent),
                 'mime_type' => 'application/pdf',
                 'disk' => 'local',
@@ -477,7 +439,7 @@ class LogisticsDemoSeeder extends Seeder
                 'uploaded_by_id' => $warehouseStaff->id,
                 'retention_class' => 'tax_invoice_5yr',
                 'retention_until' => now()->addYears(5),
-            ]
-        );
+            ]);
+        }
     }
 }

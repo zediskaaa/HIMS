@@ -29,7 +29,6 @@ class ChainOfCustodyLog extends Model
         'package_condition',
         'verification_method',
         'notes',
-        'ip_address',
         'user_agent',
     ];
 

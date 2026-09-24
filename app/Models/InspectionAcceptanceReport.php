@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -103,15 +102,29 @@ class InspectionAcceptanceReport extends Model
         return ! empty($this->coa_transmitted_at);
     }
 
+    public function isCoaDeadlineOverdue(): bool
+    {
+        return ! $this->isCoaTransmitted()
+            && $this->coa_transmittal_deadline_at !== null
+            && $this->coa_transmittal_deadline_at->startOfDay()->lt(today());
+    }
+
+    public function isCoaDeadlineDueWithin(int $days = 5): bool
+    {
+        if ($this->isCoaTransmitted() || $this->coa_transmittal_deadline_at === null) {
+            return false;
+        }
+
+        $deadline = $this->coa_transmittal_deadline_at->startOfDay();
+
+        return $deadline->gte(today()) && $deadline->lte(today()->addDays($days));
+    }
+
     /**
      * Determine if COA 5-day transmittal window is expiring soon or overdue.
      */
     public function isCoaDeadlineUrgent(): bool
     {
-        if ($this->isCoaTransmitted() || empty($this->coa_transmittal_deadline_at)) {
-            return false;
-        }
-
-        return Carbon::parse($this->coa_transmittal_deadline_at)->diffInDays(now(), false) >= -2;
+        return $this->isCoaDeadlineOverdue() || $this->isCoaDeadlineDueWithin(2);
     }
 }

@@ -41,11 +41,6 @@ class DemoPdfBuilder
      */
     public static function create(string $title, array $sections, ?string $subtitle = null): string
     {
-        // Detect if this document is an Electronic Sales Invoice
-        if (self::isElectronicSalesInvoice($title, $subtitle, $sections)) {
-            return (new self())->renderElectronicSalesInvoice($title, $subtitle, $sections);
-        }
-
         return (new self())->renderGeneralDocument($title, $subtitle, $sections);
     }
 
@@ -108,6 +103,64 @@ class DemoPdfBuilder
                 ['heading' => 'RECEIVING & INSPECTION STATUS', 'lines' => $inspectionLines],
             ],
             subtitle: 'HIMS Goods Receipt '.$receipt->grn_number.' | DR No: '.($receipt->dr_number ?: $receipt->packing_slip_number ?: 'Not recorded'),
+        );
+    }
+
+    /**
+     * Build a sales invoice summary using only values linked to the receiving record.
+     */
+    public static function createSalesInvoice(GoodsReceiptNote $receipt): string
+    {
+        $receipt->loadMissing(['supplier', 'purchaseOrder', 'receivedBy', 'lines.item']);
+
+        $invoiceDetails = collect([
+            'Supplier: '.($receipt->supplier?->name ?? 'Not recorded'),
+            $receipt->supplier?->tax_number ? 'Supplier TIN: '.$receipt->supplier->tax_number : null,
+            'Sales Invoice No: '.($receipt->sales_invoice_number ?: 'Not recorded'),
+            'Purchase Order Ref: '.($receipt->purchaseOrder?->po_number ?? 'Not recorded'),
+            'Linked Goods Receipt: '.$receipt->grn_number,
+            $receipt->received_at ? 'Received Date: '.$receipt->received_at->format('Y-m-d H:i') : null,
+            $receipt->purchaseOrder?->payment_terms ? 'Payment Terms: '.$receipt->purchaseOrder->payment_terms : null,
+        ])->filter()->values()->all();
+
+        $total = 0.0;
+        $rows = $receipt->lines->map(function (GoodsReceiptNoteLine $line) use (&$total): array {
+            $unit = $line->purchase_unit ?: ($line->item?->unit ?: 'unit');
+            $quantity = (int) $line->received_quantity;
+            $unitCost = (float) $line->unit_cost;
+            $lineTotal = $quantity * $unitCost;
+            $total += $lineTotal;
+
+            return [
+                $line->item?->name ?? 'Item record unavailable',
+                $line->item?->sku ?? '',
+                $quantity.' '.$unit,
+                number_format($unitCost, 2),
+                number_format($lineTotal, 2),
+            ];
+        })->all();
+
+        $summary = collect([
+            'Total Invoice Value: PHP '.number_format($total, 2),
+            'Receiving Status: '.Str::headline($receipt->receipt_status),
+            $receipt->receivedBy?->name ? 'Receiving Officer: '.$receipt->receivedBy->name : null,
+        ])->filter()->values()->all();
+
+        return (new self())->renderGeneralDocument(
+            title: strtoupper($receipt->supplier?->name ?? 'Supplier').' - SALES INVOICE',
+            subtitle: 'SI No: '.($receipt->sales_invoice_number ?: 'Not recorded').' | PO: '.($receipt->purchaseOrder?->po_number ?? 'Not recorded'),
+            sections: [
+                ['heading' => 'INVOICE & RECEIVING REFERENCES', 'lines' => $invoiceDetails],
+                [
+                    'heading' => 'INVOICED ITEMS',
+                    'table' => [
+                        'headers' => ['Item / Product Name', 'SKU', 'Quantity', 'Unit Price (PHP)', 'Line Total (PHP)'],
+                        'widths' => [2.7, 1.1, 1.0, 1.15, 1.2],
+                        'rows' => $rows,
+                    ],
+                ],
+                ['heading' => 'INVOICE SUMMARY', 'lines' => $summary],
+            ],
         );
     }
 

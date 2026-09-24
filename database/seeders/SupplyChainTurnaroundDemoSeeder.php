@@ -9,6 +9,7 @@ use App\Enums\RfqStatus;
 use App\Enums\SupplierStatus;
 use App\Models\CostCenter;
 use App\Models\GoodsReceiptNote;
+use App\Models\GoodsReceiptNoteLine;
 use App\Models\InspectionAcceptanceReport;
 use App\Models\InventoryItem;
 use App\Models\KpiProcessReview;
@@ -222,7 +223,7 @@ class SupplyChainTurnaroundDemoSeeder extends Seeder
         );
         $this->setTimestamps($purchaseOrder, $poCreatedAt, $receivedAt);
 
-        PurchaseOrderLine::updateOrCreate(
+        $purchaseOrderLine = PurchaseOrderLine::updateOrCreate(
             ['purchase_order_id' => $purchaseOrder->id, 'line_number' => 1],
             [
                 'pr_line_id' => $prLine->id,
@@ -252,6 +253,29 @@ class SupplyChainTurnaroundDemoSeeder extends Seeder
         );
         $this->setTimestamps($goodsReceipt, $receivedAt, $receivedAt);
 
+        $goodsReceiptLine = GoodsReceiptNoteLine::updateOrCreate(
+            [
+                'goods_receipt_note_id' => $goodsReceipt->id,
+                'po_line_id' => $purchaseOrderLine->id,
+            ],
+            [
+                'item_id' => $item->id,
+                'purchase_unit' => $item->unit ?? 'unit',
+                'conversion_factor' => 1,
+                'ordered_quantity' => $quantity,
+                'shipped_quantity' => $quantity,
+                'received_quantity' => $quantity,
+                'received_base_quantity' => $quantity,
+                'accepted_quantity' => $quantity,
+                'rejected_quantity' => 0,
+                'quarantined_quantity' => 0,
+                'unit_cost' => $unitCost,
+                'status' => 'accepted',
+                'notes' => 'Received item line supporting lifecycle turnaround evidence.',
+            ]
+        );
+        $this->setTimestamps($goodsReceiptLine, $receivedAt, $receivedAt);
+
         $inspectionReport = InspectionAcceptanceReport::updateOrCreate(
             ['iar_number' => "IAR-{$reference}"],
             [
@@ -269,6 +293,7 @@ class SupplyChainTurnaroundDemoSeeder extends Seeder
                 'status' => 'accepted',
                 'days_delayed' => max(0, $deliveryDurations[$index] - 10),
                 'liquidated_damages_amount' => 0,
+                'coa_transmittal_deadline_at' => $receivedAt->copy()->addDays(5)->toDateString(),
                 'notes' => 'Completed inspection and custodial acceptance evidence.',
             ]
         );

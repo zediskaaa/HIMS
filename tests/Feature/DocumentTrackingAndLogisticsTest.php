@@ -12,6 +12,7 @@ use App\Models\ChainOfCustodyLog;
 use App\Models\CostCenter;
 use App\Models\GoodsReceiptNote;
 use App\Models\GoodsReceiptNoteLine;
+use App\Models\InspectionAcceptanceReport;
 use App\Models\InventoryItem;
 use App\Models\LogisticsDocument;
 use App\Models\PurchaseOrder;
@@ -22,6 +23,7 @@ use App\Models\User;
 use App\Services\Logistics\DocumentTrackingService;
 use App\Services\Logistics\InspectionAcceptanceService;
 use App\Services\Logistics\ShipmentTrackingService;
+use App\Support\DemoPdfBuilder;
 use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -344,7 +346,12 @@ class DocumentTrackingAndLogisticsTest extends TestCase
         extract($this->createSetup());
 
         $service = app(DocumentTrackingService::class);
-        $file = UploadedFile::fake()->create('sales_invoice_88192.pdf', 120, 'application/pdf');
+        $file = UploadedFile::fake()->createWithContent(
+            'sales_invoice_88192.pdf',
+            DemoPdfBuilder::create('Sales invoice record', [
+                ['heading' => 'INVOICE', 'lines' => ['Reference: SI-88192']],
+            ]),
+        );
 
         $doc = $service->uploadDocument([
             'document_type' => DocumentType::SalesInvoice,
@@ -358,6 +365,7 @@ class DocumentTrackingAndLogisticsTest extends TestCase
         $this->assertEquals('tax_invoice_5yr', $doc->retention_class);
         $this->assertNotNull($doc->retention_until);
         $this->assertFalse($doc->isVerified());
+        $this->assertNull($doc->custodyLogs()->sole()->ip_address);
 
         // Verify document
         $service->verifyDocument($doc, 'verified', 'BIR stamp confirmed authentic.', $inspector);
@@ -760,7 +768,10 @@ class DocumentTrackingAndLogisticsTest extends TestCase
         $this->assertNull($originalDoc->superseded_by_id);
         $this->assertEquals('verified', $originalDoc->status);
 
-        $newFile = UploadedFile::fake()->create('revised_invoice_88192.pdf', 150, 'application/pdf');
+        $validPdf = DemoPdfBuilder::create('Revised logistics record', [
+            ['heading' => 'REVISION', 'lines' => ['Supplier revised VAT invoice breakdown.']],
+        ]);
+        $newFile = UploadedFile::fake()->createWithContent('revised_invoice_88192.pdf', $validPdf);
 
         $response = $this->actingAs($buyer)->post(
             route('inventory.logistics.documents.supersede', $originalDoc),
@@ -792,7 +803,7 @@ class DocumentTrackingAndLogisticsTest extends TestCase
         ]);
 
         // Attempting to supersede again on the already-superseded document should fail
-        $anotherFile = UploadedFile::fake()->create('attempt_third_revision.pdf', 100, 'application/pdf');
+        $anotherFile = UploadedFile::fake()->createWithContent('attempt_third_revision.pdf', $validPdf);
         $duplicateAttemptResponse = $this->actingAs($buyer)->from(route('inventory.logistics.documents'))->post(
             route('inventory.logistics.documents.supersede', $originalDoc),
             [
@@ -803,6 +814,128 @@ class DocumentTrackingAndLogisticsTest extends TestCase
 
         $duplicateAttemptResponse->assertRedirect(route('inventory.logistics.documents'));
         $duplicateAttemptResponse->assertSessionHas('error');
+    }
+
+    public function test_logistics_document_revision_rejects_a_pdf_without_page_content(): void
+    {
+        Storage::fake('local');
+        extract($this->createSetup());
+
+        $originalDoc = $this->createDownloadableDocument($buyer);
+        $blankPdf = "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]>>endobj\n%%EOF";
+
+        $response = $this->actingAs($buyer)->from(route('inventory.logistics.documents'))->post(
+            route('inventory.logistics.documents.supersede', $originalDoc),
+            [
+                'file' => UploadedFile::fake()->createWithContent('blank.pdf', $blankPdf),
+                'reason' => 'Replace invoice.',
+            ]
+        );
+
+        $response->assertRedirect(route('inventory.logistics.documents'));
+        $response->assertSessionHas('error', 'Failed to supersede document: The uploaded PDF has no renderable page content. Upload a PDF containing text or images.');
+        $this->assertNull($originalDoc->fresh()->superseded_by_id);
+        $this->assertSame(1, LogisticsDocument::count());
+    }
+
+    public function test_sales_invoice_pdf_uses_linked_receiving_data_and_has_page_content(): void
+    {
+        extract($this->createSetup());
+
+        $purchaseOrder = PurchaseOrder::create([
+            'po_number' => 'PO-INVOICE-001',
+            'supplier_id' => $supplier->id,
+            'item_id' => $item->id,
+            'quantity' => 3,
+            'unit_cost' => 1250.50,
+            'total_amount' => 3751.50,
+            'payment_terms' => 'Net 30 days',
+            'status' => PurchaseOrderStatus::Approved->value,
+            'requested_by_id' => $buyer->id,
+        ]);
+        $receipt = GoodsReceiptNote::create([
+            'grn_number' => 'GRN-INVOICE-001',
+            'sales_invoice_number' => 'SI-INVOICE-001',
+            'purchase_order_id' => $purchaseOrder->id,
+            'supplier_id' => $supplier->id,
+            'received_by_id' => $buyer->id,
+            'received_at' => now(),
+            'receipt_status' => 'received',
+        ]);
+        GoodsReceiptNoteLine::create([
+            'goods_receipt_note_id' => $receipt->id,
+            'item_id' => $item->id,
+            'purchase_unit' => 'vial',
+            'received_quantity' => 3,
+            'unit_cost' => 1250.50,
+            'status' => 'accepted',
+        ]);
+
+        $pdf = DemoPdfBuilder::createSalesInvoice($receipt);
+
+        $this->assertStringStartsWith('%PDF-', $pdf);
+        $this->assertStringContainsString('/Contents', $pdf);
+        $this->assertStringContainsString('SI-INVOICE-001', $pdf);
+        $this->assertStringContainsString('PO-INVOICE-001', $pdf);
+        $this->assertStringContainsString('(TEST-RAB-001)', $pdf);
+        $this->assertStringContainsString('(3,751.50)', $pdf);
+        $this->assertStringNotContainsString('Sensor', $pdf);
+        $this->assertStringNotContainsString('VAT-Exempt', $pdf);
+    }
+
+    public function test_coa_transmittal_badge_requires_and_respects_the_actual_deadline(): void
+    {
+        extract($this->createSetup());
+
+        $purchaseOrder = PurchaseOrder::create([
+            'po_number' => 'PO-COA-DEADLINE-01',
+            'supplier_id' => $supplier->id,
+            'item_id' => $item->id,
+            'quantity' => 1,
+            'unit_cost' => 1000,
+            'total_amount' => 1000,
+            'status' => PurchaseOrderStatus::Received->value,
+            'requested_by_id' => $buyer->id,
+        ]);
+        $receipt = GoodsReceiptNote::create([
+            'grn_number' => 'GRN-COA-DEADLINE-01',
+            'purchase_order_id' => $purchaseOrder->id,
+            'supplier_id' => $supplier->id,
+            'received_by_id' => $buyer->id,
+            'received_at' => now(),
+            'receipt_status' => 'posted',
+        ]);
+        $iar = InspectionAcceptanceReport::create([
+            'iar_number' => 'IAR-COA-DEADLINE-01',
+            'goods_receipt_note_id' => $receipt->id,
+            'purchase_order_id' => $purchaseOrder->id,
+            'supplier_id' => $supplier->id,
+            'iar_date' => today(),
+            'status' => 'accepted',
+            'acceptance_date' => today(),
+        ]);
+
+        $this->actingAs($buyer)->get(route('inventory.logistics.iar.index'))
+            ->assertOk()
+            ->assertSee('Deadline not recorded')
+            ->assertDontSee('Due within 5 days');
+
+        $iar->update(['coa_transmittal_deadline_at' => today()->addDays(4)]);
+        $this->actingAs($buyer)->get(route('inventory.logistics.iar.index'))
+            ->assertOk()
+            ->assertSee('Due within 5 days');
+
+        $iar->update(['coa_transmittal_deadline_at' => today()->addDays(10)]);
+        $this->actingAs($buyer)->get(route('inventory.logistics.iar.index'))
+            ->assertOk()
+            ->assertSee('Due '.today()->addDays(10)->format('M d, Y'))
+            ->assertDontSee('Due within 5 days');
+
+        $iar->update(['coa_transmittal_deadline_at' => today()->subDay()]);
+        $this->actingAs($buyer)->get(route('inventory.logistics.iar.index'))
+            ->assertOk()
+            ->assertSee('OVERDUE')
+            ->assertDontSee('Due within 5 days');
     }
 
     public function test_documents_table_actions_column_alignment_and_slots_across_mixed_statuses(): void
@@ -1027,7 +1160,6 @@ class DocumentTrackingAndLogisticsTest extends TestCase
             'transferred_at' => now()->subHours(2),
             'notes' => 'Dock intake complete with zero excursions.',
             'user_agent' => 'HIMS Dock Handheld Console',
-            'ip_address' => '192.168.10.45',
         ]);
 
         $response = $this->actingAs($buyer)->get(route('inventory.logistics.chain-of-custody'));
@@ -1056,6 +1188,8 @@ class DocumentTrackingAndLogisticsTest extends TestCase
         $response->assertSee('HIMS Receiving Dock Bay 1');
         $response->assertSee('Condition: Good Order');
         $response->assertSee('HIMS Dock Handheld Console');
+        $response->assertDontSee('IP:', false);
+        $response->assertDontSee('192.168.10.45');
     }
 
     public function test_missing_logistics_metadata_is_not_presented_as_known_facts(): void
@@ -1176,4 +1310,3 @@ class DocumentTrackingAndLogisticsTest extends TestCase
         $response->assertSee('DR');
     }
 }
-

@@ -92,6 +92,7 @@ enum AuditAction: string
     case VerifiedLogisticsDocument = 'verified_logistics_document';
     case RevisedLogisticsDocument = 'revised_logistics_document';
     case ArchivedLogisticsDocument = 'archived_logistics_document';
+    case DeletedLogisticsDocument = 'deleted_logistics_document';
     case CreatedInspectionAcceptanceReport = 'created_inspection_acceptance_report';
     case CompletedTechnicalInspection = 'completed_technical_inspection';
     case ApprovedIarAcceptance = 'approved_iar_acceptance';
@@ -215,6 +216,7 @@ enum AuditAction: string
             self::VerifiedLogisticsDocument => 'Verified Logistics Document',
             self::RevisedLogisticsDocument => 'Revised Logistics Document',
             self::ArchivedLogisticsDocument => 'Archived Logistics Document',
+            self::DeletedLogisticsDocument => 'Deleted Logistics Document',
             self::CreatedInspectionAcceptanceReport => 'Created Inspection & Acceptance Report',
             self::CompletedTechnicalInspection => 'Completed Technical Inspection (IAR)',
             self::ApprovedIarAcceptance => 'Approved IAR Custodial Acceptance',
