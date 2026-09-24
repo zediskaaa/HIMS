@@ -273,6 +273,27 @@ class PostDeliveryReceivingWorkflowTest extends TestCase
             'quantity' => 400,
             'to_location_id' => $this->quarantineLocation->id,
         ]);
+
+        $this->actingAs($this->receivingClerk)
+            ->get(route('inventory.receiving.show', $grn))
+            ->assertOk()
+            ->assertSee('Delivery Receipt Details')
+            ->assertSee('DR-GLV-001')
+            ->assertSee('PO-2026-GLV-01')
+            ->assertSee('Metro Drug Distribution PH')
+            ->assertSee('Dock Receiving Clerk')
+            ->assertSee('Main Pharmacy Central Bay')
+            ->assertSee('Latex Examination Gloves (Medium)')
+            ->assertSee('GLV-MED-100')
+            ->assertSee('LOT-GLV-2026-A')
+            ->assertSee($line->expiry_date->format('M d, Y'))
+            ->assertSee('4 packs')
+            ->assertSee('₱400.00/pack')
+            ->assertSee('₱1,600.00')
+            ->assertDontSee('Sensor Logger')
+            ->assertDontSee('Transit Temperature')
+            ->assertDontSee('Bluetooth')
+            ->assertDontSee('USB');
     }
 
     /**
@@ -776,8 +797,8 @@ class PostDeliveryReceivingWorkflowTest extends TestCase
         $this->actingAs($this->receivingClerk)
             ->get(route('inventory.receiving.show', $grn))
             ->assertOk()
-            ->assertSee('Post-Delivery Receiving Lifecycle')
-            ->assertSee('QA Assay')
+            ->assertSee('Receiving Workflow')
+            ->assertSee('Quality inspection')
             ->assertSee('PO-SAL-008');
     }
 

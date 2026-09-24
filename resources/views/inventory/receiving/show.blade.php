@@ -2,35 +2,49 @@
     <x-slot name="header">
         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-                <div class="flex items-center gap-2">
-                    <a href="{{ route('inventory.receiving.index') }}" class="text-xs font-semibold text-primary-600 hover:underline">
-                        &larr; Inbound Receiving
-                    </a>
-                    <span class="text-xs text-neutral-400">/</span>
-                    <span class="text-xs text-neutral-500">{{ $goodsReceiptNote->grn_number }}</span>
+                <div class="flex items-center gap-2 text-xs">
+                    <a href="{{ route('inventory.receiving.index') }}" class="font-semibold text-primary-600 hover:underline">&larr; Inbound Receiving</a>
+                    <span class="text-neutral-400">/</span>
+                    <span class="text-neutral-500">{{ $goodsReceiptNote->grn_number }}</span>
                 </div>
-                <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">
-                    Goods Receipt Note: {{ $goodsReceiptNote->grn_number }}
-                </h2>
+                <h2 class="mt-1 text-2xl font-bold tracking-tight text-neutral-900">Delivery Receipt Details</h2>
+                <p class="mt-1 text-sm text-neutral-500">Verified receiving record linked to the purchase order and inventory intake workflow.</p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center gap-2">
+                @if($goodsReceiptNote->inspectionAcceptanceReport)
+                    <a href="{{ route('inventory.logistics.iar.show', $goodsReceiptNote->inspectionAcceptanceReport) }}" class="inline-flex items-center rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50">View IAR</a>
+                @endif
                 @can(\App\Enums\Permission::InspectStock->value)
-                    <a href="{{ route('inventory.qc.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2 text-sm font-medium text-amber-800 shadow-sm hover:bg-amber-100">
-                        <svg class="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                        </svg>
-                        QC Inspection Queue
-                    </a>
+                    <a href="{{ route('inventory.qc.index') }}" class="inline-flex items-center rounded-lg bg-primary-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700">QC Inspection Queue</a>
                 @endcan
-                <a href="{{ route('inventory.warehousing.scan-station') }}" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                    </svg>
-                    Scan Workstation
-                </a>
             </div>
         </div>
     </x-slot>
+
+    @php
+        $deliveryReceiptNumber = $goodsReceiptNote->dr_number ?: $goodsReceiptNote->packing_slip_number;
+        $receiptStatus = $goodsReceiptNote->receipt_status ?: 'draft';
+        $deliveryStatus = $goodsReceiptNote->delivery_status;
+        $allInspections = $goodsReceiptNote->lines->flatMap->inspections;
+        $allTasks = $allInspections->flatMap->warehouseTasks;
+        $hasPendingInspection = $allInspections->contains(fn ($inspection) => in_array($inspection->inspection_status, ['pending_sample', 'partially_disposed', 'under_review'], true));
+        $hasRejectedInspection = $allInspections->contains(fn ($inspection) => $inspection->inspection_status === 'rejected');
+        $acceptedQuantity = (int) $goodsReceiptNote->lines->sum('accepted_quantity');
+        $hasPendingPutAway = (int) $goodsReceiptNote->lines->sum('pending_put_away_quantity') > 0;
+        $allTasksCompleted = $allTasks->isNotEmpty() && $allTasks->every(fn ($task) => $task->status === \App\Enums\WarehouseTaskStatus::Completed);
+        $discrepancyLines = $goodsReceiptNote->lines->filter(fn ($line) => $line->item_condition !== 'good' || filled($line->discrepancy_type));
+        $destinations = $goodsReceiptNote->lines->pluck('destinationLocation')->filter()->unique('id');
+        $linkedDocuments = $goodsReceiptNote->documents
+            ->merge($goodsReceiptNote->inspectionAcceptanceReport?->documents ?? collect())
+            ->unique('id');
+        $totalReceivedValue = $goodsReceiptNote->lines->sum(fn ($line) => (float) $line->received_quantity * (float) $line->unit_cost);
+        $receiptStatusClasses = match ($receiptStatus) {
+            'received', 'stored', 'posted' => 'bg-emerald-100 text-emerald-800',
+            'quarantined', 'under_qc', 'under_inspection' => 'bg-amber-100 text-amber-800',
+            'rejected' => 'bg-rose-100 text-rose-800',
+            default => 'bg-neutral-100 text-neutral-700',
+        };
+    @endphp
 
     <div class="space-y-6">
         @if(session('success'))
@@ -39,384 +53,304 @@
         @if($errors->any())
             <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{{ $errors->first() }}</div>
         @endif
-        {{-- SWS Consolidated Workflow Navigation --}}
+
         @include('inventory.warehousing.partials.workflow_nav')
 
-        @php
-            // Calculate workflow stages
-            $allInspections = $goodsReceiptNote->lines->flatMap->inspections;
-            $allTasks = $allInspections->flatMap->warehouseTasks;
-
-            $hasPendingInspection = $allInspections->contains(fn($i) => in_array($i->inspection_status, ['pending_sample', 'partially_disposed', 'under_review']));
-            $hasApprovedInspection = $goodsReceiptNote->lines->sum('accepted_quantity') > 0;
-            $hasRejectedInspection = $allInspections->contains(fn($i) => $i->inspection_status === 'rejected');
-
-            $allTasksCompleted = $allTasks->isNotEmpty() && $allTasks->every(fn($t) => $t->status === \App\Enums\WarehouseTaskStatus::Completed);
-            $hasPendingTasks = $goodsReceiptNote->lines->sum('pending_put_away_quantity') > 0;
-
-            $discrepancyLines = $goodsReceiptNote->lines->filter(fn($l) => $l->item_condition !== 'good' || $l->discrepancy_type !== null);
-        @endphp
-
-        {{-- 1. End-to-End Receiving Lifecycle Stepper --}}
-        <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-4">Post-Delivery Receiving Lifecycle</h3>
-            <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
-                {{-- Step 1: PO Approved --}}
-                <div class="flex items-center gap-2.5 p-2 rounded-lg bg-emerald-50 border border-emerald-200">
-                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">1</div>
+        <article class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+            <header class="border-b border-neutral-200 bg-neutral-50 px-5 py-5 sm:px-7">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                        <p class="text-xs font-bold text-emerald-900">1. PO Approved</p>
-                        <p class="text-[10px] text-emerald-700 font-mono">{{ $goodsReceiptNote->purchaseOrder?->po_number ?? 'Direct' }}</p>
+                        <p class="text-xs font-bold uppercase tracking-[0.18em] text-primary-700">Delivery Receipt / Goods Receiving Record</p>
+                        <h3 class="mt-2 font-mono text-xl font-bold text-neutral-950 sm:text-2xl">{{ $deliveryReceiptNumber ?: 'Reference not recorded' }}</h3>
+                        <p class="mt-1 text-xs text-neutral-500">HIMS Goods Receipt Note: <span class="font-mono font-semibold text-neutral-700">{{ $goodsReceiptNote->grn_number }}</span></p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 sm:justify-end">
+                        <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $receiptStatusClasses }}">{{ \Illuminate\Support\Str::headline($receiptStatus) }}</span>
+                        @if($deliveryStatus)
+                            <span class="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">Delivery: {{ \Illuminate\Support\Str::headline($deliveryStatus) }}</span>
+                        @endif
                     </div>
                 </div>
+            </header>
 
-                {{-- Step 2: Delivery Received --}}
-                <div class="flex items-center gap-2.5 p-2 rounded-lg bg-emerald-50 border border-emerald-200">
-                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">2</div>
-                    <div>
-                        <p class="text-xs font-bold text-emerald-900">2. Dock Intake</p>
-                        <p class="text-[10px] text-emerald-700">{{ $goodsReceiptNote->received_at ? $goodsReceiptNote->received_at->format('M d, H:i') : 'Received' }}</p>
-                    </div>
+            <section class="grid grid-cols-1 gap-px border-b border-neutral-200 bg-neutral-200 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="bg-white px-5 py-4 sm:px-7">
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Supplier</p>
+                    <p class="mt-1 text-sm font-semibold text-neutral-900">{{ $goodsReceiptNote->supplier?->name ?? 'Not recorded' }}</p>
                 </div>
-
-                {{-- Step 3: Under Inspection / QA --}}
-                <div class="flex items-center gap-2.5 p-2 rounded-lg {{ $hasPendingInspection ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-400/30' : ($allInspections->isNotEmpty() ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50 border-neutral-200') }}">
-                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full {{ $hasPendingInspection ? 'bg-amber-500 text-white animate-pulse' : ($allInspections->isNotEmpty() ? 'bg-emerald-600 text-white' : 'bg-neutral-300 text-neutral-600') }} text-xs font-bold">
-                        {{ $hasPendingInspection ? '!' : '3' }}
-                    </div>
-                    <div>
-                        <p class="text-xs font-bold {{ $hasPendingInspection ? 'text-amber-900' : ($allInspections->isNotEmpty() ? 'text-emerald-900' : 'text-neutral-600') }}">3. QA Assay</p>
-                        <p class="text-[10px] {{ $hasPendingInspection ? 'text-amber-700 font-semibold' : 'text-neutral-500' }}">
-                            {{ $hasPendingInspection ? 'In Quarantine' : 'Completed' }}
-                        </p>
-                    </div>
+                <div class="bg-white px-5 py-4 sm:px-7">
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Purchase Order</p>
+                    <p class="mt-1 font-mono text-sm font-semibold text-neutral-900">{{ $goodsReceiptNote->purchaseOrder?->po_number ?? 'Not recorded' }}</p>
                 </div>
-
-                {{-- Step 4: Accepted / Rejected --}}
-                <div class="flex items-center gap-2.5 p-2 rounded-lg {{ $hasRejectedInspection ? 'bg-rose-50 border-rose-200' : ($hasApprovedInspection ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50 border-neutral-200') }}">
-                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full {{ $hasRejectedInspection ? 'bg-rose-600 text-white' : ($hasApprovedInspection ? 'bg-emerald-600 text-white' : 'bg-neutral-300 text-neutral-600') }} text-xs font-bold">
-                        4
-                    </div>
-                    <div>
-                        <p class="text-xs font-bold {{ $hasRejectedInspection ? 'text-rose-900' : ($hasApprovedInspection ? 'text-emerald-900' : 'text-neutral-600') }}">4. Disposition</p>
-                        <p class="text-[10px] text-neutral-500">
-                            {{ $hasRejectedInspection ? 'Rejected/Blocked' : ($hasApprovedInspection ? 'Approved / Staging' : 'Pending') }}
-                        </p>
-                    </div>
+                <div class="bg-white px-5 py-4 sm:px-7">
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Delivered / Received</p>
+                    <p class="mt-1 text-sm font-semibold text-neutral-900">{{ $goodsReceiptNote->received_at?->format('M d, Y') ?? 'Not recorded' }}</p>
+                    @if($goodsReceiptNote->received_at)
+                        <p class="text-xs text-neutral-500">{{ $goodsReceiptNote->received_at->format('h:i A') }}</p>
+                    @endif
                 </div>
-
-                {{-- Step 5: Awaiting Put-Away --}}
-                <div class="flex items-center gap-2.5 p-2 rounded-lg {{ $hasPendingTasks ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-400/30' : ($allTasksCompleted ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50 border-neutral-200') }}">
-                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full {{ $hasPendingTasks ? 'bg-blue-600 text-white animate-pulse' : ($allTasksCompleted ? 'bg-emerald-600 text-white' : 'bg-neutral-300 text-neutral-600') }} text-xs font-bold">
-                        5
-                    </div>
-                    <div>
-                        <p class="text-xs font-bold {{ $hasPendingTasks ? 'text-blue-900' : ($allTasksCompleted ? 'text-emerald-900' : 'text-neutral-600') }}">5. Put-Away</p>
-                        <p class="text-[10px] text-neutral-500">
-                            {{ $hasPendingTasks ? 'Transfer Pending' : ($allTasksCompleted ? 'Transferred' : 'Not required') }}
-                        </p>
-                    </div>
+                <div class="bg-white px-5 py-4 sm:px-7">
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Receiving Officer</p>
+                    <p class="mt-1 text-sm font-semibold text-neutral-900">{{ $goodsReceiptNote->receivedBy?->name ?? 'Not recorded' }}</p>
                 </div>
-
-                {{-- Step 6: Available Stock --}}
-                <div class="flex items-center gap-2.5 p-2 rounded-lg {{ $allTasksCompleted ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50 border-neutral-200' }}">
-                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full {{ $allTasksCompleted ? 'bg-emerald-600 text-white' : 'bg-neutral-300 text-neutral-600' }} text-xs font-bold">
-                        6
-                    </div>
-                    <div>
-                        <p class="text-xs font-bold {{ $allTasksCompleted ? 'text-emerald-900' : 'text-neutral-600' }}">6. Available</p>
-                        <p class="text-[10px] text-neutral-500">
-                            {{ $allTasksCompleted ? 'Active Stock' : 'Locked' }}
-                        </p>
-                    </div>
+                <div class="bg-white px-5 py-4 sm:px-7">
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Receiving Destination</p>
+                    <p class="mt-1 text-sm font-semibold text-neutral-900">{{ $destinations->isNotEmpty() ? $destinations->pluck('name')->join(', ') : 'Not recorded' }}</p>
                 </div>
-            </div>
-        </div>
-
-        {{-- Discrepancy Alert Banner --}}
-        @if($discrepancyLines->isNotEmpty())
-            <div class="rounded-xl border border-amber-300 bg-amber-50/90 p-5 shadow-sm">
-                <div class="flex items-start gap-3">
-                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-200 text-amber-900">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
+                @if($goodsReceiptNote->carrier_name)
+                    <div class="bg-white px-5 py-4 sm:px-7">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Carrier</p>
+                        <p class="mt-1 text-sm font-semibold text-neutral-900">{{ $goodsReceiptNote->carrier_name }}</p>
                     </div>
-                    <div class="space-y-2 flex-1">
-                        <h4 class="text-sm font-bold text-amber-950">Inbound Discrepancy &amp; Inspection Flags Detected</h4>
-                        <p class="text-xs text-amber-800">
-                            The following line items were flagged with packaging defects, shortages, or discrepancies during physical dock intake and have been quarantined:
-                        </p>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
-                            @foreach($discrepancyLines as $disc)
-                                <div class="p-2.5 rounded-lg bg-white/80 border border-amber-200 text-xs space-y-1">
-                                    <div class="font-bold text-neutral-900">{{ $disc->item?->name ?? 'Item' }}</div>
-                                    <div class="text-[11px] text-neutral-600">Condition: <strong class="uppercase text-amber-900">{{ str_replace('_', ' ', $disc->item_condition) }}</strong></div>
-                                    @if($disc->discrepancy_type)
-                                        <div class="text-[11px] text-neutral-600">Type: <span class="capitalize font-semibold text-neutral-800">{{ str_replace('_', ' ', $disc->discrepancy_type) }}</span></div>
+                @endif
+                @if($goodsReceiptNote->waybill_number)
+                    <div class="bg-white px-5 py-4 sm:px-7">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Waybill</p>
+                        <p class="mt-1 font-mono text-sm font-semibold text-neutral-900">{{ $goodsReceiptNote->waybill_number }}</p>
+                    </div>
+                @endif
+                @if($goodsReceiptNote->sales_invoice_number)
+                    <div class="bg-white px-5 py-4 sm:px-7">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Sales Invoice</p>
+                        <p class="mt-1 font-mono text-sm font-semibold text-neutral-900">{{ $goodsReceiptNote->sales_invoice_number }}</p>
+                    </div>
+                @endif
+            </section>
+
+            <section>
+                <div class="border-b border-neutral-200 px-5 py-4 sm:px-7">
+                    <h3 class="text-sm font-bold text-neutral-900">Delivered Items</h3>
+                    <p class="mt-0.5 text-xs text-neutral-500">Quantities and values captured from the linked purchase order receiving record.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-[980px] w-full text-left text-sm">
+                        <thead class="border-b border-neutral-200 bg-neutral-50 text-[11px] uppercase tracking-wider text-neutral-500">
+                            <tr>
+                                <th class="px-5 py-3 font-semibold sm:px-7">Item / SKU</th>
+                                <th class="px-5 py-3 font-semibold">Batch, Lot &amp; Expiry</th>
+                                <th class="px-5 py-3 font-semibold">Destination</th>
+                                <th class="px-5 py-3 font-semibold text-right">Quantity Received</th>
+                                <th class="px-5 py-3 font-semibold text-right">Unit Cost</th>
+                                <th class="px-5 py-3 font-semibold text-right sm:pr-7">Line Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-neutral-200">
+                            @forelse($goodsReceiptNote->lines as $line)
+                                @php
+                                    $lineUnit = $line->purchase_unit ?: ($line->item?->unit ?: 'unit');
+                                    $lineTotal = (float) $line->received_quantity * (float) $line->unit_cost;
+                                    $inspection = $line->inspections->first();
+                                    $expiryStatus = $line->expiry_date ? $line->batch?->expiryStatusLabel() : null;
+                                @endphp
+                                <tr class="align-top">
+                                    <td class="px-5 py-4 sm:px-7">
+                                        <p class="font-semibold text-neutral-900">{{ $line->item?->name ?? 'Item record unavailable' }}</p>
+                                        @if($line->item?->sku)
+                                            <p class="mt-0.5 font-mono text-xs text-neutral-500">{{ $line->item->sku }}</p>
+                                        @endif
+                                        <div class="mt-2 flex flex-wrap gap-1.5">
+                                            <span class="rounded bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-700">{{ \Illuminate\Support\Str::headline($line->item_condition ?: 'good') }}</span>
+                                            @if($inspection)
+                                                <span class="rounded bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">QC: {{ \Illuminate\Support\Str::headline($inspection->inspection_status) }}</span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td class="px-5 py-4 text-xs text-neutral-700">
+                                        @if($line->batch_number || $line->lot_number || $line->serial_number || $line->expiry_date)
+                                            <div class="space-y-1">
+                                                @if($line->batch_number)
+                                                    <p>Batch: <span class="font-mono font-semibold text-neutral-900">{{ $line->batch_number }}</span></p>
+                                                @endif
+                                                @if($line->lot_number && $line->lot_number !== $line->batch_number)
+                                                    <p>Lot: <span class="font-mono font-semibold text-neutral-900">{{ $line->lot_number }}</span></p>
+                                                @endif
+                                                @if($line->serial_number)
+                                                    <p>Serial: <span class="font-mono font-semibold text-neutral-900">{{ $line->serial_number }}</span></p>
+                                                @endif
+                                                @if($line->expiry_date)
+                                                    <p>Expiry: <span class="font-semibold text-neutral-900">{{ $line->expiry_date->format('M d, Y') }}</span></p>
+                                                    @if($expiryStatus)
+                                                        <p class="text-[11px] text-neutral-500">{{ $expiryStatus }}</p>
+                                                    @endif
+                                                @endif
+                                            </div>
+                                        @else
+                                            <span class="text-neutral-400">Not recorded</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-5 py-4 text-xs text-neutral-700">
+                                        @if($line->destinationLocation)
+                                            <p class="font-medium text-neutral-900">{{ $line->destinationLocation->name }}</p>
+                                            @if($line->destinationLocation->code)
+                                                <p class="mt-0.5 font-mono text-neutral-500">{{ $line->destinationLocation->code }}</p>
+                                            @endif
+                                        @else
+                                            <span class="text-neutral-400">Not recorded</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-5 py-4 text-right">
+                                        <p class="font-mono font-bold text-neutral-900">{{ $line->received_quantity }} {{ \Illuminate\Support\Str::plural($lineUnit, $line->received_quantity) }}</p>
+                                        @if($line->ordered_quantity)
+                                            <p class="mt-0.5 text-[11px] text-neutral-500">of {{ $line->ordered_quantity }} ordered</p>
+                                        @endif
+                                    </td>
+                                    <td class="px-5 py-4 text-right font-mono text-xs text-neutral-700">₱{{ number_format((float) $line->unit_cost, 2) }}/{{ $lineUnit }}</td>
+                                    <td class="px-5 py-4 text-right font-mono text-xs font-bold text-neutral-900 sm:pr-7">₱{{ number_format($lineTotal, 2) }}</td>
+                                </tr>
+                                @if($line->discrepancy_type || $line->discrepancy_notes || $line->notes)
+                                    <tr class="bg-amber-50/60">
+                                        <td colspan="6" class="px-5 py-3 text-xs text-neutral-700 sm:px-7">
+                                            @if($line->discrepancy_type)
+                                                <span class="font-semibold text-amber-900">Discrepancy: {{ \Illuminate\Support\Str::headline($line->discrepancy_type) }}</span>
+                                                @if($line->discrepancy_action)
+                                                    <span class="text-neutral-500"> · Action: {{ \Illuminate\Support\Str::headline($line->discrepancy_action) }}</span>
+                                                @endif
+                                            @endif
+                                            @if($line->discrepancy_notes)
+                                                <p class="mt-1">{{ $line->discrepancy_notes }}</p>
+                                            @endif
+                                            @if($line->notes)
+                                                <p class="mt-1 text-neutral-600">Line note: {{ $line->notes }}</p>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endif
+                            @empty
+                                <tr><td colspan="6" class="px-5 py-10 text-center text-sm text-neutral-500">No delivered items are recorded for this receipt.</td></tr>
+                            @endforelse
+                        </tbody>
+                        <tfoot class="border-t border-neutral-300 bg-neutral-50">
+                            <tr>
+                                <td colspan="4" class="px-5 py-3 text-right text-xs font-semibold text-neutral-600 sm:px-7">Total Received Goods Value:</td>
+                                <td colspan="2" class="px-5 py-3 text-right font-mono text-sm font-bold text-primary-700 sm:pr-7">₱{{ number_format($totalReceivedValue, 2) }}</td>
+                            </tr>
+                            @if($goodsReceiptNote->purchaseOrder)
+                                <tr class="border-t border-neutral-200">
+                                    <td colspan="4" class="px-5 py-3 text-right text-xs text-neutral-500 sm:px-7">Original Purchase Order Total:</td>
+                                    <td colspan="2" class="px-5 py-3 text-right font-mono text-xs text-neutral-700 sm:pr-7">₱{{ number_format((float) $goodsReceiptNote->purchaseOrder->total_amount, 2) }}</td>
+                                </tr>
+                            @endif
+                        </tfoot>
+                    </table>
+                </div>
+            </section>
+
+            <section class="grid grid-cols-1 border-t border-neutral-200 lg:grid-cols-2 lg:divide-x lg:divide-neutral-200">
+                <div class="px-5 py-5 sm:px-7">
+                    <h3 class="text-sm font-bold text-neutral-900">Inspection &amp; Acceptance</h3>
+                    @if($goodsReceiptNote->inspectionAcceptanceReport)
+                        @php
+                            $iar = $goodsReceiptNote->inspectionAcceptanceReport;
+                        @endphp
+                        <dl class="mt-3 grid grid-cols-2 gap-4 text-xs">
+                            <div><dt class="text-neutral-500">IAR Reference</dt><dd class="mt-1 font-mono font-semibold text-neutral-900">{{ $iar->iar_number }}</dd></div>
+                            <div><dt class="text-neutral-500">IAR Status</dt><dd class="mt-1 font-semibold text-neutral-900">{{ \Illuminate\Support\Str::headline($iar->status) }}</dd></div>
+                            @if($iar->inspectedBy)
+                                <div><dt class="text-neutral-500">Inspector</dt><dd class="mt-1 font-semibold text-neutral-900">{{ $iar->inspectedBy->name }}</dd></div>
+                            @endif
+                            @if($iar->acceptedBy)
+                                <div><dt class="text-neutral-500">Accepting Officer</dt><dd class="mt-1 font-semibold text-neutral-900">{{ $iar->acceptedBy->name }}</dd></div>
+                            @endif
+                        </dl>
+                    @else
+                        <p class="mt-2 text-xs text-neutral-500">No Inspection and Acceptance Report is linked to this receipt.</p>
+                    @endif
+                </div>
+                <div class="border-t border-neutral-200 px-5 py-5 sm:px-7 lg:border-t-0">
+                    <h3 class="text-sm font-bold text-neutral-900">Receiving Notes</h3>
+                    <p class="mt-2 whitespace-pre-line text-sm leading-6 text-neutral-700">{{ $goodsReceiptNote->notes ?: 'No receiving notes were recorded.' }}</p>
+                </div>
+            </section>
+        </article>
+
+        @if($linkedDocuments->isNotEmpty())
+            <section class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
+                <h3 class="text-sm font-bold text-neutral-900">Linked Documents</h3>
+                <p class="mt-0.5 text-xs text-neutral-500">Files already registered against this receiving record or its IAR.</p>
+                <div class="mt-4 grid gap-3 md:grid-cols-2">
+                    @foreach($linkedDocuments as $document)
+                        <div class="flex items-center justify-between gap-4 rounded-lg border border-neutral-200 p-3">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-semibold text-neutral-900">{{ $document->title }}</p>
+                                <p class="mt-0.5 text-xs text-neutral-500">
+                                    {{ $document->document_type?->label() ?? \Illuminate\Support\Str::headline((string) $document->document_type) }}
+                                    @if($document->reference_number)
+                                        · {{ $document->reference_number }}
                                     @endif
-                                    @if($disc->discrepancy_action)
-                                        <div class="text-[11px] text-neutral-600">Action: <span class="capitalize font-semibold text-primary-700">{{ str_replace('_', ' ', $disc->discrepancy_action) }}</span></div>
-                                    @endif
-                                    @if($disc->discrepancy_notes)
-                                        <div class="text-[10px] text-neutral-500 italic">"{{ $disc->discrepancy_notes }}"</div>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-            </div>
-        @endif
-
-        {{-- Put-Away Tasks Queue --}}
-        @if($allTasks->isNotEmpty())
-            <div class="rounded-xl border border-blue-200 bg-blue-50/50 p-5 shadow-sm">
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center gap-2">
-                        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-blue-600 text-white text-xs font-bold">5</span>
-                        <h4 class="text-sm font-bold text-neutral-900">Put-Away Warehouse Transfer Tasks</h4>
-                    </div>
-                    <a href="{{ route('inventory.warehousing.scan-station') }}" class="text-xs font-semibold text-primary-700 hover:underline">
-                        Open Scan Workstation &rarr;
-                    </a>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    @foreach($allTasks as $task)
-                        <div class="p-3 rounded-lg bg-white border border-neutral-200 shadow-xs space-y-2">
-                            <div class="flex items-center justify-between">
-                                <span class="font-mono text-xs font-bold text-primary-800">{{ $task->task_number }}</span>
-                                <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $task->status === \App\Enums\WarehouseTaskStatus::Completed ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800' }}">
-                                    {{ ucfirst($task->status->value) }}
-                                </span>
+                                </p>
                             </div>
-                            <div class="text-xs text-neutral-700">
-                                <div>Item: <strong class="text-neutral-900">{{ $task->item?->name }}</strong></div>
-                                <div>Transfer: <strong class="font-mono">{{ $task->requested_quantity }}</strong> units</div>
-                                <div class="text-[11px] text-neutral-500 mt-1">
-                                    <span>From: <strong>{{ $task->sourceLocation?->name ?? 'LOC-STAGING' }}</strong></span><br>
-                                    <span>To: <strong class="text-primary-800">{{ $task->destinationLocation?->name ?? 'Rack/Bin' }}</strong></span>
-                                </div>
-                            </div>
+                            @if($document->hasFile())
+                                <a href="{{ route('inventory.logistics.documents.download', $document) }}" class="shrink-0 text-xs font-semibold text-primary-700 hover:underline" data-hims-download data-loading-text="Preparing document..." data-download-name="{{ $document->original_name ?: ($document->file_name ?: 'document') }}">Download</a>
+                            @endif
                         </div>
                     @endforeach
                 </div>
-            </div>
+            </section>
         @endif
 
-        {{-- Status & Summary Card --}}
-        <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <section class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">GRN Status</p>
-                    <div class="mt-2">
-                        @if($goodsReceiptNote->status === 'quarantined')
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-                                <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-                                Quarantined (Inbound QA Assay)
-                            </span>
-                        @elseif($goodsReceiptNote->status === 'received')
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
-                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                                Released &amp; Stored
-                            </span>
-                        @else
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-800">
-                                {{ ucfirst(str_replace('_', ' ', $goodsReceiptNote->status)) }}
-                            </span>
-                        @endif
-                    </div>
+                    <h3 class="text-sm font-bold text-neutral-900">Receiving Workflow</h3>
+                    <p class="mt-0.5 text-xs text-neutral-500">Operational progress for this recorded delivery.</p>
                 </div>
-                <div>
-                    <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">Purchase Order</p>
-                    <p class="mt-1 text-sm font-semibold text-neutral-900 font-mono">
-                        {{ $goodsReceiptNote->purchaseOrder->po_number ?? 'Direct Receipt' }}
-                    </p>
-                    <p class="text-xs text-neutral-500">
-                        Supplier: <strong>{{ $goodsReceiptNote->supplier->name ?? 'N/A' }}</strong>
-                    </p>
+                @if($allTasks->isNotEmpty())
+                    <a href="{{ route('inventory.warehousing.scan-station') }}" class="text-xs font-semibold text-primary-700 hover:underline">Open Scan Workstation &rarr;</a>
+                @endif
+            </div>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                    <p class="text-xs font-bold text-emerald-900">1. Delivery recorded</p>
+                    <p class="mt-1 text-[11px] text-emerald-700">{{ $goodsReceiptNote->received_at?->format('M d, Y h:i A') ?? 'Timestamp unavailable' }}</p>
                 </div>
-                <div>
-                    <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">Carrier Logistics</p>
-                    <p class="mt-1 text-sm font-semibold text-neutral-900">
-                        {{ $goodsReceiptNote->carrier_name ?: 'Not recorded' }}
-                    </p>
-                    <p class="text-xs text-neutral-500">
-                        Waybill: {{ $goodsReceiptNote->waybill_number ?? 'N/A' }} | Slip: {{ $goodsReceiptNote->packing_slip_number ?? 'N/A' }}
-                    </p>
+                <div class="rounded-lg border p-3 {{ $hasPendingInspection ? 'border-amber-300 bg-amber-50' : 'border-emerald-200 bg-emerald-50' }}">
+                    <p class="text-xs font-bold {{ $hasPendingInspection ? 'text-amber-900' : 'text-emerald-900' }}">2. Quality inspection</p>
+                    <p class="mt-1 text-[11px] {{ $hasPendingInspection ? 'text-amber-700' : 'text-emerald-700' }}">{{ $hasPendingInspection ? 'Pending or in progress' : ($allInspections->isNotEmpty() ? 'Inspection recorded' : 'No inspection record') }}</p>
                 </div>
-                <div>
-                    <p class="text-xs font-medium uppercase tracking-wider text-neutral-500">Dock Intake Audit</p>
-                    <p class="mt-1 text-sm font-semibold text-neutral-900">
-                        {{ $goodsReceiptNote->receivedBy->name ?? 'Warehouse Staff' }}
-                    </p>
-                    <p class="text-xs text-neutral-500">
-                        {{ $goodsReceiptNote->received_at ? $goodsReceiptNote->received_at->format('M d, Y h:i A') : 'N/A' }}
-                    </p>
+                <div class="rounded-lg border p-3 {{ $hasRejectedInspection ? 'border-rose-200 bg-rose-50' : ($acceptedQuantity > 0 ? 'border-emerald-200 bg-emerald-50' : 'border-neutral-200 bg-neutral-50') }}">
+                    <p class="text-xs font-bold text-neutral-900">3. Disposition</p>
+                    <p class="mt-1 text-[11px] text-neutral-600">{{ $hasRejectedInspection ? 'Rejected quantity recorded' : ($acceptedQuantity > 0 ? 'Accepted quantity recorded' : 'Awaiting disposition') }}</p>
+                </div>
+                <div class="rounded-lg border p-3 {{ $hasPendingPutAway ? 'border-blue-300 bg-blue-50' : ($allTasksCompleted ? 'border-emerald-200 bg-emerald-50' : 'border-neutral-200 bg-neutral-50') }}">
+                    <p class="text-xs font-bold text-neutral-900">4. Put-away</p>
+                    <p class="mt-1 text-[11px] text-neutral-600">{{ $hasPendingPutAway ? 'Transfer pending' : ($allTasksCompleted ? 'Stored in destination' : 'Not yet required') }}</p>
                 </div>
             </div>
+        </section>
 
-            @if($goodsReceiptNote->notes)
-                <div class="mt-6 border-t border-neutral-100 pt-4">
-                    <p class="text-xs font-medium text-neutral-500">Intake Observations / Inspection Notes:</p>
-                    <p class="mt-1 text-sm text-neutral-700">{{ $goodsReceiptNote->notes }}</p>
+        @if($discrepancyLines->isNotEmpty())
+            <section class="rounded-xl border border-amber-300 bg-amber-50 p-5 shadow-sm sm:p-6">
+                <h3 class="text-sm font-bold text-amber-950">Recorded Discrepancies</h3>
+                <div class="mt-3 grid gap-3 md:grid-cols-2">
+                    @foreach($discrepancyLines as $line)
+                        <div class="rounded-lg border border-amber-200 bg-white p-3 text-xs">
+                            <p class="font-bold text-neutral-900">{{ $line->item?->name ?? 'Item' }}</p>
+                            <p class="mt-1 text-neutral-600">{{ \Illuminate\Support\Str::headline($line->discrepancy_type ?: $line->item_condition) }}</p>
+                            @if($line->discrepancy_notes)
+                                <p class="mt-1 text-neutral-500">{{ $line->discrepancy_notes }}</p>
+                            @endif
+                            @can(\App\Enums\Permission::RecordMovements->value)
+                                @php
+                                    $conversion = $line->conversionFactor();
+                                    $returnableQuantity = max(0, (int) round($line->rejected_quantity * $conversion) - $line->returned_quantity);
+                                    $baseUnit = $line->item?->unit ?: 'unit';
+                                @endphp
+                                @if($returnableQuantity > 0)
+                                    <form method="POST" action="{{ route('inventory.receiving.return', [$goodsReceiptNote, $line]) }}" data-confirm-title="Return rejected stock" data-confirm-message="Confirm physical return of the rejected base units to the supplier." data-confirm-label="Record return" class="mt-3 flex flex-wrap items-end gap-2 border-t border-amber-100 pt-3">
+                                        @csrf
+                                        <input type="hidden" name="return_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
+                                        <label class="block">
+                                            <span class="block text-[11px] font-medium text-neutral-600">Return quantity ({{ $baseUnit }})</span>
+                                            <input type="number" name="quantity" min="1" max="{{ $returnableQuantity }}" value="{{ $returnableQuantity }}" required class="mt-1 w-24 rounded border-neutral-300 text-xs">
+                                        </label>
+                                        <button type="submit" class="rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50">Record return</button>
+                                    </form>
+                                @endif
+                            @endcan
+                        </div>
+                    @endforeach
                 </div>
-            @endif
-        </div>
-
-        {{-- Line Items Table --}}
-        <div class="rounded-xl border border-neutral-200 bg-white shadow-sm overflow-hidden">
-            <div class="border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
-                <div>
-                    <h3 class="text-base font-semibold text-neutral-900">Delivered Line Items, UoM Conversions &amp; Quality Assay</h3>
-                    <p class="text-xs text-neutral-500">Line verification against ordered quantities, registered lot numbers, and current inspection checkpoints.</p>
-                </div>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm text-neutral-600">
-                    <thead class="bg-neutral-50 text-xs uppercase text-neutral-500 border-b border-neutral-200">
-                        <tr>
-                            <th class="px-6 py-3 font-medium">Item &amp; SKU</th>
-                            <th class="px-6 py-3 font-medium">PO Expected vs Delivered</th>
-                            <th class="px-6 py-3 font-medium">Batch / Serial / Expiry</th>
-                            <th class="px-6 py-3 font-medium">Condition &amp; Route</th>
-                            <th class="px-6 py-3 font-medium text-right">Unit Cost</th>
-                            <th class="px-6 py-3 font-medium text-right">Total Price</th>
-                            <th class="px-6 py-3 font-medium text-center">QC Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-neutral-200">
-                        @forelse($goodsReceiptNote->lines as $line)
-                            @php
-                                $lineUnit = $line->purchase_unit ?: ($line->item?->unit ?: 'unit');
-                                $baseUnit = $line->item?->unit ?: 'unit';
-                                $lineTotal = (float) ($line->received_quantity * $line->unit_cost);
-                                $conversion = $line->conversionFactor();
-                                $baseQty = $line->calculatedReceivedBaseQuantity();
-                                $inspection = $line->inspections->first();
-                            @endphp
-                            <tr class="hover:bg-neutral-50 align-top">
-                                <td class="px-6 py-4">
-                                    <p class="font-medium text-neutral-900">{{ $line->item->name ?? 'Item #' . $line->inventory_item_id }}</p>
-                                    <p class="text-xs font-mono text-neutral-500">{{ $line->item->sku ?? 'No SKU' }}</p>
-                                    @if($conversion > 1)
-                                        <span class="inline-block mt-1 rounded bg-neutral-100 px-2 py-0.5 text-[10px] font-mono font-medium text-neutral-700">
-                                            1 {{ $lineUnit }} = {{ $conversion }} {{ $baseUnit }}s
-                                        </span>
-                                    @endif
-                                </td>
-                                <td class="px-6 py-4">
-                                    <div class="text-xs space-y-1">
-                                        <div>Ordered: <span class="font-mono font-bold">{{ $line->ordered_quantity }} {{ \Illuminate\Support\Str::plural($lineUnit, $line->ordered_quantity) }}</span></div>
-                                        <div>Received: <span class="font-mono font-bold text-primary-700">{{ $line->received_quantity }} {{ \Illuminate\Support\Str::plural($lineUnit, $line->received_quantity) }}</span></div>
-                                        <div>QC accepted: <strong>{{ $line->accepted_quantity }} {{ $lineUnit }}</strong></div>
-                                        <div>QC rejected: <strong>{{ $line->rejected_quantity }} {{ $lineUnit }}</strong></div>
-                                        <div>Pending QC: <strong>{{ $line->quarantined_quantity }} {{ $lineUnit }}</strong></div>
-                                        <div>Awaiting put-away: <strong>{{ $line->pending_put_away_quantity }} {{ $baseUnit }}</strong></div>
-                                        <div>Available from this receipt: <strong>{{ max(0, $line->accepted_quantity * $conversion - $line->pending_put_away_quantity) }} {{ $baseUnit }}</strong></div>
-                                        <div>PO outstanding: <strong>{{ $line->purchaseOrderLine?->outstandingQuantity() ?? 0 }} {{ $lineUnit }}</strong></div>
-                                        <div>Returned: <strong>{{ $line->returned_quantity }} {{ $baseUnit }}</strong></div>
-                                        <div class="rounded bg-neutral-50 px-2 py-1 text-[11px] font-mono text-neutral-600 border border-neutral-200">
-                                            = <strong class="text-primary-800">{{ $baseQty }}</strong> {{ \Illuminate\Support\Str::plural($baseUnit, $baseQty) }} inventory
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <div class="text-xs space-y-0.5">
-                                        @if($line->batch_number)
-                                            <p><span class="font-medium text-neutral-700">Batch:</span> <span class="font-mono">{{ $line->batch_number }}</span></p>
-                                        @endif
-                                        @if($line->serial_number)
-                                            <p><span class="font-medium text-neutral-700">Serial:</span> <span class="font-mono">{{ $line->serial_number }}</span></p>
-                                        @endif
-                                        @if($line->expiry_date)
-                                            <p><span class="font-medium text-neutral-700">Expiry:</span> <span class="{{ $line->expiry_date->isPast() ? 'text-rose-600 font-semibold' : 'text-neutral-700' }}">{{ $line->expiry_date->format('M d, Y') }}</span></p>
-                                        @endif
-                                        @if(!$line->batch_number && !$line->serial_number && !$line->expiry_date)
-                                            <span class="text-neutral-400 italic">No batch/serial registered</span>
-                                        @endif
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <div class="text-xs space-y-1">
-                                        <span class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-semibold {{ $line->item_condition === 'good' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200' }}">
-                                            {{ $line->item_condition === 'good' ? 'Good Condition' : ucfirst(str_replace('_', ' ', $line->item_condition ?? 'Inspection')) }}
-                                        </span>
-                                        @if($line->destinationLocation)
-                                            <div class="text-[11px] text-neutral-500">
-                                                Target: <strong class="text-neutral-800">{{ $line->destinationLocation->name }}</strong>
-                                            </div>
-                                        @endif
-                                        @can(\App\Enums\Permission::RecordMovements->value)
-                                            @if($line->rejected_quantity * $conversion > $line->returned_quantity)
-                                                <form method="POST" action="{{ route('inventory.receiving.return', [$goodsReceiptNote, $line]) }}"
-                                                      data-confirm-title="Return rejected stock"
-                                                      data-confirm-message="Confirm physical return of the rejected base units to the supplier."
-                                                      data-confirm-label="Record return" class="mt-2 space-y-1">
-                                                    @csrf
-                                                    <input type="hidden" name="return_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
-                                                    <label class="block text-[11px] font-medium">Return quantity ({{ $baseUnit }})</label>
-                                                    <input type="number" name="quantity" min="1" max="{{ $line->rejected_quantity * $conversion - $line->returned_quantity }}" value="{{ $line->rejected_quantity * $conversion - $line->returned_quantity }}" required class="w-24 rounded border-neutral-300 text-xs">
-                                                    <button type="submit" class="block text-xs font-semibold text-rose-700 underline">Return rejected stock</button>
-                                                </form>
-                                            @endif
-                                        @endcan
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4 text-right font-mono text-neutral-700 text-xs">
-                                    ₱{{ number_format($line->unit_cost, 2) }}/{{ $lineUnit }}
-                                </td>
-                                <td class="px-6 py-4 text-right font-mono font-semibold text-neutral-900 text-xs">
-                                    ₱{{ number_format($lineTotal, 2) }}
-                                </td>
-                                <td class="px-6 py-4 text-center">
-                                    @if(!$inspection || in_array($inspection->inspection_status, ['pending_sample', 'partially_disposed']))
-                                        <span class="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200">
-                                            Pending QA Assay
-                                        </span>
-                                    @elseif($inspection->inspection_status === 'approved')
-                                        <span class="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800 border border-emerald-200">
-                                            Accepted (Put-Away Pending)
-                                        </span>
-                                    @elseif($inspection->inspection_status === 'rejected')
-                                        <span class="inline-flex items-center gap-1 rounded bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-800 border border-rose-200">
-                                            Rejected (Blocked)
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1 rounded bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-800 border border-neutral-200">
-                                            {{ ucfirst($inspection->inspection_status) }}
-                                        </span>
-                                    @endif
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="px-6 py-8 text-center text-sm text-neutral-500">
-                                    No line items associated with this Goods Receipt Note.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                    <tfoot class="border-t border-neutral-200 bg-neutral-50 font-semibold text-neutral-900 text-xs">
-                        <tr>
-                            <td colspan="4" class="px-6 py-3 text-right">Total Received Goods Value:</td>
-                            <td class="px-6 py-3 text-right font-mono font-bold text-primary-700" colspan="2">
-                                ₱{{ number_format($goodsReceiptNote->lines->sum(fn ($l) => $l->received_quantity * $l->unit_cost), 2) }}
-                            </td>
-                            <td></td>
-                        </tr>
-                        @if($goodsReceiptNote->purchaseOrder)
-                            <tr class="text-neutral-500 font-normal">
-                                <td colspan="4" class="px-6 py-2 text-right">Original Purchase Order Total:</td>
-                                <td class="px-6 py-2 text-right font-mono" colspan="2">
-                                    ₱{{ number_format((float) $goodsReceiptNote->purchaseOrder->total_amount, 2) }}
-                                </td>
-                                <td></td>
-                            </tr>
-                        @endif
-                    </tfoot>
-                </table>
-            </div>
-        </div>
+            </section>
+        @endif
     </div>
 </x-app-layout>

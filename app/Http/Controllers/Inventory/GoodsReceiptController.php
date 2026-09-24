@@ -90,6 +90,10 @@ class GoodsReceiptController extends Controller implements HasMiddleware
             'lines.inspections.warehouseTasks.destinationLocation',
             'lines.inspections.warehouseTasks.sourceLocation',
             'lines.inspections.inspectedBy',
+            'inspectionAcceptanceReport.inspectedBy',
+            'inspectionAcceptanceReport.acceptedBy',
+            'inspectionAcceptanceReport.documents.uploadedBy',
+            'documents.uploadedBy',
         ]);
 
         $storageLocations = StorageLocation::where('status', 'active')

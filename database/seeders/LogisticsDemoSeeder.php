@@ -387,40 +387,7 @@ class LogisticsDemoSeeder extends Seeder
         // 7. Seed Authentic PDF Records in Storage
         Storage::disk('local')->makeDirectory('logistics_documents');
 
-        $drPdfContent = DemoPdfBuilder::create(
-            title: 'ZUELLIG PHARMA PHILIPPINES, INC. - DELIVERY RECEIPT',
-            sections: [
-                [
-                    'heading' => 'DELIVERY & CONSIGNMENT PARTICULARS',
-                    'lines' => [
-                        'Supplier / Carrier: Zuellig Pharma Philippines, Inc. (Cold Chain Fleet)',
-                        'Dispatch Facility: KM 14 West Service Road, South Superhighway, Paranaque City',
-                        'Recipient: Hospital Information Management System (Central Receiving Dock Bay 1)',
-                        'Purchase Order Ref: PO-2026-09-0145 | Waybill: WB-MNL-00912 | Plate: NDO-9821',
-                        'Delivery Date: '.now()->toDateString().' | Mode: Cold Chain Direct Fleet Transfer',
-                    ],
-                ],
-                [
-                    'heading' => 'DELIVERED INVENTORY & BATCH SPECIFICATIONS',
-                    'table' => [
-                        'headers' => ['Item / Product Name', 'Batch / Lot No.', 'Expiry Date', 'Quantity', 'Unit Cost (PHP)'],
-                        'rows' => [
-                            ['Verorab Inactivated Rabies Vaccine 0.5mL + Diluent', 'VER-2026-881', now()->addYears(2)->toDateString(), '500 vials', '1,450.00'],
-                        ],
-                    ],
-                ],
-                [
-                    'heading' => 'RECEIVING INSPECTION & COLD CHAIN COMPLIANCE',
-                    'lines' => [
-                        'Storage Requirement: Biological Cold Chain Protocol (2.0 deg C to 8.0 deg C)',
-                        'Sensor Logger SEN-LOG-ZP-9941: Transit Range 3.4 deg C - 5.6 deg C (Temperature Excursion: None)',
-                        'Receiving Officer: Eduardo Reyes (Warehouse Receiving Staff)',
-                        'Physical Inspection: Packaging intact, seal unbroken, tamper-evident indicators valid.',
-                    ],
-                ],
-            ],
-            subtitle: 'Healthcare Logistics & Central Receiving Documentation | DR No: DR-ZP-889922'
-        );
+        $drPdfContent = DemoPdfBuilder::createDeliveryReceipt($grnRabies);
 
         $docPath1 = 'logistics_documents/demo_dr_889922.pdf';
         Storage::disk('local')->put($docPath1, $drPdfContent);

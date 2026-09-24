@@ -2,6 +2,10 @@
 
 namespace App\Support;
 
+use App\Models\GoodsReceiptNote;
+use App\Models\GoodsReceiptNoteLine;
+use Illuminate\Support\Str;
+
 class DemoPdfBuilder
 {
     // Standard A4 Dimensions in PDF Points (72 pts/inch: 210mm x 297mm)
@@ -33,7 +37,7 @@ class DemoPdfBuilder
     /**
      * Build a formatted PDF document binary with institutional header, detail cards, styled tables, and footer.
      *
-     * @param  array<int, array{heading?: string, lines?: array<string>, table?: array{headers: array<string>, rows: array<array<string>>}}>  $sections
+     * @param  array<int, array{heading?: string, lines?: array<string>, table?: array{headers: array<string>, widths?: array<float|int>, rows: array<array<string>>}}>  $sections
      */
     public static function create(string $title, array $sections, ?string $subtitle = null): string
     {
@@ -43,6 +47,68 @@ class DemoPdfBuilder
         }
 
         return (new self())->renderGeneralDocument($title, $subtitle, $sections);
+    }
+
+    /**
+     * Build a delivery receipt using only data recorded on the receiving record.
+     */
+    public static function createDeliveryReceipt(GoodsReceiptNote $receipt): string
+    {
+        $receipt->loadMissing(['supplier', 'purchaseOrder', 'receivedBy', 'lines.item', 'lines.destinationLocation']);
+
+        $destinations = $receipt->lines
+            ->pluck('destinationLocation.name')
+            ->filter()
+            ->unique()
+            ->values()
+            ->join(', ');
+        $particulars = collect([
+            'Supplier: '.($receipt->supplier?->name ?? 'Not recorded'),
+            'Purchase Order Ref: '.($receipt->purchaseOrder?->po_number ?? 'Not recorded'),
+            'Delivery Receipt No: '.($receipt->dr_number ?: $receipt->packing_slip_number ?: 'Not recorded'),
+            'Delivery Date: '.$receipt->received_at?->format('Y-m-d H:i'),
+            $destinations !== '' ? 'Receiving Destination: '.$destinations : null,
+            $receipt->carrier_name ? 'Carrier: '.$receipt->carrier_name : null,
+            $receipt->waybill_number ? 'Waybill: '.$receipt->waybill_number : null,
+        ])->filter()->values()->all();
+        $rows = $receipt->lines->map(function (GoodsReceiptNoteLine $line): array {
+            $unit = $line->purchase_unit ?: ($line->item?->unit ?: 'unit');
+            $itemLabel = $line->item?->name ?? 'Item record unavailable';
+            if ($line->item?->sku) {
+                $itemLabel .= ' ['.$line->item->sku.']';
+            }
+
+            return [
+                $itemLabel,
+                $line->batch_number ?: ($line->lot_number ?: 'Not recorded'),
+                $line->expiry_date?->format('Y-m-d') ?? '',
+                $line->received_quantity.' '.$unit,
+                number_format((float) $line->unit_cost, 2),
+            ];
+        })->all();
+        $inspectionLines = collect([
+            'Receiving Officer: '.($receipt->receivedBy?->name ?? 'Not recorded'),
+            'Receiving Status: '.Str::headline($receipt->receipt_status),
+            $receipt->delivery_status ? 'Delivery Status: '.Str::headline($receipt->delivery_status) : null,
+            $receipt->notes ? 'Receiving Notes: '.$receipt->notes : null,
+        ])->filter()->values()->all();
+
+        return self::create(
+            title: strtoupper($receipt->supplier?->name ?? 'Supplier').' - DELIVERY RECEIPT',
+            sections: [
+                ['heading' => 'DELIVERY & CONSIGNMENT PARTICULARS', 'lines' => $particulars],
+                [
+                    'heading' => 'DELIVERED INVENTORY & BATCH SPECIFICATIONS',
+                    'table' => [
+                        'headers' => ['Item / Product Name & SKU', 'Batch / Lot No.', 'Expiry Date', 'Quantity', 'Unit Cost (PHP)'],
+                        'widths' => [2.8, 1.25, 1.1, 0.9, 1.1],
+                        'rows' => $rows,
+                    ],
+                ],
+                ['heading' => 'RECEIVING & INSPECTION STATUS', 'lines' => $inspectionLines],
+            ],
+            subtitle: 'HIMS Goods Receipt '.$receipt->grn_number.' | DR No: '.($receipt->dr_number ?: $receipt->packing_slip_number ?: 'Not recorded'),
+        );
     }
 
     /**
@@ -1109,31 +1175,72 @@ class DemoPdfBuilder
                 $colCount = count($headers);
 
                 if ($colCount > 0) {
-                    $colW = self::CONTENT_WIDTH / $colCount;
-                    $headerHeight = 20.0;
+                    $configuredWidths = $section['table']['widths'] ?? [];
+                    $configuredTotal = array_sum($configuredWidths);
+                    $columnWidths = [];
+
+                    for ($columnIndex = 0; $columnIndex < $colCount; $columnIndex++) {
+                        $configuredWidth = (float) ($configuredWidths[$columnIndex] ?? 0);
+                        $columnWidths[] = $configuredTotal > 0
+                            ? self::CONTENT_WIDTH * ($configuredWidth / $configuredTotal)
+                            : self::CONTENT_WIDTH / $colCount;
+                    }
+
+                    $headerLines = [];
+                    foreach ($headers as $idx => $headerText) {
+                        $headerLines[$idx] = $this->wrapText((string) $headerText, $columnWidths[$idx] - 14.0, 7.5, true);
+                    }
+
+                    $headerLineCount = max(array_map('count', $headerLines));
+                    $headerHeight = max(20.0, ($headerLineCount * 9.0) + 8.0);
 
                     $stream .= "0.91 0.94 0.975 rg\n" . self::MARGIN_LEFT . " " . ($y - $headerHeight) . " " . self::CONTENT_WIDTH . " {$headerHeight} re f\n";
                     $stream .= "0.75 0.80 0.88 RG\n0.75 w\n" . self::MARGIN_LEFT . " " . ($y - $headerHeight) . " " . self::CONTENT_WIDTH . " {$headerHeight} re S\n";
 
-                    foreach ($headers as $idx => $headerText) {
-                        $xPos = self::MARGIN_LEFT + ($idx * $colW) + 7.0;
-                        $stream .= "BT\n/F1 8 Tf\n0.06 0.16 0.32 rg\n{$xPos} " . ($y - 13.5) . " Td\n(" . self::escape($headerText) . ") Tj\nET\n";
+                    $columnX = self::MARGIN_LEFT;
+                    foreach ($headerLines as $idx => $lines) {
+                        $textY = $y - 12.0;
+                        foreach ($lines as $headerLine) {
+                            $xPos = $columnX + 7.0;
+                            $stream .= "BT\n/F1 7.5 Tf\n0.06 0.16 0.32 rg\n{$xPos} {$textY} Td\n(" . self::escape($headerLine) . ") Tj\nET\n";
+                            $textY -= 9.0;
+                        }
+                        $columnX += $columnWidths[$idx];
                     }
 
                     $y -= $headerHeight;
 
                     foreach ($rows as $rIdx => $row) {
-                        $rowHeight = 20.0;
+                        $wrappedCells = [];
+                        foreach ($headers as $cIdx => $_header) {
+                            $wrappedCells[$cIdx] = $this->wrapText(
+                                (string) ($row[$cIdx] ?? ''),
+                                $columnWidths[$cIdx] - 14.0,
+                                7.5,
+                                $cIdx === 0 || $cIdx === ($colCount - 1)
+                            );
+                        }
+
+                        $rowLineCount = max(array_map('count', $wrappedCells));
+                        $rowHeight = max(20.0, ($rowLineCount * 9.5) + 8.0);
                         $rowBg = ($rIdx % 2 === 0) ? '1 1 1 rg' : '0.985 0.990 0.995 rg';
 
                         $stream .= "{$rowBg}\n" . self::MARGIN_LEFT . " " . ($y - $rowHeight) . " " . self::CONTENT_WIDTH . " {$rowHeight} re f\n";
                         $stream .= "0.88 0.90 0.93 RG\n0.4 w\n" . self::MARGIN_LEFT . " " . ($y - $rowHeight) . " " . self::CONTENT_WIDTH . " {$rowHeight} re S\n";
 
-                        foreach ($row as $cIdx => $cellText) {
-                            $xPos = self::MARGIN_LEFT + ($cIdx * $colW) + 7.0;
+                        $columnX = self::MARGIN_LEFT;
+                        foreach ($wrappedCells as $cIdx => $cellLines) {
                             $font = ($cIdx === ($colCount - 1) || $cIdx === 0) ? '/F1' : '/F2';
                             $color = ($cIdx === ($colCount - 1)) ? '0.08 0.22 0.55 rg' : '0.15 0.18 0.22 rg';
-                            $stream .= "BT\n{$font} 7.5 Tf\n{$color}\n{$xPos} " . ($y - 13.5) . " Td\n(" . self::escape((string) $cellText) . ") Tj\nET\n";
+                            $textY = $y - 12.0;
+
+                            foreach ($cellLines as $cellLine) {
+                                $xPos = $columnX + 7.0;
+                                $stream .= "BT\n{$font} 7.5 Tf\n{$color}\n{$xPos} {$textY} Td\n(" . self::escape($cellLine) . ") Tj\nET\n";
+                                $textY -= 9.5;
+                            }
+
+                            $columnX += $columnWidths[$cIdx];
                         }
 
                         $y -= $rowHeight;
