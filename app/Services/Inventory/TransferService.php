@@ -166,32 +166,67 @@ class TransferService
             }
 
             $hasDiscrepancy = false;
-            $linesInput = $receiveData['lines'] ?? [];
+            $linesInput = collect($receiveData['lines'] ?? []);
+
+            if ($linesInput->count() !== $tr->lines->count()
+                || $linesInput->pluck('line_id')->unique()->count() !== $tr->lines->count()) {
+                throw ValidationException::withMessages([
+                    'lines' => ['Every dispatched transfer line must be reconciled exactly once.'],
+                ]);
+            }
+
+            $receiptPlan = [];
 
             foreach ($tr->lines as $line) {
-                $lineInput = collect($linesInput)->firstWhere('line_id', $line->id) ?? [];
-                $receivedQty = isset($lineInput['received_quantity']) ? (int) $lineInput['received_quantity'] : $line->dispatched_quantity;
+                $lineInput = $linesInput->firstWhere('line_id', $line->id);
+
+                if (! is_array($lineInput)) {
+                    throw ValidationException::withMessages([
+                        'lines' => ["Transfer line {$line->id} is missing from the destination reconciliation."],
+                    ]);
+                }
+
+                $receivedQty = (int) $lineInput['received_quantity'];
                 $damagedQty = (int) ($lineInput['damaged_quantity'] ?? 0);
                 $lostQty = (int) ($lineInput['lost_quantity'] ?? 0);
 
                 if (($receivedQty + $damagedQty + $lostQty) !== $line->dispatched_quantity) {
-                    $lostQty = max(0, $line->dispatched_quantity - ($receivedQty + $damagedQty));
+                    throw ValidationException::withMessages([
+                        'lines' => ["The accepted, damaged, and lost quantities for {$line->item->name} must total {$line->dispatched_quantity}."],
+                    ]);
                 }
 
                 if ($damagedQty > 0 || $lostQty > 0) {
                     $hasDiscrepancy = true;
                 }
 
+                $receiptPlan[] = compact('line', 'receivedQty', 'damagedQty', 'lostQty');
+            }
+
+            if ($hasDiscrepancy && blank($receiveData['discrepancy_reason'] ?? null)) {
+                throw ValidationException::withMessages([
+                    'discrepancy_reason' => ['Explain the damaged or lost quantity before confirming the receipt.'],
+                ]);
+            }
+
+            $destLocation = StorageLocation::lockForUpdate()->find($tr->destination_location_id);
+
+            if (! $destLocation || $destLocation->status !== 'active') {
+                throw ValidationException::withMessages([
+                    'destination_location_id' => ['Destination location is inactive and cannot receive transferred inventory. Reassign or reactivate the location to receive.'],
+                ]);
+            }
+
+            foreach ($receiptPlan as $plannedReceipt) {
+                /** @var StockTransferLine $line */
+                $line = $plannedReceipt['line'];
+                $receivedQty = $plannedReceipt['receivedQty'];
+                $damagedQty = $plannedReceipt['damagedQty'];
+                $lostQty = $plannedReceipt['lostQty'];
+
                 $item = InventoryItem::lockForUpdate()->findOrFail($line->item_id);
                 $inTransitLocId = $tr->in_transit_location_id;
                 $destLocId = $tr->destination_location_id;
-
-                $destLocation = StorageLocation::find($destLocId);
-                if (! $destLocation || $destLocation->status !== 'active') {
-                    throw ValidationException::withMessages([
-                        'destination_location_id' => ["Destination location is inactive and cannot receive transferred inventory. Reassign or reactivate location to receive."]
-                    ]);
-                }
 
                 // 1. Decrement In-Transit balance
                 $this->automationService->adjustInTransitStock($item->id, $inTransitLocId, $line->item_batch_id, -$line->dispatched_quantity);

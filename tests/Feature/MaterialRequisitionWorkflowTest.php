@@ -5,13 +5,16 @@ namespace Tests\Feature;
 use App\Enums\AuditAction;
 use App\Enums\Permission;
 use App\Enums\UserRole;
+use App\Enums\WarehouseTaskType;
 use App\Models\CostCenter;
 use App\Models\InventoryItem;
 use App\Models\ItemStockLevel;
 use App\Models\MaterialRequisition;
 use App\Models\StorageLocation;
 use App\Models\User;
+use App\Models\WarehouseTask;
 use App\Services\Inventory\IssuanceEngine;
+use App\Services\Warehouse\WarehouseTaskService;
 use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -302,19 +305,10 @@ class MaterialRequisitionWorkflowTest extends TestCase
         ]);
     }
 
-    public function test_cancellation_releases_atp_reservations(): void
+    public function test_requester_can_cancel_only_before_approval(): void
     {
         $requester = $this->createPharmacyUser();
-        $manager = $this->createInventoryManager();
         $item = $this->createItem(['quantity_on_hand' => 100]);
-        $location = $this->createLocation();
-
-        ItemStockLevel::create([
-            'item_id' => $item->id,
-            'storage_location_id' => $location->id,
-            'quantity' => 100,
-            'reserved_quantity' => 0,
-        ]);
 
         $this->actingAs($requester)->post(route('inventory.requisitions.store'), [
             'department' => 'Emergency',
@@ -325,13 +319,6 @@ class MaterialRequisitionWorkflowTest extends TestCase
         ]);
 
         $requisition = MaterialRequisition::first();
-
-        // Approve it first to trigger ATP reservation
-        $this->actingAs($manager)->post(route('inventory.requisitions.approve', $requisition));
-        $item->refresh();
-        $this->assertEquals(20, $item->reservedQuantity());
-
-        // Cancel the approved requisition
         $response = $this->actingAs($requester)->post(route('inventory.requisitions.cancel', $requisition), [
             'cancellation_reason' => 'Patient transferred to another hospital, medication no longer required.',
         ]);
@@ -340,18 +327,110 @@ class MaterialRequisitionWorkflowTest extends TestCase
         $response->assertSessionHas('success');
 
         $requisition->refresh();
-        $item->refresh();
 
         $this->assertEquals('cancelled', $requisition->status);
-        $this->assertEquals(0, $item->reservedQuantity()); // ATP hold released!
-        $this->assertEquals(100, $item->availableToPromise());
-
-        // Verify Audit Log
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $requester->id,
             'action' => AuditAction::CancelledMaterialRequisition->value,
             'target_id' => $requisition->id,
         ]);
+    }
+
+    public function test_approved_requisition_cannot_be_cancelled_and_keeps_its_stock_reservation(): void
+    {
+        $requester = $this->createPharmacyUser();
+        $manager = $this->createInventoryManager();
+        $item = $this->createItem(['quantity_on_hand' => 100]);
+        $location = $this->createLocation();
+        ItemStockLevel::create([
+            'item_id' => $item->id,
+            'storage_location_id' => $location->id,
+            'quantity' => 100,
+            'reserved_quantity' => 0,
+        ]);
+
+        $requisition = app(IssuanceEngine::class)->createRequisition([
+            'department' => 'Pharmacy',
+            'lines' => [['item_id' => $item->id, 'requested_quantity' => 20]],
+        ], $requester);
+        app(IssuanceEngine::class)->approveRequisition($requisition, $manager);
+
+        $this->actingAs($requester)
+            ->post(route('inventory.requisitions.cancel', $requisition), [
+                'cancellation_reason' => 'Attempted after approval.',
+            ])
+            ->assertSessionHasErrors(['cancel']);
+
+        $this->assertSame('approved', $requisition->fresh()->status);
+        $this->assertSame(20, $item->fresh()->reservedQuantity());
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => AuditAction::CancelledMaterialRequisition->value,
+            'target_id' => $requisition->id,
+        ]);
+
+        $this->actingAs($requester)
+            ->get(route('inventory.requisitions.show', $requisition))
+            ->assertOk()
+            ->assertDontSeeText('Cancel Requisition');
+    }
+
+    public function test_issue_action_opens_and_completes_the_generated_warehouse_workflow(): void
+    {
+        $requester = $this->createPharmacyUser();
+        $manager = $this->createInventoryManager();
+        $warehouseStaff = $this->createWarehouseStaff();
+        $item = $this->createItem(['quantity_on_hand' => 40]);
+        $source = $this->createLocation();
+        StorageLocation::create([
+            'code' => 'DISPATCH-01',
+            'name' => 'Department Dispatch Staging',
+            'zone' => 'Dispatch',
+            'status' => 'active',
+            'is_dispatch_staging' => true,
+        ]);
+        ItemStockLevel::create([
+            'item_id' => $item->id,
+            'storage_location_id' => $source->id,
+            'quantity' => 40,
+            'reserved_quantity' => 0,
+        ]);
+
+        $requisition = app(IssuanceEngine::class)->createRequisition([
+            'department' => 'Pharmacy',
+            'lines' => [['item_id' => $item->id, 'requested_quantity' => 10]],
+        ], $requester);
+        app(IssuanceEngine::class)->approveRequisition($requisition, $manager);
+        $task = WarehouseTask::query()->sole();
+
+        $this->actingAs($warehouseStaff)
+            ->get(route('inventory.requisitions.show', $requisition))
+            ->assertOk()
+            ->assertSeeText('Issue Stock to Department')
+            ->assertSee(route('inventory.warehouse-tasks.show', $task), false)
+            ->assertDontSeeText('Cancel Requisition');
+
+        $tasks = app(WarehouseTaskService::class);
+        $tasks->start($task, $warehouseStaff);
+        $tasks->scan($task, $source->code, $warehouseStaff);
+        $tasks->scan($task, $item->sku, $warehouseStaff);
+        $tasks->scan($task, 'DISPATCH-01', $warehouseStaff);
+        $tasks->complete($task, 10, $warehouseStaff);
+
+        $packTask = WarehouseTask::query()->where('task_type', WarehouseTaskType::Pack)->sole();
+        $tasks->start($packTask, $warehouseStaff);
+        $tasks->scan($packTask, $item->sku, $warehouseStaff);
+        $tasks->complete($packTask, 10, $warehouseStaff);
+
+        $dispatchTask = WarehouseTask::query()->where('task_type', WarehouseTaskType::Dispatch)->sole();
+        $tasks->start($dispatchTask, $warehouseStaff);
+        $tasks->scan($dispatchTask, 'DISPATCH-01', $warehouseStaff);
+        $tasks->scan($dispatchTask, $item->sku, $warehouseStaff);
+        $tasks->complete($dispatchTask, 10, $warehouseStaff);
+
+        $this->assertSame('issued', $requisition->fresh()->status);
+        $this->assertSame(10, $requisition->fresh()->lines()->sole()->issued_quantity);
+        $this->assertSame(30, $item->fresh()->quantity_on_hand);
+        $this->assertSame(0, $item->fresh()->reservedQuantity());
     }
 
     public function test_requisition_show_displays_details_and_picklist(): void
@@ -982,5 +1061,3 @@ class MaterialRequisitionWorkflowTest extends TestCase
         $this->assertSame($pharmCostCenter->id, $persisted->cost_center_id);
     }
 }
-
-

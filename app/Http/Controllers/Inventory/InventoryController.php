@@ -2,12 +2,11 @@
 
 namespace App\Http\Controllers\Inventory;
 
-use App\Enums\AlertStatus;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\InventoryItem;
 use App\Models\ItemCategory;
 use App\Models\PurchaseOrder;
-use App\Models\StockAlert;
 use App\Models\StockMovement;
 use App\Models\StorageLocation;
 use App\Models\Supplier;
@@ -154,17 +153,25 @@ class InventoryController extends Controller implements HasMiddleware
         $stockStatus = $this->reports->stockStatus();
         $summary = $this->reports->summary($stockStatus);
 
-        // Alerts still describing a live condition, worst severity first.
-        $activeAlerts = StockAlert::with(['item', 'batch', 'location'])
-            ->where('status', '!=', AlertStatus::Resolved)
-            ->orderByRaw("case severity when 'critical' then 0 when 'warning' then 1 else 2 end")
-            ->latest('created_at')
+        // Use current balances, which are also the source of truth on the
+        // inventory alerts page. Persisted alert rows can lag behind imports
+        // or older data that predates real-time alert synchronization.
+        $attentionItems = InventoryItem::query()
+            ->where(function ($query): void {
+                $query->where('quantity_on_hand', '<=', 0)
+                    ->orWhere(function ($lowStock): void {
+                        $lowStock->where('reorder_level', '>', 0)
+                            ->whereColumn('quantity_on_hand', '<=', 'reorder_level');
+                    });
+            })
+            ->orderBy('quantity_on_hand')
+            ->orderBy('name')
             ->take(6)
             ->get();
 
         return [
-            'activeAlerts' => $activeAlerts,
-            'openAlertCount' => StockAlert::where('status', AlertStatus::Open)->count(),
+            'attentionItems' => $attentionItems,
+            'openAlertCount' => $summary['needs_attention'],
             'totalItems' => $summary['items'],
             'lowStockItems' => $summary['needs_attention'],
             'outOfStockItems' => $stockStatus['out_of_stock']['items'],

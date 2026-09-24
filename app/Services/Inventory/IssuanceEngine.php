@@ -312,48 +312,19 @@ class IssuanceEngine
     }
 
     /**
-     * Cancel a store requisition and release any reserved ATP stock.
+     * Let the original requester withdraw a requisition before approval.
      */
     public function cancelRequisition(MaterialRequisition $requisition, User $actor, ?string $reason = null): MaterialRequisition
     {
         return DB::transaction(function () use ($requisition, $actor, $reason) {
-            $req = MaterialRequisition::lockForUpdate()->with('lines.item')->findOrFail($requisition->id);
+            $req = MaterialRequisition::lockForUpdate()->findOrFail($requisition->id);
 
-            if ($req->requesting_user_id !== $actor->id && ! $actor->hasPermission(Permission::ApproveRequisition)) {
-                throw new DomainException('Only the requester or an authorized requisition approver may cancel this requisition.');
+            if ($req->requesting_user_id !== $actor->id) {
+                throw new DomainException('Only the original requester may cancel this requisition.');
             }
 
-            if (! in_array($req->status, ['submitted', 'pending_approval', 'approved', 'rejected'], true)) {
+            if (! in_array($req->status, ['submitted', 'pending_approval'], true)) {
                 throw new DomainException("Cannot cancel requisition already in status {$req->status}.");
-            }
-
-            // If requisition was approved, release any placed ATP reservations
-            if ($req->status === 'approved') {
-                foreach ($req->lines as $line) {
-                    $openTasks = WarehouseTask::query()
-                        ->where('reference_type', $line->getMorphClass())
-                        ->where('reference_id', $line->id)
-                        ->where('task_type', WarehouseTaskType::Pick->value)
-                        ->whereNotIn('status', ['completed', 'cancelled'])
-                        ->lockForUpdate()
-                        ->get();
-
-                    if ($openTasks->isNotEmpty()) {
-                        foreach ($openTasks as $task) {
-                            $remainingReservation = max(0, $task->requested_quantity - $task->completed_quantity);
-                            if ($remainingReservation > 0) {
-                                $this->automationService->releaseReservation($task->item_id, $task->source_location_id, $task->item_batch_id, $remainingReservation);
-                            }
-                            $this->warehouseTasks->cancel($task, $reason ?? 'Source requisition cancelled', $actor);
-                        }
-                    } elseif ($line->reserved_quantity > 0) {
-                        $this->releaseReservedStock($line->item_id, $line->reserved_quantity);
-                    }
-
-                    $line->reserved_quantity = 0;
-                    $line->line_status = 'cancelled';
-                    $line->save();
-                }
             }
 
             $req->status = 'cancelled';
@@ -475,7 +446,22 @@ class IssuanceEngine
 
             $linesInput = $issueData['lines'] ?? [];
 
+            $submittedLineIds = collect($linesInput)->pluck('line_id')->map(fn ($id) => (int) $id);
+            $expectedLineIds = $req->lines
+                ->filter(fn (MaterialRequisitionLine $line) => $line->issued_quantity < $line->requested_quantity)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id);
+
+            if ($submittedLineIds->duplicates()->isNotEmpty()
+                || $submittedLineIds->sort()->values()->all() !== $expectedLineIds->sort()->values()->all()) {
+                throw new DomainException('Issuance must include each unfulfilled requisition line exactly once.');
+            }
+
             foreach ($req->lines as $line) {
+                if ($line->issued_quantity >= $line->requested_quantity) {
+                    continue;
+                }
+
                 $lineInput = collect($linesInput)->firstWhere('line_id', $line->id) ?? [];
                 $issueQty = isset($lineInput['quantity']) ? (int) $lineInput['quantity'] : ($line->requested_quantity - $line->issued_quantity);
                 $remainingQty = $line->requested_quantity - $line->issued_quantity;

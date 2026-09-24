@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\InventoryItem;
 use App\Models\ItemStockLevel;
+use App\Models\StockAlert;
 use App\Models\StorageLocation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -108,6 +109,21 @@ class DashboardLiveEndpointTest extends TestCase
         // The rendered partial carries the live quantity, not the snapshot.
         $this->assertStringContainsString('Surgical Gloves (Large)', $response->json('alertsHtml'));
         $this->assertStringContainsString('40', $response->json('alertsHtml'));
+    }
+
+    public function test_open_alert_count_matches_live_reorder_conditions_without_persisted_alert_rows(): void
+    {
+        [$user] = $this->stockedItem(quantity: 40, reorderLevel: 50);
+
+        $this->assertSame(0, StockAlert::count());
+
+        $response = $this->actingAs($user)->get('/dashboard/live');
+
+        $response->assertOk()
+            ->assertJsonPath('openAlertCount', 1)
+            ->assertJsonPath('lowStockItems', 1);
+        $this->assertStringContainsString('Surgical Gloves (Large)', $response->json('alertsHtml'));
+        $this->assertStringContainsString('reorder at 50', $response->json('alertsHtml'));
     }
 
     public function test_it_clears_the_counters_once_stock_is_replenished(): void

@@ -197,13 +197,26 @@ class StockTransferController extends Controller implements HasMiddleware
 
     public function receive(Request $request, StockTransfer $stockTransfer): RedirectResponse
     {
+        $lineCount = $stockTransfer->lines()->count();
+
         $validated = $request->validate([
-            'lines' => ['nullable', 'array'],
-            'lines.*.line_id' => ['required', 'exists:stock_transfer_lines,id'],
-            'lines.*.received_quantity' => ['required', 'integer', 'min:0'],
-            'lines.*.damaged_quantity' => ['nullable', 'integer', 'min:0'],
-            'lines.*.lost_quantity' => ['nullable', 'integer', 'min:0'],
+            'lines' => ['required', 'array', 'size:'.$lineCount],
+            'lines.*.line_id' => [
+                'required',
+                'integer',
+                'distinct',
+                Rule::exists('stock_transfer_lines', 'id')
+                    ->where(fn ($query) => $query->where('stock_transfer_id', $stockTransfer->id)),
+            ],
+            'lines.*.received_quantity' => ['required', 'integer', 'min:0', 'max:999999'],
+            'lines.*.damaged_quantity' => ['nullable', 'integer', 'min:0', 'max:999999'],
+            'lines.*.lost_quantity' => ['nullable', 'integer', 'min:0', 'max:999999'],
             'discrepancy_reason' => ['nullable', 'string', 'max:500'],
+        ], [
+            'lines.required' => 'Every dispatched transfer line must be reconciled.',
+            'lines.size' => 'Every dispatched transfer line must be reconciled exactly once.',
+            'lines.*.line_id.exists' => 'A submitted line does not belong to this stock transfer.',
+            'lines.*.line_id.distinct' => 'Each stock transfer line may only be submitted once.',
         ]);
 
         try {

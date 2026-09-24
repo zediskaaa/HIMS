@@ -3144,7 +3144,7 @@ Alpine.data('dashboardLive', (endpoint) => ({
                 if (valueEl) valueEl.textContent = new Intl.NumberFormat().format(data.openAlertCount);
                 if (hintEl) {
                     hintEl.textContent = data.openAlertCount > 0
-                        ? 'Awaiting acknowledgement'
+                        ? 'Inventory conditions needing action'
                         : 'Nothing outstanding';
                 }
             }

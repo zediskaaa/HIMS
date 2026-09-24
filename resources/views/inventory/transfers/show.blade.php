@@ -15,7 +15,7 @@
             </div>
             <div class="flex items-center gap-3">
                 @if(in_array($stockTransfer->status, ['dispatched', 'in_transit']) && auth()->user()->can(\App\Enums\Permission::TransferStock->value))
-                    <button type="button" x-data @click="$dispatch('open-receive-modal')" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
+                    <button id="btn-receive-stock-destination" type="button" x-data @click="$dispatch('open-receive-modal')" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                         </svg>
@@ -26,7 +26,11 @@
         </div>
     </x-slot>
 
-    <div class="space-y-6" x-data="{ receiveModalOpen: false }" @open-receive-modal.window="receiveModalOpen = true">
+    <div id="stock-transfer-receiving-workflow"
+         class="space-y-6"
+         x-data="{ receiveModalOpen: {{ $errors->any() ? 'true' : 'false' }} }"
+         @open-receive-modal.window="receiveModalOpen = true"
+         @keydown.escape.window="receiveModalOpen = false">
 
             {{-- Flash Alerts --}}
             @if(session('success'))
@@ -191,11 +195,9 @@
                 </div>
             </div>
 
-        </div>
-
         {{-- RECEIVE STOCK AT DESTINATION MODAL --}}
         @can(\App\Enums\Permission::TransferStock->value)
-        <div x-show="receiveModalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;"
+        <div id="receive-stock-modal" x-show="receiveModalOpen" x-cloak class="fixed inset-0 z-50 overflow-y-auto"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100"
@@ -235,27 +237,28 @@
                                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                             <div>
                                                 <label class="block text-xs font-semibold text-emerald-700">Received Qty</label>
-                                                <input type="number" name="lines[{{ $idx }}][received_quantity]" min="0" max="{{ $line->dispatched_quantity }}" value="{{ $line->dispatched_quantity }}" required
+                                                <input type="number" name="lines[{{ $idx }}][received_quantity]" min="0" max="{{ $line->dispatched_quantity }}" value="{{ old('lines.'.$idx.'.received_quantity', $line->dispatched_quantity) }}" required
                                                        class="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-xs text-right">
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-semibold text-rose-700">Damaged Qty</label>
-                                                <input type="number" name="lines[{{ $idx }}][damaged_quantity]" min="0" max="{{ $line->dispatched_quantity }}" value="0"
+                                                <input type="number" name="lines[{{ $idx }}][damaged_quantity]" min="0" max="{{ $line->dispatched_quantity }}" value="{{ old('lines.'.$idx.'.damaged_quantity', 0) }}"
                                                        class="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 text-xs text-right">
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-semibold text-neutral-600">Lost In-Transit</label>
-                                                <input type="number" name="lines[{{ $idx }}][lost_quantity]" min="0" max="{{ $line->dispatched_quantity }}" value="0"
+                                                <input type="number" name="lines[{{ $idx }}][lost_quantity]" min="0" max="{{ $line->dispatched_quantity }}" value="{{ old('lines.'.$idx.'.lost_quantity', 0) }}"
                                                        class="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-neutral-500 focus:ring-neutral-500 text-xs text-right">
                                             </div>
                                         </div>
+                                        <p class="text-[11px] text-neutral-500">Accepted, damaged, and lost quantities must total {{ number_format($line->dispatched_quantity) }} dispatched units.</p>
                                     </div>
                                 @endforeach
 
                                 <div>
                                     <label class="block text-xs font-semibold uppercase tracking-wider text-neutral-700">Discrepancy Explanation (if damaged or lost)</label>
                                     <textarea name="discrepancy_reason" rows="2" placeholder="e.g. Carrier carton arrived crushed, vial leakage observed."
-                                              class="mt-1 block w-full rounded-lg border-neutral-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm"></textarea>
+                                              class="mt-1 block w-full rounded-lg border-neutral-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">{{ old('discrepancy_reason') }}</textarea>
                                 </div>
                             </div>
                         </div>
@@ -273,4 +276,5 @@
             </div>
         </div>
         @endcan
+    </div>
 </x-app-layout>

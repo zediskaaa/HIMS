@@ -124,7 +124,7 @@
             </div>
             {{-- Zone 3: Footer --}}
             <div class="mt-3.5 flex items-center border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
-                <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate" data-stat-hint>{{ $openAlertCount > 0 ? 'Awaiting acknowledgement' : 'Nothing outstanding' }}</span>
+                <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate" data-stat-hint>{{ $openAlertCount > 0 ? 'Inventory conditions needing action' : 'Nothing outstanding' }}</span>
             </div>
         </a>
 

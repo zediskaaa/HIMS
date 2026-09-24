@@ -50,7 +50,7 @@
                 @endif
 
                 {{-- Cancel Action --}}
-                @if(in_array($requisition->status, ['submitted', 'pending_approval', 'approved'], true) && ((auth()->id() === $requisition->requesting_user_id && auth()->user()->can(\App\Enums\Permission::CreateRequisition->value)) || auth()->user()->can(\App\Enums\Permission::ApproveRequisition->value)))
+                @if(in_array($requisition->status, ['submitted', 'pending_approval'], true) && auth()->id() === $requisition->requesting_user_id && auth()->user()->can(\App\Enums\Permission::CreateRequisition->value))
                     <button type="button" @click="cancelModalOpen = true" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 transition">
                         Cancel Requisition
                     </button>
@@ -58,12 +58,21 @@
 
                 {{-- Issue Action Button --}}
                 @if(in_array($requisition->status, ['approved', 'picking'], true) && auth()->user()->can(\App\Enums\Permission::IssueStock->value))
+                    @if($issueTask && auth()->user()->can(\App\Enums\Permission::ViewWarehouseTasks->value))
+                    <a href="{{ route('inventory.warehouse-tasks.show', $issueTask) }}" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 transition">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                        Issue Stock to Department
+                    </a>
+                    @elseif(!$issueTask)
                     <button type="button" @click="issueModalOpen = true" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 transition">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                         </svg>
                         Issue Stock to Department
                     </button>
+                    @endif
                 @endif
 
                 {{-- Acknowledge Action Button --}}
@@ -407,15 +416,16 @@
 
                             <div class="mt-6 space-y-4">
                                 <p class="text-xs font-semibold uppercase tracking-wider text-neutral-700">Confirm Issuance Quantities</p>
-                                @foreach($requisition->lines as $idx => $line)
+                                @foreach($requisition->lines->filter(fn ($line) => $line->issued_quantity < $line->requested_quantity)->values() as $idx => $line)
+                                    @php($remainingQuantity = $line->requested_quantity - $line->issued_quantity)
                                     <div class="flex items-center justify-between rounded-lg bg-neutral-50 p-3 border border-neutral-200">
                                         <div>
                                             <p class="text-sm font-semibold text-neutral-900">{{ $line->item->name }}</p>
-                                            <p class="text-xs text-neutral-500">Requested: {{ $line->requested_quantity }} units</p>
+                                            <p class="text-xs text-neutral-500">Remaining: {{ $remainingQuantity }} units</p>
                                             <input type="hidden" name="lines[{{ $idx }}][line_id]" value="{{ $line->id }}">
                                         </div>
                                         <div class="w-32">
-                                            <input type="number" name="lines[{{ $idx }}][quantity]" min="1" max="{{ $line->requested_quantity }}" value="{{ $line->requested_quantity }}" required
+                                            <input type="number" name="lines[{{ $idx }}][quantity]" min="1" max="{{ $remainingQuantity }}" value="{{ old("lines.{$idx}.quantity", $remainingQuantity) }}" required
                                                    class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm text-right">
                                         </div>
                                     </div>
@@ -544,7 +554,7 @@
         @endcan
 
         {{-- CANCEL REQUISITION MODAL --}}
-        @if((auth()->id() === $requisition->requesting_user_id && auth()->user()->can(\App\Enums\Permission::CreateRequisition->value)) || auth()->user()->can(\App\Enums\Permission::ApproveRequisition->value))
+        @if(in_array($requisition->status, ['submitted', 'pending_approval'], true) && auth()->id() === $requisition->requesting_user_id && auth()->user()->can(\App\Enums\Permission::CreateRequisition->value))
         <div x-show="cancelModalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0"
@@ -571,7 +581,7 @@
                                 </div>
                                 <div>
                                     <h3 class="text-lg font-bold text-neutral-900">Cancel Store Requisition</h3>
-                                    <p class="text-xs text-neutral-500">Cancelling will release any reserved inventory holds.</p>
+                                    <p class="text-xs text-neutral-500">Withdraw this requisition before it is approved.</p>
                                 </div>
                             </div>
 

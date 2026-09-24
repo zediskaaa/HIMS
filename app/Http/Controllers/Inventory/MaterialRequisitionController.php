@@ -8,7 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Models\CostCenter;
 use App\Models\InventoryItem;
 use App\Models\MaterialRequisition;
+use App\Models\MaterialRequisitionLine;
 use App\Models\User;
+use App\Models\WarehouseTask;
 use App\Services\AiDemandForecastService;
 use App\Services\Inventory\IssuanceEngine;
 use DomainException;
@@ -27,7 +29,7 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
     {
         return [
             'auth:web,admin,super_admin',
-            new Middleware('can:'.Permission::CreateRequisition->value, only: ['store', 'acknowledge']),
+            new Middleware('can:'.Permission::CreateRequisition->value, only: ['store', 'acknowledge', 'cancel']),
             new Middleware('can:'.Permission::ApproveRequisition->value, only: ['approve', 'reject']),
             new Middleware('can:'.Permission::IssueStock->value, only: ['issue']),
             new Middleware('can:'.Permission::ViewInventory->value, only: ['index', 'show', 'itemAiRecommendation']),
@@ -176,8 +178,14 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
         $requisition->load(['requestingUser', 'approvedBy', 'issuedBy', 'acknowledgedBy', 'costCenter', 'lines.item', 'lines.batch', 'lines.location']);
         $pickList = $this->issuanceEngine->generatePickList($requisition);
         $approverRoleLabels = $this->approverRoleLabels();
+        $issueTask = WarehouseTask::query()
+            ->where('reference_type', (new MaterialRequisitionLine)->getMorphClass())
+            ->whereIn('reference_id', $requisition->lines->modelKeys())
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->oldest('id')
+            ->first();
 
-        return view('inventory.requisitions.show', compact('requisition', 'pickList', 'approverRoleLabels'));
+        return view('inventory.requisitions.show', compact('requisition', 'pickList', 'approverRoleLabels', 'issueTask'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -282,8 +290,14 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
     public function issue(Request $request, MaterialRequisition $requisition): RedirectResponse
     {
         $validated = $request->validate([
-            'lines' => ['nullable', 'array'],
-            'lines.*.line_id' => ['required', 'exists:material_requisition_lines,id'],
+            'lines' => ['required', 'array', 'min:1'],
+            'lines.*.line_id' => [
+                'required',
+                'integer',
+                'distinct',
+                Rule::exists('material_requisition_lines', 'id')
+                    ->where(fn ($query) => $query->where('material_requisition_id', $requisition->id)),
+            ],
             'lines.*.quantity' => ['required', 'integer', 'min:1'],
             'lines.*.location_id' => ['nullable', 'exists:storage_locations,id'],
             'lines.*.batch_id' => ['nullable', 'exists:item_batches,id'],
@@ -333,12 +347,6 @@ class MaterialRequisitionController extends Controller implements HasMiddleware
 
     public function cancel(Request $request, MaterialRequisition $requisition): RedirectResponse
     {
-        abort_unless(
-            $request->user()->can(Permission::CreateRequisition->value)
-                || $request->user()->can(Permission::ApproveRequisition->value),
-            403
-        );
-
         $validated = $request->validate([
             'cancellation_reason' => ['nullable', 'string', 'max:500'],
         ]);

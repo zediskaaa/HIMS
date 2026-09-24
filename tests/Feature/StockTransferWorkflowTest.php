@@ -231,6 +231,114 @@ class StockTransferWorkflowTest extends TestCase
         $this->assertEquals(0, $inTransitLevel->in_transit_quantity);
     }
 
+    public function test_receive_button_opens_a_modal_inside_the_same_alpine_scope(): void
+    {
+        extract($this->createSetup());
+
+        $this->actingAs($staff)->post(route('inventory.transfers.store'), [
+            'source_location_id' => $source->id,
+            'destination_location_id' => $destination->id,
+            'lines' => [['item_id' => $item->id, 'quantity' => 20]],
+        ]);
+
+        $transfer = StockTransfer::query()->latest('id')->firstOrFail();
+        $response = $this->get(route('inventory.transfers.show', $transfer));
+
+        $response->assertOk()
+            ->assertSee('id="btn-receive-stock-destination"', false)
+            ->assertSee('@open-receive-modal.window="receiveModalOpen = true"', false)
+            ->assertSee('id="receive-stock-modal"', false);
+
+        $document = new \DOMDocument;
+        @$document->loadHTML($response->getContent());
+        $xpath = new \DOMXPath($document);
+
+        $this->assertSame(
+            1,
+            $xpath->query('//*[@id="receive-stock-modal" and ancestor::*[@id="stock-transfer-receiving-workflow"]]')->length,
+            'The receive modal must be inside the Alpine component that owns receiveModalOpen.',
+        );
+    }
+
+    public function test_destination_reconciliation_rejects_invalid_totals_without_changing_stock(): void
+    {
+        extract($this->createSetup());
+
+        $this->actingAs($staff)->post(route('inventory.transfers.store'), [
+            'source_location_id' => $source->id,
+            'destination_location_id' => $destination->id,
+            'lines' => [['item_id' => $item->id, 'quantity' => 20]],
+        ]);
+
+        $transfer = StockTransfer::query()->latest('id')->firstOrFail();
+        $line = $transfer->lines()->firstOrFail();
+
+        $this->from(route('inventory.transfers.show', $transfer))
+            ->post(route('inventory.transfers.receive', $transfer), [
+                'lines' => [[
+                    'line_id' => $line->id,
+                    'received_quantity' => 20,
+                    'damaged_quantity' => 1,
+                    'lost_quantity' => 0,
+                ]],
+                'discrepancy_reason' => 'One carton was damaged.',
+            ])
+            ->assertRedirect(route('inventory.transfers.show', $transfer))
+            ->assertSessionHasErrors('lines');
+
+        $this->assertSame('in_transit', $transfer->fresh()->status);
+        $this->assertSame(20, ItemStockLevel::query()
+            ->where('item_id', $item->id)
+            ->where('storage_location_id', $transfer->in_transit_location_id)
+            ->value('in_transit_quantity'));
+        $this->assertDatabaseMissing('item_stock_levels', [
+            'item_id' => $item->id,
+            'storage_location_id' => $destination->id,
+        ]);
+        $this->assertDatabaseMissing('stock_movements', [
+            'reference_type' => StockTransfer::class,
+            'reference_id' => $transfer->id,
+            'movement_type' => MovementType::TransferReceipt->value,
+        ]);
+    }
+
+    public function test_duplicate_destination_receipt_does_not_post_stock_twice(): void
+    {
+        extract($this->createSetup());
+
+        $this->actingAs($staff)->post(route('inventory.transfers.store'), [
+            'source_location_id' => $source->id,
+            'destination_location_id' => $destination->id,
+            'lines' => [['item_id' => $item->id, 'quantity' => 20]],
+        ]);
+
+        $transfer = StockTransfer::query()->latest('id')->firstOrFail();
+        $line = $transfer->lines()->firstOrFail();
+        $payload = [
+            'lines' => [[
+                'line_id' => $line->id,
+                'received_quantity' => 20,
+                'damaged_quantity' => 0,
+                'lost_quantity' => 0,
+            ]],
+        ];
+
+        $this->post(route('inventory.transfers.receive', $transfer), $payload)
+            ->assertSessionHas('success');
+        $this->post(route('inventory.transfers.receive', $transfer), $payload)
+            ->assertSessionHasErrors('receive');
+
+        $this->assertSame(20, ItemStockLevel::query()
+            ->where('item_id', $item->id)
+            ->where('storage_location_id', $destination->id)
+            ->value('quantity'));
+        $this->assertSame(1, StockMovement::query()
+            ->where('reference_type', StockTransfer::class)
+            ->where('reference_id', $transfer->id)
+            ->where('movement_type', MovementType::TransferReceipt)
+            ->count());
+    }
+
     public function test_initiating_stock_transfer_validates_stock_availability_and_rejects_insufficient_quantity(): void
     {
         extract($this->createSetup());
@@ -341,4 +449,3 @@ class StockTransferWorkflowTest extends TestCase
         $this->assertEquals(40, $item->fresh()->quantity_on_hand);
     }
 }
-
