@@ -311,23 +311,14 @@
                             @enderror
                         </div>
 
-                        {{-- Expiry Alert Days (4 cols) --}}
+                        {{-- Fixed expiry monitoring policy (4 cols) --}}
                         <div class="col-span-12 sm:col-span-4">
-                            <label for="field-expiry_alert_days" class="block text-[11px] font-semibold text-neutral-700 mb-1">
-                                Expiry alert lead time (days)
-                            </label>
-                            <input type="number"
-                                   name="expiry_alert_days"
-                                   id="field-expiry_alert_days"
-                                   value="{{ old('expiry_alert_days', 30) }}"
-                                   min="0"
-                                   max="3650"
-                                   step="1"
-                                   inputmode="numeric"
-                                   class="block w-full h-8.5 rounded-lg border-neutral-300 shadow-2xs text-xs font-medium py-1.5 px-2.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 {{ $errors->has('expiry_alert_days') ? 'border-rose-500 ring-1 ring-rose-500' : '' }}" />
-                            @error('expiry_alert_days')
-                                <p class="mt-0.5 text-[11px] text-rose-600 font-medium">{{ $message }}</p>
-                            @enderror
+                            <span class="block text-[11px] font-semibold text-neutral-700 mb-1">Expiry monitoring window</span>
+                            <input type="hidden" name="expiry_alert_days" value="90" />
+                            <div class="flex h-8.5 items-center rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 text-xs font-medium text-neutral-700">
+                                Fixed at 90 days
+                            </div>
+                            <p class="mt-0.5 text-[10px] text-neutral-500">Days 1–30 are Critical / Near Expiry; days 31–90 are Expiring Soon.</p>
                         </div>
                     </div>
                 </div>

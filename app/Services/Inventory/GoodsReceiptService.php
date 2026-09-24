@@ -213,13 +213,13 @@ class GoodsReceiptService
                 $discrepancyType = $lineInput['discrepancy_type'] ?? null;
                 if ($itemCondition !== 'good' && empty($discrepancyType)) {
                     $discrepancyType = $itemCondition === 'damaged' || $itemCondition === 'compromised' ? 'damage' : $itemCondition;
-                } elseif ($expiryDate && $expiryDate->isPast() && empty($discrepancyType)) {
+                } elseif (ItemBatch::classifyExpiryDate($expiryDate) === ItemBatch::EXPIRY_EXPIRED && empty($discrepancyType)) {
                     $discrepancyType = 'expired';
                 } elseif ($receivedQty < $openQty && empty($discrepancyType)) {
                     $discrepancyType = 'shortage';
                 } elseif ($receivedQty > $openQty && empty($discrepancyType)) {
                     $discrepancyType = 'overage';
-                } elseif ($expiryDate && ! $expiryDate->isPast() && now()->diffInDays($expiryDate) < 30 && empty($discrepancyType)) {
+                } elseif (ItemBatch::classifyExpiryDate($expiryDate) === ItemBatch::EXPIRY_CRITICAL && empty($discrepancyType)) {
                     $discrepancyType = 'near_expiry';
                 }
 

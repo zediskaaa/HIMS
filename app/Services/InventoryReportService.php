@@ -312,6 +312,7 @@ class InventoryReportService
 
         $expired = $batches->filter(fn (ItemBatch $batch) => $batch->isExpired());
         $expiringSoon = $batches->filter(fn (ItemBatch $batch) => $batch->isExpiringSoon());
+        $critical = $expiringSoon->filter(fn (ItemBatch $batch) => $batch->isCriticalExpiry());
 
         // Batch cost where the receipt recorded one, item cost otherwise.
         $value = fn (Collection $set) => (float) $set->sum(
@@ -329,6 +330,11 @@ class InventoryReportService
                 'batches' => $expiringSoon->count(),
                 'units' => (int) $expiringSoon->sum(fn (ItemBatch $batch) => (int) $batch->units_on_hand),
                 'value' => $value($expiringSoon),
+            ],
+            'critical' => [
+                'batches' => $critical->count(),
+                'units' => (int) $critical->sum(fn (ItemBatch $batch) => (int) $batch->units_on_hand),
+                'value' => $value($critical),
             ],
             'rows' => $expired->merge($expiringSoon)->take(10)->values(),
         ];
@@ -1051,7 +1057,7 @@ class InventoryReportService
             $isExp = $batch->isExpired();
 
             $expiryDate = $batch->expiry_date ? Carbon::parse($batch->expiry_date) : null;
-            $daysLeft = $expiryDate ? (int) now()->startOfDay()->diffInDays($expiryDate, false) : 0;
+            $daysLeft = $batch->daysUntilExpiry() ?? 0;
 
             $activeLevels = $batch->stockLevels->filter(fn ($sl) => (int) $sl->quantity > 0);
             if ($activeLevels->isEmpty()) {
@@ -1076,7 +1082,7 @@ class InventoryReportService
                 'units' => $units,
                 'unit_cost' => $cost,
                 'risk_value' => $riskVal,
-                'status' => $isExp ? 'EXPIRED' : 'EXPIRING SOON',
+                'status' => strtoupper($batch->expiryStatusLabel()),
             ];
         });
 
@@ -1111,6 +1117,7 @@ class InventoryReportService
             'Expired Units' => (int) $expired->sum('units_on_hand'),
             'Expiring Soon Batches' => $expiringSoon->count(),
             'Expiring Soon Units' => (int) $expiringSoon->sum('units_on_hand'),
+            'Critical / Near Expiry Batches' => $expiringSoon->filter(fn (ItemBatch $batch) => $batch->isCriticalExpiry())->count(),
             'Total Units at Risk' => $totalUnits,
         ];
         if ($canViewFinancial) {

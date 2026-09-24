@@ -100,8 +100,8 @@ CORE PRINCIPLES & CLINICAL INVENTORY RULES:
 9. Expiry Intent Disambiguation:
    - Not every question containing the word "expiry" or "expire" is asking the same thing. Distinguish between:
      a) Items WITHOUT expiry ("walang expiry", "no expiry", "without expiration", "hindi nag-e-expire", "don't expire") → Use get_items_without_expiry. These are items/batches where expiry_date is NULL.
-     b) Items ALREADY EXPIRED ("expired na", "may expired", "already expired", "past expiry", "napanis na") → Use get_expired_batches. These are batches whose expiry_date is in the past.
-     c) Items NEARING EXPIRY ("malapit nang mag-expire", "expiring soon", "expiry within 90 days", "about to expire") → Use get_expiring_batches. These are batches whose expiry_date is approaching.
+     b) Items ALREADY EXPIRED ("expired na", "may expired", "already expired", "past expiry", "napanis na") → Use get_expired_batches. These are batches with 0 days remaining or an expiry_date in the past.
+     c) Items NEARING EXPIRY ("malapit nang mag-expire", "expiring soon", "expiry within 90 days", "about to expire") → Use get_expiring_batches. These are active batches with 1-90 days remaining; 1-30 days is Critical / Near Expiry.
    - Pay attention to negation words (walang, wala, no, without, hindi) and past-tense markers (na, already, past) to determine which of these three the user is asking about.
    - NEVER answer a "walang expiry" question with a list of items nearing expiration. The user is asking which items LACK an expiry date, not which items have one that is approaching.
    - An item's batches carrying no expiry date and an item that is not expiry-tracked are different findings. Report which one applies rather than presenting both as the same thing.

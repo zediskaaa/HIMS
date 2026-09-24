@@ -800,9 +800,13 @@
                     </p>
                     <p class="text-xs text-warning-700">
                         {{ $expiry['expiring_soon']['batches'] }} batches
+                        &middot; 1&ndash;90 days
                         @if ($canViewFinancialData)
                             &middot; ₱{{ number_format($expiry['expiring_soon']['value'], 2) }}
                         @endif
+                    </p>
+                    <p class="mt-1 text-xs font-medium text-danger-700">
+                        {{ $expiry['critical']['batches'] }} Critical / Near Expiry (1&ndash;30 days)
                     </p>
                 </div>
             </div>
@@ -819,8 +823,8 @@
                                     {{ $batch->batch_number }} &middot; {{ number_format((int) $batch->units_on_hand) }} units
                                 </span>
                             </span>
-                            <x-ui.badge :status="$batch->isExpired() ? 'expired' : 'expiring_soon'">
-                                {{ $batch->expiry_date?->format('M d, Y') }}
+                            <x-ui.badge :status="$batch->expiryClassification()">
+                                {{ $batch->expiryStatusLabel() }} &middot; {{ $batch->expiry_date?->format('M d, Y') }}
                             </x-ui.badge>
                         </li>
                     @endforeach
@@ -1278,8 +1282,8 @@
                                     {{ $batch->expiry_date?->format('M d, Y') }}
                                 </x-ui.table.td>
                                 <x-ui.table.td class="px-3 py-2.5">
-                                    <x-ui.badge :status="$batch->isExpired() ? 'expired' : 'expiring_soon'">
-                                        {{ $batch->isExpired() ? 'Expired' : 'Expiring Soon' }}
+                                    <x-ui.badge :status="$batch->expiryClassification()">
+                                        {{ $batch->expiryStatusLabel() }}
                                     </x-ui.badge>
                                 </x-ui.table.td>
                                 @if ($canViewFinancialData)

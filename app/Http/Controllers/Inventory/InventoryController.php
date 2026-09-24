@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Inventory;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
+use App\Models\ItemBatch;
 use App\Models\ItemCategory;
 use App\Models\PurchaseOrder;
 use App\Models\StockMovement;
@@ -110,6 +111,8 @@ class InventoryController extends Controller implements HasMiddleware
         return response()->json(array_filter([
             'alertsHtml' => view('inventory.partials.dashboard-alerts', $snapshot)->render(),
             'openAlertCount' => $snapshot['openAlertCount'],
+            'expiringSoonCount' => $snapshot['expiringSoonCount'],
+            'criticalExpiryCount' => $snapshot['criticalExpiryCount'],
             'lowStockItems' => $snapshot['lowStockItems'],
             'outOfStockItems' => $snapshot['outOfStockItems'],
             'totalOnHand' => $snapshot['totalOnHand'],
@@ -152,6 +155,15 @@ class InventoryController extends Controller implements HasMiddleware
         $request ??= request();
         $stockStatus = $this->reports->stockStatus();
         $summary = $this->reports->summary($stockStatus);
+        $stockedExpiryBatches = fn ($query) => $query
+            ->active()
+            ->whereHas('stockLevels', fn ($stock) => $stock->where('quantity', '>', 0));
+        $expiringSoonCount = $stockedExpiryBatches(ItemBatch::query())
+            ->expiringSoon()
+            ->count();
+        $criticalExpiryCount = $stockedExpiryBatches(ItemBatch::query())
+            ->expiringSoon(ItemBatch::CRITICAL_EXPIRY_DAYS)
+            ->count();
 
         // Use current balances, which are also the source of truth on the
         // inventory alerts page. Persisted alert rows can lag behind imports
@@ -172,6 +184,8 @@ class InventoryController extends Controller implements HasMiddleware
         return [
             'attentionItems' => $attentionItems,
             'openAlertCount' => $summary['needs_attention'],
+            'expiringSoonCount' => $expiringSoonCount,
+            'criticalExpiryCount' => $criticalExpiryCount,
             'totalItems' => $summary['items'],
             'lowStockItems' => $summary['needs_attention'],
             'outOfStockItems' => $stockStatus['out_of_stock']['items'],

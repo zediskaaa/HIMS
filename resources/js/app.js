@@ -3125,7 +3125,7 @@ Alpine.data('dashboardLive', (endpoint) => ({
 
             // Update stat tiles
             const lowStockTile = this.$refs.lowStockTile;
-            const openAlertTile = this.$refs.openAlertTile;
+            const expiryTile = this.$refs.expiryTile;
 
             if (lowStockTile) {
                 const valueEl = lowStockTile.querySelector('[data-stat-value]');
@@ -3138,14 +3138,16 @@ Alpine.data('dashboardLive', (endpoint) => ({
                 }
             }
 
-            if (openAlertTile) {
-                const valueEl = openAlertTile.querySelector('[data-stat-value]');
-                const hintEl = openAlertTile.querySelector('[data-stat-hint]');
-                if (valueEl) valueEl.textContent = new Intl.NumberFormat().format(data.openAlertCount);
+            if (expiryTile) {
+                const valueEl = expiryTile.querySelector('[data-stat-value]');
+                const hintEl = expiryTile.querySelector('[data-stat-hint]');
+                if (valueEl) valueEl.textContent = new Intl.NumberFormat().format(data.expiringSoonCount);
                 if (hintEl) {
-                    hintEl.textContent = data.openAlertCount > 0
-                        ? 'Inventory conditions needing action'
-                        : 'Nothing outstanding';
+                    hintEl.textContent = data.criticalExpiryCount > 0
+                        ? `${new Intl.NumberFormat().format(data.criticalExpiryCount)} critical / near expiry`
+                        : (data.expiringSoonCount > 0
+                            ? '1–90 days remaining'
+                            : 'No batches expiring within 90 days');
                 }
             }
 

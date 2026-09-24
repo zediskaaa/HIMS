@@ -223,7 +223,7 @@ class HimsAiToolRegistry
             ->take(6)
             ->get()
             ->map(function (ItemBatch $b) {
-                $days = $b->expiry_date ? (int) now()->diffInDays($b->expiry_date, false) : null;
+                $days = $b->daysUntilExpiry();
                 $qty = (int) ($b->remaining_stock ?? ($b->stockLevels->sum('quantity') ?: ($b->initial_quantity ?? 0)));
 
                 return [
@@ -232,8 +232,10 @@ class HimsAiToolRegistry
                     'quantity' => $qty,
                     'expiry_date' => $b->expiry_date?->toDateString(),
                     'days_remaining' => $days,
-                    'is_expired' => $days !== null && $days < 0,
-                    'is_nearing_expiry' => $days !== null && $days >= 0 && $days <= 90,
+                    'expiry_status' => $b->expiryClassification(),
+                    'expiry_status_label' => $b->expiryStatusLabel(),
+                    'is_expired' => $b->isExpired(),
+                    'is_nearing_expiry' => $b->isExpiringSoon(),
                 ];
             })->all();
 
@@ -426,18 +428,18 @@ class HimsAiToolRegistry
     }
 
     /**
-     * Retrieve batches nearing expiry or already expired (FEFO prioritisation).
+     * Retrieve active batches with one through ninety days remaining.
      *
      * @return array<string, mixed>
      */
     public function getExpiringBatches(User $actor, int $daysAhead = 90, ?int $itemId = null, int $limit = 10): array
     {
+        $daysAhead = max(1, min(ItemBatch::EXPIRING_SOON_DAYS, $daysAhead));
+
         $builder = ItemBatch::query()
             ->with(['item:id,name,sku,unit', 'stockLevels'])
             ->withSum('stockLevels as remaining_stock', 'quantity')
-            ->whereNotNull('expiry_date')
-            ->where('expiry_date', '<=', now()->addDays($daysAhead))
-            ->where('expiry_date', '>=', now()->subDays(30))
+            ->expiringSoon($daysAhead)
             ->where(function ($q) {
                 $q->whereHas('stockLevels', fn ($sl) => $sl->where('quantity', '>', 0))
                     ->orWhere('initial_quantity', '>', 0);
@@ -453,8 +455,7 @@ class HimsAiToolRegistry
             'count' => $batches->count(),
             'threshold_days' => $daysAhead,
             'batches' => $batches->map(function (ItemBatch $b) {
-                $days = $b->expiry_date ? (int) now()->diffInDays($b->expiry_date, false) : null;
-                $isExpired = $days !== null && $days < 0;
+                $days = $b->daysUntilExpiry();
                 $remainingQty = (int) ($b->remaining_stock ?? ($b->stockLevels->sum('quantity') ?: ($b->initial_quantity ?? 0)));
 
                 return [
@@ -467,8 +468,9 @@ class HimsAiToolRegistry
                     'unit' => $b->item?->unit ?? 'units',
                     'expiry_date' => $b->expiry_date?->toDateString(),
                     'days_remaining' => $days,
-                    'status' => $isExpired ? 'EXPIRED' : ($days <= 30 ? 'CRITICAL_EXPIRY' : 'NEAR_EXPIRY'),
-                    'recommendation' => $isExpired ? 'Quarantine & Dispose' : 'Prioritize FEFO Dispensing',
+                    'status' => strtoupper($b->expiryClassification() ?? 'normal'),
+                    'status_label' => $b->expiryStatusLabel(),
+                    'recommendation' => 'Prioritize FEFO Dispensing',
                 ];
             })->all(),
         ];
@@ -608,8 +610,7 @@ class HimsAiToolRegistry
         $builder = ItemBatch::query()
             ->with(['item:id,name,sku,unit', 'stockLevels'])
             ->withSum('stockLevels as remaining_stock', 'quantity')
-            ->whereNotNull('expiry_date')
-            ->where('expiry_date', '<', now()->startOfDay())
+            ->expired()
             ->where(function ($q) {
                 $q->whereHas('stockLevels', fn ($sl) => $sl->where('quantity', '>', 0))
                     ->orWhere('initial_quantity', '>', 0);
@@ -625,7 +626,7 @@ class HimsAiToolRegistry
             'count' => $batches->count(),
             'is_expired' => true,
             'batches' => $batches->map(function (ItemBatch $b) {
-                $daysSinceExpiry = (int) $b->expiry_date->diffInDays(now(), false);
+                $daysSinceExpiry = abs($b->daysUntilExpiry() ?? 0);
                 $remainingQty = (int) ($b->remaining_stock ?? ($b->stockLevels->sum('quantity') ?: ($b->initial_quantity ?? 0)));
 
                 return [
@@ -956,8 +957,7 @@ class HimsAiToolRegistry
         $pendingRequisitions = MaterialRequisition::whereIn('status', ['pending', 'draft', 'pending_approval'])->count();
         $pendingPOs = PurchaseOrder::whereIn('status', ['pending', 'draft', 'ordered'])->count();
         $expiringBatches = ItemBatch::query()
-            ->whereNotNull('expiry_date')
-            ->where('expiry_date', '<=', now()->addDays(90))
+            ->expiringSoon()
             ->where(function ($q) {
                 $q->whereHas('stockLevels', fn ($sl) => $sl->where('quantity', '>', 0))
                     ->orWhere('initial_quantity', '>', 0);
@@ -1318,7 +1318,7 @@ class HimsAiToolRegistry
                 [
                     'name' => 'Batch Expiry & FEFO Risk Report',
                     'category' => 'Clinical / Pharmacy',
-                    'description' => 'Upcoming expiring batches within 30/60/90 days and past-due items.',
+                    'description' => 'Active expiring batches with 1-90 days remaining, including critical 1-30 day stock, plus expired batches at 0 days or past due.',
                     'accessible' => $canViewReports,
                 ],
                 [
@@ -1418,7 +1418,7 @@ class HimsAiToolRegistry
             ],
             [
                 'name' => 'get_expiring_batches',
-                'description' => 'Retrieve medication batches whose expiry date is approaching (nearing expiration, FEFO priority). Use this ONLY for items that have an expiry date and it is in the future. Do NOT use for items without expiry or already expired items.',
+                'description' => 'Retrieve active medication batches with 1-90 days remaining (nearing expiration, FEFO priority). Results with 1-30 days remaining are Critical / Near Expiry. Do NOT use for items without expiry or items at 0 days/past due.',
                 'parameters' => [
                     'type' => 'OBJECT',
                     'properties' => [
@@ -1438,7 +1438,7 @@ class HimsAiToolRegistry
             ],
             [
                 'name' => 'get_expired_batches',
-                'description' => 'Retrieve batches that have already expired (expiry_date is in the past) and still have remaining stock. Use when the user asks about "expired na", "already expired", "may expired stock", or "past expiry". Do NOT use this for items nearing expiry or items without expiry.',
+                'description' => 'Retrieve batches that are expired (0 days remaining or expiry_date is in the past) and still have remaining stock. Use when the user asks about "expired na", "already expired", "may expired stock", or "past expiry". Do NOT use this for active items with 1-90 days remaining or items without expiry.',
                 'parameters' => [
                     'type' => 'OBJECT',
                     'properties' => [],

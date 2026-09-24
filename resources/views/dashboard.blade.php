@@ -107,24 +107,28 @@
             </div>
         </a>
 
-        {{-- 3. Open alerts --}}
-        <a href="{{ route('inventory.alerts') }}" x-ref="openAlertTile"
+        {{-- 3. Expiring soon --}}
+        <a href="{{ route('inventory.alerts') }}" x-ref="expiryTile"
            class="group rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/95 flex flex-col justify-between hover:border-rose-400 dark:hover:border-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 transition-all duration-150">
             {{-- Zone 1: Header --}}
             <div class="flex items-center justify-between gap-2">
-                <p class="text-xs sm:text-sm font-bold uppercase tracking-wider {{ $openAlertCount > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300' }}">Open alerts</p>
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {{ $openAlertCount > 0 ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 ring-1 ring-rose-200 dark:ring-rose-800/50' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-800/50' }} group-hover:scale-105 transition-transform duration-150">
-                    <x-ui.icon :name="$openAlertCount > 0 ? 'bell-alert' : 'check-circle'" class="h-5 w-5" />
+                <p class="text-xs sm:text-sm font-bold uppercase tracking-wider {{ $expiringSoonCount > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300' }}">Expiring soon</p>
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {{ $expiringSoonCount > 0 ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 ring-1 ring-rose-200 dark:ring-rose-800/50' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-800/50' }} group-hover:scale-105 transition-transform duration-150">
+                    <x-ui.icon :name="$expiringSoonCount > 0 ? 'clock' : 'check-circle'" class="h-5 w-5" />
                 </span>
             </div>
             {{-- Zone 2: Value --}}
             <div class="mt-3 flex items-baseline gap-1.5">
-                <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums {{ $openAlertCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400' }}" data-stat-value>{{ number_format($openAlertCount) }}</span>
-                <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">active</span>
+                <span class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums {{ $expiringSoonCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400' }}" data-stat-value>{{ number_format($expiringSoonCount) }}</span>
+                <span class="text-sm sm:text-base font-bold text-neutral-500 dark:text-neutral-400">batches</span>
             </div>
             {{-- Zone 3: Footer --}}
             <div class="mt-3.5 flex items-center border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
-                <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate" data-stat-hint>{{ $openAlertCount > 0 ? 'Inventory conditions needing action' : 'Nothing outstanding' }}</span>
+                <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate" data-stat-hint>
+                    {{ $criticalExpiryCount > 0
+                        ? number_format($criticalExpiryCount).' critical / near expiry'
+                        : ($expiringSoonCount > 0 ? '1–90 days remaining' : 'No batches expiring within 90 days') }}
+                </span>
             </div>
         </a>
 

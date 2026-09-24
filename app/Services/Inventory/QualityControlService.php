@@ -142,7 +142,7 @@ class QualityControlService
                 if ($line->item_condition !== 'good'
                     || ($line->discrepancy_type !== null && $line->discrepancy_type !== 'shortage')
                     || in_array($line->discrepancy_action, ['reject', 'return_to_supplier', 'hold'], true)
-                    || ($line->expiry_date && $line->expiry_date->lessThanOrEqualTo(now()->addDays(30)))) {
+                    || in_array(ItemBatch::classifyExpiryDate($line->expiry_date), [ItemBatch::EXPIRY_EXPIRED, ItemBatch::EXPIRY_CRITICAL], true)) {
                     throw ValidationException::withMessages(['accepted_quantity' => ['Resolve the safety discrepancy before releasing this stock.']]);
                 }
                 $target = StorageLocation::findOrFail($targetId);

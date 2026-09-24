@@ -10,7 +10,7 @@
         @include('inventory.partials.workflow_nav')
 
         {{-- Top Summary Metric Cards --}}
-        <div class="grid gap-3.5 sm:gap-4 grid-cols-1 sm:grid-cols-3">
+        <div class="grid gap-3.5 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
             {{-- Card 1: Out of Stock (Critical Shortage) --}}
             <div class="rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/95 flex flex-col justify-between hover:border-neutral-300 dark:hover:border-neutral-700 transition-all duration-150">
                 {{-- Zone 1: Header --}}
@@ -51,11 +51,11 @@
                 </div>
             </div>
 
-            {{-- Card 3: Near-Expiry Batches (Clinical Risk) --}}
+            {{-- Card 3: Active Expiring Batches --}}
             <div class="rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/95 flex flex-col justify-between hover:border-neutral-300 dark:hover:border-neutral-700 transition-all duration-150">
                 {{-- Zone 1: Header --}}
                 <div class="flex items-center justify-between gap-2">
-                    <p class="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">Near-Expiry Batches</p>
+                    <p class="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">Expiring Soon</p>
                     <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-950/80 dark:text-indigo-300 dark:ring-indigo-800/50">
                         <x-ui.icon name="clock" class="h-5 w-5" />
                     </span>
@@ -67,7 +67,24 @@
                 </div>
                 {{-- Zone 3: Footer --}}
                 <div class="mt-3.5 flex items-center border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
-                    <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">Expiring in &le; 30 days</span>
+                    <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">1&ndash;90 days remaining, including critical</span>
+                </div>
+            </div>
+
+            {{-- Card 4: Expired Batches --}}
+            <div class="rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/95 flex flex-col justify-between hover:border-neutral-300 dark:hover:border-neutral-700 transition-all duration-150">
+                <div class="flex items-center justify-between gap-2">
+                    <p class="text-xs sm:text-sm font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">Expired Batches</p>
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/80 dark:text-rose-300 dark:ring-rose-800/50">
+                        <x-ui.icon name="exclamation-triangle" class="h-5 w-5" />
+                    </span>
+                </div>
+                <div class="mt-3 flex items-baseline gap-1.5">
+                    <span id="stat-expired" class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight tabular-nums text-rose-600 dark:text-rose-400">&mdash;</span>
+                    <span class="text-sm sm:text-base font-bold text-rose-500/80 dark:text-rose-400/80">batches</span>
+                </div>
+                <div class="mt-3.5 flex items-center border-t border-neutral-100 pt-2.5 dark:border-neutral-800/80">
+                    <span class="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300 truncate">0 days remaining or past due</span>
                 </div>
             </div>
         </div>
@@ -177,7 +194,7 @@
                                             'bg-indigo-500': alertType === 'near_expiry'
                                         }"
                                     ></span>
-                                    <span x-text="alertType === 'near_expiry' ? 'EXPIRATION WATCH' : (isOut ? 'OUT OF STOCK' : 'LOW STOCK')"></span>
+                                    <span x-text="alertType === 'near_expiry' ? (item?.expiry_status_label || 'EXPIRING SOON') : (isOut ? 'OUT OF STOCK' : 'LOW STOCK')"></span>
                                 </span>
                             </div>
                             <p class="mt-0.5 text-xs font-mono text-neutral-500 dark:text-neutral-400 truncate">
@@ -216,7 +233,7 @@
                             </svg>
                         </div>
                         <div>
-                            <div class="font-bold text-xs" x-text="alertType === 'near_expiry' ? 'Upcoming Lot Expiration' : (isOut ? 'Critical Depleted Stock' : 'Reorder Threshold Triggered')"></div>
+                            <div class="font-bold text-xs" x-text="alertType === 'near_expiry' ? (item?.expiry_status_label || 'Expiring Soon') : (isOut ? 'Critical Depleted Stock' : 'Reorder Threshold Triggered')"></div>
                             <p class="mt-0.5 leading-relaxed text-[11px] opacity-90" x-show="isOut || alertType === 'out_of_stock'">
                                 Physical stock is completely exhausted (0 on hand). Immediate purchase requisition or internal stock transfer is recommended to maintain clinical readiness.
                             </p>
@@ -224,7 +241,7 @@
                                 Available inventory has fallen below the established safety threshold. Prompt restocking is advised to prevent stockouts during surge periods.
                             </p>
                             <p class="mt-0.5 leading-relaxed text-[11px] opacity-90" x-show="alertType === 'near_expiry'">
-                                This inventory batch is expiring within 30 days. Prioritize FEFO (First-Expired, First-Out) dispensing or initiate return/exchange protocols.
+                                This inventory batch has 1&ndash;90 days remaining. Batches with 1&ndash;30 days are Critical / Near Expiry. Prioritize FEFO (First-Expired, First-Out) dispensing or initiate return/exchange protocols.
                             </p>
                         </div>
                     </div>
@@ -463,6 +480,7 @@
             const statOutOfStock = document.getElementById('stat-out-of-stock');
             const statLowStock = document.getElementById('stat-low-stock');
             const statExpiring = document.getElementById('stat-expiring');
+            const statExpired = document.getElementById('stat-expired');
 
             try {
                 await fetch('/sanctum/csrf-cookie', {
@@ -491,32 +509,32 @@
                     return (a.name || '').localeCompare(b.name || '');
                 });
 
-                const expiringSoon = items.filter(item => {
-                    if (!item.expiry_date) return false;
-                    const expiry = new Date(item.expiry_date);
-                    const cutoff = new Date();
-                    cutoff.setDate(cutoff.getDate() + 30);
-                    return expiry <= cutoff;
-                });
+                const expiryBatches = items.flatMap(item => (item.expiry_batches || []).map(batch => {
+                    const alertItem = {
+                        ...item,
+                        ...batch,
+                        id: item.id,
+                        _alert_key: `${item.id}:${batch.batch_id}`,
+                    };
+                    window.__cachedAlertItems.set(alertItem._alert_key, alertItem);
 
-                // Sort ascending by expiry date (earliest expiring items appear first)
-                expiringSoon.sort((a, b) => {
-                    const dateA = a.expiry_date ? new Date(a.expiry_date).getTime() : 0;
-                    const dateB = b.expiry_date ? new Date(b.expiry_date).getTime() : 0;
-                    if (dateA !== dateB) {
-                        return dateA - dateB;
-                    }
-                    const qtyA = parseInt(a.quantity_on_hand, 10) || 0;
-                    const qtyB = parseInt(b.quantity_on_hand, 10) || 0;
-                    return qtyA - qtyB;
-                });
+                    return alertItem;
+                }));
+                const byRemainingDays = (a, b) => (a.days_remaining ?? 0) - (b.days_remaining ?? 0);
+                const expiringSoon = expiryBatches
+                    .filter(batch => ['expiring_soon', 'critical'].includes(batch.expiry_status))
+                    .sort(byRemainingDays);
+                const expired = expiryBatches
+                    .filter(batch => batch.expiry_status === 'expired')
+                    .sort(byRemainingDays);
 
                 // Update Stat Cards
                 if (statOutOfStock) statOutOfStock.textContent = outOfStock.length.toLocaleString();
                 if (statLowStock) statLowStock.textContent = lowStockOnly.length.toLocaleString();
                 if (statExpiring) statExpiring.textContent = expiringSoon.length.toLocaleString();
+                if (statExpired) statExpired.textContent = expired.length.toLocaleString();
 
-                if (allLowOrOut.length === 0 && expiringSoon.length === 0) {
+                if (allLowOrOut.length === 0 && expiringSoon.length === 0 && expired.length === 0) {
                     container.className = 'w-full';
                     container.innerHTML = `
                         <div class="rounded-xl border border-dashed border-neutral-300 dark:border-neutral-700 bg-neutral-50/60 dark:bg-neutral-800/30 p-8 text-center">
@@ -526,14 +544,15 @@
                                 </svg>
                             </div>
                             <h3 class="text-sm font-semibold text-neutral-800 dark:text-neutral-200">All Stock Levels Optimal</h3>
-                            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto">No items are currently below reorder levels or expiring within the 30-day monitoring window.</p>
+                            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto">No items are below reorder levels, expiring within 90 days, or expired.</p>
                         </div>
                     `;
                 } else {
                     const cards = [];
                     const hasLowStock = allLowOrOut.length > 0;
                     const hasExpiring = expiringSoon.length > 0;
-                    const isSingleCategory = (hasLowStock && !hasExpiring) || (!hasLowStock && hasExpiring);
+                    const hasExpired = expired.length > 0;
+                    const isSingleCategory = [hasLowStock, hasExpiring, hasExpired].filter(Boolean).length === 1;
                     const itemsGridClass = isSingleCategory
                         ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3'
                         : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3';
@@ -623,7 +642,7 @@
                         `);
                     }
 
-                    // 2. Near-Expiry Inventory Card
+                    // 2. Active Expiring Inventory Card
                     if (hasExpiring) {
                         cards.push(`
                             <div class="${isSingleCategory ? 'col-span-1' : ''} rounded-xl border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/40 dark:bg-indigo-950/20 p-4 sm:p-5 shadow-2xs">
@@ -635,8 +654,8 @@
                                             </svg>
                                         </span>
                                         <div>
-                                            <h3 class="text-xs sm:text-sm font-bold text-indigo-900 dark:text-indigo-200">Near-Expiry Inventory</h3>
-                                            <p class="text-[11px] text-indigo-700 dark:text-indigo-300">${expiringSoon.length} item(s) expiring within 30 days</p>
+                                            <h3 class="text-xs sm:text-sm font-bold text-indigo-900 dark:text-indigo-200">Expiring Soon Inventory</h3>
+                                            <p class="text-[11px] text-indigo-700 dark:text-indigo-300">${expiringSoon.length} batch(es) with 1&ndash;90 days remaining</p>
                                         </div>
                                     </div>
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 dark:bg-indigo-900/70 px-2.5 py-1 text-xs font-bold text-indigo-800 dark:text-indigo-200 tabular-nums">
@@ -652,11 +671,9 @@
                                         const categoryText = item.category?.name ? escapeHtml(item.category.name) : '';
                                         const itemTarget = item.sku || item.name || '';
                                         const itemUrl = itemTarget ? `/inventory/items?search=${encodeURIComponent(itemTarget)}` : '/inventory/items';
-                                        const expiryDate = item.expiry_date ? new Date(item.expiry_date) : null;
-                                        const now = new Date();
-                                        const daysLeft = expiryDate ? Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24)) : null;
-                                        const daysLabel = daysLeft !== null ? (daysLeft <= 0 ? 'Expired' : `${daysLeft}d left`) : 'Near expiry';
-                                        const isCritical = daysLeft !== null && daysLeft <= 7;
+                                        const daysLeft = item.days_remaining;
+                                        const daysLabel = item.expiry_status_label || 'Expiring Soon';
+                                        const isCritical = item.expiry_status === 'critical';
 
                                         return `
                                             <div class="rounded-xl bg-white dark:bg-neutral-900 p-3.5 shadow-2xs border border-neutral-200/90 dark:border-neutral-800 border-l-4 border-l-indigo-500 hover:border-neutral-300 dark:hover:border-neutral-700 hover:shadow-xs transition-all flex flex-col justify-between">
@@ -668,7 +685,7 @@
                                                         </div>
                                                         <span class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset ${isCritical ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 ring-rose-200 dark:ring-rose-800/60' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300 ring-indigo-200 dark:ring-indigo-800/60'}">
                                                             <span class="h-1.5 w-1.5 rounded-full ${isCritical ? 'bg-rose-500 animate-pulse' : 'bg-indigo-500'}"></span>
-                                                            ${daysLabel}
+                                                            ${escapeHtml(daysLabel)} · ${daysLeft}d
                                                         </span>
                                                     </div>
 
@@ -688,12 +705,70 @@
                                                     <span class="font-medium text-neutral-500 dark:text-neutral-400 truncate">
                                                         Batch: <strong class="text-neutral-700 dark:text-neutral-300">${escapeHtml(item.batch_number || 'Default')}</strong>
                                                     </span>
-                                                    <button type="button" onclick="window.__openItemManageModal('${escapeHtml(item.id)}', 'near_expiry')" class="font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 hover:underline inline-flex items-center gap-0.5 text-[11px] cursor-pointer" title="Manage alert details">
+                                                    <button type="button" onclick="window.__openItemManageModal('${escapeHtml(item._alert_key)}', 'near_expiry')" class="font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 hover:underline inline-flex items-center gap-0.5 text-[11px] cursor-pointer" title="Manage alert details">
                                                         Manage
                                                         <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                                                         </svg>
                                                     </button>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        `);
+                    }
+
+                    // 3. Expired Inventory Card
+                    if (hasExpired) {
+                        cards.push(`
+                            <div class="${isSingleCategory ? 'col-span-1' : ''} rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 p-4 sm:p-5 shadow-2xs">
+                                <div class="flex items-center justify-between pb-3 border-b border-rose-200/70 dark:border-rose-900/40">
+                                    <div>
+                                        <h3 class="text-xs sm:text-sm font-bold text-rose-900 dark:text-rose-200">Expired Inventory</h3>
+                                        <p class="text-[11px] text-rose-700 dark:text-rose-300">0 days remaining or past due</p>
+                                    </div>
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-rose-100 dark:bg-rose-900/70 px-2.5 py-1 text-xs font-bold text-rose-800 dark:text-rose-200 tabular-nums">
+                                        <span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                                        ${expired.length} batches
+                                    </span>
+                                </div>
+                                <div class="mt-3.5 ${itemsGridClass}">
+                                    ${expired.map(item => {
+                                        const unitText = item.unit ? escapeHtml(item.unit) : 'units';
+                                        const skuText = item.sku ? escapeHtml(item.sku) : 'No SKU';
+                                        const itemTarget = item.sku || item.name || '';
+                                        const itemUrl = itemTarget ? `/inventory/items?search=${encodeURIComponent(itemTarget)}` : '/inventory/items';
+                                        const elapsedLabel = item.days_remaining === 0 ? 'Expired today' : `${Math.abs(item.days_remaining)}d overdue`;
+
+                                        return `
+                                            <div class="rounded-xl bg-white dark:bg-neutral-900 p-3.5 shadow-2xs border border-neutral-200/90 dark:border-neutral-800 border-l-4 border-l-rose-500 flex flex-col justify-between">
+                                                <div>
+                                                    <div class="flex items-start justify-between gap-2">
+                                                        <div class="min-w-0 flex-1">
+                                                            <h4 class="font-bold text-xs text-neutral-900 dark:text-neutral-100 line-clamp-2 leading-snug">${escapeHtml(item.name)}</h4>
+                                                            <p class="text-[10px] font-mono text-neutral-400 dark:text-neutral-500 mt-0.5 truncate">${skuText} &middot; Batch ${escapeHtml(item.batch_number || 'Default')}</p>
+                                                        </div>
+                                                        <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset ring-rose-200 dark:ring-rose-800/60">
+                                                            <span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                                                            EXPIRED
+                                                        </span>
+                                                    </div>
+                                                    <div class="mt-2.5 grid grid-cols-2 gap-1.5 rounded-lg bg-neutral-50/90 dark:bg-neutral-800/50 p-1.5 text-center text-xs">
+                                                        <div class="rounded-md bg-white dark:bg-neutral-900 py-1.5 px-2 border border-neutral-100 dark:border-neutral-700/60">
+                                                            <span class="block text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">On Hand</span>
+                                                            <span class="text-sm font-black tabular-nums text-neutral-800 dark:text-neutral-200">${escapeHtml(item.quantity_on_hand)} <span class="text-[10px] font-normal text-neutral-400">${unitText}</span></span>
+                                                        </div>
+                                                        <div class="rounded-md bg-white dark:bg-neutral-900 py-1.5 px-2 border border-neutral-100 dark:border-neutral-700/60">
+                                                            <span class="block text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Expiry Date</span>
+                                                            <span class="text-sm font-bold tabular-nums text-rose-600 dark:text-rose-400">${escapeHtml(item.expiry_date || 'N/A')}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="mt-2.5 pt-2 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between text-[11px]">
+                                                    <span class="font-semibold text-rose-600 dark:text-rose-400">${elapsedLabel}</span>
+                                                    <a href="${itemUrl}" class="font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 hover:underline">View Item</a>
                                                 </div>
                                             </div>
                                         `;
@@ -716,6 +791,7 @@
                 if (statOutOfStock) statOutOfStock.textContent = '0';
                 if (statLowStock) statLowStock.textContent = '0';
                 if (statExpiring) statExpiring.textContent = '0';
+                if (statExpired) statExpired.textContent = '0';
 
                 container.className = 'w-full';
                 container.innerHTML = `<div class="rounded-xl border border-dashed border-rose-300 dark:border-rose-800 bg-rose-50/50 dark:bg-rose-950/20 p-6 text-xs text-rose-700 dark:text-rose-300 text-center">Unable to load active stock alerts from API. Please refresh the page.</div>`;
@@ -749,9 +825,7 @@
                     return Math.max(0, reorder - qoh);
                 },
                 get daysUntilExpiry() {
-                    if (!this.item || !this.item.expiry_date) return null;
-                    const diff = new Date(this.item.expiry_date) - new Date();
-                    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+                    return this.item?.days_remaining ?? null;
                 },
                 get catalogueUrl() {
                     if (!this.item) return '{{ route('inventory.items') }}';

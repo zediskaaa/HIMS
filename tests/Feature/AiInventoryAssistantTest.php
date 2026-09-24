@@ -1185,7 +1185,9 @@ class AiInventoryAssistantTest extends TestCase
         ItemBatch::create([
             'item_id' => $imminent->id,
             'batch_number' => 'BATCH-SOON',
-            'expiry_date' => now()->toDateString(),
+            // Day zero is already expired; tomorrow is the first active
+            // expiring-soon boundary.
+            'expiry_date' => now()->addDay()->toDateString(),
             'initial_quantity' => 25,
             'status' => 'active',
         ]);

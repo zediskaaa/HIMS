@@ -26,7 +26,9 @@
 
                 <x-ui.table.td>
                     <x-ui.badge :status="$alert->type->value" dot>
-                        {{ $alert->type->label() }}
+                        {{ $alert->type === \App\Enums\AlertType::ExpiringSoon && $alert->severity === \App\Enums\AlertSeverity::Critical
+                            ? 'Critical / Near Expiry'
+                            : $alert->type->label() }}
                     </x-ui.badge>
                     @if ($alert->location)
                         <span class="block mt-1 text-xs text-neutral-500">{{ $alert->location->name }}</span>

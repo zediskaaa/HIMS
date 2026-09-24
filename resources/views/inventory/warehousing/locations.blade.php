@@ -443,8 +443,11 @@
                                                     <template x-if="item.is_expired">
                                                         <span class="ml-1.5 inline-flex rounded bg-red-100 px-1.5 py-0.2 text-[10px] font-bold uppercase text-red-800 dark:bg-red-950 dark:text-red-300">Expired</span>
                                                     </template>
-                                                    <template x-if="!item.is_expired && item.is_expiring_soon">
-                                                        <span class="ml-1.5 inline-flex rounded bg-amber-100 px-1.5 py-0.2 text-[10px] font-bold uppercase text-amber-800 dark:bg-amber-950 dark:text-amber-300">Soon</span>
+                                                    <template x-if="!item.is_expired && item.is_critical_expiry">
+                                                        <span class="ml-1.5 inline-flex rounded bg-rose-100 px-1.5 py-0.2 text-[10px] font-bold uppercase text-rose-800 dark:bg-rose-950 dark:text-rose-300">Critical / Near Expiry</span>
+                                                    </template>
+                                                    <template x-if="!item.is_expired && !item.is_critical_expiry && item.is_expiring_soon">
+                                                        <span class="ml-1.5 inline-flex rounded bg-amber-100 px-1.5 py-0.2 text-[10px] font-bold uppercase text-amber-800 dark:bg-amber-950 dark:text-amber-300">Expiring Soon</span>
                                                     </template>
                                                 </div>
                                             </template>

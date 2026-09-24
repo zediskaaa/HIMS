@@ -68,6 +68,8 @@ class DashboardLiveEndpointTest extends TestCase
             ->assertJsonStructure([
                 'alertsHtml',
                 'openAlertCount',
+                'expiringSoonCount',
+                'criticalExpiryCount',
                 'lowStockItems',
                 'outOfStockItems',
                 'totalOnHand',
@@ -75,6 +77,8 @@ class DashboardLiveEndpointTest extends TestCase
             ]);
 
         $this->assertSame(0, $response->json('openAlertCount'));
+        $this->assertSame(0, $response->json('expiringSoonCount'));
+        $this->assertSame(0, $response->json('criticalExpiryCount'));
         $this->assertSame(0, $response->json('lowStockItems'));
         $this->assertSame(100, $response->json('totalOnHand'));
         $this->assertStringContainsString('data-dashboard-alert-list', $response->json('alertsHtml'));

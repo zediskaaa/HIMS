@@ -2,14 +2,28 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 class ItemBatch extends Model
 {
     use HasFactory;
+
+    public const EXPIRING_SOON_DAYS = 90;
+
+    public const CRITICAL_EXPIRY_DAYS = 30;
+
+    public const EXPIRY_NORMAL = 'normal';
+
+    public const EXPIRY_SOON = 'expiring_soon';
+
+    public const EXPIRY_CRITICAL = 'critical';
+
+    public const EXPIRY_EXPIRED = 'expired';
 
     protected $fillable = [
         'item_id',
@@ -57,28 +71,63 @@ class ItemBatch extends Model
 
     public function isExpired(): bool
     {
-        return $this->expiry_date !== null && $this->expiry_date->isPast();
+        return $this->expiryClassification() === self::EXPIRY_EXPIRED;
     }
 
-    /**
-     * Whether the batch falls inside its item's expiry warning window.
-     */
-    public function isExpiringSoon(?int $withinDays = null): bool
+    public function isExpiringSoon(): bool
     {
-        if ($this->expiry_date === null || $this->isExpired()) {
-            return false;
-        }
+        return in_array($this->expiryClassification(), [self::EXPIRY_SOON, self::EXPIRY_CRITICAL], true);
+    }
 
-        $withinDays ??= $this->item?->expiry_alert_days ?? 30;
-
-        return $this->expiry_date->lessThanOrEqualTo(now()->addDays($withinDays));
+    public function isCriticalExpiry(): bool
+    {
+        return $this->expiryClassification() === self::EXPIRY_CRITICAL;
     }
 
     public function daysUntilExpiry(): ?int
     {
-        return $this->expiry_date === null
-            ? null
-            : (int) now()->startOfDay()->diffInDays($this->expiry_date->startOfDay(), false);
+        return static::daysUntil($this->expiry_date);
+    }
+
+    public function expiryClassification(): ?string
+    {
+        return static::classifyExpiryDate($this->expiry_date);
+    }
+
+    public function expiryStatusLabel(): string
+    {
+        return match ($this->expiryClassification()) {
+            self::EXPIRY_NORMAL => 'Normal',
+            self::EXPIRY_SOON => 'Expiring Soon',
+            self::EXPIRY_CRITICAL => 'Critical / Near Expiry',
+            self::EXPIRY_EXPIRED => 'Expired',
+            default => 'No Expiration Date',
+        };
+    }
+
+    public static function classifyExpiryDate(CarbonInterface|string|null $expiryDate): ?string
+    {
+        $days = static::daysUntil($expiryDate);
+
+        if ($days === null) {
+            return null;
+        }
+
+        return match (true) {
+            $days <= 0 => self::EXPIRY_EXPIRED,
+            $days <= self::CRITICAL_EXPIRY_DAYS => self::EXPIRY_CRITICAL,
+            $days <= self::EXPIRING_SOON_DAYS => self::EXPIRY_SOON,
+            default => self::EXPIRY_NORMAL,
+        };
+    }
+
+    public static function daysUntil(CarbonInterface|string|null $expiryDate): ?int
+    {
+        if ($expiryDate === null || $expiryDate === '') {
+            return null;
+        }
+
+        return (int) today()->diffInDays(Carbon::parse($expiryDate)->startOfDay(), false);
     }
 
     public function scopeActive($query)
@@ -109,5 +158,20 @@ class ItemBatch extends Model
     public function scopeExpiringBefore($query, $date)
     {
         return $query->whereNotNull('expiry_date')->where('expiry_date', '<=', $date);
+    }
+
+    public function scopeExpiringSoon($query, int $withinDays = self::EXPIRING_SOON_DAYS)
+    {
+        $withinDays = max(1, min(self::EXPIRING_SOON_DAYS, $withinDays));
+
+        return $query->whereNotNull('expiry_date')
+            ->whereDate('expiry_date', '>', today())
+            ->whereDate('expiry_date', '<=', today()->addDays($withinDays));
+    }
+
+    public function scopeExpired($query)
+    {
+        return $query->whereNotNull('expiry_date')
+            ->whereDate('expiry_date', '<=', today());
     }
 }

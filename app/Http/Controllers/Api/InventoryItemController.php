@@ -31,13 +31,21 @@ class InventoryItemController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         $perPage = (int) $request->query('per_page', 15);
-        $items = InventoryItem::with('supplier')->paginate($perPage);
+        $items = InventoryItem::with([
+            'supplier',
+            'batches' => fn ($query) => $query->active()->whereNotNull('expiry_date')->with('stockLevels'),
+        ])->paginate($perPage);
 
         return InventoryItemResource::collection($items);
     }
 
     public function show(InventoryItem $inventory_item)
     {
+        $inventory_item->load([
+            'supplier',
+            'batches' => fn ($query) => $query->active()->whereNotNull('expiry_date')->with('stockLevels'),
+        ]);
+
         return new InventoryItemResource($inventory_item);
     }
 
