@@ -318,6 +318,54 @@ class SuperAdminProvisioningTest extends TestCase
         $this->assertTrue(Hash::check('SyntheticCommandAdmin123!', $user->password));
     }
 
+    public function test_non_protected_super_admin_can_edit_phone_without_losing_its_role(): void
+    {
+        $superAdmin = User::factory()->superAdministrator()->create([
+            'password' => Hash::make(self::INITIAL_PASSWORD),
+            'phone' => '09170000000',
+            'is_protected' => false,
+        ]);
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->get(route('admin.users.edit', $superAdmin))
+            ->assertOk()
+            ->assertSee('value="super_administrator"', false)
+            ->assertDontSee('value="administrator"', false);
+
+        $payload = $this->validUpdatePayload($superAdmin, UserRole::SuperAdministrator);
+        $payload['phone'] = '09179999999';
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->put(route('admin.users.update', $superAdmin), $payload)
+            ->assertSessionHasNoErrors();
+
+        $superAdmin->refresh();
+
+        $this->assertSame('09179999999', $superAdmin->phone);
+        $this->assertSame(UserRole::SuperAdministrator, $superAdmin->role);
+    }
+
+    public function test_general_account_edit_cannot_demote_a_non_protected_super_admin(): void
+    {
+        $superAdmin = User::factory()->superAdministrator()->create([
+            'password' => Hash::make(self::INITIAL_PASSWORD),
+            'phone' => '09170000000',
+            'is_protected' => false,
+        ]);
+
+        $payload = $this->validUpdatePayload($superAdmin, UserRole::Administrator);
+        $payload['phone'] = '09179999999';
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->put(route('admin.users.update', $superAdmin), $payload)
+            ->assertSessionHasErrors('role');
+
+        $superAdmin->refresh();
+
+        $this->assertSame('09170000000', $superAdmin->phone);
+        $this->assertSame(UserRole::SuperAdministrator, $superAdmin->role);
+    }
+
     public function test_artisan_command_validates_weak_password(): void
     {
         $this->artisan('hims:create-super-admin', [

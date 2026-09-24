@@ -38,7 +38,8 @@ class ProfilePictureTest extends TestCase
         $response->assertOk()
             ->assertSee('Profile Picture')
             ->assertSee('Upload a photo to personalize your avatar')
-            ->assertSee('accept="image/jpeg,image/png,image/jpg"', false)
+            ->assertSee('accept="image/*"', false)
+            ->assertSee('JPG, PNG, GIF, WebP, and BMP files')
             ->assertSee('Add a profile picture');
     }
 
@@ -90,7 +91,57 @@ class ProfilePictureTest extends TestCase
         $user->refresh();
 
         $this->assertNotNull($user->avatar_path);
+        $this->assertSame('png', pathinfo($user->avatar_path, PATHINFO_EXTENSION));
         Storage::disk('public')->assertExists($user->avatar_path);
+
+        $this->actingAs($user)
+            ->get(route('users.avatar', $user))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png');
+    }
+
+    public function test_supported_image_content_is_accepted_regardless_of_filename_extension(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create();
+        $file = $this->createFakePng('profile.uncommon-extension');
+
+        $this->actingAs($user)
+            ->post(route('profile.avatar.update'), ['avatar' => $file])
+            ->assertRedirect(route('profile.edit'))
+            ->assertSessionHasNoErrors();
+
+        $user->refresh();
+
+        $this->assertSame('png', pathinfo($user->avatar_path, PATHINFO_EXTENSION));
+        Storage::disk('public')->assertExists($user->avatar_path);
+    }
+
+    public function test_super_admin_can_upload_and_view_a_png_avatar(): void
+    {
+        Storage::fake('public');
+
+        $superAdmin = User::factory()->superAdministrator()->create();
+        $file = $this->createFakePng('super-admin-avatar.png');
+
+        $this->actingAs($superAdmin, AuthenticationContext::SUPER_ADMIN_GUARD)
+            ->post(route('profile.avatar.update'), ['avatar' => $file])
+            ->assertRedirect(route('profile.edit'))
+            ->assertSessionHasNoErrors();
+
+        $superAdmin->refresh();
+
+        $this->assertTrue($superAdmin->hasAvatar());
+        $this->assertSame('png', pathinfo($superAdmin->avatar_path, PATHINFO_EXTENSION));
+
+        $this->get(route('users.avatar', $superAdmin))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png');
+
+        $this->get(route('super-admin.dashboard'))
+            ->assertOk()
+            ->assertSee($superAdmin->avatarUrl(), false);
     }
 
     public function test_replacing_avatar_deletes_old_file_from_storage(): void
@@ -255,6 +306,14 @@ class ProfilePictureTest extends TestCase
         $this->actingAs($userWithMissingFile)
             ->get(route('users.avatar', $userWithMissingFile))
             ->assertNotFound();
+
+        $this->assertFalse($userWithMissingFile->hasAvatar());
+        $this->assertNull($userWithMissingFile->avatarUrl());
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('Add a profile picture')
+            ->assertDontSee(route('users.avatar', $userWithMissingFile), false);
     }
 
     public function test_avatar_renders_in_topbar_and_admin_user_views(): void

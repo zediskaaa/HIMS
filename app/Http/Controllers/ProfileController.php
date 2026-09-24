@@ -17,11 +17,22 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ProfileController extends Controller
 {
+    /** @var list<string> */
+    private const AVATAR_MIME_TYPES = [
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'image/bmp',
+        'image/x-ms-bmp',
+    ];
+
     /**
      * Display the user's profile form.
      */
@@ -190,15 +201,11 @@ class ProfileController extends Controller
             'avatar' => [
                 'required',
                 'file',
-                'mimes:jpg,jpeg,png',
-                'mimetypes:image/jpeg,image/png',
                 'max:3072', // 3 MB max
             ],
         ], [
             'avatar.required' => 'Please select an image file to upload.',
             'avatar.file' => 'The uploaded file is not valid.',
-            'avatar.mimes' => 'The profile picture must be a file of type: JPG, JPEG, PNG.',
-            'avatar.mimetypes' => 'The profile picture must be a file of type: JPG, JPEG, PNG.',
             'avatar.max' => 'The profile picture must not exceed 3 MB.',
         ]);
 
@@ -216,8 +223,8 @@ class ProfileController extends Controller
                 return;
             }
 
-            if (! in_array($imageInfo['mime'], ['image/jpeg', 'image/png'], true)) {
-                $validator->errors()->add('avatar', 'The uploaded image must be a valid JPG, JPEG, or PNG format.');
+            if (! in_array($imageInfo['mime'], self::AVATAR_MIME_TYPES, true)) {
+                $validator->errors()->add('avatar', 'The uploaded image must be a valid JPG, PNG, GIF, WebP, or BMP format.');
 
                 return;
             }
@@ -237,15 +244,36 @@ class ProfileController extends Controller
 
         $user = $request->user();
         $file = $request->file('avatar');
+        $oldPath = $user->avatar_path;
+        $mime = getimagesize($file->getRealPath())['mime'];
+        $extension = match ($mime) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            'image/bmp', 'image/x-ms-bmp' => 'bmp',
+        };
 
-        // Delete previous avatar file from storage disk if exists
-        if ($user->avatar_path && Storage::disk('public')->exists($user->avatar_path)) {
-            Storage::disk('public')->delete($user->avatar_path);
+        // Store the replacement before deleting the old file so a storage
+        // failure cannot leave the account pointing at a missing avatar.
+        $path = $file->storeAs('avatars', Str::uuid().'.'.$extension, 'public');
+
+        if (! is_string($path)) {
+            return Redirect::route('profile.edit')
+                ->withErrors(['avatar' => 'The profile picture could not be saved. Please try again.']);
         }
 
-        // Store new image securely using hashed filename on public disk
-        $path = $file->store('avatars', 'public');
-        $user->forceFill(['avatar_path' => $path])->save();
+        try {
+            $user->forceFill(['avatar_path' => $path])->save();
+        } catch (\Throwable $exception) {
+            Storage::disk('public')->delete($path);
+
+            throw $exception;
+        }
+
+        if ($oldPath && $oldPath !== $path && Storage::disk('public')->exists($oldPath)) {
+            Storage::disk('public')->delete($oldPath);
+        }
 
         $request->session()->put('avatar_success', 'Profile picture updated successfully.');
 

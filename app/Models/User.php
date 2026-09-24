@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -326,16 +327,17 @@ class User extends Authenticatable
 
     public function hasAvatar(): bool
     {
-        return ! empty($this->avatar_path);
+        return ! empty($this->avatar_path)
+            && Storage::disk('public')->exists($this->avatar_path);
     }
 
     public function avatarUrl(): ?string
     {
-        if (! $this->avatar_path) {
+        if (! $this->hasAvatar()) {
             return null;
         }
 
-        return route('users.avatar', $this);
+        return route('users.avatar', $this).'?v='.substr(hash('sha256', $this->avatar_path), 0, 12);
     }
 
     public function isArchived(): bool

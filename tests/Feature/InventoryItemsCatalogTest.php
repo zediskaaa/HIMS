@@ -110,6 +110,34 @@ class InventoryItemsCatalogTest extends TestCase
         $response->assertSee('bottle');
     }
 
+    public function test_catalog_shows_price_per_piece_only_to_financially_authorized_users(): void
+    {
+        $manager = User::factory()->inventoryManager()->create();
+        $pharmacyStaff = User::factory()->pharmacyStaff()->create();
+
+        InventoryItem::create([
+            'name' => 'Sterile Examination Gloves',
+            'sku' => 'CAT-PRICE-01',
+            'unit' => 'piece',
+            'quantity_on_hand' => 100,
+            'reorder_level' => 20,
+            'unit_cost' => 12.50,
+            'total_value' => 1250,
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('inventory.items'))
+            ->assertOk()
+            ->assertSee('Price / Piece')
+            ->assertSee('&#8369;12.50', false);
+
+        $this->actingAs($pharmacyStaff)
+            ->get(route('inventory.items'))
+            ->assertOk()
+            ->assertDontSee('Price / Piece')
+            ->assertDontSee('&#8369;12.50', false);
+    }
+
     /**
      * The catalog is the lookup surface for every department, so a term that
      * matches nothing has to say so rather than look like an empty inventory.

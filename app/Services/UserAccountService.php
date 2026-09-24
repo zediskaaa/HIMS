@@ -29,28 +29,27 @@ class UserAccountService
 
     /**
      * Roles the actor may assign. Super Admin may manage Administrator
-     * accounts, while the protected Super Administrator role is never exposed
-     * as a creatable role.
+     * accounts, while the Super Administrator role is never exposed as a
+     * creatable or demotable role through the general account form.
      *
      * @return array<int, UserRole>
      */
     public function assignableRoles(User $actor, ?User $target = null): array
     {
-        $roles = collect(UserRole::cases())
+        // Keep every existing Super Administrator on that role during ordinary
+        // account edits. Additional Super Administrators created by the CLI are
+        // intentionally not protected records, so checking only is_protected
+        // would silently submit the first visible role from the HTML select.
+        if ($actor->isSuperAdministrator() && $target?->isSuperAdministrator()) {
+            return [UserRole::SuperAdministrator];
+        }
+
+        return collect(UserRole::cases())
             ->filter(fn (UserRole $role) => $actor->isSuperAdministrator()
                 ? ! $role->isSuperAdministrator()
                 : ! $role->isAdministrator() && ! $role->grants(Permission::ViewAuditTrail))
             ->values()
             ->all();
-
-        // The protected account may preserve its existing role while editing
-        // its own non-security profile fields. It still cannot assign that role
-        // to any other account.
-        if ($target?->isProtected() && $target->is($actor)) {
-            array_unshift($roles, UserRole::SuperAdministrator);
-        }
-
-        return $roles;
     }
 
     /**

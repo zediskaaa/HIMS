@@ -10,9 +10,8 @@
             if (!file) return;
             this.fileError = '';
 
-            const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-            if (!validTypes.includes(file.type)) {
-                this.fileError = 'Please select a valid JPG, JPEG, or PNG image file.';
+            if (!file.type.startsWith('image/')) {
+                this.fileError = 'Please select a valid image file.';
                 this.clearPreview();
                 return;
             }
@@ -116,7 +115,7 @@
             </h3>
 
             <p class="mt-1 max-w-sm text-xs text-neutral-600 dark:text-neutral-300">
-                <span x-show="!previewUrl">{{ __('Upload a photo to personalize your avatar across the navigation panel and user directory. Click or tap the photo above to select a file (JPG, JPEG, PNG up to 3 MB).') }}</span>
+                <span x-show="!previewUrl">{{ __('Upload a photo to personalize your avatar across the navigation panel and user directory. JPG, PNG, GIF, WebP, and BMP files up to 3 MB are supported.') }}</span>
                 <span x-show="previewUrl" x-cloak>{{ __('Click Save Picture to apply your new photo, or click the photo again to pick a different one.') }}</span>
             </p>
 
@@ -143,7 +142,7 @@
                     type="file"
                     name="avatar"
                     id="avatar"
-                    accept="image/jpeg,image/png,image/jpg"
+                    accept="image/*"
                     class="sr-only"
                     @change="handleFileSelect($event)"
                 />

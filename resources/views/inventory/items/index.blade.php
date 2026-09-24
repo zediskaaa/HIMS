@@ -1,5 +1,8 @@
 @php
     $activeFilterCount = collect($filters)->filter(fn ($value) => filled($value))->count();
+    $canViewFinancialData = auth()->user()->can(\App\Enums\Permission::ViewProcurementSensitiveData->value);
+    $canViewSuppliers = auth()->user()->can(\App\Enums\Permission::ViewSuppliers->value);
+    $tableColumnCount = 6 + ($canViewFinancialData ? 1 : 0) + ($canViewSuppliers ? 1 : 0);
 @endphp
 
 <x-app-layout full-width>
@@ -94,6 +97,9 @@
                             <th scope="col" class="w-auto min-w-[280px] lg:min-w-[340px] px-3.5 py-2.5 text-left font-semibold text-neutral-600 dark:text-neutral-300">Item</th>
                             <th scope="col" class="w-36 min-w-[130px] px-3 py-2.5 text-left font-semibold text-neutral-600 dark:text-neutral-300 whitespace-nowrap">SKU</th>
                             <th scope="col" class="w-20 min-w-[70px] px-3 py-2.5 text-left font-semibold text-neutral-600 dark:text-neutral-300 whitespace-nowrap">Unit</th>
+                            @if ($canViewFinancialData)
+                                <th scope="col" class="w-28 min-w-[105px] px-3 py-2.5 text-right font-semibold text-neutral-600 dark:text-neutral-300 whitespace-nowrap">Price / Piece</th>
+                            @endif
                             <th scope="col" class="w-40 min-w-[140px] px-3 py-2.5 text-left font-semibold text-neutral-600 dark:text-neutral-300 whitespace-nowrap">Qty</th>
                             <th scope="col" class="w-24 min-w-[80px] px-3 py-2.5 text-left font-semibold text-neutral-600 dark:text-neutral-300 whitespace-nowrap">Reorder</th>
                             @can(\App\Enums\Permission::ViewSuppliers->value)
@@ -119,6 +125,11 @@
                                 </td>
                                 <td class="px-3 py-2.5 font-mono text-neutral-600 dark:text-neutral-400 whitespace-nowrap">{{ $item->sku }}</td>
                                 <td class="px-3 py-2.5 text-neutral-600 dark:text-neutral-400 whitespace-nowrap">{{ $item->unit ?: 'unit' }}</td>
+                                @if ($canViewFinancialData)
+                                    <td class="px-3 py-2.5 text-right font-mono font-semibold tabular-nums text-neutral-800 dark:text-neutral-200 whitespace-nowrap">
+                                        &#8369;{{ number_format((float) $item->unit_cost, 2) }}
+                                    </td>
+                                @endif
                                 <td class="px-3 py-2.5 whitespace-nowrap">
                                     <div class="inline-flex items-center gap-1.5">
                                         <span class="font-semibold text-neutral-800 dark:text-neutral-200">{{ $item->quantity_on_hand }}</span>
@@ -180,7 +191,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ auth()->user()->can(\App\Enums\Permission::ViewSuppliers->value) ? 7 : 6 }}" class="px-3 py-8 text-center text-xs text-neutral-500 dark:text-neutral-400">
+                                <td colspan="{{ $tableColumnCount }}" class="px-3 py-8 text-center text-xs text-neutral-500 dark:text-neutral-400">
                                     {{ $activeFilterCount > 0 ? 'No items match these filters.' : 'No inventory items yet.' }}
                                 </td>
                             </tr>
