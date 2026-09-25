@@ -105,6 +105,38 @@ class PasswordResetTest extends TestCase
         $this->assertSame($originalPasswordHash, $user->refresh()->password);
     }
 
+    public function test_live_password_reset_verification_returns_a_json_error_for_an_invalid_code(): void
+    {
+        $user = User::factory()->create();
+        $notification = $this->requestOtp($user);
+        $incorrectOtp = $notification->otp === '000000' ? '999999' : '000000';
+
+        $this->postJson(route('password.otp.verify'), [
+            'email' => $user->email,
+            'otp' => $incorrectOtp,
+        ])->assertUnprocessable()->assertJson([
+            'success' => false,
+            'message' => 'This verification code is invalid or has expired.',
+            'errors' => ['otp' => ['This verification code is invalid or has expired.']],
+        ]);
+    }
+
+    public function test_live_password_reset_verification_returns_the_secure_redirect_after_exchange(): void
+    {
+        $user = User::factory()->create();
+        $notification = $this->requestOtp($user);
+
+        $response = $this->postJson(route('password.otp.verify'), [
+            'email' => $user->email,
+            'otp' => $notification->otp,
+        ])->assertOk()->assertJson(['success' => true]);
+
+        $this->assertStringContainsString('/reset-password/', $response->json('redirect_url'));
+        $exchangedTokenHash = DB::table('password_reset_tokens')->where('email', $user->email)->value('token');
+        $this->assertIsString($exchangedTokenHash);
+        $this->assertFalse(Hash::check($notification->otp, $exchangedTokenHash));
+    }
+
     public function test_expired_otp_is_rejected_and_removed(): void
     {
         $user = User::factory()->create();

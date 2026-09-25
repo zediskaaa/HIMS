@@ -105,7 +105,7 @@ class LoginMfaController extends Controller
         PasswordExpirationService $expiration,
         SmsMfaChallengeService $sms,
         AuditLogger $audit,
-    ): RedirectResponse {
+    ): JsonResponse|RedirectResponse {
         $validated = $request->validate([
             'otp' => ['required', 'digits:6'],
         ], [
@@ -122,7 +122,14 @@ class LoginMfaController extends Controller
             $mfa->clear($request);
             $audit->log(AuditAction::SmsVerification, null, 'SMS verification attempt limit reached.', $pendingUser, 'Account', outcome: 'failure', source: 'user');
 
-            return redirect()->route($panel->loginRoute())->withErrors(['email' => 'Too many verification attempts. Please wait before signing in again.']);
+            return $this->verificationFailure(
+                $request,
+                $panel,
+                'email',
+                'Too many verification attempts. Please wait before signing in again.',
+                429,
+                true,
+            );
         }
 
         $result = $mfa->verify($request, $panel->guard(), $validated['otp']);
@@ -144,8 +151,14 @@ class LoginMfaController extends Controller
         }
 
         if ($result['status'] === LoginMfaService::MISSING) {
-            return redirect()->route($panel->loginRoute())
-                ->withErrors(['email' => 'Your verification session is no longer valid. Please sign in again.']);
+            return $this->verificationFailure(
+                $request,
+                $panel,
+                'email',
+                'Your verification session is no longer valid. Please sign in again.',
+                401,
+                true,
+            );
         }
 
         if ($result['status'] === LoginMfaService::EXPIRED) {
@@ -153,7 +166,7 @@ class LoginMfaController extends Controller
                 ? 'Your authenticator verification session has expired. Please sign in again.'
                 : 'This verification code has expired. Request a new code.';
 
-            return back()->withErrors(['otp' => $message]);
+            return $this->verificationFailure($request, $panel, 'otp', $message, 410);
         }
 
         if ($result['status'] === LoginMfaService::INVALID) {
@@ -169,7 +182,7 @@ class LoginMfaController extends Controller
                     ? 'Too many incorrect attempts. Please sign in again.'
                     : 'Too many incorrect attempts. Request a new code.');
 
-            return back()->withErrors(['otp' => $message]);
+            return $this->verificationFailure($request, $panel, 'otp', $message);
         }
 
         $throttleKey = $result['login_throttle_key']
@@ -178,18 +191,36 @@ class LoginMfaController extends Controller
         if ($restriction = $lockouts->activeRestriction($result['user'], $throttleKey)) {
             $lockouts->rememberRestriction($request, $panel->guard(), $result['user']->email, $restriction);
 
-            return redirect()->route($panel->loginRoute())
-                ->withErrors(['email' => $lockouts->message($restriction)]);
+            return $this->verificationFailure(
+                $request,
+                $panel,
+                'email',
+                $lockouts->message($restriction),
+                423,
+                true,
+            );
         }
 
         if (($result['method'] ?? null) !== LoginMfaService::METHOD_SMS && $result['user']->sms_mfa_enabled) {
             $status = $sms->begin($request, $result['user'], $panel->guard(), $result['remember'], $throttleKey);
 
-            return $status === SmsOtpDelivery::SENT
-                ? redirect()->route($panel->loginMfaRoute())
-                : redirect()->route($panel->loginRoute())->withErrors(['email' => $status === SmsOtpDelivery::RATE_LIMITED
+            if ($status === SmsOtpDelivery::SENT) {
+                return $this->verificationSuccess(
+                    $request,
+                    redirect()->route($panel->loginMfaRoute()),
+                );
+            }
+
+            return $this->verificationFailure(
+                $request,
+                $panel,
+                'email',
+                $status === SmsOtpDelivery::RATE_LIMITED
                     ? 'Too many SMS code requests. Please wait before trying again.'
-                    : 'We could not send a verification code. Please try signing in again.']);
+                    : 'We could not send a verification code. Please try signing in again.',
+                $status === SmsOtpDelivery::RATE_LIMITED ? 429 : 503,
+                true,
+            );
         }
 
         if ($result['user']->passwordHasExpired()) {
@@ -203,14 +234,23 @@ class LoginMfaController extends Controller
                 $throttleKey,
             );
 
-            return redirect()->route($panel->expiredPasswordRoute());
+            return $this->verificationSuccess(
+                $request,
+                redirect()->route($panel->expiredPasswordRoute()),
+            );
         }
 
         if ($restriction = $lockouts->completeSuccessfulLogin($result['user'], $throttleKey)) {
             $lockouts->rememberRestriction($request, $panel->guard(), $result['user']->email, $restriction);
 
-            return redirect()->route($panel->loginRoute())
-                ->withErrors(['email' => $lockouts->message($restriction)]);
+            return $this->verificationFailure(
+                $request,
+                $panel,
+                'email',
+                $lockouts->message($restriction),
+                423,
+                true,
+            );
         }
 
         $lockouts->clearRestriction($request);
@@ -222,7 +262,10 @@ class LoginMfaController extends Controller
             now()->getTimestamp(),
         );
 
-        return redirect()->intended(route($panel->dashboardRoute(), absolute: false));
+        return $this->verificationSuccess(
+            $request,
+            redirect()->intended(route($panel->dashboardRoute(), absolute: false)),
+        );
     }
 
     public function resend(Request $request, LoginMfaService $mfa, SmsMfaChallengeService $sms): RedirectResponse
@@ -340,6 +383,42 @@ class LoginMfaController extends Controller
     private function panel(Request $request): AuthenticationPanel
     {
         return AuthenticationPanel::from((string) $request->route('auth_panel'));
+    }
+
+    private function verificationFailure(
+        Request $request,
+        AuthenticationPanel $panel,
+        string $field,
+        string $message,
+        int $status = 422,
+        bool $redirectToLogin = false,
+    ): JsonResponse|RedirectResponse {
+        if ($request->expectsJson() || $request->isJson() || $request->ajax()) {
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+                'errors' => [$field => [$message]],
+                'redirect_url' => $redirectToLogin ? route($panel->loginRoute()) : null,
+            ], $status);
+        }
+
+        if ($redirectToLogin) {
+            return redirect()->route($panel->loginRoute())->withErrors([$field => $message]);
+        }
+
+        return back()->withErrors([$field => $message]);
+    }
+
+    private function verificationSuccess(Request $request, RedirectResponse $redirect): JsonResponse|RedirectResponse
+    {
+        if ($request->expectsJson() || $request->isJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'redirect_url' => $redirect->getTargetUrl(),
+            ]);
+        }
+
+        return $redirect;
     }
 
     private function throttleKey(

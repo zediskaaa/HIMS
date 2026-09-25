@@ -399,25 +399,24 @@
             action="{{ route($panel->loginMfaVerifyRoute()) }}"
             class="space-y-5"
             x-show="!isAuthenticator || !isExpired"
+            x-data="himsOtpVerification({
+                length: 6,
+                initial: @js(old('otp', '')),
+                initialError: @js($errors->first('otp')),
+            })"
+            x-on:submit.prevent="verify()"
         >
             @csrf
 
             <div>
-                <x-input-label for="otp" :value="__('Verification code')" class="text-neutral-700 dark:text-neutral-300" />
-                <x-text-input
-                    id="otp"
-                    class="mt-2 block h-12 w-full rounded-lg border-neutral-300 bg-neutral-50 px-3.5 text-center font-mono text-xl tracking-[0.45em] text-neutral-900 shadow-sm focus:border-primary-500 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-primary-400 dark:focus:ring-primary-500"
-                    type="text"
-                    name="otp"
-                    required
-                    autofocus
-                    inputmode="numeric"
-                    pattern="[0-9]{6}"
-                    maxlength="6"
-                    autocomplete="one-time-code"
-                    x-bind:disabled="isAuthenticator && isExpired"
-                />
-                <x-input-error :messages="$errors->get('otp')" class="mt-2 text-danger-600" />
+                <x-input-label for="login-otp-0" :value="__('Verification code')" class="text-neutral-700 dark:text-neutral-300" />
+                <div class="mt-2">
+                    <x-auth.otp-input
+                        id="login-otp"
+                        :value="old('otp', '')"
+                        :error="$errors->first('otp')"
+                    />
+                </div>
             </div>
 
             <x-ui.button
@@ -425,11 +424,17 @@
                 size="lg"
                 data-loading-text="Verifying..."
                 class="w-full"
-                x-bind:disabled="isAuthenticator && isExpired"
+                x-bind:disabled="(isAuthenticator && isExpired) || validating || state === 'success'"
+                x-bind:aria-busy="validating ? 'true' : 'false'"
             >
-                {{ $method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR_RECOVERY
-                    ? __('Reconfigure and sign in')
-                    : __('Verify and sign in') }}
+                <span x-show="validating" x-cloak class="loader loader--sm" aria-hidden="true"></span>
+                <span x-show="validating" x-cloak>{{ __('Verifying...') }}</span>
+                <span x-show="!validating && state !== 'success'">
+                    {{ $method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR_RECOVERY
+                        ? __('Reconfigure and sign in')
+                        : __('Verify and sign in') }}
+                </span>
+                <span x-show="state === 'success'" x-cloak>{{ __('Verified') }}</span>
             </x-ui.button>
         </form>
 

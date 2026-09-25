@@ -88,7 +88,7 @@
                     </div>
                 </header>
 
-                <main class="grid flex-1 items-center gap-10 py-8 lg:grid-cols-[minmax(0,1fr)_28rem] lg:gap-16 lg:py-12">
+                <main class="grid min-w-0 grid-cols-[minmax(0,1fr)] flex-1 items-center gap-10 py-8 lg:grid-cols-[minmax(0,1fr)_28rem] lg:gap-16 lg:py-12">
                     <section class="hidden max-w-xl lg:block">
                         @if ($isSuperAdminPortal)
                             <h1 class="animate-fade-up text-balance text-4xl font-semibold leading-tight tracking-tight text-neutral-900 [animation-delay:240ms] dark:text-neutral-100 xl:text-5xl">
@@ -146,7 +146,7 @@
                         @endif
                     </section>
 
-                    <div class="mx-auto w-full max-w-md animate-fade-in-scale overflow-hidden rounded-xl border {{ $isThemeAwarePortal ? 'border-neutral-200 dark:border-neutral-800' : 'border-primary-200 dark:border-primary-300/30' }} {{ $isThemeAwarePortal ? 'bg-neutral-100/95 dark:bg-neutral-900' : 'bg-neutral-50/95 dark:bg-neutral-900' }} shadow-lg shadow-neutral-900/10 backdrop-blur-xs [animation-delay:200ms] dark:shadow-xl dark:shadow-black/35">
+                    <div class="mx-auto min-w-0 w-full max-w-[min(28rem,100%)] animate-fade-in-scale overflow-hidden rounded-xl border {{ $isThemeAwarePortal ? 'border-neutral-200 dark:border-neutral-800' : 'border-primary-200 dark:border-primary-300/30' }} {{ $isThemeAwarePortal ? 'bg-neutral-100/95 dark:bg-neutral-900' : 'bg-neutral-50/95 dark:bg-neutral-900' }} shadow-lg shadow-neutral-900/10 backdrop-blur-xs [animation-delay:200ms] dark:shadow-xl dark:shadow-black/35">
                         <div class="p-6 sm:p-8">
                             {{ $slot }}
                         </div>

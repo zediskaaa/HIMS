@@ -230,6 +230,55 @@ class LoginMfaTest extends TestCase
         $this->assertGuest(AuthenticationContext::ADMIN_GUARD);
     }
 
+    public function test_live_verification_returns_json_errors_from_the_real_mfa_check(): void
+    {
+        $admin = $this->admin();
+        $notification = $this->beginMfa($admin, 'admin.login.store', 'admin.login.mfa');
+        $wrongOtp = $notification->otp === '000000' ? '999999' : '000000';
+
+        $this->postJson(route('admin.login.mfa.verify'), ['otp' => $wrongOtp])
+            ->assertUnprocessable()
+            ->assertJson([
+                'success' => false,
+                'message' => 'This verification code is invalid.',
+                'errors' => ['otp' => ['This verification code is invalid.']],
+            ]);
+
+        $this->assertGuest(AuthenticationContext::ADMIN_GUARD);
+    }
+
+    public function test_live_verification_returns_success_only_after_server_authentication(): void
+    {
+        $admin = $this->admin();
+        $notification = $this->beginMfa($admin, 'admin.login.store', 'admin.login.mfa');
+
+        $this->postJson(route('admin.login.mfa.verify'), ['otp' => $notification->otp])
+            ->assertOk()
+            ->assertJson([
+                'success' => true,
+                'redirect_url' => route('dashboard'),
+            ]);
+
+        $this->assertAuthenticatedAs($admin, AuthenticationContext::ADMIN_GUARD);
+        $this->assertNull(session(LoginMfaService::SESSION_KEY));
+    }
+
+    public function test_live_verification_reports_an_expired_code_without_authenticating(): void
+    {
+        $admin = $this->admin();
+        $notification = $this->beginMfa($admin, 'admin.login.store', 'admin.login.mfa');
+        $this->travel(config('auth.login_mfa.expire') + 1)->minutes();
+
+        $this->postJson(route('admin.login.mfa.verify'), ['otp' => $notification->otp])
+            ->assertStatus(410)
+            ->assertJson([
+                'success' => false,
+                'message' => 'This verification code has expired. Request a new code.',
+            ]);
+
+        $this->assertGuest(AuthenticationContext::ADMIN_GUARD);
+    }
+
     public function test_a_successful_otp_is_one_time_and_cannot_be_reused(): void
     {
         $admin = $this->admin();

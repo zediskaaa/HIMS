@@ -53,6 +53,36 @@ class LoadingIndicatorTest extends TestCase
             ->assertSee('data-loading-text="Sending..."', false);
     }
 
+    public function test_verification_forms_render_the_shared_segmented_otp_contract(): void
+    {
+        Notification::fake();
+        $admin = User::factory()->administrator()->create([
+            'password' => bcrypt('password'),
+            'mfa_enabled' => true,
+        ]);
+
+        $this->post(route('admin.login.store'), [
+            'email' => $admin->email,
+            'password' => 'password',
+        ]);
+
+        $this->get(route('admin.login.mfa'))
+            ->assertOk()
+            ->assertSee('himsOtpVerification', false)
+            ->assertSee('data-otp-digit', false)
+            ->assertSee('x-on:paste="handlePaste(index, $event)"', false)
+            ->assertSee('aria-live="assertive"', false);
+
+        $user = User::factory()->create();
+        $this->post(route('password.email'), ['email' => $user->email]);
+
+        $this->get(route('password.otp', ['email' => $user->email]))
+            ->assertOk()
+            ->assertSee('himsOtpVerification', false)
+            ->assertSee('password-reset-otp-0', false)
+            ->assertSee('name="otp"', false);
+    }
+
     public function test_every_authenticated_panel_uses_the_shared_hidden_overlay(): void
     {
         $panels = [

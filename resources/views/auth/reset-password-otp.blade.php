@@ -15,30 +15,44 @@
             :status="session('status')"
         />
 
-        <form method="POST" action="{{ route($panel->passwordOtpVerifyRoute()) }}" class="space-y-5" autocomplete="off">
+        <form
+            method="POST"
+            action="{{ route($panel->passwordOtpVerifyRoute()) }}"
+            class="space-y-5"
+            autocomplete="off"
+            x-data="himsOtpVerification({
+                length: 6,
+                initial: @js(old('otp', '')),
+                initialError: @js($errors->first('otp')),
+            })"
+            x-on:submit.prevent="verify()"
+        >
             @csrf
             <input type="hidden" name="email" value="{{ $email }}">
 
             <div>
-                <x-input-label for="otp" :value="__('Verification code')" class="text-neutral-700" />
-                <x-text-input
-                    id="otp"
-                    class="mt-2 block h-12 w-full rounded-lg border-neutral-300 bg-white px-3.5 text-center font-mono text-xl tracking-[0.45em] shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                    type="text"
-                    name="otp"
-                    :value="old('otp')"
-                    required
-                    autofocus
-                    inputmode="numeric"
-                    pattern="[0-9]{6}"
-                    maxlength="6"
-                    autocomplete="one-time-code"
-                />
-                <x-input-error :messages="$errors->get('otp')" class="mt-2 text-danger-600" />
+                <x-input-label for="password-reset-otp-0" :value="__('Verification code')" class="text-neutral-700 dark:text-neutral-300" />
+                <div class="mt-2">
+                    <x-auth.otp-input
+                        id="password-reset-otp"
+                        :value="old('otp', '')"
+                        :error="$errors->first('otp')"
+                    />
+                </div>
             </div>
 
-            <x-ui.button type="submit" size="lg" data-loading-text="Verifying..." class="w-full">
-                {{ __('Verify code') }}
+            <x-ui.button
+                type="submit"
+                size="lg"
+                data-loading-text="Verifying..."
+                class="w-full"
+                x-bind:disabled="validating || state === 'success'"
+                x-bind:aria-busy="validating ? 'true' : 'false'"
+            >
+                <span x-show="validating" x-cloak class="loader loader--sm" aria-hidden="true"></span>
+                <span x-show="validating" x-cloak>{{ __('Verifying...') }}</span>
+                <span x-show="!validating && state !== 'success'">{{ __('Verify code') }}</span>
+                <span x-show="state === 'success'" x-cloak>{{ __('Verified') }}</span>
             </x-ui.button>
         </form>
 

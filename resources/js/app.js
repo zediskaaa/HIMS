@@ -1238,6 +1238,195 @@ const startLoginCooldown = () => {
 
 startLoginCooldown();
 
+Alpine.data('himsOtpVerification', ({ length = 6, initial = '', initialError = '' } = {}) => ({
+    length,
+    digits: Array.from({ length }, (_, index) => String(initial)[index] || ''),
+    state: initialError ? 'error' : 'idle',
+    message: initialError || '',
+    validating: false,
+    shaking: false,
+    successCount: 0,
+
+    get code() {
+        return this.digits.join('');
+    },
+
+    init() {
+        this.$nextTick(() => {
+            const firstEmpty = this.digits.findIndex((digit) => digit === '');
+            this.focusDigit(firstEmpty === -1 ? 0 : firstEmpty);
+        });
+    },
+
+    inputs() {
+        return Array.from(this.$root.querySelectorAll('[data-otp-digit]'));
+    },
+
+    focusDigit(index) {
+        const input = this.inputs()[Math.max(0, Math.min(this.length - 1, index))];
+        if (input instanceof HTMLInputElement && !input.disabled) {
+            input.focus();
+            input.select();
+        }
+    },
+
+    digitClasses(index) {
+        if (index < this.successCount) {
+            return 'border-success-500 bg-success-50 text-success-800 ring-2 ring-success-500/20 dark:border-success-500 dark:bg-success-950/40 dark:text-success-300';
+        }
+
+        if (this.state === 'error') {
+            return 'border-danger-500 bg-danger-50 text-danger-800 ring-2 ring-danger-500/20 dark:border-danger-500 dark:bg-danger-950/40 dark:text-danger-300';
+        }
+
+        return 'border-neutral-300 dark:border-neutral-700';
+    },
+
+    beginCorrection(index, value) {
+        if (this.state !== 'error') return;
+
+        this.digits = Array(this.length).fill('');
+        this.digits[index] = value;
+        this.state = 'idle';
+        this.message = '';
+        this.shaking = false;
+    },
+
+    handleInput(index, event) {
+        const characters = String(event.target.value).replace(/\D/g, '');
+        const value = characters.slice(-1);
+        this.beginCorrection(index, value);
+        this.digits[index] = value;
+
+        if (value && index < this.length - 1) this.focusDigit(index + 1);
+        if (this.code.length === this.length) this.$nextTick(() => this.verify());
+    },
+
+    handleKeydown(index, event) {
+        if (event.key === 'Backspace') {
+            event.preventDefault();
+            if (this.state === 'error') {
+                this.state = 'idle';
+                this.message = '';
+                this.shaking = false;
+            }
+
+            if (this.digits[index]) {
+                this.digits[index] = '';
+                event.target.value = '';
+            } else if (index > 0) {
+                this.focusDigit(index - 1);
+            }
+            return;
+        }
+
+        if (event.key === 'ArrowLeft' && index > 0) {
+            event.preventDefault();
+            this.focusDigit(index - 1);
+        } else if (event.key === 'ArrowRight' && index < this.length - 1) {
+            event.preventDefault();
+            this.focusDigit(index + 1);
+        } else if (event.key.length === 1 && !/\d/.test(event.key)) {
+            event.preventDefault();
+        }
+    },
+
+    handlePaste(index, event) {
+        const characters = event.clipboardData?.getData('text').replace(/\D/g, '').slice(0, this.length) || '';
+        if (!characters) return;
+
+        event.preventDefault();
+        if (characters.length === this.length) {
+            this.digits = Array(this.length).fill('');
+            index = 0;
+        }
+        if (this.state === 'error') {
+            this.state = 'idle';
+            this.message = '';
+            this.shaking = false;
+            this.digits = Array(this.length).fill('');
+            index = 0;
+        }
+
+        characters.split('').forEach((character, offset) => {
+            if (index + offset < this.length) this.digits[index + offset] = character;
+        });
+
+        const nextEmpty = this.digits.findIndex((digit) => digit === '');
+        this.focusDigit(nextEmpty === -1 ? this.length - 1 : nextEmpty);
+        if (this.code.length === this.length) this.$nextTick(() => this.verify());
+    },
+
+    async verify() {
+        if (this.validating || this.state === 'success') return;
+
+        if (this.code.length !== this.length) {
+            this.message = `Enter the complete ${this.length}-digit verification code.`;
+            this.focusDigit(Math.max(0, this.digits.findIndex((digit) => digit === '')));
+            return;
+        }
+
+        this.validating = true;
+        this.state = 'validating';
+        this.message = 'Verifying code...';
+
+        try {
+            const response = await fetch(this.$root.action, {
+                method: this.$root.method || 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: new FormData(this.$root),
+            });
+            const data = await response.json();
+
+            if (response.ok && data.success && data.redirect_url) {
+                await this.confirmSuccess(data.redirect_url);
+                return;
+            }
+
+            if (data.redirect_url && [401, 403, 423, 429].includes(response.status)) {
+                window.himsNavigate(data.redirect_url);
+                return;
+            }
+
+            this.showError(data.errors?.otp?.[0] || data.message || 'The verification code could not be confirmed.');
+        } catch {
+            this.showError('Unable to verify the code right now. Check your connection and try again.');
+        } finally {
+            if (this.state !== 'success') this.validating = false;
+        }
+    },
+
+    showError(message) {
+        this.state = 'error';
+        this.message = message;
+        this.shaking = false;
+        this.$nextTick(() => {
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                window.requestAnimationFrame(() => { this.shaking = true; });
+            }
+            this.focusDigit(0);
+        });
+    },
+
+    async confirmSuccess(redirectUrl) {
+        this.state = 'success';
+        this.message = 'Code verified. Continuing...';
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        for (let index = 1; index <= this.length; index += 1) {
+            this.successCount = index;
+            if (!reducedMotion && index < this.length) {
+                await new Promise((resolve) => window.setTimeout(resolve, 42));
+            }
+        }
+
+        window.himsNavigate(redirectUrl, { message: 'Verification complete...' });
+    },
+}));
+
 /**
  * Shared visual feedback for native page submissions, internal navigation,
  * and foreground API requests. Passive polling and session heartbeats stay

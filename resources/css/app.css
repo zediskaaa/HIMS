@@ -385,6 +385,10 @@
         display: flex !important;
     }
 
+    .otp-code-grid--shake {
+        animation: hims-otp-shake 280ms ease-out;
+    }
+
     .hims-loading-overlay__backdrop {
         @apply absolute inset-0 bg-neutral-950/35 backdrop-blur-[2px];
     }
@@ -401,6 +405,19 @@
     .menu-link.active {
         @apply bg-primary-600 text-white rounded-md;
         margin: 0 2px;
+    }
+}
+
+@keyframes hims-otp-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    50% { transform: translateX(5px); }
+    75% { transform: translateX(-3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .otp-code-grid--shake {
+        animation: none;
     }
 }
 

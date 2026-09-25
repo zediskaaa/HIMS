@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\PasswordResetOtpService;
 use App\Support\AuthenticationPanel;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -31,7 +32,7 @@ class PasswordResetOtpController extends Controller
         ]);
     }
 
-    public function verify(Request $request, PasswordResetOtpService $otpService): RedirectResponse
+    public function verify(Request $request, PasswordResetOtpService $otpService): JsonResponse|RedirectResponse
     {
         $validated = $request->validate([
             'email' => ['required', 'email'],
@@ -44,13 +45,19 @@ class PasswordResetOtpController extends Controller
         $account = $this->eligibleAccount($request);
 
         if ($account === null) {
-            return back()->withInput($request->only('email'))->withErrors([
-                'otp' => 'This verification code is invalid or has expired.',
-            ]);
+            return $this->verificationFailure($request, 'This verification code is invalid or has expired.');
         }
 
         if (! $panel->accepts($account->role)) {
             $correctPanel = AuthenticationPanel::forRole($account->role);
+
+            if ($request->expectsJson() || $request->isJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $panel->wrongPanelAlert($correctPanel)['message'],
+                    'redirect_url' => route($correctPanel->passwordRequestRoute()),
+                ], 403);
+            }
 
             return redirect()
                 ->route($correctPanel->passwordRequestRoute())
@@ -60,15 +67,22 @@ class PasswordResetOtpController extends Controller
         $resetToken = $otpService->exchangeForResetToken($account, $validated['otp']);
 
         if ($resetToken === null) {
-            return back()->withInput($request->only('email'))->withErrors([
-                'otp' => 'This verification code is invalid or has expired.',
-            ]);
+            return $this->verificationFailure($request, 'This verification code is invalid or has expired.');
         }
 
-        return redirect()->route($panel->passwordResetRoute(), [
+        $redirect = redirect()->route($panel->passwordResetRoute(), [
             'token' => $resetToken,
             'email' => $account->email,
         ]);
+
+        if ($request->expectsJson() || $request->isJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'redirect_url' => $redirect->getTargetUrl(),
+            ]);
+        }
+
+        return $redirect;
     }
 
     private function eligibleAccount(Request $request): ?User
@@ -77,6 +91,19 @@ class PasswordResetOtpController extends Controller
             ->where('email', $request->string('email'))
             ->where('status', UserStatus::Active->value)
             ->first();
+    }
+
+    private function verificationFailure(Request $request, string $message): JsonResponse|RedirectResponse
+    {
+        if ($request->expectsJson() || $request->isJson() || $request->ajax()) {
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+                'errors' => ['otp' => [$message]],
+            ], 422);
+        }
+
+        return back()->withInput($request->only('email'))->withErrors(['otp' => $message]);
     }
 
     private function panel(Request $request): AuthenticationPanel
