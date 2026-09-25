@@ -1241,17 +1241,40 @@ startLoginCooldown();
 Alpine.data('himsOtpVerification', ({ length = 6, initial = '', initialError = '' } = {}) => ({
     length,
     digits: Array.from({ length }, (_, index) => String(initial)[index] || ''),
-    state: initialError ? 'error' : 'idle',
+    state: initialError ? 'error' : (String(initial).replace(/\D/g, '').length === length ? 'ready' : 'idle'),
     message: initialError || '',
-    validating: false,
     shaking: false,
     successCount: 0,
+
+    get validating() {
+        return this.state === 'verifying';
+    },
+
+    set validating(value) {
+        if (value && this.state !== 'verifying') this.state = 'verifying';
+        else if (!value && this.state === 'verifying') this.syncState();
+    },
+
+    get isVerified() {
+        return this.state === 'verified';
+    },
+
+    get isComplete() {
+        return this.code.length === this.length && this.digits.every((digit) => digit !== '' && /\d/.test(digit));
+    },
+
+    get canSubmit() {
+        return this.state === 'ready';
+    },
 
     get code() {
         return this.digits.join('');
     },
 
     init() {
+        if (!this.message && this.state !== 'error') {
+            this.syncState();
+        }
         this.$nextTick(() => {
             const firstEmpty = this.digits.findIndex((digit) => digit === '');
             this.focusDigit(firstEmpty === -1 ? 0 : firstEmpty);
@@ -1267,6 +1290,16 @@ Alpine.data('himsOtpVerification', ({ length = 6, initial = '', initialError = '
         if (input instanceof HTMLInputElement && !input.disabled) {
             input.focus();
             input.select();
+        }
+    },
+
+    syncState() {
+        if (this.state === 'verifying' || this.state === 'verified') return;
+
+        if (this.isComplete) {
+            this.state = 'ready';
+        } else {
+            this.state = 'idle';
         }
     },
 
@@ -1287,36 +1320,57 @@ Alpine.data('himsOtpVerification', ({ length = 6, initial = '', initialError = '
 
         this.digits = Array(this.length).fill('');
         this.digits[index] = value;
-        this.state = 'idle';
         this.message = '';
         this.shaking = false;
+        this.syncState();
     },
 
     handleInput(index, event) {
         const characters = String(event.target.value).replace(/\D/g, '');
         const value = characters.slice(-1);
-        this.beginCorrection(index, value);
-        this.digits[index] = value;
 
-        if (value && index < this.length - 1) this.focusDigit(index + 1);
-        if (this.code.length === this.length) this.$nextTick(() => this.verify());
+        if (this.state === 'error') {
+            this.beginCorrection(index, value);
+        } else {
+            this.digits[index] = value;
+            this.syncState();
+        }
+
+        if (value && index < this.length - 1) {
+            this.focusDigit(index + 1);
+        }
     },
 
     handleKeydown(index, event) {
+        if (event.key === 'Enter') {
+            if (this.state !== 'ready') {
+                event.preventDefault();
+            }
+            return;
+        }
+
         if (event.key === 'Backspace') {
             event.preventDefault();
             if (this.state === 'error') {
-                this.state = 'idle';
                 this.message = '';
                 this.shaking = false;
             }
 
             if (this.digits[index]) {
                 this.digits[index] = '';
-                event.target.value = '';
+                if (event.target instanceof HTMLInputElement) {
+                    event.target.value = '';
+                }
             } else if (index > 0) {
                 this.focusDigit(index - 1);
+                this.digits[index - 1] = '';
+                const prevInput = this.inputs()[index - 1];
+                if (prevInput instanceof HTMLInputElement) {
+                    prevInput.value = '';
+                }
             }
+
+            this.syncState();
             return;
         }
 
@@ -1336,39 +1390,37 @@ Alpine.data('himsOtpVerification', ({ length = 6, initial = '', initialError = '
         if (!characters) return;
 
         event.preventDefault();
-        if (characters.length === this.length) {
-            this.digits = Array(this.length).fill('');
-            index = 0;
-        }
+
         if (this.state === 'error') {
-            this.state = 'idle';
             this.message = '';
             this.shaking = false;
             this.digits = Array(this.length).fill('');
             index = 0;
         }
 
+        if (characters.length === this.length) {
+            this.digits = Array(this.length).fill('');
+            index = 0;
+        }
+
         characters.split('').forEach((character, offset) => {
-            if (index + offset < this.length) this.digits[index + offset] = character;
+            if (index + offset < this.length) {
+                this.digits[index + offset] = character;
+            }
         });
 
         const nextEmpty = this.digits.findIndex((digit) => digit === '');
         this.focusDigit(nextEmpty === -1 ? this.length - 1 : nextEmpty);
-        if (this.code.length === this.length) this.$nextTick(() => this.verify());
+
+        this.syncState();
     },
 
     async verify() {
-        if (this.validating || this.state === 'success') return;
+        if (this.state === 'verifying' || this.state === 'verified') return;
+        if (this.state !== 'ready' || !this.isComplete) return;
 
-        if (this.code.length !== this.length) {
-            this.message = `Enter the complete ${this.length}-digit verification code.`;
-            this.focusDigit(Math.max(0, this.digits.findIndex((digit) => digit === '')));
-            return;
-        }
-
-        this.validating = true;
-        this.state = 'validating';
-        this.message = 'Verifying code...';
+        this.state = 'verifying';
+        this.message = '';
 
         try {
             const response = await fetch(this.$root.action, {
@@ -1387,15 +1439,13 @@ Alpine.data('himsOtpVerification', ({ length = 6, initial = '', initialError = '
             }
 
             if (data.redirect_url && [401, 403, 423, 429].includes(response.status)) {
-                window.himsNavigate(data.redirect_url);
+                window.himsNavigate(data.redirect_url, { showOverlay: false });
                 return;
             }
 
             this.showError(data.errors?.otp?.[0] || data.message || 'The verification code could not be confirmed.');
         } catch {
             this.showError('Unable to verify the code right now. Check your connection and try again.');
-        } finally {
-            if (this.state !== 'success') this.validating = false;
         }
     },
 
@@ -1403,6 +1453,7 @@ Alpine.data('himsOtpVerification', ({ length = 6, initial = '', initialError = '
         this.state = 'error';
         this.message = message;
         this.shaking = false;
+        this.successCount = 0;
         this.$nextTick(() => {
             if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
                 window.requestAnimationFrame(() => { this.shaking = true; });
@@ -1412,18 +1463,22 @@ Alpine.data('himsOtpVerification', ({ length = 6, initial = '', initialError = '
     },
 
     async confirmSuccess(redirectUrl) {
-        this.state = 'success';
-        this.message = 'Code verified. Continuing...';
+        this.state = 'verified';
+        this.message = '';
         const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-        for (let index = 1; index <= this.length; index += 1) {
-            this.successCount = index;
-            if (!reducedMotion && index < this.length) {
-                await new Promise((resolve) => window.setTimeout(resolve, 42));
+        if (reducedMotion) {
+            this.successCount = this.length;
+        } else {
+            for (let index = 1; index <= this.length; index += 1) {
+                this.successCount = index;
+                if (index < this.length) {
+                    await new Promise((resolve) => window.setTimeout(resolve, 45));
+                }
             }
         }
 
-        window.himsNavigate(redirectUrl, { message: 'Verification complete...' });
+        window.himsNavigate(redirectUrl, { showOverlay: false });
     },
 }));
 
@@ -1766,11 +1821,15 @@ const startLoadingIndicators = () => {
         }
     });
 
-    window.himsNavigate = (url, { message = 'Loading page...', replace = false } = {}) => {
+    window.himsNavigate = (url, { message = 'Loading page...', replace = false, showOverlay: shouldShowOverlay = true } = {}) => {
         if (pageTransitionPending) return;
 
-        rememberPageTransition();
-        showOverlay(message);
+        if (shouldShowOverlay) {
+            rememberPageTransition();
+            showOverlay(message);
+        } else {
+            pageTransitionPending = true;
+        }
 
         continueAfterPaint(() => {
             try {

@@ -424,17 +424,17 @@
                 size="lg"
                 data-loading-text="Verifying..."
                 class="w-full"
-                x-bind:disabled="(isAuthenticator && isExpired) || validating || state === 'success'"
-                x-bind:aria-busy="validating ? 'true' : 'false'"
+                x-bind:disabled="state !== 'ready' || (typeof isExpired !== 'undefined' && isAuthenticator && isExpired)"
+                x-bind:aria-busy="state === 'verifying' || validating ? 'true' : 'false'"
             >
-                <span x-show="validating" x-cloak class="loader loader--sm" aria-hidden="true"></span>
-                <span x-show="validating" x-cloak>{{ __('Verifying...') }}</span>
-                <span x-show="!validating && state !== 'success'">
+                <span x-show="state === 'verifying' || validating" x-cloak class="loader loader--sm" aria-hidden="true"></span>
+                <span x-show="state === 'verifying' || validating" x-cloak>{{ __('Verifying...') }}</span>
+                <span x-show="state === 'idle' || state === 'ready' || state === 'error'">
                     {{ $method === \App\Services\LoginMfaService::METHOD_AUTHENTICATOR_RECOVERY
                         ? __('Reconfigure and sign in')
                         : __('Verify and sign in') }}
                 </span>
-                <span x-show="state === 'success'" x-cloak>{{ __('Verified') }}</span>
+                <span x-show="state === 'verified' || state === 'success'" x-cloak>{{ __('Verified') }}</span>
             </x-ui.button>
         </form>
 

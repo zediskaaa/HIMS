@@ -26,7 +26,7 @@
                 x-bind:aria-label="'Digit ' + (index + 1) + ' of ' + length"
                 x-bind:aria-invalid="state === 'error' ? 'true' : 'false'"
                 x-bind:autocomplete="index === 0 ? 'one-time-code' : 'off'"
-                x-bind:disabled="validating || state === 'success' || (typeof isExpired !== 'undefined' && isAuthenticator && isExpired)"
+                x-bind:disabled="state === 'verifying' || state === 'verified' || validating || state === 'success' || (typeof isExpired !== 'undefined' && isAuthenticator && isExpired)"
                 x-on:input="handleInput(index, $event)"
                 x-on:keydown="handleKeydown(index, $event)"
                 x-on:paste="handlePaste(index, $event)"
@@ -44,10 +44,10 @@
     <p
         id="{{ $id }}-feedback"
         class="min-h-5 text-sm"
-        x-bind:class="state === 'error' ? 'text-danger-600 dark:text-danger-400' : (state === 'success' ? 'text-success-700 dark:text-success-400' : 'text-neutral-500 dark:text-neutral-400')"
+        x-bind:class="state === 'error' ? 'text-danger-600 dark:text-danger-400' : 'text-neutral-500 dark:text-neutral-400'"
         aria-live="assertive"
         aria-atomic="true"
-        x-text="message"
+        x-text="state === 'error' ? message : ''"
     ></p>
 
     <noscript>

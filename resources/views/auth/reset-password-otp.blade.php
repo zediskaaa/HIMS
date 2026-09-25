@@ -46,13 +46,13 @@
                 size="lg"
                 data-loading-text="Verifying..."
                 class="w-full"
-                x-bind:disabled="validating || state === 'success'"
-                x-bind:aria-busy="validating ? 'true' : 'false'"
+                x-bind:disabled="state !== 'ready'"
+                x-bind:aria-busy="state === 'verifying' || validating ? 'true' : 'false'"
             >
-                <span x-show="validating" x-cloak class="loader loader--sm" aria-hidden="true"></span>
-                <span x-show="validating" x-cloak>{{ __('Verifying...') }}</span>
-                <span x-show="!validating && state !== 'success'">{{ __('Verify code') }}</span>
-                <span x-show="state === 'success'" x-cloak>{{ __('Verified') }}</span>
+                <span x-show="state === 'verifying' || validating" x-cloak class="loader loader--sm" aria-hidden="true"></span>
+                <span x-show="state === 'verifying' || validating" x-cloak>{{ __('Verifying...') }}</span>
+                <span x-show="state === 'idle' || state === 'ready' || state === 'error'">{{ __('Verify code') }}</span>
+                <span x-show="state === 'verified' || state === 'success'" x-cloak>{{ __('Verified') }}</span>
             </x-ui.button>
         </form>
 
