@@ -15,6 +15,7 @@
         actualSupplierId: '',
         poLines: [],
         openOrders: {{ Js::from($openPurchaseOrders) }},
+        barcodeLookupUrl: {{ Js::from(route('inventory.warehousing.lookup-barcode')) }},
         selectPo(poId) {
             this.selectedPo = this.openOrders.find(p => p.id == poId);
             this.actualSupplierId = '';
@@ -56,23 +57,70 @@
                     serial_number: '',
                     actual_sku: '',
                     actual_purchase_unit: '',
+                    scan_value: '',
+                    scan_loading: false,
+                    scan_error: '',
+                    scan_success: '',
                 };
             });
+        },
+        async applyBarcode(index) {
+            const line = this.poLines[index];
+            const code = (line?.scan_value || '').trim();
+            if (!line || !code || line.scan_loading) return;
+
+            line.scan_loading = true;
+            line.scan_error = '';
+            line.scan_success = '';
+
+            try {
+                const token = document.querySelector('meta[name=\'csrf-token\']')?.getAttribute('content');
+                const response = await fetch(this.barcodeLookupUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': token || '',
+                    },
+                    body: JSON.stringify({ barcode: code, operation: 'receive' }),
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message || 'Barcode lookup failed.');
+                if (result.type !== 'item' || String(result.id) !== String(line.item_id)) {
+                    throw new Error(`Scanned item does not match this purchase-order line${line.item?.sku ? ` (${line.item.sku})` : ''}.`);
+                }
+                if (!result.is_active) throw new Error(result.warning || 'Archived items cannot be received.');
+
+                const parsed = result.parsed || {};
+                const applied = [];
+                line.actual_sku = result.sku;
+                applied.push('item');
+
+                if (line.item?.is_batch_tracked && parsed.batch) {
+                    line.batch_number = parsed.batch;
+                    line.lot_number = parsed.batch;
+                    applied.push('lot');
+                }
+                if (line.item?.is_expiry_tracked && parsed.expiry) {
+                    line.expiry_date = parsed.expiry;
+                    applied.push('expiry');
+                }
+                if (line.item?.is_serial_tracked && parsed.serial) {
+                    line.serial_number = parsed.serial;
+                    applied.push('serial');
+                }
+
+                line.scan_success = `Matched ${result.sku}. Applied ${applied.join(', ')} data.`;
+            } catch (error) {
+                line.scan_error = error.message || 'Unable to validate this barcode.';
+            } finally {
+                line.scan_loading = false;
+            }
         }
     }" x-init="if ({{ Js::from(request()->query('purchase_order_id')) }}) { selectPo({{ Js::from(request()->query('purchase_order_id')) }}); showReceiveModal = !!selectedPo; }">
 
             {{-- SWS Consolidated Workflow Navigation --}}
             @include('inventory.warehousing.partials.workflow_nav')
-
-            {{-- Flash Alerts --}}
-            @if(session('success'))
-                <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 flex items-center justify-between shadow-sm">
-                    <div class="flex items-center gap-2">
-                        <svg class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                        <span class="font-medium">{{ session('success') }}</span>
-                    </div>
-                </div>
-            @endif
 
             @if($errors->any())
                 <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 shadow-sm">
@@ -387,8 +435,32 @@
                                             {{-- Expected PO Info --}}
                                             <td class="px-4 py-3.5">
                                                 <input type="hidden" :name="`lines[${index}][po_line_id]`" :value="line.id">
+                                                <input type="hidden" :name="`lines[${index}][actual_item_id]`" :value="line.item_id">
                                                 <p class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 leading-snug" x-text="line.item ? line.item.name : 'Item'"></p>
                                                 <p class="text-xs font-mono text-neutral-500 dark:text-neutral-400 mt-0.5" x-text="line.item ? line.item.sku : ''"></p>
+                                                <div class="mt-2" :aria-busy="line.scan_loading">
+                                                    <label :for="`receiving-barcode-${index}`" class="block text-[10px] font-bold uppercase tracking-wider text-neutral-500">Scan product barcode</label>
+                                                    <div class="mt-1 flex min-w-0 gap-1.5">
+                                                        <input
+                                                            type="text"
+                                                            :id="`receiving-barcode-${index}`"
+                                                            x-model="line.scan_value"
+                                                            @keydown.enter.prevent="applyBarcode(index)"
+                                                            autocomplete="off"
+                                                            placeholder="UPC, EAN, GS1 or internal code"
+                                                            class="min-w-0 flex-1 rounded-md border border-neutral-300 bg-white px-2 py-1.5 font-mono text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                                                        >
+                                                        <button
+                                                            type="button"
+                                                            @click="applyBarcode(index)"
+                                                            :disabled="line.scan_loading || !line.scan_value.trim()"
+                                                            class="shrink-0 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                                                            x-text="line.scan_loading ? 'Checking...' : 'Apply'"
+                                                        ></button>
+                                                    </div>
+                                                    <p x-show="line.scan_error" x-cloak x-text="line.scan_error" class="mt-1 break-words text-[11px] font-medium text-rose-700 dark:text-rose-300" role="alert"></p>
+                                                    <p x-show="line.scan_success" x-cloak x-text="line.scan_success" class="mt-1 break-words text-[11px] font-medium text-emerald-700 dark:text-emerald-300" aria-live="polite"></p>
+                                                </div>
                                                 <label class="mt-2 block text-[10px] font-bold uppercase tracking-wider text-neutral-500">Actual delivered SKU</label>
                                                 <input type="text" :name="`lines[${index}][actual_sku]`" x-model="line.actual_sku" required class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100">
                                                 <label class="mt-2 block text-[10px] font-bold uppercase tracking-wider text-neutral-500">Actual delivered UOM</label>
@@ -485,18 +557,23 @@
                                                         <input
                                                             type="text"
                                                             :name="`lines[${index}][batch_number]`"
+                                                            x-model="line.batch_number"
                                                             placeholder="e.g. LOT-2026-X1"
                                                             class="mt-0.5 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 text-xs font-mono py-1.5 px-2 focus:ring-primary-500 focus:border-primary-500"
                                                             :required="line.item && line.item.is_batch_tracked"
                                                         >
+                                                        <input type="hidden" :name="`lines[${index}][lot_number]`" :value="line.lot_number">
                                                     </div>
                                                     <div>
-                                                        <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-500">Serial No. (Optional)</label>
+                                                        <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-500" x-text="line.item && line.item.is_serial_tracked ? 'Serial No. (Required)' : 'Serial No. (Not tracked)' "></label>
                                                         <input
                                                             type="text"
                                                             :name="`lines[${index}][serial_number]`"
+                                                            x-model="line.serial_number"
                                                             placeholder="e.g. SN-098234"
                                                             class="mt-0.5 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 text-xs font-mono py-1.5 px-2 focus:ring-primary-500 focus:border-primary-500"
+                                                            :required="line.item && line.item.is_serial_tracked"
+                                                            :disabled="line.item && !line.item.is_serial_tracked"
                                                         >
                                                     </div>
                                                 </div>
@@ -510,9 +587,10 @@
                                                         <input
                                                             type="date"
                                                             :name="`lines[${index}][expiry_date]`"
+                                                            x-model="line.expiry_date"
                                                             class="mt-0.5 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs font-mono py-1.5 px-2 focus:ring-primary-500 focus:border-primary-500"
                                                             :min="new Date().toISOString().split('T')[0]"
-                                                            :required="line.item && line.item.expiry_alert_days > 0"
+                                                            :required="line.item && line.item.is_expiry_tracked"
                                                         >
                                                     </div>
                                                     <div>

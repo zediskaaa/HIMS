@@ -458,6 +458,10 @@ class WarehouseTaskService
      */
     private function validateScan(WarehouseTask $task, string $expected, array $parsed): array
     {
+        if (($parsed['errors'] ?? []) !== []) {
+            return [false, implode(' ', $parsed['errors']), 'reject'];
+        }
+
         if ($parsed['resolved_type'] === null) {
             return [false, "Unknown barcode or identifier: '{$parsed['raw']}'. Please verify the barcode label.", 'reject'];
         }

@@ -76,13 +76,7 @@
         {{-- SWS Consolidated Workflow Navigation --}}
         @include('inventory.warehousing.partials.workflow_nav')
 
-        {{-- Session & Validation Alerts --}}
-        @if(session('success'))
-            <x-ui.alert variant="success" :message="session('success')" />
-        @endif
-        @if(session('error'))
-            <x-ui.alert variant="danger" :message="session('error')" />
-        @endif
+        {{-- Persistent notices and validation summaries --}}
         @if(session('notice'))
             <x-ui.alert variant="info" :message="session('notice')" />
         @endif
@@ -443,44 +437,6 @@
                                         </div>
                                     </form>
 
-                                    {{-- Fast Simulator Buttons for Rapid Testing --}}
-                                    <div class="mt-4 border-t border-primary-200/60 pt-3 dark:border-primary-900/60">
-                                        <p class="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">1-Click Test Shortcuts (or use Camera Scanner)</p>
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            @if($task->sourceLocation)
-                                                <form method="POST" action="{{ route('inventory.warehouse-tasks.scan', $task) }}" class="inline">
-                                                    @csrf
-                                                    <input type="hidden" name="scan_value" value="{{ $sourceVal }}">
-                                                    <button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-mono border transition-all @if($activeStepNum === 1) bg-primary-600 text-white font-bold border-primary-700 ring-2 ring-primary-500/30 shadow-sm @else bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700 @endif">
-                                                        @if($activeStepNum === 1) Current: @endif Step 1: Scan Source ({{ $task->sourceLocation->code }})
-                                                    </button>
-                                                </form>
-                                            @endif
-                                            <form method="POST" action="{{ route('inventory.warehouse-tasks.scan', $task) }}" class="inline">
-                                                @csrf
-                                                <input type="hidden" name="scan_value" value="{{ $itemVal }}">
-                                                <button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-mono border transition-all @if($activeStepNum === 2) bg-primary-600 text-white font-bold border-primary-700 ring-2 ring-primary-500/30 shadow-sm @else bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700 @endif">
-                                                    @if($activeStepNum === 2) Current: @endif Step 2: Scan Item ({{ $task->item?->sku }})
-                                                </button>
-                                            </form>
-                                            @if($task->destinationLocation)
-                                                <form method="POST" action="{{ route('inventory.warehouse-tasks.scan', $task) }}" class="inline">
-                                                    @csrf
-                                                    <input type="hidden" name="scan_value" value="{{ $destVal }}">
-                                                    <button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-mono border transition-all @if($activeStepNum === 3) bg-primary-600 text-white font-bold border-primary-700 ring-2 ring-primary-500/30 shadow-sm @else bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700 @endif">
-                                                        @if($activeStepNum === 3) Current: @endif Step 3: Scan Dest ({{ $task->destinationLocation->code }})
-                                                    </button>
-                                                </form>
-                                            @endif
-                                            <form method="POST" action="{{ route('inventory.warehouse-tasks.scan', $task) }}" class="inline">
-                                                @csrf
-                                                <input type="hidden" name="scan_value" value="INVALID-BARCODE-999">
-                                                <button type="submit" class="rounded-lg bg-rose-50 text-rose-700 px-2.5 py-1.5 text-xs font-mono border border-rose-200 hover:bg-rose-100 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-900/60">
-                                                    Test Wrong Scan
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </div>
                                 </div>
 
                                 {{-- Task Completion Card --}}
@@ -597,6 +553,26 @@
                                         <p class="text-xs font-semibold text-neutral-800 dark:text-neutral-200" x-text="lookupResult?.name || lookupResult?.message"></p>
                                         <template x-if="lookupResult?.warning">
                                             <p class="mt-1 text-[11px] font-medium text-amber-800 dark:text-amber-300" x-text="lookupResult?.warning"></p>
+                                        </template>
+                                        <template x-if="lookupResult?.parsed && (lookupResult.parsed.gtin || lookupResult.parsed.batch || lookupResult.parsed.expiry || lookupResult.parsed.serial)">
+                                            <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-neutral-600 dark:text-neutral-300 sm:grid-cols-4">
+                                                <div x-show="lookupResult.parsed.gtin" class="min-w-0">
+                                                    <dt class="font-semibold text-neutral-500 dark:text-neutral-400">GTIN</dt>
+                                                    <dd class="truncate font-mono" :title="lookupResult.parsed.gtin" x-text="lookupResult.parsed.gtin"></dd>
+                                                </div>
+                                                <div x-show="lookupResult.parsed.batch" class="min-w-0">
+                                                    <dt class="font-semibold text-neutral-500 dark:text-neutral-400">Lot / Batch</dt>
+                                                    <dd class="truncate font-mono" :title="lookupResult.parsed.batch" x-text="lookupResult.parsed.batch"></dd>
+                                                </div>
+                                                <div x-show="lookupResult.parsed.expiry" class="min-w-0">
+                                                    <dt class="font-semibold text-neutral-500 dark:text-neutral-400">Expiry</dt>
+                                                    <dd class="font-mono" x-text="lookupResult.parsed.expiry"></dd>
+                                                </div>
+                                                <div x-show="lookupResult.parsed.serial" class="min-w-0">
+                                                    <dt class="font-semibold text-neutral-500 dark:text-neutral-400">Serial</dt>
+                                                    <dd class="truncate font-mono" :title="lookupResult.parsed.serial" x-text="lookupResult.parsed.serial"></dd>
+                                                </div>
+                                            </dl>
                                         </template>
                                     </div>
                                     <div class="flex shrink-0 items-center gap-2">

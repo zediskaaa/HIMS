@@ -13,6 +13,8 @@
         'fulfilled' => 'success', 'received' => 'success', 'completed' => 'success',
         'resolved' => 'success', 'delivered' => 'success', 'healthy' => 'success',
         'accepted' => 'success', 'arrived_at_dock' => 'success',
+        'posted' => 'success', 'stored' => 'success', 'complete' => 'success',
+        'good' => 'success',
 
         // amber — needs attention, in flight
         'low_stock' => 'warning', 'pending' => 'warning', 'submitted' => 'warning',
@@ -21,6 +23,9 @@
         'pending_review' => 'warning', 'action_required' => 'danger',
         'warning' => 'warning', 'degraded' => 'warning',
         'pending_inspection' => 'warning', 'customs_hold' => 'warning',
+        'quarantined' => 'warning', 'under_qc' => 'warning', 'under_inspection' => 'warning',
+        'partially_received' => 'warning', 'partially_disposed' => 'warning',
+        'awaiting_put_away' => 'warning', 'pending_sample' => 'warning',
 
         // red — blocked, failed, critical
         'out_of_stock' => 'danger', 'expired' => 'danger', 'rejected' => 'danger',

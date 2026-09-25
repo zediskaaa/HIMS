@@ -7,138 +7,334 @@ use App\Models\InventoryItem;
 use App\Models\ItemBatch;
 use App\Models\StorageLocation;
 use App\Models\WarehouseTask;
+use Carbon\CarbonImmutable;
 
 class BarcodeService
 {
-    /** @return array{raw:string, normalized:string, symbology:string, gtin:?string, batch:?string, expiry:?string, serial:?string, resolved_type:?string, resolved_id:?int} */
+    private const GROUP_SEPARATOR = "\x1D";
+
+    /**
+     * @return array{raw:string,normalized:string,symbology:string,gtin:?string,batch:?string,expiry:?string,serial:?string,resolved_type:?string,resolved_id:?int,errors:array<int, string>}
+     */
     public function parseAndResolve(string $raw): array
     {
+        $raw = trim($raw);
         $normalized = trim(str_replace(["\r", "\n", "\t"], '', $raw));
         $symbology = 'internal';
         $gtin = $batch = $expiry = $serial = null;
+        $errors = [];
+        $isGs1 = false;
 
         if (str_starts_with($normalized, ']d2')) {
             $normalized = substr($normalized, 3);
             $symbology = 'gs1_datamatrix';
+            $isGs1 = true;
+        } elseif (str_starts_with($normalized, ']C1')) {
+            $normalized = substr($normalized, 3);
+            $symbology = 'gs1_128';
+            $isGs1 = true;
+        } elseif (str_starts_with($normalized, ']d1')) {
+            $normalized = substr($normalized, 3);
+            $symbology = 'data_matrix';
+        } elseif (str_starts_with($normalized, ']C0')) {
+            $normalized = substr($normalized, 3);
+            $symbology = 'code_128';
         } elseif (str_contains($normalized, '(01)')) {
             $symbology = 'gs1_hri';
+            $isGs1 = true;
+        } elseif ($this->looksLikeGs1ElementString($normalized)) {
+            $symbology = 'gs1_element_string';
+            $isGs1 = true;
         }
 
-        if (in_array($symbology, ['gs1_datamatrix', 'gs1_hri'], true) || str_starts_with($normalized, '01')) {
+        if ($isGs1) {
             $parsed = $this->parseGs1($normalized);
             $gtin = $parsed['gtin'];
             $batch = $parsed['batch'];
             $expiry = $parsed['expiry'];
             $serial = $parsed['serial'];
-            $symbology = $symbology === 'internal' ? 'gs1_element_string' : $symbology;
+            $errors = $parsed['errors'];
         }
 
         $resolvedType = null;
         $resolvedId = null;
 
-        $item = $gtin ? InventoryItem::query()->where('gtin', $gtin)->first() : null;
-        if ($item) {
-            $resolvedType = 'item';
-            $resolvedId = $item->id;
-        } else {
-            $location = StorageLocation::query()
-                ->where('barcode_value', $normalized)
-                ->orWhere('code', $normalized)
-                ->first();
-            $item = InventoryItem::query()
-                ->where('barcode_value', $normalized)
-                ->orWhere('sku', $normalized)
-                ->orWhere('gtin', $normalized)
-                ->first();
-            $itemBatch = ItemBatch::query()
-                ->where('batch_number', $normalized)
-                ->orWhere('lot_number', $normalized)
-                ->first();
-            $task = WarehouseTask::query()->where('task_number', $normalized)->first();
-            $alias = BarcodeAlias::query()->where('code', $normalized)->where('is_active', true)->first();
-
-            foreach ([['location', $location], ['item', $item], ['batch', $itemBatch], ['task', $task]] as [$type, $model]) {
-                if ($model) {
-                    $resolvedType = $type;
-                    $resolvedId = $model->id;
-                    break;
+        if ($errors === []) {
+            if ($gtin !== null) {
+                $item = InventoryItem::query()->whereIn('gtin', $this->equivalentGtinValues($gtin))->first();
+                if ($item !== null) {
+                    $resolvedType = 'item';
+                    $resolvedId = $item->id;
                 }
-            }
+            } else {
+                [$resolvedType, $resolvedId, $lookupErrors] = $this->resolveDirectIdentifier($normalized, $symbology);
+                $errors = [...$errors, ...$lookupErrors];
 
-            if ($resolvedType === null && $alias) {
-                $resolvedType = $alias->target_type;
-                $resolvedId = (int) $alias->target_id;
-                $symbology = $alias->symbology;
+                if ($resolvedType === 'item' && $this->isValidGtin($normalized)) {
+                    $gtin = str_pad($normalized, 14, '0', STR_PAD_LEFT);
+                    if ($symbology === 'internal') {
+                        $symbology = 'upc_ean';
+                    }
+                }
             }
         }
 
-        return compact('raw', 'normalized', 'symbology', 'gtin', 'batch', 'expiry', 'serial') + [
+        return compact('raw', 'normalized', 'symbology', 'gtin', 'batch', 'expiry', 'serial', 'errors') + [
             'resolved_type' => $resolvedType,
             'resolved_id' => $resolvedId,
         ];
     }
 
-    /** @return array{gtin:?string,batch:?string,expiry:?string,serial:?string} */
+    /** @return array{gtin:?string,batch:?string,expiry:?string,serial:?string,errors:array<int, string>} */
     private function parseGs1(string $value): array
     {
         $fields = [];
+        $errors = [];
 
         if (str_contains($value, '(')) {
             preg_match_all('/\((01|10|17|21)\)([^()]*)/', $value, $matches, PREG_SET_ORDER);
             foreach ($matches as $match) {
+                if (array_key_exists($match[1], $fields)) {
+                    $errors[] = "GS1 AI ({$match[1]}) appears more than once.";
+
+                    continue;
+                }
+
                 $fields[$match[1]] = $match[2];
             }
         } else {
-            $segments = explode(chr(29), $value);
-            $head = array_shift($segments) ?? '';
-            if (str_starts_with($head, '01') && strlen($head) >= 16) {
-                $fields['01'] = substr($head, 2, 14);
-                $head = substr($head, 16);
-            }
-            while ($head !== '') {
-                $ai = substr($head, 0, 2);
-                if ($ai === '17' && strlen($head) >= 8) {
-                    $fields['17'] = substr($head, 2, 6);
-                    $head = substr($head, 8);
-                    continue;
-                }
-                if (in_array($ai, ['10', '21'], true)) {
-                    $fields[$ai] = substr($head, 2);
-                }
-                break;
-            }
-            foreach ($segments as $segment) {
-                $ai = substr($segment, 0, 2);
-                if (in_array($ai, ['10', '21'], true)) {
-                    $fields[$ai] = substr($segment, 2);
-                }
-            }
+            $this->parseElementString($value, $fields, $errors);
         }
 
         $gtin = $fields['01'] ?? null;
-        if ($gtin !== null && ! $this->hasValidGtinCheckDigit($gtin)) {
+        if ($gtin === null) {
+            $errors[] = 'A GS1 product barcode must include AI (01) GTIN.';
+        } elseif (! preg_match('/^\d{14}$/', $gtin) || ! $this->isValidGtin($gtin)) {
+            $errors[] = 'GS1 AI (01) must contain a valid 14-digit GTIN with a correct check digit.';
             $gtin = null;
         }
 
-        $expiry = null;
-        if (isset($fields['17']) && preg_match('/^\d{6}$/', $fields['17'])) {
-            $expiry = '20'.substr($fields['17'], 0, 2).'-'.substr($fields['17'], 2, 2).'-'.substr($fields['17'], 4, 2);
-        }
+        $batch = $this->validateVariableField($fields['10'] ?? null, '10', 'batch/lot', $errors);
+        $serial = $this->validateVariableField($fields['21'] ?? null, '21', 'serial number', $errors);
+        $expiry = $this->parseExpiry($fields['17'] ?? null, $errors);
 
-        return ['gtin' => $gtin, 'batch' => $fields['10'] ?? null, 'expiry' => $expiry, 'serial' => $fields['21'] ?? null];
+        return compact('gtin', 'batch', 'expiry', 'serial', 'errors');
     }
 
-    private function hasValidGtinCheckDigit(string $gtin): bool
+    /** @param array<string, string> $fields @param array<int, string> $errors */
+    private function parseElementString(string $value, array &$fields, array &$errors): void
     {
-        if (! preg_match('/^\d{14}$/', $gtin)) {
+        $offset = 0;
+        $length = strlen($value);
+
+        while ($offset < $length) {
+            if ($value[$offset] === self::GROUP_SEPARATOR) {
+                $offset++;
+
+                continue;
+            }
+
+            $ai = substr($value, $offset, 2);
+            if (! in_array($ai, ['01', '10', '17', '21'], true)) {
+                $errors[] = "Unsupported or malformed GS1 Application Identifier at character {$offset}.";
+
+                return;
+            }
+            if (array_key_exists($ai, $fields)) {
+                $errors[] = "GS1 AI ({$ai}) appears more than once.";
+
+                return;
+            }
+
+            $offset += 2;
+            $fixedLength = match ($ai) {
+                '01' => 14,
+                '17' => 6,
+                default => null,
+            };
+
+            if ($fixedLength !== null) {
+                if (($length - $offset) < $fixedLength) {
+                    $errors[] = "GS1 AI ({$ai}) is incomplete.";
+
+                    return;
+                }
+
+                $fields[$ai] = substr($value, $offset, $fixedLength);
+                $offset += $fixedLength;
+
+                continue;
+            }
+
+            $separator = strpos($value, self::GROUP_SEPARATOR, $offset);
+            $fieldLength = $separator === false ? $length - $offset : $separator - $offset;
+            if ($fieldLength > 20) {
+                $errors[] = "GS1 AI ({$ai}) exceeds its 20-character maximum or is missing an FNC1 separator.";
+
+                return;
+            }
+
+            $fields[$ai] = substr($value, $offset, $fieldLength);
+            $offset += $fieldLength;
+        }
+    }
+
+    /** @param array<int, string> $errors */
+    private function validateVariableField(?string $value, string $ai, string $label, array &$errors): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if ($value === '' || strlen($value) > 20) {
+            $errors[] = "GS1 AI ({$ai}) {$label} must contain 1 to 20 characters.";
+
+            return null;
+        }
+
+        return $value;
+    }
+
+    /** @param array<int, string> $errors */
+    private function parseExpiry(?string $value, array &$errors): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (! preg_match('/^(\d{2})(\d{2})(\d{2})$/', $value, $matches)) {
+            $errors[] = 'GS1 AI (17) expiration date must use YYMMDD format.';
+
+            return null;
+        }
+
+        $twoDigitYear = (int) $matches[1];
+        $month = (int) $matches[2];
+        $day = (int) $matches[3];
+        $currentYear = (int) now()->format('Y');
+        $year = intdiv($currentYear, 100) * 100 + $twoDigitYear;
+        if ($year > $currentYear + 50) {
+            $year -= 100;
+        } elseif ($year < $currentYear - 49) {
+            $year += 100;
+        }
+
+        if ($month < 1 || $month > 12) {
+            $errors[] = 'GS1 AI (17) contains an invalid expiration month.';
+
+            return null;
+        }
+
+        if ($day === 0) {
+            return CarbonImmutable::create($year, $month, 1)->endOfMonth()->toDateString();
+        }
+        if (! checkdate($month, $day, $year)) {
+            $errors[] = 'GS1 AI (17) contains an invalid calendar date.';
+
+            return null;
+        }
+
+        return CarbonImmutable::create($year, $month, $day)->toDateString();
+    }
+
+    private function looksLikeGs1ElementString(string $value): bool
+    {
+        return preg_match('/^01\d{14}(?:17|10|21|\x1D|$)/', $value) === 1;
+    }
+
+    /** @return array{0:?string,1:?int,2:array<int, string>} */
+    private function resolveDirectIdentifier(string $normalized, string &$symbology): array
+    {
+        $matches = [];
+        $location = StorageLocation::query()->where('barcode_value', $normalized)->orWhere('code', $normalized)->first();
+        if ($location !== null) {
+            $matches["location:{$location->id}"] = ['location', $location->id];
+        }
+
+        $gtinValues = $this->isValidGtin($normalized) ? $this->equivalentGtinValues($normalized) : [];
+        $item = InventoryItem::query()
+            ->where(function ($query) use ($normalized, $gtinValues): void {
+                $query->where('barcode_value', $normalized)->orWhere('sku', $normalized);
+                if ($gtinValues !== []) {
+                    $query->orWhereIn('gtin', $gtinValues);
+                } else {
+                    $query->orWhere('gtin', $normalized);
+                }
+            })
+            ->first();
+        if ($item !== null) {
+            $matches["item:{$item->id}"] = ['item', $item->id];
+        }
+
+        $itemBatch = ItemBatch::query()->where('batch_number', $normalized)->orWhere('lot_number', $normalized)->first();
+        if ($itemBatch !== null) {
+            $matches["batch:{$itemBatch->id}"] = ['batch', $itemBatch->id];
+        }
+
+        $task = WarehouseTask::query()->where('task_number', $normalized)->first();
+        if ($task !== null) {
+            $matches["task:{$task->id}"] = ['task', $task->id];
+        }
+
+        $alias = BarcodeAlias::query()->where('code', $normalized)->where('is_active', true)->first();
+        if ($alias !== null) {
+            $aliasType = match ($alias->target_type) {
+                'inventory_item' => 'item',
+                'storage_location' => 'location',
+                'item_batch' => 'batch',
+                'warehouse_task' => 'task',
+                default => $alias->target_type,
+            };
+            $matches["{$aliasType}:{$alias->target_id}"] = [$aliasType, (int) $alias->target_id];
+            $symbology = $alias->symbology;
+        }
+
+        if (count($matches) > 1) {
+            return [null, null, ['This identifier matches multiple records. Assign a unique barcode or use the item SKU.']];
+        }
+        if ($matches === []) {
+            return [null, null, []];
+        }
+
+        [$type, $id] = array_values($matches)[0];
+
+        return [$type, $id, []];
+    }
+
+    /** @return array<int, string> */
+    private function equivalentGtinValues(string $gtin): array
+    {
+        if (! $this->isValidGtin($gtin)) {
+            return [$gtin];
+        }
+
+        $canonical = str_pad($gtin, 14, '0', STR_PAD_LEFT);
+        $values = [$canonical];
+        foreach ([13, 12, 8] as $length) {
+            $candidate = substr($canonical, -$length);
+            if (str_pad($candidate, 14, '0', STR_PAD_LEFT) === $canonical && $this->isValidGtin($candidate)) {
+                $values[] = $candidate;
+            }
+        }
+
+        return array_values(array_unique($values));
+    }
+
+    private function isValidGtin(string $gtin): bool
+    {
+        if (! preg_match('/^\d{8}$|^\d{12}$|^\d{13}$|^\d{14}$/', $gtin)) {
             return false;
         }
 
+        $digits = str_split($gtin);
+        $checkDigit = (int) array_pop($digits);
         $sum = 0;
-        for ($i = 0; $i < 13; $i++) {
-            $sum += (int) $gtin[$i] * ($i % 2 === 0 ? 3 : 1);
+        $weight = 3;
+
+        for ($index = count($digits) - 1; $index >= 0; $index--) {
+            $sum += (int) $digits[$index] * $weight;
+            $weight = $weight === 3 ? 1 : 3;
         }
 
-        return (10 - ($sum % 10)) % 10 === (int) $gtin[13];
+        return (10 - ($sum % 10)) % 10 === $checkDigit;
     }
 }

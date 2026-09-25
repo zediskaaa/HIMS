@@ -1100,6 +1100,21 @@ class PostDeliveryReceivingWorkflowTest extends TestCase
         $this->assertSame('pending_sample', $inspection->refresh()->inspection_status);
     }
 
+    public function test_receiving_workspace_supports_keyboard_barcode_prefill_for_po_lines(): void
+    {
+        [$po] = $this->makeOrder(1, 1, true);
+
+        $this->actingAs($this->receivingClerk)
+            ->get(route('inventory.receiving.index', ['purchase_order_id' => $po->id]))
+            ->assertOk()
+            ->assertSee('Scan product barcode')
+            ->assertSee('@keydown.enter.prevent="applyBarcode(index)"', false)
+            ->assertSee("operation: 'receive'", false)
+            ->assertSee('line.batch_number = parsed.batch', false)
+            ->assertSee('line.expiry_date = parsed.expiry', false)
+            ->assertSee('line.serial_number = parsed.serial', false);
+    }
+
     public function test_receiving_notifications_resolve_to_the_grn_and_put_away_task(): void
     {
         [$po, $line] = $this->makeOrder(1);

@@ -61,7 +61,11 @@ class InventoryItemController extends Controller implements HasMiddleware
                 'Created an inventory item.',
                 $item,
                 $item->sku,
-                newValues: Arr::only($item->getAttributes(), ['sku', 'name', 'unit', 'unit_cost', 'reorder_level', 'status', 'supplier_id']),
+                newValues: Arr::only($item->getAttributes(), [
+                    'sku', 'barcode_value', 'gtin', 'name', 'unit',
+                    'is_batch_tracked', 'is_serial_tracked', 'is_expiry_tracked',
+                    'unit_cost', 'reorder_level', 'status', 'supplier_id',
+                ]),
             );
 
             return $item;
@@ -73,7 +77,11 @@ class InventoryItemController extends Controller implements HasMiddleware
     public function update(UpdateInventoryItemRequest $request, InventoryItem $inventory_item)
     {
         DB::transaction(function () use ($inventory_item, $request): void {
-            $fields = ['sku', 'name', 'unit', 'unit_cost', 'reorder_level', 'status', 'supplier_id'];
+            $fields = [
+                'sku', 'barcode_value', 'gtin', 'name', 'unit',
+                'is_batch_tracked', 'is_serial_tracked', 'is_expiry_tracked',
+                'unit_cost', 'reorder_level', 'status', 'supplier_id',
+            ];
             $old = Arr::only($inventory_item->getAttributes(), $fields);
             $inventory_item->update($request->validated());
             $new = Arr::only($inventory_item->getAttributes(), $fields);

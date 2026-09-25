@@ -351,11 +351,42 @@ class CameraScanWorkflowTest extends TestCase
         $this->assertSame($item->id, $gs1Result['resolved_id']);
         $this->assertSame('04801234567897', $gs1Result['gtin']);
         $this->assertSame('LOT-2026-X1', $gs1Result['batch']);
+        $this->assertSame([], $gs1Result['errors']);
 
         // GS1 DataMatrix format with ]d2 prefix
         $dmResult = $barcodeService->parseAndResolve(']d2010480123456789710LOT-2026-X1');
         $this->assertSame('item', $dmResult['resolved_type']);
         $this->assertSame($item->id, $dmResult['resolved_id']);
+
+        // EAN-13 resolves to the same canonical GTIN-14 item without replacing
+        // compatibility with the manufacturer's ordinary retail barcode.
+        $eanResult = $barcodeService->parseAndResolve('4801234567897');
+        $this->assertSame('upc_ean', $eanResult['symbology']);
+        $this->assertSame('04801234567897', $eanResult['gtin']);
+        $this->assertSame($item->id, $eanResult['resolved_id']);
+    }
+
+    public function test_gs1_128_parser_handles_fnc1_variable_fields_and_validates_expiry(): void
+    {
+        [, , $item] = $this->seedTaskPrerequisites();
+        $barcodeService = app(BarcodeService::class);
+
+        $value = ']C1010480123456789710LOT-2026-X1'.chr(29).'1726123121SN-773910482';
+        $result = $barcodeService->parseAndResolve($value);
+
+        $this->assertSame('gs1_128', $result['symbology']);
+        $this->assertSame($item->id, $result['resolved_id']);
+        $this->assertSame('LOT-2026-X1', $result['batch']);
+        $this->assertSame('2026-12-31', $result['expiry']);
+        $this->assertSame('SN-773910482', $result['serial']);
+        $this->assertSame([], $result['errors']);
+
+        $monthOnlyExpiry = $barcodeService->parseAndResolve('(01)04801234567897(17)260200');
+        $this->assertSame('2026-02-28', $monthOnlyExpiry['expiry']);
+
+        $invalid = $barcodeService->parseAndResolve('(01)04801234567897(17)261332');
+        $this->assertNull($invalid['resolved_type']);
+        $this->assertContains('GS1 AI (17) contains an invalid expiration month.', $invalid['errors']);
     }
 
     public function test_smart_warehousing_dashboard_renders_with_scan_events(): void
@@ -382,6 +413,8 @@ class CameraScanWorkflowTest extends TestCase
         $response->assertOk()
             ->assertSee('Smart Warehousing System (SWS)')
             ->assertSee($source->barcode_value)
+            ->assertDontSee('1-Click Test Shortcuts')
+            ->assertDontSee('Test Wrong Scan')
             ->assertDontSee('View All (', false);
     }
 
@@ -421,6 +454,39 @@ class CameraScanWorkflowTest extends TestCase
                 'sku' => $item->sku,
                 'is_active' => true,
             ]);
+    }
+
+    public function test_operator_lookup_returns_parsed_gs1_receiving_data(): void
+    {
+        $operator = User::factory()->warehouseStaff()->create();
+        [, , $item] = $this->seedTaskPrerequisites();
+
+        $response = $this->actingAs($operator)
+            ->postJson(route('inventory.warehousing.lookup-barcode'), [
+                'barcode' => '(01)04801234567897(17)261231(10)LOT-2026-X1(21)SN-100',
+                'operation' => 'receive',
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('id', $item->id)
+            ->assertJsonPath('parsed.symbology', 'gs1_hri')
+            ->assertJsonPath('parsed.gtin', '04801234567897')
+            ->assertJsonPath('parsed.batch', 'LOT-2026-X1')
+            ->assertJsonPath('parsed.expiry', '2026-12-31')
+            ->assertJsonPath('parsed.serial', 'SN-100');
+    }
+
+    public function test_operator_lookup_rejects_malformed_gs1_data(): void
+    {
+        $operator = User::factory()->warehouseStaff()->create();
+        $this->seedTaskPrerequisites();
+
+        $this->actingAs($operator)
+            ->postJson(route('inventory.warehousing.lookup-barcode'), [
+                'barcode' => '(01)04801234567897(17)269932',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('status', 'invalid_barcode');
     }
 
     public function test_operator_can_lookup_storage_location_barcode(): void

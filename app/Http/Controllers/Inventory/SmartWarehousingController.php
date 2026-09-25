@@ -285,6 +285,16 @@ class SmartWarehousingController extends Controller implements HasMiddleware
 
         $resolved = $this->barcodeService->parseAndResolve($raw);
 
+        if ($resolved['errors'] !== []) {
+            return response()->json([
+                'success' => false,
+                'status' => 'invalid_barcode',
+                'raw' => $raw,
+                'message' => implode(' ', $resolved['errors']),
+                'errors' => $resolved['errors'],
+            ], 422);
+        }
+
         if ($resolved['resolved_type'] === null) {
             return response()->json([
                 'success' => false,
@@ -357,8 +367,19 @@ class SmartWarehousingController extends Controller implements HasMiddleware
                 'id' => $item->id,
                 'sku' => $item->sku,
                 'name' => $item->name,
+                'gtin' => $item->gtin,
+                'is_batch_tracked' => $item->is_batch_tracked,
+                'is_expiry_tracked' => $item->is_expiry_tracked,
+                'is_serial_tracked' => $item->is_serial_tracked,
                 'item_status' => $item->status,
                 'is_active' => ! $isArchived,
+                'parsed' => [
+                    'symbology' => $resolved['symbology'],
+                    'gtin' => $resolved['gtin'],
+                    'batch' => $resolved['batch'],
+                    'expiry' => $resolved['expiry'],
+                    'serial' => $resolved['serial'],
+                ],
                 'warning' => $isArchived ? 'This item is ARCHIVED. It is retained for historical records but cannot receive new transactions.' : null,
                 'redirect_url' => route('inventory.items', ['search' => $item->sku]),
                 'message' => "Item [{$item->sku}] ({$item->name}) identified." . ($isArchived ? ' NOTE: Item is archived.' : ''),

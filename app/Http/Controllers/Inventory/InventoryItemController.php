@@ -267,8 +267,10 @@ class InventoryItemController extends Controller implements HasMiddleware
                 $item,
                 $item->sku,
                 newValues: Arr::only($item->getAttributes(), [
-                    'sku', 'name', 'category_id', 'unit', 'unit_cost', 'reorder_level',
-                    'status', 'supplier_id', 'default_location_id', 'quantity_on_hand',
+                    'sku', 'barcode_value', 'gtin', 'name', 'category_id', 'unit',
+                    'is_batch_tracked', 'is_serial_tracked', 'is_expiry_tracked',
+                    'unit_cost', 'reorder_level', 'status', 'supplier_id',
+                    'default_location_id', 'quantity_on_hand',
                 ]),
             );
         });
