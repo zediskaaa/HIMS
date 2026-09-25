@@ -23,7 +23,7 @@
             </label>
             <select
                 id="logistics-mobile-tab-select"
-                onchange="if (this.value) window.location.href = this.value;"
+                onchange="if (this.value) window.himsNavigate(this.value);"
                 class="block w-full rounded-lg border border-neutral-300 py-2.5 pl-3 pr-10 text-xs font-semibold text-neutral-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 shadow-2xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
             >
                 <option value="">Jump to DTRS workflow...</option>

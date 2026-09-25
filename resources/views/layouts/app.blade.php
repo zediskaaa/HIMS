@@ -23,14 +23,34 @@
     {{-- Early zero-flicker theme script --}}
     @include('layouts.partials.theme-script')
 
+    {{-- Preserve a navigation loader across the outgoing and incoming documents. --}}
+    @include('layouts.partials.navigation-loading-state')
+
     {{-- Early zero-flicker bfcache back-navigation protection --}}
     <script>
         (function () {
             window.addEventListener('pageshow', function (event) {
-                if (event.persisted) {
-                    document.documentElement.style.display = 'none';
-                    window.location.reload();
+                if (! event.persisted || ! document.body.dataset.sessionActivityUrl) return;
+
+                try {
+                    window.sessionStorage.setItem('hims:navigation-pending', '1');
+                } catch {
+                    // The visible overlay still protects the cached page.
                 }
+
+                document.documentElement.classList.add('hims-navigation-pending');
+                const overlay = document.querySelector('[data-hims-loading-overlay]');
+                if (overlay) {
+                    overlay.hidden = false;
+                    overlay.setAttribute('aria-hidden', 'false');
+                    document.body.setAttribute('aria-busy', 'true');
+                }
+
+                window.requestAnimationFrame(function () {
+                    window.requestAnimationFrame(function () {
+                        window.location.reload();
+                    });
+                });
             });
         })();
     </script>
@@ -88,6 +108,8 @@
         data-audit-location-url="{{ $auditLocationCaptureUrl }}"
     @endif
 >
+    @include('layouts.partials.loading-overlay')
+
     <div
         x-data="{
             sidebarOpen: window.innerWidth >= 1024,
@@ -143,7 +165,6 @@
     </div>
 
     @include('layouts.partials.toast-notifications')
-    @include('layouts.partials.loading-overlay')
     @include('layouts.partials.decision-confirmation')
     @if (auth()->user()?->isSuperAdministrator())
         @include('layouts.partials.super-admin-password-confirmation')

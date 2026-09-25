@@ -10,6 +10,7 @@
         <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
         <title>HIMS | Supply Chain &amp; Inventory Management</title>
         @include('layouts.partials.theme-script')
+        @include('layouts.partials.navigation-loading-state')
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     @php
@@ -19,6 +20,8 @@
             : null;
     @endphp
     <body class="min-h-screen bg-neutral-50 text-neutral-800 antialiased dark:bg-neutral-950 dark:text-neutral-100">
+        @include('layouts.partials.loading-overlay')
+
         <div class="relative min-h-screen overflow-hidden">
             <div class="absolute inset-0" aria-hidden="true">
                 <img src="{{ asset('img/landingpage.jpg') }}" alt="" class="h-full w-full animate-slow-zoom object-cover object-center will-change-transform grayscale opacity-[0.06] dark:opacity-[0.14]" />
@@ -133,6 +136,5 @@
         </div>
         </div>
 
-        @include('layouts.partials.loading-overlay')
     </body>
 </html>

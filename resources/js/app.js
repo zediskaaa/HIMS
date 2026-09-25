@@ -1244,6 +1244,7 @@ startLoginCooldown();
  * quiet.
  */
 const startLoadingIndicators = () => {
+    const navigationStorageKey = 'hims:navigation-pending';
     const overlay = document.querySelector('[data-hims-loading-overlay]');
     const overlayMessage = overlay?.querySelector('[data-hims-loading-message]');
     const processingForms = new WeakSet();
@@ -1251,7 +1252,36 @@ const startLoadingIndicators = () => {
     const nativeFetch = window.fetch.bind(window);
     let activeApiRequests = 0;
     let pageTransitionPending = false;
-    let navigationWatchdog = null;
+
+    const continueAfterPaint = (callback) => {
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(callback);
+        });
+    };
+
+    const rememberPageTransition = ({ coverCurrentPage = true } = {}) => {
+        pageTransitionPending = true;
+        if (coverCurrentPage) {
+            document.documentElement.classList.add('hims-navigation-pending');
+        }
+
+        try {
+            window.sessionStorage.setItem(navigationStorageKey, '1');
+        } catch {
+            // The current document can still keep its overlay visible.
+        }
+    };
+
+    const forgetPageTransition = () => {
+        pageTransitionPending = false;
+        document.documentElement.classList.remove('hims-navigation-pending');
+
+        try {
+            window.sessionStorage.removeItem(navigationStorageKey);
+        } catch {
+            // There is no persisted marker to clear.
+        }
+    };
 
     const showOverlay = (message) => {
         if (!(overlay instanceof HTMLElement)) return;
@@ -1275,13 +1305,8 @@ const startLoadingIndicators = () => {
     };
 
     const reset = () => {
-        if (navigationWatchdog) {
-            clearTimeout(navigationWatchdog);
-            navigationWatchdog = null;
-        }
-
         activeApiRequests = 0;
-        pageTransitionPending = false;
+        forgetPageTransition();
 
         document.querySelectorAll('[data-hims-loading-active]').forEach((button) => {
             resetButtonLoading(button);
@@ -1319,14 +1344,25 @@ const startLoadingIndicators = () => {
         hideOverlay();
     });
 
-    // Never inherit a visible or busy state from cached/restored page markup.
-    reset();
-
-    const continueAfterPaint = (callback) => {
-        window.requestAnimationFrame(() => {
-            window.requestAnimationFrame(callback);
-        });
+    const finishDestinationLoad = () => {
+        forgetPageTransition();
+        hideOverlay();
     };
+
+    if (document.documentElement.classList.contains('hims-navigation-pending')) {
+        rememberPageTransition();
+        showOverlay('Loading page...');
+
+        const revealDestination = () => continueAfterPaint(finishDestinationLoad);
+        if (document.readyState === 'complete') {
+            revealDestination();
+        } else {
+            window.addEventListener('load', revealDestination, { once: true });
+        }
+    } else {
+        // Never inherit a visible or busy state from cached/restored page markup.
+        reset();
+    }
 
     const requestUsesVisibleLoader = (input, options = {}) => {
         try {
@@ -1404,7 +1440,7 @@ const startLoadingIndicators = () => {
             showOverlay('Processing request...');
         }
 
-        pageTransitionPending = true;
+        rememberPageTransition({ coverCurrentPage: false });
 
         continueAfterPaint(() => {
             if (!form.isConnected) {
@@ -1517,17 +1553,10 @@ const startLoadingIndicators = () => {
         event.preventDefault();
         if (pageTransitionPending) return;
 
-        pageTransitionPending = true;
+        rememberPageTransition();
         link.setAttribute('aria-busy', 'true');
         link.setAttribute('data-hims-navigation-active', '');
         showOverlay('Loading page...');
-
-        if (navigationWatchdog) clearTimeout(navigationWatchdog);
-        navigationWatchdog = setTimeout(() => {
-            if (pageTransitionPending) {
-                reset();
-            }
-        }, 4000);
 
         continueAfterPaint(() => {
             try {
@@ -1540,25 +1569,32 @@ const startLoadingIndicators = () => {
 
     window.addEventListener('pageshow', (event) => {
         if (event.persisted) {
-            reset();
             if (document.querySelector('[data-session-activity-url]')) {
-                document.documentElement.style.display = 'none';
-                window.location.reload();
+                return;
             }
+
+            continueAfterPaint(reset);
         }
     });
 
-    window.addEventListener('focus', () => {
-        if (pageTransitionPending) {
-            setTimeout(() => {
-                if (document.visibilityState === 'visible' && pageTransitionPending) {
-                    reset();
+    window.himsNavigate = (url, { message = 'Loading page...', replace = false } = {}) => {
+        if (pageTransitionPending) return;
+
+        rememberPageTransition();
+        showOverlay(message);
+
+        continueAfterPaint(() => {
+            try {
+                if (replace) {
+                    window.location.replace(url);
+                } else {
+                    window.location.assign(url);
                 }
-            }, 800);
-        }
-    });
-
-    window.addEventListener('pagehide', reset);
+            } catch {
+                reset();
+            }
+        });
+    };
 };
 
 startLoadingIndicators();
@@ -3303,7 +3339,7 @@ Alpine.data('himsGlobalSearch', ({ endpoint, initialQuery = '' }) => ({
     navigate(url) {
         if (!url) return;
         this.open = false;
-        window.location.href = url;
+        window.himsNavigate(url);
     },
 
     clear() {

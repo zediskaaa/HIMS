@@ -380,6 +380,11 @@
         display: none !important;
     }
 
+    /* Keep a cross-document navigation covered until the destination loads. */
+    html.hims-navigation-pending .hims-loading-overlay[hidden] {
+        display: flex !important;
+    }
+
     .hims-loading-overlay__backdrop {
         @apply absolute inset-0 bg-neutral-950/35 backdrop-blur-[2px];
     }

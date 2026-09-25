@@ -1998,7 +1998,7 @@
                     if (this.movementType) params.set('movement_type', this.movementType);
                     if (this.status && this.status !== 'all') params.set('stock_status', this.status);
 
-                    window.location.href = config.dashboardUrl + '?' + params.toString();
+                    window.himsNavigate(config.dashboardUrl + '?' + params.toString());
                 },
 
                 async generate() {
@@ -2126,7 +2126,7 @@
                     const params = new URLSearchParams();
                     params.set('period', days);
                     params.set('days', days === 'all' ? '365' : days);
-                    window.location.href = config.dashboardUrl + '?' + params.toString();
+                    window.himsNavigate(config.dashboardUrl + '?' + params.toString());
                 },
 
                 applyCustom() {
@@ -2152,7 +2152,7 @@
                     params.set('period', 'custom');
                     params.set('from', this.from);
                     params.set('to', this.to);
-                    window.location.href = config.dashboardUrl + '?' + params.toString();
+                    window.himsNavigate(config.dashboardUrl + '?' + params.toString());
                 }
             };
         }

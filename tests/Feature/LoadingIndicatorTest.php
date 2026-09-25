@@ -72,6 +72,32 @@ class LoadingIndicatorTest extends TestCase
         }
     }
 
+    public function test_page_shells_bootstrap_cross_document_loading_before_rendering_the_overlay(): void
+    {
+        foreach ([route('login'), route('privacy.notice'), route('terms'), url('/')] as $url) {
+            $content = $this->get($url)->assertOk()->getContent();
+
+            $statePosition = strpos($content, "sessionStorage.getItem(storageKey)");
+            $overlayPosition = strpos($content, 'data-hims-loading-overlay');
+
+            $this->assertNotFalse($statePosition);
+            $this->assertNotFalse($overlayPosition);
+            $this->assertLessThan($overlayPosition, $statePosition);
+            $this->assertSame(1, preg_match_all('/<div\s+data-hims-loading-overlay\b/', $content));
+        }
+    }
+
+    public function test_navigation_loader_waits_for_destination_load_instead_of_outgoing_page_timeouts(): void
+    {
+        $script = file_get_contents(resource_path('js/app.js'));
+
+        $this->assertStringContainsString("window.addEventListener('load', revealDestination, { once: true })", $script);
+        $this->assertStringContainsString("window.sessionStorage.setItem(navigationStorageKey, '1')", $script);
+        $this->assertStringContainsString('rememberPageTransition({ coverCurrentPage: false })', $script);
+        $this->assertStringNotContainsString('navigationWatchdog', $script);
+        $this->assertStringNotContainsString("window.addEventListener('pagehide', reset)", $script);
+    }
+
     public function test_account_settings_forms_have_accessible_specific_loading_states(): void
     {
         $admin = User::factory()->administrator()->create();

@@ -19,7 +19,7 @@
             </label>
             <select
                 id="inventory-workflow-mobile-select"
-                onchange="if (this.value) window.location.href = this.value;"
+                onchange="if (this.value) window.himsNavigate(this.value);"
                 class="block w-full rounded-lg border border-neutral-300 bg-white py-2.5 pl-3 pr-10 text-xs font-semibold text-neutral-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 shadow-2xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             >
                 <option value="">Jump to inventory workflow...</option>

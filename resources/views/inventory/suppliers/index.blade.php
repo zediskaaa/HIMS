@@ -141,7 +141,7 @@
                                 $score = $scorecard ? max(0, min(100, (float) $scorecard->total_score)) : null;
                                 $selectUrl = route('inventory.suppliers', array_merge(request()->query(), ['supplier' => $supplier->id])).'#supplier-summary';
                                 $rowOnclick = ! $selectedSupplier?->is($supplier)
-                                    ? "document.dispatchEvent(new CustomEvent('hims-loading-start', { detail: { message: 'Loading supplier...' } })); window.location.assign('{$selectUrl}');"
+                                    ? "window.himsNavigate('{$selectUrl}', { message: 'Loading supplier...' });"
                                     : null;
                             @endphp
                             <x-ui.table.row
@@ -325,8 +325,7 @@
                                     x-on:change="
                                         if ($event.target.value) {
                                             switching = true;
-                                            document.dispatchEvent(new CustomEvent('hims-loading-start', { detail: { message: 'Loading supplier...' } }));
-                                            window.location.assign($event.target.value);
+                                            window.himsNavigate($event.target.value, { message: 'Loading supplier...' });
                                         }
                                     "
                                     class="block w-full rounded-lg border border-neutral-200 bg-white py-1.5 pl-2.5 pr-8 text-xs font-medium text-neutral-800 shadow-2xs hover:border-neutral-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors disabled:opacity-60 disabled:cursor-wait"

@@ -24,12 +24,16 @@
         {{-- Early zero-flicker theme script --}}
         @include('layouts.partials.theme-script')
 
+        @include('layouts.partials.navigation-loading-state')
+
         {{-- Inter is pulled in by app.css; this just warms the connection. --}}
         <link rel="preconnect" href="https://fonts.bunny.net">
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="min-h-screen font-sans text-neutral-800 antialiased {{ $isThemeAwarePortal ? 'bg-neutral-50 dark:bg-neutral-950 dark:text-neutral-100' : 'bg-neutral-950' }}">
+        @include('layouts.partials.loading-overlay')
+
         <div class="relative min-h-screen overflow-hidden {{ $isThemeAwarePortal ? 'bg-neutral-50 dark:bg-neutral-950' : '' }}">
             {{-- One continuous backdrop keeps authentication visually connected
                  to the public landing page without exposing application data. --}}
@@ -166,7 +170,6 @@
             </div>
         </div>
 
-        @include('layouts.partials.loading-overlay')
         @include('layouts.partials.decision-confirmation')
     </body>
 </html>

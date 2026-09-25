@@ -162,7 +162,7 @@
                     </label>
                     <select
                         id="procurement-mobile-tab-select"
-                        x-on:change="if ($event.target.value.startsWith('http') || $event.target.value.startsWith('/')) { window.location.href = $event.target.value; } else { activeTab = $event.target.value; }"
+                        x-on:change="if ($event.target.value.startsWith('http') || $event.target.value.startsWith('/')) { window.himsNavigate($event.target.value); } else { activeTab = $event.target.value; }"
                         class="block w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 py-2.5 pl-3 pr-10 text-xs font-semibold text-neutral-800 dark:text-neutral-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 shadow-2xs"
                     >
                         <optgroup label="Purchasing &amp; Orders">

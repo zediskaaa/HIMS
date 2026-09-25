@@ -46,7 +46,7 @@
                             this.tick();
                         }
                     } else if (e.key === 'hims:mfa:cancelled') {
-                        window.location.href = this.loginUrl;
+                        window.himsNavigate(this.loginUrl);
                     }
                 });
             },
@@ -133,7 +133,7 @@
                         } catch {}
                         this.announce('Verification session extended.');
                     } else if (data.redirect_url) {
-                        window.location.href = data.redirect_url;
+                        window.himsNavigate(data.redirect_url);
                     } else {
                         this.extensionError = data.message || 'Unable to extend session. Please complete verification.';
                         if (data.status === 'expired' || data.status === 'missing') {
@@ -166,9 +166,9 @@
                         body: JSON.stringify({})
                     });
                     const data = await response.json();
-                    window.location.href = data.redirect_url || this.loginUrl;
+                    window.himsNavigate(data.redirect_url || this.loginUrl);
                 } catch {
-                    window.location.href = this.loginUrl;
+                    window.himsNavigate(this.loginUrl);
                 }
             }
         }"
