@@ -24,6 +24,18 @@ Find the closest existing screen -> identify its layout, components, server resp
 
 Do not redesign unrelated navigation, swap the component system, introduce a new frontend framework, or add a package for an interaction the existing stack already supports.
 
+### Essential-Only Interface Controls
+
+Every visible element must support a real end-user task, communicate necessary state, prevent an error, or satisfy an accessibility requirement. Do not add controls, labels, cards, helper text, or actions merely because they are easy to implement or potentially useful.
+
+- Do not expose testing shortcuts, demo actions, debug toggles, fixture generators, developer diagnostics, or one-click data fillers in normal user-facing screens. Keep them in automated tests, seeders, local developer tooling, browser/dev utilities, or a clearly isolated non-production surface when explicitly required.
+- Do not add duplicate ways to perform the same action unless distinct workflows genuinely require them.
+- Do not add speculative secondary actions, decorative metadata, explanatory copy, or convenience panels without evidence that they help the intended user complete the current workflow.
+- Before adding an element, identify its user, purpose, and normal-use scenario. If those are unclear, omit it.
+- When editing an existing screen, preserve unrelated controls unless removal is part of the request or the changed area clearly contains an obsolete, duplicate, or developer-only element. Do not expand a focused UI task into unrelated cleanup.
+
+Testing support must verify the production interaction without becoming part of the production interface. For example, tests may populate a scan input directly, but the rendered warehouse screen must not include a button that inserts the expected identifier solely to make testing easier.
+
 ## Reuse the Actual Components
 
 Prefer the existing `<x-ui.*>` component when its contract fits. Important current contracts include:
@@ -68,6 +80,37 @@ Operational hospital workspaces, clinical catalogs, inventory tables, procuremen
     - **Single-Line Toolbars**: Filter controls, date pickers, status dropdowns, search inputs, and action buttons must expand horizontally across the top of the table in a single cohesive flex-wrap bar, rather than breaking into multiple vertical rows.
     - **Multi-Zone Dashboards**: Elevate supplementary summary stats, KPI cards, and secondary review panels into horizontal 3-column, 4-column, or 5-column grids (`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4`) so that vital metrics sit above the fold without pushing data tables down.
   - **Core Rule**: If a user has to scroll past an empty vertical expanse while large horizontal margins sit idle on the screen edges, the layout is broken. Fill the horizontal real estate to bring critical controls and lists up into view.
+
+### Balanced Two-Column Companion Panels
+
+When a page has two substantial sibling sections that are both vertically long, such as a primary operational workspace beside its activity history, exception queue, preview, or review panel, prefer placing them side by side on wide screens instead of stacking both at full width.
+
+Use a responsive two-column layout only when all of these are true:
+
+- Both sections contain enough information or interaction to justify a persistent panel; do not create a column for a tiny control or a short message.
+- The sections are useful together and can be read or operated independently without breaking the workflow sequence.
+- Each column can retain a comfortable usable width after page padding, navigation, gaps, and long content are accounted for.
+- Inputs, tables, buttons, badges, identifiers, and localized labels can wrap or reflow without clipping, crowding, or horizontal scrolling.
+
+Prefer an equal `xl:grid-cols-2` split when both panels have similar visual weight. Use `minmax(0, ...)` tracks for intentionally asymmetric companions:
+
+```html
+<div class="space-y-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4 xl:space-y-0">
+    <section class="min-w-0"><!-- Primary workspace --></section>
+    <section class="min-w-0"><!-- Activity / exceptions --></section>
+</div>
+```
+
+Do not force two columns merely because two sections exist. Keep them stacked when either panel needs the full width, when the content is sequential, when a table would become cramped, or when each column would fall below a practical working width. Dense operational pairs should normally split at `xl`; simpler pairs may split at `lg` only after checking their real content.
+
+When introducing the split:
+
+- Keep `min-w-0` on both columns and on nested text-bearing flex/grid children.
+- Recompose controls for the narrower panel width. A row that fits in a full-width card may need to stack until `2xl` once its card occupies half the page.
+- Keep primary actions visible; do not hide required controls just to preserve the two-column layout.
+- Stack naturally below the chosen breakpoint with normal vertical spacing and no page-level horizontal scroll.
+- Use `items-start` unless matching heights has a functional reason; do not add empty padding merely to make panels equally tall.
+- Verify the paired layout at 1280px, 1536px, and 1920px, then verify the stacked layout at 375px and 768px. If either panel feels compressed at the activation breakpoint, move the split to a wider breakpoint or keep it stacked.
 
 - **Table Column Breathing Room**:
   - Full-width real estate must be leveraged to give tables wide, comfortable columns. Essential columns (Code/SKU, Item Name, Category, Stock on Hand, Reorder Level, Cost/Price, Supplier, Status, and Row Actions) must have generous column widths (`min-w-[...]`) with ample breathing room so no text or numbers are clipped or crammed.
