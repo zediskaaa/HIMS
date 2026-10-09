@@ -53,10 +53,6 @@
         </x-ui.alert>
     @endif
 
-    {{-- The table needs roughly 700px to hold six columns. Splitting the layout
-         any earlier squeezes it to ~604px at 1280, which is narrower than its
-         own headers, so the summary aside only moves alongside once the row can
-         afford it. --}}
     <div class="mt-5 grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_21rem]">
         <x-ui.card :padding="false">
             <x-slot:header>
@@ -130,15 +126,15 @@
                  supplier column ~40% of the row because the truncating name
                  still reported its full width as a minimum, which pushed the
                  table past the card and drew a horizontal scrollbar. --}}
-            <div class="hidden md:block">
+            <div class="hidden xl:block">
                 <x-ui.table :sticky-header="false" class="w-full table-fixed supplier-directory-table">
                     <colgroup>
-                        <col class="w-[27%]">
-                        <col class="w-[17%]">
-                        <col class="w-[9%]">
+                        <col class="w-[25%]">
                         <col class="w-[15%]">
-                        <col class="w-[12%]">
-                        <col class="w-[20%]">
+                        <col class="w-[8%]">
+                        <col class="w-[14%]">
+                        <col class="w-[17%]">
+                        <col class="w-[21%]">
                     </colgroup>
                     <x-ui.table.head>
                         <x-ui.table.th>Supplier</x-ui.table.th>
@@ -161,76 +157,85 @@
                             @endphp
                             <x-ui.table.row
                                 @class([
-                                    'cursor-pointer transition-colors hover:bg-neutral-50/80',
-                                    '!bg-primary-50/80 ring-1 ring-inset ring-primary-500/20' => $selectedSupplier?->is($supplier),
+                                    'cursor-pointer transition-colors hover:!bg-primary-50/40 dark:hover:!bg-primary-950/20',
+                                    '!bg-primary-50/70 dark:!bg-primary-950/35' => $selectedSupplier?->is($supplier),
                                 ])
                                 :onclick="$rowOnclick"
                             >
-                                <x-ui.table.td class="relative !pr-2">
+                                <x-ui.table.td class="relative !py-5 !pr-2">
                                     @if ($selectedSupplier?->is($supplier))
-                                        <span data-selected-supplier-indicator aria-hidden="true" class="absolute inset-y-2 left-0 w-1 rounded-r-full bg-success-500 dark:bg-success-400"></span>
+                                        <span data-selected-supplier-indicator aria-hidden="true" class="absolute inset-y-3 left-0 w-1 rounded-r-full bg-primary-600 dark:bg-primary-400"></span>
                                     @endif
-                                    <div class="flex min-w-0 items-center gap-3">
-                                        <x-ui.supplier-logo :supplier="$supplier" size="md" />
+                                    <div class="flex min-w-0 items-center gap-4">
+                                        <x-ui.supplier-logo :supplier="$supplier" size="xl" class="!rounded-xl" />
                                         <div class="min-w-0 flex-1">
-                                            <a href="{{ $selectUrl }}" data-no-loading class="block font-semibold text-neutral-900 hover:text-primary-700 hover:underline leading-snug break-words" title="{{ $supplier->name }}" {{ $selectedSupplier?->is($supplier) ? 'aria-current="true" onclick="event.preventDefault();"' : '' }}>{{ $supplier->name }}</a>
-                                            <span class="block truncate text-xs text-neutral-500 leading-tight">SUP-{{ str_pad((string) $supplier->id, 4, '0', STR_PAD_LEFT) }}{{ $supplier->trade_name ? ' · '.$supplier->trade_name : '' }}</span>
+                                            <a href="{{ $selectUrl }}" data-no-loading class="block truncate text-base font-semibold leading-snug text-neutral-950 hover:text-primary-700 hover:underline dark:text-white" title="{{ $supplier->name }}" {{ $selectedSupplier?->is($supplier) ? 'aria-current="true" onclick="event.preventDefault();"' : '' }}>{{ $supplier->name }}</a>
+                                            <span class="mt-1 block truncate text-sm leading-tight text-neutral-500 dark:text-neutral-400">SUP-{{ str_pad((string) $supplier->id, 4, '0', STR_PAD_LEFT) }}{{ $supplier->trade_name ? ' · '.$supplier->trade_name : '' }}</span>
                                         </div>
                                     </div>
                                 </x-ui.table.td>
-                                <x-ui.table.td>
-                                    <span class="block truncate" title="{{ $categories->take(2)->join(', ') }}">{{ $categories->take(2)->join(', ') ?: 'No linked categories' }}</span>
-                                    <span class="block truncate text-xs text-neutral-500">{{ $supplier->active_products_count }} active {{ str('item')->plural($supplier->active_products_count) }}</span>
+                                <x-ui.table.td class="!py-5">
+                                    <span class="block truncate font-medium text-neutral-900 dark:text-neutral-100" title="{{ $categories->take(2)->join(', ') }}">{{ $categories->take(2)->join(', ') ?: 'No linked categories' }}</span>
+                                    <span class="mt-1 block truncate text-sm text-neutral-500 dark:text-neutral-400">{{ $supplier->active_products_count }} active {{ str('item')->plural($supplier->active_products_count) }}</span>
                                 </x-ui.table.td>
-                                <x-ui.table.td class="!px-2.5">{{ $supplier->standard_lead_time_days !== null ? $supplier->standard_lead_time_days.' days' : 'Not set' }}</x-ui.table.td>
-                                <x-ui.table.td class="whitespace-nowrap">
+                                <x-ui.table.td class="!px-2.5 !py-5 font-semibold whitespace-nowrap">{{ $supplier->standard_lead_time_days !== null ? $supplier->standard_lead_time_days.' days' : 'Not set' }}</x-ui.table.td>
+                                <x-ui.table.td class="!py-5 whitespace-nowrap">
                                     @if ($score !== null)
                                         <div class="flex items-center gap-2">
-                                            <span class="w-11 shrink-0 font-semibold tabular-nums whitespace-nowrap">{{ number_format($score, 0) }}%</span>
-                                            <span class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700"><span class="block h-full rounded-full bg-primary-600" style="width: {{ $score }}%"></span></span>
+                                            <span class="w-12 shrink-0 text-lg font-bold tabular-nums text-neutral-950 dark:text-white">{{ number_format($score, 0) }}%</span>
+                                            <span class="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700"><span class="block h-full rounded-full bg-primary-600" style="width: {{ $score }}%"></span></span>
                                         </div>
-                                        <span class="block whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400">Reviewed score</span>
+                                        <span class="mt-1 block whitespace-nowrap text-sm text-neutral-500 dark:text-neutral-400">Reviewed score</span>
                                     @else
-                                        <span class="block whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400">Not reviewed</span>
+                                        <div class="flex items-center gap-2">
+                                            <span class="shrink-0 font-medium text-neutral-800 dark:text-neutral-200">Not reviewed</span>
+                                            <span class="h-2 min-w-0 flex-1 rounded-full bg-neutral-100 dark:bg-neutral-800"></span>
+                                        </div>
+                                        <span class="mt-1 block whitespace-nowrap text-sm text-neutral-400 dark:text-neutral-500">Not reviewed</span>
                                     @endif
                                 </x-ui.table.td>
-                                <x-ui.table.td class="!pr-2">
-                                    <x-ui.badge :status="$supplier->status->value" dot>{{ $supplier->status->label() }}</x-ui.badge>
-                                    <span class="mt-1 block truncate text-xs text-neutral-500">{{ $supplier->effectiveAccreditationStatus()->label() }}</span>
+                                <x-ui.table.td class="!py-5 !pr-2">
+                                    <div class="flex flex-col items-start gap-1.5">
+                                        <x-ui.badge :status="$supplier->status->value" dot>{{ $supplier->status->label() }}</x-ui.badge>
+                                        <x-ui.badge :status="$supplier->effectiveAccreditationStatus()->value" dot>{{ $supplier->effectiveAccreditationStatus()->label() }}</x-ui.badge>
+                                    </div>
                                 </x-ui.table.td>
-                                <x-ui.table.td align="right" class="!pr-4 !pl-1 whitespace-nowrap min-w-[8.5rem]" onclick="event.stopPropagation()">
-                                    <div class="inline-flex items-center justify-end gap-1.5 shrink-0 whitespace-nowrap">
+                                <x-ui.table.td align="right" class="!py-5 !pr-4 !pl-1 whitespace-nowrap" onclick="event.stopPropagation()">
+                                    <div class="inline-flex shrink-0 items-center justify-end whitespace-nowrap">
                                         <x-ui.button
                                             size="sm"
                                             variant="secondary"
                                             :href="route('inventory.suppliers.show', $supplier)"
                                             icon="eye"
-                                            class="shrink-0 whitespace-nowrap text-xs shadow-2xs"
+                                            class="min-w-20 shrink-0 whitespace-nowrap !px-4 text-sm shadow-2xs"
                                             onclick="event.stopPropagation(); if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); window.himsNavigate(this.href, { message: 'Loading supplier...' }); }"
                                         >
                                             View
                                         </x-ui.button>
                                         @can(\App\Enums\Permission::ManageArchive->value)
-                                            <x-ui.button
-                                                type="button"
-                                                size="sm"
-                                                variant="ghost"
-                                                class="shrink-0 whitespace-nowrap text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                                                @click="$dispatch('open-archive-modal', {
-                                                    actionUrl: '{{ route('inventory.suppliers.archive', $supplier) }}',
-                                                    title: '{{ addslashes($supplier->name) }}',
-                                                    identifier: 'SUP-{{ str_pad((string) $supplier->id, 4, '0', STR_PAD_LEFT) }}',
-                                                    context: 'Tax ID: {{ addslashes($supplier->tax_number ?? 'N/A') }}',
-                                                    type: 'Supplier',
-                                                    presets: [
-                                                        'Vendor business ceased operations / bankruptcy',
-                                                        'Procurement contract concluded / terminated',
-                                                        'Failed compliance / accreditation standards',
-                                                        'Duplicate vendor listing'
-                                                    ]
-                                                })">
-                                                Archive
-                                            </x-ui.button>
+                                            <span class="ml-2 inline-flex border-l border-neutral-200 pl-2 dark:border-neutral-700">
+                                                <x-ui.button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    icon="trash"
+                                                    class="shrink-0 whitespace-nowrap text-sm text-rose-600 hover:bg-transparent hover:text-rose-700 dark:hover:bg-transparent"
+                                                    @click="$dispatch('open-archive-modal', {
+                                                        actionUrl: '{{ route('inventory.suppliers.archive', $supplier) }}',
+                                                        title: '{{ addslashes($supplier->name) }}',
+                                                        identifier: 'SUP-{{ str_pad((string) $supplier->id, 4, '0', STR_PAD_LEFT) }}',
+                                                        context: 'Tax ID: {{ addslashes($supplier->tax_number ?? 'N/A') }}',
+                                                        type: 'Supplier',
+                                                        presets: [
+                                                            'Vendor business ceased operations / bankruptcy',
+                                                            'Procurement contract concluded / terminated',
+                                                            'Failed compliance / accreditation standards',
+                                                            'Duplicate vendor listing'
+                                                        ]
+                                                    })">
+                                                    Archive
+                                                </x-ui.button>
+                                            </span>
                                         @endcan
                                     </div>
                                 </x-ui.table.td>
@@ -242,7 +247,7 @@
                 </x-ui.table>
             </div>
 
-            <div class="divide-y divide-neutral-100 dark:divide-neutral-800 md:hidden">
+            <div class="divide-y divide-neutral-100 dark:divide-neutral-800 xl:hidden">
                 @forelse ($suppliers as $supplier)
                     @php
                         $categories = $supplier->supplierProducts->pluck('item.category.name')->filter()->unique();
@@ -251,7 +256,7 @@
                     @endphp
                     <div @class(['relative overflow-hidden p-4 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/50', 'bg-primary-50/70 dark:bg-primary-950/40 ring-1 ring-inset ring-primary-500/20' => $selectedSupplier?->is($supplier)])>
                         @if ($selectedSupplier?->is($supplier))
-                            <span data-selected-supplier-indicator aria-hidden="true" class="absolute inset-y-2 left-0 w-1 rounded-r-full bg-success-500 dark:bg-success-400"></span>
+                            <span data-selected-supplier-indicator aria-hidden="true" class="absolute inset-y-2 left-0 w-1 rounded-r-full bg-primary-600 dark:bg-primary-400"></span>
                         @endif
                         <div class="flex items-start gap-3">
                             <x-ui.supplier-logo :supplier="$supplier" size="lg" />
@@ -268,7 +273,10 @@
                                         </div>
                                         <p class="text-xs text-neutral-500 dark:text-neutral-400">SUP-{{ str_pad((string) $supplier->id, 4, '0', STR_PAD_LEFT) }}{{ $supplier->trade_name ? ' · '.$supplier->trade_name : '' }}</p>
                                     </div>
-                                    <x-ui.badge :status="$supplier->status->value" dot>{{ $supplier->status->label() }}</x-ui.badge>
+                                    <div class="flex shrink-0 flex-col items-end gap-1">
+                                        <x-ui.badge :status="$supplier->status->value" dot>{{ $supplier->status->label() }}</x-ui.badge>
+                                        <x-ui.badge :status="$supplier->effectiveAccreditationStatus()->value" dot>{{ $supplier->effectiveAccreditationStatus()->label() }}</x-ui.badge>
+                                    </div>
                                 </div>
                                 <dl class="mt-3 grid grid-cols-3 gap-2 text-xs">
                                     <div><dt class="text-neutral-500 dark:text-neutral-400">Category</dt><dd class="mt-0.5 truncate font-medium text-neutral-800 dark:text-neutral-200">{{ $categories->first() ?: 'Not linked' }}</dd></div>
@@ -415,7 +423,7 @@
                                 <p class="text-xs text-neutral-500">SUP-{{ str_pad((string) $selectedSupplier->id, 4, '0', STR_PAD_LEFT) }}{{ $selectedSupplier->trade_name ? ' · '.$selectedSupplier->trade_name : '' }}</p>
                                 <div class="mt-2 flex flex-wrap gap-1.5">
                                     <x-ui.badge :status="$selectedSupplier->status->value" dot>{{ $selectedSupplier->status->label() }}</x-ui.badge>
-                                    <x-ui.badge :status="$selectedSupplier->effectiveAccreditationStatus()->value">{{ $selectedSupplier->effectiveAccreditationStatus()->label() }}</x-ui.badge>
+                                    <x-ui.badge :status="$selectedSupplier->effectiveAccreditationStatus()->value" dot>{{ $selectedSupplier->effectiveAccreditationStatus()->label() }}</x-ui.badge>
                                 </div>
                             </div>
                         </div>
