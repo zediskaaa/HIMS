@@ -24,15 +24,18 @@ class SupplierInvitationNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $data = [
+            'appName' => config('app.name'),
+            'name' => $notifiable->name,
+            'supplierName' => $this->invitation->supplier->name,
+            'invitationUrl' => route('supplier-invitations.accept', $this->token),
+            'expiresIn' => $this->invitation->expires_at->diffForHumans(),
+        ];
+
         return (new MailMessage)
             ->subject('Invitation to complete your HIMS supplier registration')
-            ->greeting('Hello '.$notifiable->name.'!')
-            ->line('You have been invited to represent '.$this->invitation->supplier->name.' in the HIMS Supplier Portal.')
-            ->line('Activate your Vendor Administrator account, then complete the company profile and supporting documents for hospital review.')
-            ->action('Accept Supplier Invitation', route('supplier-invitations.accept', $this->token))
-            ->line('This invitation expires '.$this->invitation->expires_at->diffForHumans().'.')
-            ->line('Accepting this invitation does not approve the supplier for procurement. Hospital review is still required.')
-            ->line('If you did not expect this invitation, you can ignore this email.');
+            ->view('emails.supplier-invitation', $data)
+            ->text('emails.supplier-invitation-text', $data);
     }
 
     /** @return array<string, never> */
