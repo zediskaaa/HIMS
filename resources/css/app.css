@@ -398,6 +398,12 @@
         background-image: linear-gradient(to bottom, #fff 0%, #fff 48%, rgb(236 254 255 / 0.72) 100%);
     }
 
+    :where(div, li, td):has(> img[data-empty-surface-artwork]) > img[data-empty-surface-artwork] {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
     :where(div, li, td):has(> img[data-empty-surface-artwork]) > img[data-empty-surface-artwork] + :is(p, div, h2, h3, h4) {
         margin-top: 0.75rem;
         color: theme('colors.neutral.950');

@@ -36,7 +36,7 @@
         aria-hidden="true"
         loading="lazy"
         decoding="async"
-        {{ $attributes->class([$sizes[$size] ?? $sizes['md'], 'object-contain drop-shadow-sm']) }}
+        {{ $attributes->class(['mx-auto block', $sizes[$size] ?? $sizes['md'], 'object-contain drop-shadow-sm']) }}
         data-empty-artwork="{{ $category }}"
         @if ($surface) data-empty-surface-artwork @endif
     >

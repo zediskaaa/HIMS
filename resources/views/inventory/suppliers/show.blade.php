@@ -774,8 +774,8 @@
                         <x-ui.badge :status="$alert->severity->value">{{ $alert->severity->label() }}</x-ui.badge>
                     </div>
             @empty
-                <div class="py-4 text-center">
-                    <x-ui.empty-artwork category="compliance" size="sm" />
+                <div class="flex flex-col items-center justify-center py-4 text-center">
+                    <x-ui.empty-artwork category="compliance" size="sm" class="mx-auto" />
                     <p class="mt-2 text-sm font-semibold text-neutral-800 dark:text-neutral-200">No open expiry alerts</p>
                     <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">The daily compliance check warns 30 days before recorded dates.</p>
                 </div>
