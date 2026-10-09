@@ -106,7 +106,7 @@ class UserAccountService
     /**
      * @param  array<string, mixed>  $attributes
      */
-    public function create(array $attributes, User $actor): User
+    public function create(array $attributes, User $actor, bool $sendNotifications = true): User
     {
         $user = DB::transaction(function () use ($attributes, $actor): User {
             $role = UserRole::from($attributes['role']);
@@ -135,8 +135,10 @@ class UserAccountService
             return $user;
         });
 
-        $user->notify(new AccountCreated);
-        $this->sms->sendAccountCreated($user);
+        if ($sendNotifications) {
+            $user->notify(new AccountCreated);
+            $this->sms->sendAccountCreated($user);
+        }
 
         return $user;
     }
@@ -309,6 +311,15 @@ class UserAccountService
                 'activation_cancelled_by' => $actor->getKey(),
                 'activation_cancellation_notice_sent_at' => null,
             ])->saveQuietly();
+
+            $lockedUser->supplierInvitation()
+                ->where('status', \App\Models\SupplierInvitation::STATUS_PENDING)
+                ->update([
+                    'status' => \App\Models\SupplierInvitation::STATUS_REVOKED,
+                    'revoked_at' => now(),
+                    'revoked_by' => $actor->getKey(),
+                    'updated_at' => now(),
+                ]);
 
             $this->audit->log(
                 AuditAction::AccountActivationCancelled,

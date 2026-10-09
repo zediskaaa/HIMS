@@ -2,6 +2,21 @@
     @php
         $accreditation = $supplier->effectiveAccreditationStatus();
         $activeProducts = $supplier->supplierProducts->where('is_active', true);
+        $pendingDecision = $supplier->accreditation_status === \App\Enums\SupplierAccreditationStatus::PendingReview
+            || $supplier->company_profile_status === \App\Enums\SupplierCompanyProfileStatus::PendingReview;
+        $profileAmendmentReview = $supplier->company_profile_status === \App\Enums\SupplierCompanyProfileStatus::PendingReview
+            && $supplier->accreditation_status === \App\Enums\SupplierAccreditationStatus::Approved;
+        $initialProfileReview = $supplier->company_profile_status === \App\Enums\SupplierCompanyProfileStatus::PendingReview
+            && $supplier->accreditation_status !== \App\Enums\SupplierAccreditationStatus::Approved;
+        $submittedProfile = $supplier->company_profile_draft;
+        $portalOnboardingInProgress = is_array($submittedProfile)
+            && $supplier->accreditation_status !== \App\Enums\SupplierAccreditationStatus::Approved;
+        $currentReviewDocuments = $supplier->documents->where('is_current', true);
+        $pendingReviewDocuments = $currentReviewDocuments->where('verification_status', \App\Enums\SupplierDocumentStatus::Pending);
+        $verifiedReviewDocuments = $currentReviewDocuments->where('verification_status', \App\Enums\SupplierDocumentStatus::Verified);
+        $inviteRoleOptions = $supplier->isProcurementEligible()
+            ? ['vendor_administrator' => 'Vendor Administrator', 'vendor_operations' => 'Vendor Operations', 'vendor_finance' => 'Vendor Finance']
+            : ['vendor_administrator' => 'Vendor Administrator'];
 
         // The Lifecycle card only earns its place when at least one decision
         // branch below actually applies; otherwise it would be an empty shell.
@@ -11,19 +26,23 @@
             \App\Enums\SupplierAccreditationStatus::Expired,
         ];
         $hasLifecycle = ($canReview && in_array($accreditation, $reviewableStates, true))
-            || ($canApprove && $supplier->accreditation_status === \App\Enums\SupplierAccreditationStatus::PendingReview)
+            || ($canApprove && $pendingDecision)
             || ($canApprove && $supplier->status === \App\Enums\SupplierStatus::Active)
             || ($canApprove && in_array($supplier->status, [\App\Enums\SupplierStatus::Suspended, \App\Enums\SupplierStatus::Inactive], true))
             || auth()->user()?->can(\App\Enums\Permission::ManageArchive->value);
 
         // Sections render as tabs, so only the permitted ones become tabs at all.
-        $profileSections = ['overview' => 'Overview'];
-        if (auth()->user()?->can(\App\Enums\Permission::ViewSupplierSensitiveData->value)) {
-            $profileSections += ['contacts' => 'Contacts', 'compliance' => 'Compliance', 'products' => 'Products & Pricing', 'contracts' => 'Contracts'];
-        }
-        $profileSections += ['performance' => 'Performance'];
-        if (auth()->user()?->can(\App\Enums\Permission::ViewSupplierSensitiveData->value)) {
-            $profileSections += ['history' => 'History'];
+        if ($portalOnboardingInProgress && auth()->user()?->can(\App\Enums\Permission::ViewSupplierSensitiveData->value)) {
+            $profileSections = ['compliance' => 'Supporting Documents'];
+        } else {
+            $profileSections = ['overview' => 'Overview'];
+            if (auth()->user()?->can(\App\Enums\Permission::ViewSupplierSensitiveData->value)) {
+                $profileSections += ['contacts' => 'Contacts', 'compliance' => 'Compliance', 'products' => 'Products & Pricing', 'contracts' => 'Contracts'];
+            }
+            $profileSections += ['performance' => 'Performance'];
+            if (auth()->user()?->can(\App\Enums\Permission::ViewSupplierSensitiveData->value)) {
+                $profileSections += ['history' => 'History'];
+            }
         }
 
         $sectionIcons = [
@@ -62,8 +81,8 @@
         </x-ui.alert>
     @endif
 
-    @if ($canApprove && $supplier->isProcurementEligible())
-        <x-ui.card id="supplier-portal-access" title="Supplier Portal Access" subtitle="Hospital invitation-only accounts for this approved supplier." class="mt-5 scroll-mt-24">
+    @if ($canApprove && $supplier->status === \App\Enums\SupplierStatus::Active)
+        <x-ui.card id="supplier-portal-access" title="Supplier Portal Access" :subtitle="$supplier->isProcurementEligible() ? 'Hospital invitation-only accounts for this approved supplier.' : 'Invite a Vendor Administrator to complete the company profile before approval.'" class="mt-5 scroll-mt-24">
             <x-slot:actions>
                 <x-ui.button
                     type="button"
@@ -77,15 +96,53 @@
             @if($portalUsers->isNotEmpty())
                 <ul class="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
                     @foreach($portalUsers as $portalUser)
+                        @php
+                            $invitation = $portalUser->supplierInvitation;
+                        @endphp
                         <li class="grid gap-3 py-4 md:grid-cols-2 md:items-center xl:grid-cols-5">
                             <div class="min-w-0 xl:col-span-2">
                                 <p class="font-medium text-neutral-900 dark:text-neutral-100">{{ $portalUser->name }}</p>
-                                <p class="break-all text-xs text-neutral-500 dark:text-neutral-400">{{ $portalUser->email }}</p>
+                                <p class="break-words text-xs text-neutral-500 dark:text-neutral-400">{{ $portalUser->email }}</p>
+                                @if($invitation)
+                                    <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                        @if($invitation->accepted_at)
+                                            Accepted {{ $invitation->accepted_at->timezone(config('app.timezone'))->format('M d, Y g:i A') }}
+                                        @elseif($invitation->opened_at)
+                                            Opened {{ $invitation->opened_at->timezone(config('app.timezone'))->format('M d, Y g:i A') }} · Awaiting account setup
+                                        @elseif($invitation->sent_at)
+                                            Sent {{ $invitation->sent_at->timezone(config('app.timezone'))->format('M d, Y g:i A') }} · Expires {{ $invitation->expires_at->timezone(config('app.timezone'))->format('M d, Y g:i A') }}
+                                        @else
+                                            Delivery has not completed. The pending account is preserved for retry.
+                                        @endif
+                                    </p>
+                                @endif
                             </div>
                             <div class="flex min-w-0 flex-col gap-2 md:items-end xl:col-span-3 xl:grid xl:grid-cols-3 xl:items-center xl:gap-4">
-                                <p class="whitespace-nowrap text-xs font-medium text-neutral-600 dark:text-neutral-300">{{ $portalUser->role->label() }} · {{ $portalUser->status->label() }}</p>
+                                <div class="flex flex-wrap items-center gap-2 xl:flex-col xl:items-start">
+                                    <p class="text-xs font-medium text-neutral-600 dark:text-neutral-300">{{ $portalUser->role->label() }}</p>
+                                    @if($invitation)
+                                        <x-ui.badge :status="$invitation->displayStatus()" dot>{{ $invitation->displayStatusLabel() }}</x-ui.badge>
+                                    @else
+                                        <x-ui.badge :status="$portalUser->status->value" dot>{{ $portalUser->status->label() }}</x-ui.badge>
+                                    @endif
+                                </div>
                                 <div class="flex flex-wrap items-center gap-2 md:justify-end xl:col-span-2">
-                                    @if($portalUser->isPendingActivation())
+                                    @if($invitation?->canResend())
+                                        @php
+                                            $isReinvite = $invitation->status === \App\Models\SupplierInvitation::STATUS_REVOKED;
+                                            $sendLabel = $isReinvite ? 'Re-invite' : 'Resend Invitation';
+                                        @endphp
+                                        <form
+                                            method="POST"
+                                            action="{{ route('inventory.suppliers.invitations.resend', [$supplier, $invitation]) }}"
+                                            data-confirm-title="{{ $isReinvite ? 'Re-invite supplier user?' : 'Resend supplier invitation?' }}"
+                                            data-confirm-message="Replace the previous activation link and send a new expiring invitation to {{ $portalUser->email }}?"
+                                            data-confirm-label="{{ $sendLabel }}"
+                                        >
+                                            @csrf
+                                            <x-ui.button type="submit" variant="secondary" size="sm" data-loading-text="Sending...">{{ $sendLabel }}</x-ui.button>
+                                        </form>
+                                    @elseif($portalUser->isPendingActivation() && ! $invitation)
                                         <form
                                             method="POST"
                                             action="{{ route(\App\Support\AuthenticationContext::administrationRoute('users.verification.send'), $portalUser) }}"
@@ -96,6 +153,19 @@
                                             @csrf
                                             <input type="hidden" name="return_to_supplier" value="1">
                                             <x-ui.button type="submit" variant="secondary" size="sm" data-loading-text="Sending...">Resend Activation</x-ui.button>
+                                        </form>
+                                    @endif
+                                    @if($invitation?->canRevoke())
+                                        <form
+                                            method="POST"
+                                            action="{{ route('inventory.suppliers.invitations.revoke', [$supplier, $invitation]) }}"
+                                            data-confirm-title="Revoke supplier invitation?"
+                                            data-confirm-message="Revoke this invitation and block its activation link? The draft supplier record will be preserved."
+                                            data-confirm-label="Revoke Invitation"
+                                            data-confirm-variant="danger"
+                                        >
+                                            @csrf
+                                            <x-ui.button type="submit" variant="danger" size="sm" data-loading-text="Revoking...">Revoke</x-ui.button>
                                         </form>
                                     @endif
                                     <x-ui.button
@@ -295,11 +365,7 @@
                     <x-ui.field name="email" label="Email" type="email" hint="The activation link will be sent here." required />
                 </div>
                 <div class="sm:col-span-2">
-                    <x-ui.field name="role" label="Supplier role" type="select" :options="[
-                        'vendor_administrator' => 'Vendor Administrator',
-                        'vendor_operations' => 'Vendor Operations',
-                        'vendor_finance' => 'Vendor Finance',
-                    ]" required />
+                    <x-ui.field name="role" label="Supplier role" type="select" :options="$inviteRoleOptions" required />
                 </div>
             </form>
 
@@ -312,6 +378,32 @@
         @if(old('form_context') === 'supplier_invitation' && $errors->any())
             <div x-data x-init="$nextTick(() => $dispatch('open-modal', 'invite-supplier-user'))"></div>
         @endif
+    @endif
+
+    @if(auth()->user()?->can(\App\Enums\Permission::ViewSupplierSensitiveData->value) && is_array($submittedProfile))
+        <x-ui.card title="Supplier-submitted company profile" subtitle="Proposed information remains separate from the verified supplier master until an authorized approval is recorded." class="mt-5">
+            <x-slot:actions>
+                <x-ui.badge :status="$supplier->company_profile_status->value" dot>{{ $supplier->company_profile_status->label() }}</x-ui.badge>
+            </x-slot:actions>
+            @if ($profileAmendmentReview)
+                <x-ui.alert variant="info" title="Proposed amendment" class="mb-4">The currently approved supplier master remains in effect until this proposal is approved.</x-ui.alert>
+            @endif
+            <dl class="grid gap-x-6 gap-y-4 text-sm md:grid-cols-2 xl:grid-cols-3">
+                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Registered name</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['name'] ?? '—' }}</dd></div>
+                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Trade name</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['trade_name'] ?? '—' }}</dd></div>
+                <div><dt class="text-xs font-semibold uppercase text-neutral-500">TIN</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['tax_number'] ?? '—' }}</dd></div>
+                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Business structure</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ filled($submittedProfile['business_structure'] ?? null) ? str($submittedProfile['business_structure'])->headline() : '—' }}</dd></div>
+                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Regulated health products</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ ($submittedProfile['provides_regulated_health_products'] ?? false) ? 'Yes' : 'No' }}</dd></div>
+                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Standard lead time</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ filled($submittedProfile['standard_lead_time_days'] ?? null) ? $submittedProfile['standard_lead_time_days'].' days' : '—' }}</dd></div>
+                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Payment terms</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['payment_terms'] ?? '—' }}</dd></div>
+                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Primary contact</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['contact_person'] ?? '—' }}@if(filled($submittedProfile['contact_position'] ?? null)) · {{ $submittedProfile['contact_position'] }}@endif</dd></div>
+                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Contact details</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['email'] ?? '—' }}<span class="block">{{ $submittedProfile['phone'] ?? '—' }}</span></dd></div>
+                <div class="md:col-span-2 xl:col-span-3"><dt class="text-xs font-semibold uppercase text-neutral-500">Registered address</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['address'] ?? '—' }}</dd></div>
+                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Billing address</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['billing_address'] ?? '—' }}</dd></div>
+                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Delivery address</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['delivery_address'] ?? '—' }}</dd></div>
+                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Submitted</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $supplier->company_profile_submitted_at?->format('M d, Y g:i A') ?? 'Draft not submitted' }}</dd></div>
+            </dl>
+        </x-ui.card>
     @endif
 
     @if(auth()->user()?->can(\App\Enums\Permission::ViewSupplierSensitiveData->value) && ($supplier->discrepancies->isNotEmpty() || $supplier->invoices->isNotEmpty()))
@@ -356,12 +448,75 @@
         </div>
     @endif
 
+    @if ($pendingDecision && ($canReview || $canApprove))
+        <x-ui.card
+            title="Hospital review checklist"
+            subtitle="Follow these steps in order before this supplier can become eligible for procurement."
+            class="mt-5"
+        >
+            <ol class="grid gap-3 lg:grid-cols-3">
+                <li class="rounded-lg border border-success-200 bg-success-50/60 p-4 dark:border-success-900/60 dark:bg-success-950/20">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-semibold text-neutral-900 dark:text-white">1. Review company profile</p>
+                        <x-ui.badge status="success">Submitted</x-ui.badge>
+                    </div>
+                    <p class="mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-300">Compare the proposed company details with its legal and supporting records.</p>
+                </li>
+
+                <li class="rounded-lg border border-neutral-200 bg-neutral-50/70 p-4 dark:border-neutral-700 dark:bg-neutral-800/50">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-semibold text-neutral-900 dark:text-white">2. Verify supporting evidence</p>
+                        @if ($pendingReviewDocuments->isNotEmpty())
+                            <x-ui.badge status="warning">Action needed</x-ui.badge>
+                        @elseif ($verifiedReviewDocuments->isNotEmpty())
+                            <x-ui.badge status="success">Verified</x-ui.badge>
+                        @else
+                            <x-ui.badge status="danger">Evidence required</x-ui.badge>
+                        @endif
+                    </div>
+                    @if ($pendingReviewDocuments->isNotEmpty())
+                        <p class="mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-300">{{ $pendingReviewDocuments->count() }} current document(s) still need a verification decision.</p>
+                        <x-ui.button type="button" size="sm" variant="secondary" class="mt-3" x-data x-on:click="$dispatch('supplier-profile-tab', 'compliance')">Go to Compliance</x-ui.button>
+                    @elseif ($verifiedReviewDocuments->isNotEmpty())
+                        <p class="mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-300">At least one current supporting document has been verified.</p>
+                        <x-ui.button type="button" size="sm" variant="ghost" class="mt-3" x-data x-on:click="$dispatch('supplier-profile-tab', 'compliance')">View Evidence</x-ui.button>
+                    @else
+                        <p class="mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-300">No current acceptable evidence is available. Request a replacement document from the supplier.</p>
+                    @endif
+                </li>
+
+                <li class="rounded-lg border border-neutral-200 bg-neutral-50/70 p-4 dark:border-neutral-700 dark:bg-neutral-800/50">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-semibold text-neutral-900 dark:text-white">3. Record final decision</p>
+                        @if ($pendingReviewDocuments->isNotEmpty() || $verifiedReviewDocuments->isEmpty())
+                            <x-ui.badge status="neutral">Waiting</x-ui.badge>
+                        @elseif ($canDecide)
+                            <x-ui.badge status="primary">Ready</x-ui.badge>
+                        @else
+                            <x-ui.badge status="warning">Different approver</x-ui.badge>
+                        @endif
+                    </div>
+                    @if ($pendingReviewDocuments->isNotEmpty() || $verifiedReviewDocuments->isEmpty())
+                        <p class="mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-300">Complete the evidence review before approving, returning, or rejecting the profile.</p>
+                    @elseif (! $canApprove)
+                        <p class="mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-300">An authorized supplier approver must record the final decision.</p>
+                    @elseif (! $canDecide)
+                        <p class="mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-300">You participated in this review. Ask a different authorized approver to record the final decision.</p>
+                    @else
+                        <p class="mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-300">Evidence is verified. Approve the supplier, request corrections, or record a rejection.</p>
+                        <x-ui.button type="button" size="sm" class="mt-3" x-data x-on:click="$dispatch('open-modal', 'manage-lifecycle')">Open Final Decision</x-ui.button>
+                    @endif
+                </li>
+            </ol>
+        </x-ui.card>
+    @endif
+
     {{-- Page-level, so it stays visible whichever tab is open. --}}
     @if ($supplier->isArchived())
         <x-ui.alert variant="neutral" title="Archived Supplier Record" class="mt-5">
             This supplier has been archived and removed from active procurement. Historical purchase orders, invoices, and compliance audits remain preserved.
         </x-ui.alert>
-    @elseif (! $supplier->isProcurementEligible())
+    @elseif (! $pendingDecision && ! $supplier->isProcurementEligible())
         <x-ui.alert variant="warning" title="Not eligible for new procurement" class="mt-5">
             This record is retained for history, but it will not appear in new requisition, quotation, or purchase-order supplier choices until operational status, accreditation, and blocking evidence are current.
         </x-ui.alert>
@@ -376,7 +531,7 @@
     <div
         class="mt-5 space-y-6"
         x-data="{
-            tab: 'overview',
+            tab: {{ Js::from(array_key_first($profileSections)) }},
             tabs: {{ Js::from(array_keys($profileSections)) }},
             init() {
                 const requested = window.location.hash.slice(1);
@@ -388,7 +543,10 @@
                 this.tab = next;
                 history.replaceState(null, '', '#' + next);
             },
-        }">
+        }"
+        x-on:supplier-profile-tab.window="go($event.detail)"
+    >
+        @if (count($profileSections) > 1)
         <div>
             <nav class="flex flex-wrap items-center gap-2" aria-label="Supplier profile sections">
                 @foreach ($profileSections as $anchor => $label)
@@ -406,13 +564,20 @@
                 @endforeach
             </nav>
         </div>
+        @endif
 
-        <section id="overview" x-show="tab === 'overview'" x-cloak class="scroll-mt-20 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-            <x-ui.card title="Supplier master" subtitle="Business identity and procurement-planning defaults.">
+        <section id="overview" x-show="tab === 'overview'" x-cloak class="scroll-mt-20 {{ $initialProfileReview ? 'max-w-xl' : 'grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]' }}">
+            @unless ($initialProfileReview)
+            <x-ui.card
+                :title="$pendingDecision ? 'Current supplier master' : 'Supplier master'"
+                :subtitle="$pendingDecision ? 'Hospital-held values remain unchanged until the submitted profile is approved.' : 'Business identity and procurement-planning defaults.'"
+            >
                 @can(\App\Enums\Permission::ManageSuppliers->value)
-                    <x-slot:actions>
-                        <x-ui.button type="button" size="sm" variant="secondary" icon="pencil-square" x-data x-on:click="$dispatch('open-modal', 'edit-supplier')">Edit Supplier Information</x-ui.button>
-                    </x-slot:actions>
+                    @unless ($pendingDecision)
+                        <x-slot:actions>
+                            <x-ui.button type="button" size="sm" variant="secondary" icon="pencil-square" x-data x-on:click="$dispatch('open-modal', 'edit-supplier')">Edit Supplier Information</x-ui.button>
+                        </x-slot:actions>
+                    @endunless
                 @endcan
 
                 <div class="grid gap-4 md:grid-cols-2 text-sm">
@@ -436,6 +601,7 @@
                     @endcan
                 </div>
             </x-ui.card>
+            @endunless
 
             <div class="space-y-6">
                 {{-- Operational, accreditation, and compliance state already appear as
@@ -453,7 +619,7 @@
                     @endif
                 </x-ui.card>
 
-                @if ($hasLifecycle)
+                @if ($hasLifecycle && ! $pendingDecision)
                     <x-ui.card title="Lifecycle actions" subtitle="Decisions are server-authorized and audit logged.">
                         <x-ui.button type="button" variant="secondary" icon="arrow-path" class="w-full" x-data x-on:click="$dispatch('open-modal', 'manage-lifecycle')">Manage Lifecycle Actions</x-ui.button>
                     </x-ui.card>
@@ -488,6 +654,7 @@
         </section>
 
         <section id="compliance" x-show="tab === 'compliance'" x-cloak class="scroll-mt-20 space-y-6">
+            @unless ($portalOnboardingInProgress)
             <x-ui.card title="Expiry alerts" subtitle="Generated daily from recorded accreditation, document, and active-contract dates.">
                 @forelse ($supplier->complianceAlerts as $alert)
                     <div class="flex items-start justify-between gap-3 border-b border-neutral-100 py-2 last:border-0">
@@ -502,6 +669,7 @@
                 </div>
                 @endforelse
             </x-ui.card>
+            @endunless
 
             <x-ui.card title="Compliance evidence" subtitle="Uploaded evidence remains unverified until a reviewer records a decision." :padding="false">
                 @can(\App\Enums\Permission::ManageSuppliers->value)
@@ -989,32 +1157,45 @@
                     <x-ui.alert variant="info" title="Profile not ready for review">Complete {{ implode(', ', $supplier->accreditationReviewReadinessIssues()) }} before submitting.</x-ui.alert>
                 @endif
 
-                @if ($canDecide && $supplier->accreditation_status === \App\Enums\SupplierAccreditationStatus::PendingReview)
+                @if ($canDecide && $pendingDecision)
                     <form method="POST" action="{{ route('inventory.suppliers.approve', $supplier) }}" class="space-y-3"
-                          data-confirm-title="Approve supplier accreditation"
-                          data-confirm-message="Are you sure you want to approve accreditation for {{ $supplier->name }}? The supplier will become active for procurement."
-                          data-confirm-label="Approve Supplier">
+                          data-confirm-title="{{ $profileAmendmentReview ? 'Approve company profile amendment' : 'Approve supplier accreditation' }}"
+                          data-confirm-message="{{ $profileAmendmentReview ? 'Approve the proposed company profile changes? The current accreditation remains active.' : 'Approve accreditation for '.$supplier->name.'? The supplier will become active for procurement.' }}"
+                          data-confirm-label="{{ $profileAmendmentReview ? 'Approve Amendment' : 'Approve Supplier' }}">
                         @csrf
                         <input type="hidden" name="_supplier_form" value="lifecycle">
-                        <x-ui.field name="expires_at" label="Accreditation valid until" type="date" :min="today()->toDateString()" hint="Leave blank only when the approving policy has no fixed renewal date." />
-                        <x-ui.field name="decision_notes" label="Approval notes" type="textarea" rows="2" />
+                        @unless ($profileAmendmentReview)
+                            <x-ui.field name="expires_at" label="Accreditation valid until" type="date" :min="today()->toDateString()" hint="Leave blank only when the approving policy has no fixed renewal date." />
+                        @endunless
+                        <x-ui.field name="approval_notes" label="Approval notes" type="textarea" rows="2" />
                         <label class="flex items-start gap-2 text-xs text-neutral-700">
                             <input type="checkbox" name="compliance_attested" value="1" required class="mt-0.5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500">
-                            <span>I confirm that requirements applicable to this supplier, its legal form, products, and this procurement context were reviewed.</span>
+                            <span>I confirm that the submitted company information, legal form, products, and supporting evidence were reviewed.</span>
                         </label>
-                        <x-ui.button type="submit" class="w-full" data-loading-text="Approving...">Approve Accreditation</x-ui.button>
+                        <x-ui.button type="submit" class="w-full" data-loading-text="Approving...">{{ $profileAmendmentReview ? 'Approve Profile Amendment' : 'Approve Accreditation' }}</x-ui.button>
                     </form>
+                    @if ($supplier->company_profile_status === \App\Enums\SupplierCompanyProfileStatus::PendingReview)
+                        <form method="POST" action="{{ route('inventory.suppliers.request-profile-changes', $supplier) }}" class="space-y-3 border-t border-neutral-200 pt-4"
+                              data-confirm-title="Request supplier corrections"
+                              data-confirm-message="Return this company profile to the Vendor Administrator with the stated corrections?"
+                              data-confirm-label="Request Corrections">
+                            @csrf
+                            <input type="hidden" name="_supplier_form" value="lifecycle">
+                            <x-ui.field name="correction_notes" label="Required corrections" type="textarea" rows="3" required />
+                            <x-ui.button type="submit" variant="secondary" class="w-full" data-loading-text="Returning profile...">Request Corrections</x-ui.button>
+                        </form>
+                    @endif
                     <form method="POST" action="{{ route('inventory.suppliers.reject', $supplier) }}" class="space-y-3 border-t border-neutral-200 pt-4"
-                          data-confirm-title="Reject supplier accreditation"
-                          data-confirm-message="Are you sure you want to reject accreditation for {{ $supplier->name }}? A rejection reason will be permanently recorded."
-                          data-confirm-label="Reject Supplier"
+                          data-confirm-title="{{ $profileAmendmentReview ? 'Reject company profile amendment' : 'Reject supplier accreditation' }}"
+                          data-confirm-message="{{ $profileAmendmentReview ? 'Reject the proposed company profile changes? The approved supplier master and accreditation will remain unchanged.' : 'Reject accreditation for '.$supplier->name.'? A rejection reason will be permanently recorded.' }}"
+                          data-confirm-label="{{ $profileAmendmentReview ? 'Reject Amendment' : 'Reject Supplier' }}"
                           data-confirm-variant="danger">
                         @csrf
                         <input type="hidden" name="_supplier_form" value="lifecycle">
-                        <x-ui.field name="decision_notes" label="Rejection reason" type="textarea" rows="2" required />
-                        <x-ui.button type="submit" variant="danger" class="w-full" data-loading-text="Recording decision...">Reject Accreditation</x-ui.button>
+                        <x-ui.field name="rejection_notes" label="Rejection reason" type="textarea" rows="2" required />
+                        <x-ui.button type="submit" variant="danger" class="w-full" data-loading-text="Recording decision...">{{ $profileAmendmentReview ? 'Reject Profile Amendment' : 'Reject Accreditation' }}</x-ui.button>
                     </form>
-                @elseif ($canApprove && $supplier->accreditation_status === \App\Enums\SupplierAccreditationStatus::PendingReview)
+                @elseif ($canApprove && $pendingDecision)
                     <x-ui.alert variant="info" title="Independent decision required">You participated in this supplier review. A different authorized approver must record the decision.</x-ui.alert>
                 @endif
 

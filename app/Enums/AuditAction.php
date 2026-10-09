@@ -26,7 +26,14 @@ enum AuditAction: string
     case UnlockedUser = 'unlocked_user';
     case CreatedSupplier = 'created_supplier';
     case UpdatedSupplier = 'updated_supplier';
+    case SentSupplierInvitation = 'sent_supplier_invitation';
+    case FailedSupplierInvitation = 'failed_supplier_invitation';
+    case AcceptedSupplierInvitation = 'accepted_supplier_invitation';
+    case SavedSupplierProfileDraft = 'saved_supplier_profile_draft';
     case SubmittedSupplier = 'submitted_supplier';
+    case RequestedSupplierProfileChanges = 'requested_supplier_profile_changes';
+    case ApprovedSupplierProfile = 'approved_supplier_profile';
+    case RejectedSupplierProfile = 'rejected_supplier_profile';
     case ApprovedSupplier = 'approved_supplier';
     case RejectedSupplier = 'rejected_supplier';
     case SuspendedSupplier = 'suspended_supplier';
@@ -49,6 +56,7 @@ enum AuditAction: string
     case RefreshedDemandForecast = 'refreshed_demand_forecast';
     case FailedDemandForecast = 'failed_demand_forecast';
     case UploadedSupplierDocument = 'uploaded_supplier_document';
+    case RemovedSupplierDocument = 'removed_supplier_document';
     case DownloadedSupplierDocument = 'downloaded_supplier_document';
     case VerifiedSupplierDocument = 'verified_supplier_document';
     case RejectedSupplierDocument = 'rejected_supplier_document';
@@ -189,7 +197,14 @@ enum AuditAction: string
             self::UnlockedUser => 'Unlocked User',
             self::CreatedSupplier => 'Created Supplier',
             self::UpdatedSupplier => 'Updated Supplier',
+            self::SentSupplierInvitation => 'Sent Supplier Invitation',
+            self::FailedSupplierInvitation => 'Supplier Invitation Delivery Failed',
+            self::AcceptedSupplierInvitation => 'Accepted Supplier Invitation',
+            self::SavedSupplierProfileDraft => 'Saved Supplier Profile Draft',
             self::SubmittedSupplier => 'Submitted Supplier',
+            self::RequestedSupplierProfileChanges => 'Requested Supplier Profile Changes',
+            self::ApprovedSupplierProfile => 'Approved Supplier Profile',
+            self::RejectedSupplierProfile => 'Rejected Supplier Profile',
             self::ApprovedSupplier => 'Approved Supplier',
             self::RejectedSupplier => 'Rejected Supplier',
             self::SuspendedSupplier => 'Suspended Supplier',
@@ -212,6 +227,7 @@ enum AuditAction: string
             self::RefreshedDemandForecast => 'Refreshed Demand Forecast',
             self::FailedDemandForecast => 'Failed Demand Forecast',
             self::UploadedSupplierDocument => 'Uploaded Supplier Document',
+            self::RemovedSupplierDocument => 'Removed Supplier Document',
             self::DownloadedSupplierDocument => 'Downloaded Supplier Document',
             self::VerifiedSupplierDocument => 'Verified Supplier Document',
             self::RejectedSupplierDocument => 'Rejected Supplier Document',

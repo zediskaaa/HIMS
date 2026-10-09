@@ -3,15 +3,20 @@
 namespace App\Http\Requests;
 
 use App\Enums\Permission;
+use App\Models\User;
 use App\Services\FileContentValidator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreSupplierRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can(Permission::ManageSuppliers->value) ?? false;
+        return $this->user()?->canAny([
+            Permission::ManageSuppliers->value,
+            Permission::ApproveSuppliers->value,
+        ]) ?? false;
     }
 
     public function rules(): array
@@ -32,6 +37,19 @@ class StoreSupplierRequest extends FormRequest
             'payment_terms' => 'nullable|string|max:2000',
             'notes' => 'nullable|string|max:5000',
             'logo' => ['nullable', 'file', 'mimes:jpg,jpeg,png', 'mimetypes:image/jpeg,image/png', 'max:3072'],
+            'send_invitation' => ['sometimes', 'boolean'],
+            'invitation_first_name' => ['required_if:send_invitation,1', 'nullable', 'string', 'max:100'],
+            'invitation_surname' => ['required_if:send_invitation,1', 'nullable', 'string', 'max:100'],
+            'invitation_email' => [
+                'required_if:send_invitation,1',
+                'nullable',
+                'string',
+                'lowercase',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email'),
+            ],
+            'invitation_phone' => ['bail', 'nullable', 'string', 'digits:11', 'regex:/^09[0-9]{9}$/'],
         ];
     }
 
@@ -42,12 +60,22 @@ class StoreSupplierRequest extends FormRequest
             'logo.mimes' => 'The supplier logo must be a file of type: JPG, JPEG, PNG.',
             'logo.mimetypes' => 'The supplier logo must be a file of type: JPG, JPEG, PNG.',
             'logo.max' => 'The supplier logo must not exceed 3 MB.',
+            'invitation_email.unique' => 'This email address already belongs to a HIMS account or outstanding invitation.',
+            'invitation_phone.digits' => 'Mobile number must contain exactly 11 digits.',
+            'invitation_phone.regex' => 'Mobile number must start with 09 and contain exactly 11 digits.',
         ];
     }
 
-    public function withValidator($validator): void
+    public function withValidator(Validator $validator): void
     {
-        $validator->after(function ($validator) {
+        $validator->after(function (Validator $validator): void {
+            $phone = $this->input('invitation_phone');
+            if (is_string($phone)
+                && preg_match('/^09[0-9]{9}$/D', $phone) === 1
+                && User::query()->wherePhoneNumber($phone)->exists()) {
+                $validator->errors()->add('invitation_phone', 'This mobile phone number is already assigned to another account.');
+            }
+
             $file = $this->file('logo');
             if (! $file || ! $file->isValid()) {
                 return;

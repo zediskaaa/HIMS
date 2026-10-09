@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\AuditAction;
 use App\Enums\SupplierAccreditationStatus;
+use App\Enums\SupplierCompanyProfileStatus;
 use App\Enums\SupplierDocumentStatus;
 use App\Enums\SupplierStatus;
 use App\Models\Supplier;
@@ -19,6 +20,26 @@ use Illuminate\Validation\ValidationException;
 
 class SupplierManagementService
 {
+    private const COMPANY_PROFILE_FIELDS = [
+        'name',
+        'trade_name',
+        'business_structure',
+        'provides_regulated_health_products',
+        'tax_number',
+        'address',
+        'billing_address',
+        'delivery_address',
+        'contact_first_name',
+        'contact_middle_name',
+        'contact_surname',
+        'contact_person',
+        'contact_position',
+        'email',
+        'phone',
+        'standard_lead_time_days',
+        'payment_terms',
+    ];
+
     public function __construct(private readonly AuditLogger $audit) {}
 
     public function create(array $data, User $actor): Supplier
@@ -73,7 +94,9 @@ class SupplierManagementService
 
                 $materialFields = ['name', 'trade_name', 'business_structure', 'provides_regulated_health_products', 'tax_number', 'address'];
                 $materialChanges = array_values(array_intersect($meaningfulChanges, $materialFields));
-                if ($supplier->accreditation_status === SupplierAccreditationStatus::PendingReview && $materialChanges !== []) {
+                if (($supplier->accreditation_status === SupplierAccreditationStatus::PendingReview
+                    || $supplier->company_profile_status === SupplierCompanyProfileStatus::PendingReview)
+                    && $materialChanges !== []) {
                     throw ValidationException::withMessages([
                         'accreditation' => 'Return or reject the pending review before changing legal or compliance identity fields.',
                     ]);
@@ -84,6 +107,7 @@ class SupplierManagementService
                 if ($supplier->effectiveAccreditationStatus() === SupplierAccreditationStatus::Approved && $materialChanges !== []) {
                     $supplier->forceFill([
                         'accreditation_status' => SupplierAccreditationStatus::Draft,
+                        'company_profile_status' => SupplierCompanyProfileStatus::Draft,
                         'accreditation_expires_at' => null,
                         'approved_by' => null,
                     ]);
@@ -129,6 +153,120 @@ class SupplierManagementService
         });
     }
 
+    public function saveCompanyProfileDraft(Supplier $supplier, array $data, User $actor): Supplier
+    {
+        return DB::transaction(function () use ($supplier, $data, $actor): Supplier {
+            $supplier = Supplier::query()->whereKey($supplier->getKey())->lockForUpdate()->firstOrFail();
+            if ($supplier->company_profile_status === SupplierCompanyProfileStatus::PendingReview) {
+                throw ValidationException::withMessages(['profile' => 'This profile is under review and cannot be edited.']);
+            }
+
+            $status = $supplier->company_profile_status === SupplierCompanyProfileStatus::Approved
+                ? SupplierCompanyProfileStatus::Draft
+                : $supplier->company_profile_status;
+
+            $supplier->update([
+                'company_profile_draft' => Arr::only($data, self::COMPANY_PROFILE_FIELDS),
+                'company_profile_status' => $status,
+            ]);
+            $this->audit->log(
+                AuditAction::SavedSupplierProfileDraft,
+                $actor,
+                'Saved the supplier company profile as a draft.',
+                $supplier,
+                $supplier->name,
+                newValues: ['company_profile_status' => $status->value],
+            );
+
+            return $supplier->fresh();
+        });
+    }
+
+    public function submitCompanyProfile(Supplier $supplier, array $data, User $actor): SupplierAccreditation
+    {
+        return DB::transaction(function () use ($supplier, $data, $actor): SupplierAccreditation {
+            $supplier = Supplier::query()->whereKey($supplier->getKey())->lockForUpdate()->firstOrFail();
+            if (! in_array($supplier->company_profile_status, [
+                SupplierCompanyProfileStatus::Draft,
+                SupplierCompanyProfileStatus::ChangesRequested,
+                SupplierCompanyProfileStatus::Rejected,
+                SupplierCompanyProfileStatus::Approved,
+            ], true)) {
+                throw ValidationException::withMessages(['profile' => 'Only a draft, returned, rejected, or approved profile amendment can be submitted.']);
+            }
+
+            $profile = Arr::only($data, self::COMPANY_PROFILE_FIELDS);
+            $this->ensureIdentityIsUnique($this->identityKey($profile), $supplier);
+            if (! $supplier->documents()->where('is_current', true)->where('verification_status', '!=', SupplierDocumentStatus::Rejected->value)->exists()) {
+                throw ValidationException::withMessages(['documents' => 'Upload at least one current business or supplier verification document before submitting.']);
+            }
+
+            $review = $supplier->company_profile_status === SupplierCompanyProfileStatus::ChangesRequested
+                ? $supplier->accreditations()->where('status', SupplierAccreditationStatus::ChangesRequested->value)->latest('cycle_number')->lockForUpdate()->first()
+                : null;
+
+            if ($review) {
+                $review->update([
+                    'status' => SupplierAccreditationStatus::PendingReview,
+                    'submitted_by' => $actor->id,
+                    'submitted_at' => now(),
+                    'decided_by' => null,
+                    'decided_at' => null,
+                ]);
+            } else {
+                $review = $supplier->accreditations()->create([
+                    'cycle_number' => ((int) $supplier->accreditations()->max('cycle_number')) + 1,
+                    'status' => SupplierAccreditationStatus::PendingReview,
+                    'submitted_by' => $actor->id,
+                    'submitted_at' => now(),
+                ]);
+            }
+
+            $updates = [
+                'company_profile_draft' => $profile,
+                'company_profile_status' => SupplierCompanyProfileStatus::PendingReview,
+                'company_profile_feedback' => null,
+                'company_profile_submitted_at' => now(),
+                'company_profile_reviewed_at' => null,
+                'company_profile_reviewed_by' => null,
+                'reviewed_by' => $actor->id,
+                'last_reviewed_at' => now(),
+            ];
+            if ($supplier->accreditation_status !== SupplierAccreditationStatus::Approved) {
+                $updates['accreditation_status'] = SupplierAccreditationStatus::PendingReview;
+            }
+            $supplier->update($updates);
+            $this->audit->log(AuditAction::SubmittedSupplier, $actor, 'Submitted the supplier company profile for hospital review.', $supplier, $supplier->name, newValues: ['cycle_number' => $review->cycle_number, 'company_profile_status' => SupplierCompanyProfileStatus::PendingReview->value]);
+
+            return $review;
+        });
+    }
+
+    public function requestCompanyProfileChanges(Supplier $supplier, User $actor, string $notes): Supplier
+    {
+        return DB::transaction(function () use ($supplier, $actor, $notes): Supplier {
+            $supplier = Supplier::query()->whereKey($supplier->getKey())->lockForUpdate()->firstOrFail();
+            $this->requirePendingCompanyProfile($supplier);
+            $this->requireIndependentDecision($supplier, $actor);
+            $review = $supplier->accreditations()->where('status', SupplierAccreditationStatus::PendingReview->value)->latest('cycle_number')->lockForUpdate()->firstOrFail();
+            $review->update(['status' => SupplierAccreditationStatus::ChangesRequested, 'decided_by' => $actor->id, 'decided_at' => now(), 'decision_notes' => $notes]);
+
+            $updates = [
+                'company_profile_status' => SupplierCompanyProfileStatus::ChangesRequested,
+                'company_profile_feedback' => $notes,
+                'company_profile_reviewed_at' => now(),
+                'company_profile_reviewed_by' => $actor->id,
+            ];
+            if ($supplier->accreditation_status !== SupplierAccreditationStatus::Approved) {
+                $updates['accreditation_status'] = SupplierAccreditationStatus::ChangesRequested;
+            }
+            $supplier->update($updates);
+            $this->audit->log(AuditAction::RequestedSupplierProfileChanges, $actor, 'Requested corrections to the supplier company profile.', $supplier, $supplier->name, newValues: ['cycle_number' => $review->cycle_number, 'company_profile_status' => SupplierCompanyProfileStatus::ChangesRequested->value]);
+
+            return $supplier->fresh();
+        });
+    }
+
     public function submitForReview(Supplier $supplier, User $actor): SupplierAccreditation
     {
         return DB::transaction(function () use ($supplier, $actor): SupplierAccreditation {
@@ -152,6 +290,7 @@ class SupplierManagementService
                 'submitted_at' => now(),
             ]);
             $supplier->update(['accreditation_status' => SupplierAccreditationStatus::PendingReview, 'reviewed_by' => $actor->id, 'last_reviewed_at' => now()]);
+            $supplier->update(['company_profile_status' => SupplierCompanyProfileStatus::PendingReview]);
             $this->audit->log(AuditAction::SubmittedSupplier, $actor, 'Submitted the supplier for accreditation review.', $supplier, $supplier->name, newValues: ['cycle_number' => $cycle, 'accreditation_status' => SupplierAccreditationStatus::PendingReview->value]);
 
             return $accreditation;
@@ -165,9 +304,11 @@ class SupplierManagementService
             $this->requirePendingReview($supplier);
             $this->requireIndependentDecision($supplier, $actor);
 
+            $profileReview = $supplier->company_profile_status === SupplierCompanyProfileStatus::PendingReview
+                && is_array($supplier->company_profile_draft);
             $invalidRequired = $supplier->documents()
                 ->where('is_current', true)
-                ->where('required_for_accreditation', true)
+                ->when(! $profileReview, fn ($query) => $query->where('required_for_accreditation', true))
                 ->where(function ($query): void {
                     $query->where('verification_status', '!=', SupplierDocumentStatus::Verified->value)
                         ->orWhere(fn ($expiry) => $expiry->whereNotNull('expires_at')->whereDate('expires_at', '<', today()));
@@ -175,11 +316,56 @@ class SupplierManagementService
             if ($invalidRequired) {
                 throw ValidationException::withMessages(['accreditation' => 'Required accreditation documents must be verified and current before approval.']);
             }
+            if ($profileReview && ! $supplier->documents()->where('is_current', true)->exists()) {
+                throw ValidationException::withMessages(['accreditation' => 'At least one current supporting document is required before approval.']);
+            }
 
             $review = $supplier->accreditations()->where('status', SupplierAccreditationStatus::PendingReview->value)->latest('cycle_number')->lockForUpdate()->firstOrFail();
             $review->update(['status' => SupplierAccreditationStatus::Approved, 'decided_by' => $actor->id, 'decided_at' => now(), 'valid_from' => today(), 'expires_at' => $expiresAt, 'decision_notes' => $notes]);
-            $supplier->update(['accreditation_status' => SupplierAccreditationStatus::Approved, 'accreditation_expires_at' => $expiresAt, 'approved_by' => $actor->id, 'last_reviewed_at' => now()]);
-            $this->audit->log(AuditAction::ApprovedSupplier, $actor, 'Approved the supplier accreditation.', $supplier, $supplier->name, newValues: ['cycle_number' => $review->cycle_number, 'accreditation_status' => 'approved', 'expires_at' => $expiresAt]);
+            if ($profileReview) {
+                $profile = $supplier->company_profile_draft;
+                $profile['identity_key'] = $this->identityKey($profile);
+                $this->ensureIdentityIsUnique($profile['identity_key'], $supplier);
+                $supplier->fill(Arr::only($profile, [...self::COMPANY_PROFILE_FIELDS, 'identity_key']));
+                $supplier->contacts()->update(['is_primary' => false]);
+                $supplier->contacts()->create([
+                    'name' => User::composeName(
+                        $profile['contact_first_name'] ?? null,
+                        $profile['contact_middle_name'] ?? null,
+                        $profile['contact_surname'] ?? null,
+                    ) ?: $profile['contact_person'],
+                    'contact_type' => 'primary',
+                    'position' => $profile['contact_position'],
+                    'email' => $profile['email'],
+                    'phone' => $profile['phone'],
+                    'is_primary' => true,
+                    'is_active' => true,
+                ]);
+            }
+            $supplier->forceFill([
+                'accreditation_status' => SupplierAccreditationStatus::Approved,
+                'company_profile_status' => SupplierCompanyProfileStatus::Approved,
+                'company_profile_draft' => null,
+                'company_profile_feedback' => null,
+                'company_profile_reviewed_at' => now(),
+                'company_profile_reviewed_by' => $actor->id,
+                'accreditation_expires_at' => $expiresAt ?? $supplier->accreditation_expires_at,
+                'approved_by' => $actor->id,
+                'last_reviewed_at' => now(),
+            ])->save();
+            $this->audit->log(
+                $profileReview ? AuditAction::ApprovedSupplierProfile : AuditAction::ApprovedSupplier,
+                $actor,
+                $profileReview ? 'Approved the supplier company profile submission.' : 'Approved the supplier accreditation.',
+                $supplier,
+                $supplier->name,
+                newValues: [
+                    'cycle_number' => $review->cycle_number,
+                    'company_profile_status' => $supplier->company_profile_status->value,
+                    'accreditation_status' => $supplier->accreditation_status->value,
+                    'expires_at' => $supplier->accreditation_expires_at?->toDateString(),
+                ],
+            );
 
             return $supplier->fresh();
         });
@@ -191,10 +377,34 @@ class SupplierManagementService
             $supplier = Supplier::query()->whereKey($supplier->getKey())->lockForUpdate()->firstOrFail();
             $this->requirePendingReview($supplier);
             $this->requireIndependentDecision($supplier, $actor);
+            $profileReview = $supplier->company_profile_status === SupplierCompanyProfileStatus::PendingReview
+                && is_array($supplier->company_profile_draft);
             $review = $supplier->accreditations()->where('status', SupplierAccreditationStatus::PendingReview->value)->latest('cycle_number')->lockForUpdate()->firstOrFail();
             $review->update(['status' => SupplierAccreditationStatus::Rejected, 'decided_by' => $actor->id, 'decided_at' => now(), 'decision_notes' => $notes]);
-            $supplier->update(['accreditation_status' => SupplierAccreditationStatus::Rejected, 'approved_by' => null, 'accreditation_expires_at' => null, 'last_reviewed_at' => now()]);
-            $this->audit->log(AuditAction::RejectedSupplier, $actor, 'Rejected the supplier accreditation.', $supplier, $supplier->name, newValues: ['cycle_number' => $review->cycle_number, 'accreditation_status' => 'rejected', 'reason' => $notes]);
+            $wasApproved = $supplier->accreditation_status === SupplierAccreditationStatus::Approved;
+            $supplier->update([
+                'accreditation_status' => $wasApproved ? SupplierAccreditationStatus::Approved : SupplierAccreditationStatus::Rejected,
+                'company_profile_status' => SupplierCompanyProfileStatus::Rejected,
+                'company_profile_feedback' => $notes,
+                'company_profile_reviewed_at' => now(),
+                'company_profile_reviewed_by' => $actor->id,
+                'approved_by' => $wasApproved ? $supplier->approved_by : null,
+                'accreditation_expires_at' => $wasApproved ? $supplier->accreditation_expires_at : null,
+                'last_reviewed_at' => now(),
+            ]);
+            $this->audit->log(
+                $profileReview ? AuditAction::RejectedSupplierProfile : AuditAction::RejectedSupplier,
+                $actor,
+                $profileReview ? 'Rejected the supplier company profile submission.' : 'Rejected the supplier accreditation.',
+                $supplier,
+                $supplier->name,
+                newValues: [
+                    'cycle_number' => $review->cycle_number,
+                    'company_profile_status' => $supplier->company_profile_status->value,
+                    'accreditation_status' => $supplier->accreditation_status->value,
+                    'reason' => $notes,
+                ],
+            );
 
             return $supplier->fresh();
         });
@@ -276,8 +486,17 @@ class SupplierManagementService
 
     private function requirePendingReview(Supplier $supplier): void
     {
-        if ($supplier->accreditation_status !== SupplierAccreditationStatus::PendingReview) {
+        if ($supplier->accreditation_status !== SupplierAccreditationStatus::PendingReview
+            && ! ($supplier->accreditation_status === SupplierAccreditationStatus::Approved
+                && $supplier->company_profile_status === SupplierCompanyProfileStatus::PendingReview)) {
             throw ValidationException::withMessages(['accreditation' => 'The supplier is not pending accreditation review.']);
+        }
+    }
+
+    private function requirePendingCompanyProfile(Supplier $supplier): void
+    {
+        if ($supplier->company_profile_status !== SupplierCompanyProfileStatus::PendingReview) {
+            throw ValidationException::withMessages(['profile' => 'The supplier company profile is not pending review.']);
         }
     }
 

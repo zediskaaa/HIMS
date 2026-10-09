@@ -12,6 +12,7 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\PasswordResetOtpController;
+use App\Http\Controllers\Auth\SupplierInvitationController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Middleware\ValidateEmailVerificationSignature;
 use App\Support\AuthenticationPanel;
@@ -40,6 +41,10 @@ Route::get('verify-email/{id}/{hash}', VerifyEmailController::class)
     ->name('verification.verify');
 
 Route::middleware(['guest:web', 'guest:admin', 'guest:super_admin'])->group(function () {
+    Route::get('supplier-invitations/{token}', SupplierInvitationController::class)
+        ->where('token', '[A-Za-z0-9]{64}')
+        ->middleware('throttle:10,1')
+        ->name('supplier-invitations.accept');
     Route::get('activate-account', [AccountActivationController::class, 'start'])->name('activation.start');
     Route::post('activate-account', [AccountActivationController::class, 'identify'])
         ->middleware('throttle:6,1')

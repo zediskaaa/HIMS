@@ -2195,6 +2195,19 @@ const startLoadingIndicators = () => {
         }
 
         if (submitter) {
+            // Native form.submit() skips submitter overrides, so preserve the
+            // clicked button's endpoint and submission settings before loading.
+            [
+                ['formaction', 'action'],
+                ['formmethod', 'method'],
+                ['formenctype', 'enctype'],
+                ['formtarget', 'target'],
+            ].forEach(([buttonAttribute, formAttribute]) => {
+                if (submitter.hasAttribute(buttonAttribute)) {
+                    form.setAttribute(formAttribute, submitter.getAttribute(buttonAttribute) ?? '');
+                }
+            });
+
             const label = loadingLabelFor(submitter, form);
             setButtonLoading(submitter, label);
             if (form.matches('[data-show-overlay]') || submitter.matches('[data-show-overlay]')) {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\AuditAction;
 use App\Enums\Permission;
 use App\Enums\SupplierAccreditationStatus;
+use App\Enums\SupplierCompanyProfileStatus;
 use App\Enums\SupplierStatus;
 use App\Enums\UnitOfMeasure;
 use App\Enums\UserRole;
@@ -19,12 +20,14 @@ use App\Models\Supplier;
 use App\Models\SupplierContract;
 use App\Models\SupplierDiscrepancy;
 use App\Models\SupplierDocument;
+use App\Models\SupplierInvitation;
 use App\Models\SupplierPrice;
 use App\Models\SupplierProduct;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\FileContentValidator;
 use App\Services\SupplierManagementService;
+use App\Services\SupplierInvitationService;
 use App\Services\UserAccountService;
 use App\Support\MetricDetails;
 use App\Support\SuperAdminPasswordConfirmation;
@@ -49,6 +52,7 @@ class SupplierController extends Controller implements HasMiddleware
         private readonly AuditLogger $audit,
         private readonly FileContentValidator $fileContentValidator,
         private readonly UserAccountService $accounts,
+        private readonly SupplierInvitationService $invitations,
     ) {}
 
     public static function middleware(): array
@@ -58,7 +62,6 @@ class SupplierController extends Controller implements HasMiddleware
             new Middleware('can:'.Permission::ViewSuppliers->value, only: ['index', 'show', 'showLogo']),
             new Middleware('can:'.Permission::ViewSupplierSensitiveData->value, only: ['downloadDocument']),
             new Middleware('can:'.Permission::ManageSuppliers->value, only: [
-                'store',
                 'update',
                 'updateLogo',
                 'destroyLogo',
@@ -77,7 +80,8 @@ class SupplierController extends Controller implements HasMiddleware
             ]),
             new Middleware('can:'.Permission::ReviewSupplierCompliance->value, only: ['submitForReview', 'verifyDocument']),
             new Middleware('can:'.Permission::ApproveSuppliers->value, only: ['approve', 'reject', 'suspend', 'inactivate', 'reactivate']),
-            new Middleware('can:'.Permission::ApproveSuppliers->value, only: ['inviteUser', 'updatePortalUser']),
+            new Middleware('can:'.Permission::ApproveSuppliers->value, only: ['requestProfileChanges']),
+            new Middleware('can:'.Permission::ApproveSuppliers->value, only: ['inviteUser', 'resendInvitation', 'revokeInvitation', 'updatePortalUser']),
         ];
     }
 
@@ -281,6 +285,7 @@ class SupplierController extends Controller implements HasMiddleware
             'supplierMetricDetails' => $supplierMetricDetails,
             'canViewProcurement' => $canViewProcurement,
             'canViewSensitiveData' => $canViewSensitiveData,
+            'canInitiateSupplierInvitation' => $request->user()->can(Permission::ApproveSuppliers->value),
         ]);
     }
 
@@ -288,7 +293,45 @@ class SupplierController extends Controller implements HasMiddleware
     {
         $validated = $request->validated();
         $logoFile = $request->file('logo');
-        unset($validated['logo']);
+        $sendInvitation = (bool) ($validated['send_invitation'] ?? false);
+        $invitationData = [
+            'first_name' => $validated['invitation_first_name'] ?? null,
+            'surname' => $validated['invitation_surname'] ?? null,
+            'email' => $validated['invitation_email'] ?? null,
+            'phone' => $validated['invitation_phone'] ?? null,
+        ];
+        unset(
+            $validated['logo'],
+            $validated['send_invitation'],
+            $validated['invitation_first_name'],
+            $validated['invitation_surname'],
+            $validated['invitation_email'],
+            $validated['invitation_phone'],
+        );
+
+        if ($sendInvitation) {
+            abort_unless($request->user()->can(Permission::ApproveSuppliers->value), 403);
+            $validated['email'] = $validated['email'] ?? $invitationData['email'];
+
+            [$supplier, $prepared] = DB::transaction(function () use ($validated, $invitationData, $request): array {
+                $supplier = $this->suppliers->create($validated, $request->user());
+
+                return [$supplier, $this->invitations->prepare($supplier, $invitationData, $request->user())];
+            }, 3);
+            $delivered = $this->invitations->deliver(
+                $prepared['invitation'],
+                $prepared['token'],
+                $request->user(),
+            );
+
+            $redirect = redirect()
+                ->route('inventory.suppliers.show', $supplier)
+                ->withFragment('supplier-portal-access');
+
+            return $delivered
+                ? $redirect->with('success', 'Draft supplier created and the Vendor Administrator invitation was sent.')
+                : $redirect->with('warning', 'Draft supplier and pending account were created, but the invitation email could not be delivered. Use Resend Invitation to retry.');
+        }
 
         $supplier = $this->suppliers->create($validated, $request->user());
 
@@ -341,36 +384,70 @@ class SupplierController extends Controller implements HasMiddleware
             'recentAudit' => request()->user()->can(Permission::ViewAuditTrail->value)
                 ? AuditLog::query()->where('target_type', $supplier->getMorphClass())->where('target_id', (string) $supplier->id)->latest()->limit(20)->get()
                 : collect(),
-            'portalUsers' => $supplier->users()->orderBy('name')->get(),
+            'portalUsers' => $supplier->users()->with('supplierInvitation')->orderBy('name')->get(),
         ]);
     }
 
     public function inviteUser(Request $request, Supplier $supplier): RedirectResponse
     {
-        abort_unless($supplier->isProcurementEligible(), 422, 'Only approved, active, compliant suppliers may receive portal invitations.');
+        abort_unless($supplier->status === SupplierStatus::Active, 422, 'Only active supplier records may receive portal invitations.');
+
+        $allowedRoles = $supplier->isProcurementEligible()
+            ? [UserRole::VendorAdministrator->value, UserRole::VendorOperations->value, UserRole::VendorFinance->value]
+            : [UserRole::VendorAdministrator->value];
 
         $data = $request->validate([
             'first_name' => ['required', 'string', 'max:100'],
             'surname' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'role' => ['required', Rule::enum(UserRole::class), Rule::in([
-                UserRole::VendorAdministrator->value,
-                UserRole::VendorOperations->value,
-                UserRole::VendorFinance->value,
-            ])],
+            'phone' => [
+                'bail',
+                'nullable',
+                'string',
+                'digits:11',
+                'regex:/^09[0-9]{9}$/',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (User::query()->wherePhoneNumber($value)->exists()) {
+                        $fail('This mobile phone number is already assigned to another account.');
+                    }
+                },
+            ],
+            'role' => ['required', Rule::enum(UserRole::class), Rule::in($allowedRoles)],
         ]);
 
-        $user = $this->accounts->create([
-            ...$data,
-            'supplier_id' => $supplier->id,
-            'department' => 'External Supplier',
-        ], $request->user());
+        $result = $this->invitations->invite($supplier, $data, $request->user());
+
+        $redirect = redirect()
+            ->route('inventory.suppliers.show', $supplier)
+            ->withFragment('supplier-portal-access');
+
+        return $result['delivered']
+            ? $redirect->with('success', "Invitation sent to {$data['email']}. Ask the recipient to check their inbox and spam folder.")
+            : $redirect->with('warning', 'The pending supplier account was created, but the invitation email could not be delivered. Use Resend Invitation to retry.');
+    }
+
+    public function resendInvitation(Request $request, Supplier $supplier, SupplierInvitation $invitation): RedirectResponse
+    {
+        abort_unless($invitation->supplier_id === $supplier->id, 404);
+        $delivered = $this->invitations->resend($invitation, $request->user());
 
         return redirect()
             ->route('inventory.suppliers.show', $supplier)
             ->withFragment('supplier-portal-access')
-            ->with('success', "Invitation created for {$user->email}. The activation email was submitted for delivery; ask the recipient to check their inbox and spam folder.");
+            ->with($delivered ? 'success' : 'warning', $delivered
+                ? 'A new supplier invitation was sent and the previous link was replaced.'
+                : 'The invitation could not be delivered. The pending account was preserved so you can retry.');
+    }
+
+    public function revokeInvitation(Request $request, Supplier $supplier, SupplierInvitation $invitation): RedirectResponse
+    {
+        abort_unless($invitation->supplier_id === $supplier->id, 404);
+        $this->invitations->revoke($invitation, $request->user());
+
+        return redirect()
+            ->route('inventory.suppliers.show', $supplier)
+            ->withFragment('supplier-portal-access')
+            ->with('success', 'Supplier invitation revoked. Its activation link can no longer be used.');
     }
 
     public function updatePortalUser(Request $request, Supplier $supplier, User $portalUser): RedirectResponse
@@ -720,22 +797,49 @@ class SupplierController extends Controller implements HasMiddleware
 
     public function approve(Request $request, Supplier $supplier): RedirectResponse
     {
+        $profileReview = $supplier->company_profile_status === SupplierCompanyProfileStatus::PendingReview;
+        $profileAmendment = $profileReview && $supplier->accreditation_status === SupplierAccreditationStatus::Approved;
         $data = $request->validate([
             'compliance_attested' => ['accepted'],
             'expires_at' => ['nullable', 'date', 'after_or_equal:today'],
+            'approval_notes' => ['nullable', 'string', 'max:2000'],
             'decision_notes' => ['nullable', 'string', 'max:2000'],
         ]);
-        $this->suppliers->approve($supplier, $request->user(), $data['expires_at'] ?? null, $data['decision_notes'] ?? null);
+        $this->suppliers->approve($supplier, $request->user(), $data['expires_at'] ?? null, $data['approval_notes'] ?? $data['decision_notes'] ?? null);
 
-        return back()->with('success', 'Supplier accreditation approved.');
+        return back()->with('success', match (true) {
+            $profileAmendment => 'Supplier company profile amendment approved; accreditation remains active.',
+            $profileReview => 'Supplier company profile and accreditation approved.',
+            default => 'Supplier accreditation approved.',
+        });
     }
 
     public function reject(Request $request, Supplier $supplier): RedirectResponse
     {
-        $data = $request->validate(['decision_notes' => ['required', 'string', 'max:2000']]);
-        $this->suppliers->reject($supplier, $request->user(), $data['decision_notes']);
+        $profileReview = $supplier->company_profile_status === SupplierCompanyProfileStatus::PendingReview;
+        $profileAmendment = $profileReview && $supplier->accreditation_status === SupplierAccreditationStatus::Approved;
+        $data = $request->validate([
+            'rejection_notes' => ['nullable', 'required_without:decision_notes', 'string', 'max:2000'],
+            'decision_notes' => ['nullable', 'required_without:rejection_notes', 'string', 'max:2000'],
+        ]);
+        $this->suppliers->reject($supplier, $request->user(), $data['rejection_notes'] ?? $data['decision_notes']);
 
-        return back()->with('success', 'Supplier accreditation rejected with a recorded reason.');
+        return back()->with('success', match (true) {
+            $profileAmendment => 'Supplier company profile amendment rejected; verified data and accreditation remain unchanged.',
+            $profileReview => 'Supplier company profile and accreditation rejected with a recorded reason.',
+            default => 'Supplier accreditation rejected with a recorded reason.',
+        });
+    }
+
+    public function requestProfileChanges(Request $request, Supplier $supplier): RedirectResponse
+    {
+        $data = $request->validate([
+            'correction_notes' => ['nullable', 'required_without:decision_notes', 'string', 'max:2000'],
+            'decision_notes' => ['nullable', 'required_without:correction_notes', 'string', 'max:2000'],
+        ]);
+        $this->suppliers->requestCompanyProfileChanges($supplier, $request->user(), $data['correction_notes'] ?? $data['decision_notes']);
+
+        return back()->with('success', 'Supplier profile returned for corrections.');
     }
 
     public function suspend(Request $request, Supplier $supplier): RedirectResponse

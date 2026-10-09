@@ -22,7 +22,7 @@ use App\Models\SourcingRfq;
 use App\Models\Supplier;
 use App\Models\SupplierDiscrepancy;
 use App\Models\User;
-use App\Notifications\AccountCreated;
+use App\Notifications\SupplierInvitationNotification;
 use App\Support\DemoPdfBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -53,7 +53,7 @@ class SupplierPortalWorkflowTest extends TestCase
         $this->post(route('inventory.suppliers.portal-users.store', $supplier), [
             'first_name' => 'Ana', 'surname' => 'Vendor', 'email' => 'ana@supplier.test', 'role' => UserRole::VendorAdministrator->value,
         ])->assertRedirect(route('inventory.suppliers.show', $supplier).'#supplier-portal-access')
-            ->assertSessionHas('success', 'Invitation created for ana@supplier.test. The activation email was submitted for delivery; ask the recipient to check their inbox and spam folder.');
+            ->assertSessionHas('success', 'Invitation sent to ana@supplier.test. Ask the recipient to check their inbox and spam folder.');
 
         $this->assertDatabaseHas('users', [
             'supplier_id' => $supplier->id,
@@ -75,20 +75,20 @@ class SupplierPortalWorkflowTest extends TestCase
 
         $this->get(route('inventory.suppliers.show', $supplier))
             ->assertOk()
-            ->assertSee('Resend Activation')
+            ->assertSee('Resend Invitation')
             ->assertSee('Edit Invitation')
             ->assertSee('Manage supplier account')
             ->assertSee('Advanced settings')
-            ->assertSee('data-confirm-title="Resend activation email?"', false)
+            ->assertSee('data-confirm-title="Resend supplier invitation?"', false)
             ->assertSee('data-confirm-title="Confirm supplier account changes"', false)
             ->assertSee('x-bind:disabled="!hasAccountChanges()"', false);
 
-        $this->post(route('admin.users.verification.send', $invitedUser), [
-            'return_to_supplier' => '1',
-        ])->assertRedirect(route('inventory.suppliers.show', $supplier).'#supplier-portal-access')
-            ->assertSessionHas('success', 'A new activation email was sent to ana@supplier.test.');
+        $invitation = $invitedUser->supplierInvitation()->firstOrFail();
+        $this->post(route('inventory.suppliers.invitations.resend', [$supplier, $invitation]))
+            ->assertRedirect(route('inventory.suppliers.show', $supplier).'#supplier-portal-access')
+            ->assertSessionHas('success', 'A new supplier invitation was sent and the previous link was replaced.');
 
-        Notification::assertSentToTimes($invitedUser, AccountCreated::class, 2);
+        Notification::assertSentToTimes($invitedUser, SupplierInvitationNotification::class, 2);
     }
 
     public function test_existing_supplier_employee_identifiers_are_backfilled_without_changing_staff_ids(): void

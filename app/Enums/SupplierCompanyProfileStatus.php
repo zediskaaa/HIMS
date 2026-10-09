@@ -2,14 +2,13 @@
 
 namespace App\Enums;
 
-enum SupplierAccreditationStatus: string
+enum SupplierCompanyProfileStatus: string
 {
     case Draft = 'draft';
     case PendingReview = 'pending_review';
     case ChangesRequested = 'changes_requested';
     case Approved = 'approved';
     case Rejected = 'rejected';
-    case Expired = 'expired';
 
     public function label(): string
     {
@@ -19,12 +18,6 @@ enum SupplierAccreditationStatus: string
             self::ChangesRequested => 'Changes Requested',
             self::Approved => 'Approved',
             self::Rejected => 'Rejected',
-            self::Expired => 'Expired',
         };
-    }
-
-    public static function options(): array
-    {
-        return collect(self::cases())->mapWithKeys(fn (self $status) => [$status->value => $status->label()])->all();
     }
 }

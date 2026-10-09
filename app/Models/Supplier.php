@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\SupplierAccreditationStatus;
+use App\Enums\SupplierCompanyProfileStatus;
 use App\Enums\SupplierDocumentStatus;
 use App\Enums\SupplierStatus;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,6 +29,12 @@ class Supplier extends Model
         'identity_key',
         'status',
         'accreditation_status',
+        'company_profile_status',
+        'company_profile_draft',
+        'company_profile_feedback',
+        'company_profile_submitted_at',
+        'company_profile_reviewed_at',
+        'company_profile_reviewed_by',
         'accreditation_expires_at',
         'standard_lead_time_days',
         'payment_terms',
@@ -48,6 +55,10 @@ class Supplier extends Model
             'provides_regulated_health_products' => 'boolean',
             'status' => SupplierStatus::class,
             'accreditation_status' => SupplierAccreditationStatus::class,
+            'company_profile_status' => SupplierCompanyProfileStatus::class,
+            'company_profile_draft' => 'encrypted:array',
+            'company_profile_submitted_at' => 'datetime',
+            'company_profile_reviewed_at' => 'datetime',
             'accreditation_expires_at' => 'date',
             'standard_lead_time_days' => 'integer',
             'last_reviewed_at' => 'datetime',
@@ -105,6 +116,11 @@ class Supplier extends Model
         return $this->hasMany(User::class);
     }
 
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(SupplierInvitation::class);
+    }
+
     public function latestApprovedScorecard(): HasOne
     {
         return $this->hasOne(SupplierScorecard::class)
@@ -120,6 +136,31 @@ class Supplier extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function companyProfileReviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'company_profile_reviewed_by');
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Supplier $supplier): void {
+            if (array_key_exists('company_profile_status', $supplier->getAttributes())) {
+                return;
+            }
+
+            $accreditation = $supplier->accreditation_status instanceof SupplierAccreditationStatus
+                ? $supplier->accreditation_status
+                : SupplierAccreditationStatus::tryFrom((string) $supplier->accreditation_status);
+
+            $supplier->company_profile_status = match ($accreditation) {
+                SupplierAccreditationStatus::Approved => SupplierCompanyProfileStatus::Approved,
+                SupplierAccreditationStatus::PendingReview => SupplierCompanyProfileStatus::PendingReview,
+                SupplierAccreditationStatus::Rejected => SupplierCompanyProfileStatus::Rejected,
+                default => SupplierCompanyProfileStatus::Draft,
+            };
+        });
     }
 
     public function approver(): BelongsTo

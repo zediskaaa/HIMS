@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\UserStatus;
 use App\Models\AccountActivationChallenge;
+use App\Models\SupplierInvitation;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -217,6 +218,15 @@ class AccountActivationService
             );
 
             $challenge->forceFill(['consumed_at' => now()])->save();
+
+            SupplierInvitation::query()
+                ->where('user_id', $lockedUser->getKey())
+                ->where('status', SupplierInvitation::STATUS_PENDING)
+                ->update([
+                    'status' => SupplierInvitation::STATUS_ACCEPTED,
+                    'accepted_at' => now(),
+                    'updated_at' => now(),
+                ]);
 
             return $activated;
         }, 3);

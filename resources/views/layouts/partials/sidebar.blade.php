@@ -43,6 +43,9 @@
         @php
             $supplierNavigation = [
                 ['route' => 'supplier.dashboard', 'pattern' => 'supplier.dashboard', 'label' => 'Dashboard', 'icon' => 'home'],
+                ...(auth()->user()->can(\App\Enums\Permission::SupplierManageProfile->value)
+                    ? [['route' => 'supplier.company-profile.edit', 'pattern' => 'supplier.company-profile.*', 'label' => 'Company Profile', 'icon' => 'building-office-2']]
+                    : []),
                 ['route' => 'supplier.orders.index', 'pattern' => 'supplier.orders.*', 'label' => 'Purchase Orders', 'icon' => 'clipboard-document-list'],
                 ['route' => 'supplier.rfqs.index', 'pattern' => 'supplier.rfqs.*', 'label' => 'RFQs', 'icon' => 'scale'],
                 ['route' => 'supplier.discrepancies.index', 'pattern' => 'supplier.discrepancies.*', 'label' => 'Discrepancies', 'icon' => 'exclamation-triangle'],

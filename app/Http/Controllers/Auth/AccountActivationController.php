@@ -6,6 +6,7 @@ use App\Enums\AuditAction;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\SupplierInvitation;
 use App\Notifications\AccountActivationOtp;
 use App\Rules\PasswordStandard;
 use App\Services\AccountActivationService;
@@ -253,6 +254,9 @@ class AccountActivationController extends Controller
             'password.confirmed' => PasswordStandard::CONFIRMATION_MESSAGE,
         ]);
         $user = $this->verifiedUser($request);
+        $pendingSupplierInvitation = $user?->supplierInvitation()
+            ->where('status', SupplierInvitation::STATUS_PENDING)
+            ->first();
         $activated = $user === null ? null : $activation->complete($user, $validated['password']);
 
         if ($activated === null) {
@@ -271,6 +275,19 @@ class AccountActivationController extends Controller
             targetName: $activated->name,
             source: 'user',
         );
+
+        if ($pendingSupplierInvitation !== null) {
+            $pendingSupplierInvitation->refresh()->load('supplier');
+            $audit->record(
+                AuditAction::AcceptedSupplierInvitation,
+                actor: $activated,
+                target: $pendingSupplierInvitation,
+                description: 'Accepted the supplier registration invitation and activated the Vendor Administrator account.',
+                targetName: $pendingSupplierInvitation->supplier->name,
+                newValues: ['supplier_id' => $pendingSupplierInvitation->supplier_id, 'status' => SupplierInvitation::STATUS_ACCEPTED],
+                source: 'user',
+            );
+        }
 
         $request->session()->forget(['account_activation']);
         $request->session()->regenerateToken();

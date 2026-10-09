@@ -1334,7 +1334,10 @@ INSERT INTO `migrations` VALUES
 (87,'2026_10_01_000001_create_account_activation_challenges',1),
 (88,'2026_10_02_000001_create_user_avatars_table',1),
 (89,'2026_10_02_000002_add_activation_cancellation_to_users_table',1),
-(90,'2026_10_06_000001_add_supplier_portal_workflow',1);
+(90,'2026_10_06_000001_add_supplier_portal_workflow',1),
+(91,'2026_10_07_000001_assign_supplier_user_identifiers',1),
+(92,'2026_10_09_000001_add_company_profile_workflow_to_suppliers',1),
+(93,'2026_10_09_000002_create_supplier_invitations_table',1);
 /*!40000 ALTER TABLE `migrations` ENABLE KEYS */;
 
 --
@@ -3386,6 +3389,75 @@ ALTER TABLE `supplier_products`
     ADD COLUMN `vmi_max` INT UNSIGNED NULL AFTER `vmi_min`,
     ADD INDEX `supplier_products_supplier_id_approval_status_index`
         (`supplier_id`, `approval_status`);
+
+--
+-- Supplier company profile workflow schema
+--
+
+ALTER TABLE `suppliers`
+    ADD COLUMN `company_profile_status` VARCHAR(30) NOT NULL DEFAULT 'draft'
+        AFTER `accreditation_status`,
+    ADD COLUMN `company_profile_draft` LONGTEXT NULL
+        AFTER `company_profile_status`,
+    ADD COLUMN `company_profile_feedback` TEXT NULL
+        AFTER `company_profile_draft`,
+    ADD COLUMN `company_profile_submitted_at` TIMESTAMP NULL
+        AFTER `company_profile_feedback`,
+    ADD COLUMN `company_profile_reviewed_at` TIMESTAMP NULL
+        AFTER `company_profile_submitted_at`,
+    ADD COLUMN `company_profile_reviewed_by` BIGINT UNSIGNED NULL
+        AFTER `company_profile_reviewed_at`,
+    ADD INDEX `suppliers_company_profile_status_index`
+        (`company_profile_status`),
+    ADD CONSTRAINT `suppliers_company_profile_reviewed_by_foreign`
+        FOREIGN KEY (`company_profile_reviewed_by`) REFERENCES `users` (`id`)
+        ON DELETE SET NULL;
+
+UPDATE `suppliers`
+SET `company_profile_status` = CASE `accreditation_status`
+    WHEN 'approved' THEN 'approved'
+    WHEN 'pending_review' THEN 'pending_review'
+    WHEN 'rejected' THEN 'rejected'
+    ELSE `company_profile_status`
+END;
+
+--
+-- Invitation-only supplier onboarding schema
+--
+
+DROP TABLE IF EXISTS `supplier_invitations`;
+CREATE TABLE `supplier_invitations` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `supplier_id` bigint unsigned NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `invited_by` bigint unsigned DEFAULT NULL,
+  `revoked_by` bigint unsigned DEFAULT NULL,
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `token_hash` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `delivery_status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `delivery_attempts` smallint unsigned NOT NULL DEFAULT '0',
+  `invited_at` timestamp NOT NULL,
+  `sent_at` timestamp NULL DEFAULT NULL,
+  `delivery_failed_at` timestamp NULL DEFAULT NULL,
+  `opened_at` timestamp NULL DEFAULT NULL,
+  `accepted_at` timestamp NULL DEFAULT NULL,
+  `revoked_at` timestamp NULL DEFAULT NULL,
+  `expires_at` timestamp NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,
+  UNIQUE KEY `supplier_invitations_user_id_unique` (`user_id`),
+  UNIQUE KEY `supplier_invitations_token_hash_unique` (`token_hash`),
+  KEY `supplier_invitations_supplier_id_status_index` (`supplier_id`,`status`),
+  KEY `supplier_invitations_status_expires_at_index` (`status`,`expires_at`),
+  KEY `supplier_invitations_invited_by_foreign` (`invited_by`),
+  KEY `supplier_invitations_revoked_by_foreign` (`revoked_by`),
+  CONSTRAINT `supplier_invitations_supplier_id_foreign` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `supplier_invitations_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `supplier_invitations_invited_by_foreign` FOREIGN KEY (`invited_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `supplier_invitations_revoked_by_foreign` FOREIGN KEY (`revoked_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================================
 -- Restore global state

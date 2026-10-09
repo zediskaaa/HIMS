@@ -13,6 +13,7 @@ use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
 use App\Notifications\AccountCreated;
 use App\Services\UserAccountService;
+use App\Services\SupplierInvitationService;
 use App\Support\AuthenticationContext;
 use App\Support\SuperAdminPasswordConfirmation;
 use Illuminate\Http\JsonResponse;
@@ -27,7 +28,10 @@ use Illuminate\View\View;
 
 class UserController extends Controller implements HasMiddleware
 {
-    public function __construct(private readonly UserAccountService $accounts) {}
+    public function __construct(
+        private readonly UserAccountService $accounts,
+        private readonly SupplierInvitationService $supplierInvitations,
+    ) {}
 
     /**
      * Every action here is administrator-only. Declaring it on the controller
@@ -286,6 +290,15 @@ class UserController extends Controller implements HasMiddleware
         }
 
         if ($user->isPendingActivation()) {
+            $supplierInvitation = $user->supplierInvitation;
+            if ($supplierInvitation?->canResend()) {
+                $delivered = $this->supplierInvitations->resend($supplierInvitation, $request->user());
+
+                return $redirect->with($delivered ? 'success' : 'warning', $delivered
+                    ? sprintf('A new supplier invitation was sent to %s.', $user->email)
+                    : 'The supplier invitation could not be delivered. The pending account was preserved for retry.');
+            }
+
             $user->notify(new AccountCreated);
 
             return $redirect->with('success', sprintf('A new activation email was sent to %s.', $user->email));

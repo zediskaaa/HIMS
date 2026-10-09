@@ -66,9 +66,11 @@
                 </div>
             </x-slot:header>
             <x-slot:actions>
-                @can(\App\Enums\Permission::ManageSuppliers->value)
-                    <x-ui.button icon="plus" x-data x-on:click="$dispatch('open-modal', 'create-supplier')">Add Supplier</x-ui.button>
-                @endcan
+                @canany([\App\Enums\Permission::ManageSuppliers->value, \App\Enums\Permission::ApproveSuppliers->value])
+                    <x-ui.button icon="plus" x-data x-on:click="$dispatch('open-modal', 'create-supplier')">
+                        {{ $canInitiateSupplierInvitation ? 'Add & Invite Supplier' : 'Add Supplier' }}
+                    </x-ui.button>
+                @endcanany
             </x-slot:actions>
 
             <form method="GET" action="{{ route('inventory.suppliers') }}" class="border-b border-neutral-200 p-3 sm:p-4" role="search">
@@ -513,11 +515,73 @@
         </aside>
     </div>
 
-    @can(\App\Enums\Permission::ManageSuppliers->value)
-        <x-ui.modal name="create-supplier" title="Add supplier" maxWidth="2xl">
-            @if ($errors->any() && old('_supplier_form') === 'create')
-                <x-ui.alert variant="danger" title="Supplier could not be created" class="mb-4">Review the highlighted fields and try again.</x-ui.alert>
-            @endif
+    @canany([\App\Enums\Permission::ManageSuppliers->value, \App\Enums\Permission::ApproveSuppliers->value])
+        <x-ui.modal name="create-supplier" :title="$canInitiateSupplierInvitation ? 'Add & invite supplier' : 'Add supplier'" maxWidth="2xl">
+            @if ($canInitiateSupplierInvitation)
+                <p class="mb-5 text-sm leading-6 text-neutral-600 dark:text-neutral-300">
+                    Create a draft supplier and invite its Vendor Administrator in one step. The supplier remains unapproved until its company profile and documents pass hospital review.
+                </p>
+                <form
+                    id="create-and-invite-supplier-form"
+                    method="POST"
+                    action="{{ route('inventory.suppliers.store') }}"
+                    class="space-y-5"
+                    novalidate
+                    x-data="{ canSubmit: false, refreshValidity() { this.$nextTick(() => this.canSubmit = this.$el.checkValidity()); } }"
+                    x-init="refreshValidity()"
+                    x-on:input="refreshValidity()"
+                    x-on:change="refreshValidity()"
+                    data-confirm-title="Create and invite supplier?"
+                    data-confirm-message="Create this draft supplier and email an expiring activation link to its Vendor Administrator? This does not approve the supplier for procurement."
+                    data-confirm-label="Create & Send Invitation"
+                >
+                    @csrf
+                    <input type="hidden" name="_supplier_form" value="create">
+                    <input type="hidden" name="send_invitation" value="1">
+
+                    <div>
+                        <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Supplier</h3>
+                        <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Start with the organization name. The invited administrator will complete the verified company profile.</p>
+                    </div>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="sm:col-span-2">
+                            <x-ui.field name="name" label="Initial company name" hint="Use the name shown in your supplier correspondence." required />
+                        </div>
+                        <x-ui.field name="trade_name" label="Trade name" hint="Optional, if already known." />
+                    </div>
+
+                    <div class="border-t border-neutral-200 pt-5 dark:border-neutral-800">
+                        <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Vendor Administrator</h3>
+                        <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">This person receives the invitation and completes the supplier profile.</p>
+                    </div>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <x-ui.field name="invitation_first_name" label="First name" required />
+                        <x-ui.field name="invitation_surname" label="Surname" required />
+                        <div class="sm:col-span-2">
+                            <x-ui.field name="invitation_email" label="Official invitation email" type="email" hint="The secure activation link will be sent here and expires after {{ config('auth.verification.expire', 60) }} minutes." required />
+                        </div>
+                        <div class="sm:col-span-2">
+                            <x-ui.field
+                                name="invitation_phone"
+                                label="Mobile number"
+                                inputmode="numeric"
+                                maxlength="11"
+                                pattern="09[0-9]{9}"
+                                placeholder="09XXXXXXXXX"
+                                hint="Optional. Use a unique 11-digit Philippine mobile number starting with 09."
+                            />
+                        </div>
+                    </div>
+
+                    <p class="text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
+                        The invitation creates a pending account only. Procurement access remains blocked until hospital approval. See the <a href="{{ route('privacy.notice', ['return' => url()->current()]) }}" target="_blank" rel="opener" class="font-medium text-primary-600 underline underline-offset-2 hover:text-primary-700">Privacy Notice</a>.
+                    </p>
+                    <div class="flex flex-col-reverse gap-2 border-t border-neutral-200 pt-4 sm:flex-row sm:justify-end dark:border-neutral-800">
+                        <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'create-supplier')">Cancel</x-ui.button>
+                        <x-ui.button type="submit" data-loading-text="Creating & sending..." disabled x-bind:disabled="!canSubmit">Create & Send Invitation</x-ui.button>
+                    </div>
+                </form>
+            @else
             <form
                 method="POST"
                 action="{{ route('inventory.suppliers.store') }}"
@@ -644,10 +708,11 @@
                     <x-ui.button type="submit" data-loading-text="Creating supplier...">Create Draft Supplier</x-ui.button>
                 </div>
             </form>
+            @endif
         </x-ui.modal>
 
         @if ($errors->any() && old('_supplier_form') === 'create')
             <div x-data x-init="$nextTick(() => $dispatch('open-modal', 'create-supplier'))"></div>
         @endif
-    @endcan
+    @endcanany
 </x-app-layout>

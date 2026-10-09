@@ -289,6 +289,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasOne(AccountActivationChallenge::class);
     }
 
+    public function supplierInvitation(): HasOne
+    {
+        return $this->hasOne(SupplierInvitation::class);
+    }
+
     public function storedAvatar(): HasOne
     {
         return $this->hasOne(UserAvatar::class);
