@@ -56,20 +56,34 @@
         ];
     @endphp
 
-    <x-ui.page-header
-        :title="$supplier->name"
-        :breadcrumbs="[
-            'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
-            'Suppliers' => route('inventory.suppliers'),
-            $supplier->name => null,
-        ]">
-        <x-slot:media>
-            <x-ui.supplier-logo :supplier="$supplier" size="xl" />
-        </x-slot:media>
-        <x-slot:actions>
-            <x-ui.button variant="secondary" :href="route('inventory.suppliers')" icon="arrow-left">Back to Suppliers</x-ui.button>
-        </x-slot:actions>
-    </x-ui.page-header>
+    <style>
+        [data-supplier-profile-header] .hims-page-header {
+            --hims-header-image: url('{{ asset('img/hims-supplier-management-hero-day.png') }}');
+            --hims-header-position: right 66%;
+        }
+
+        .dark [data-supplier-profile-header] .hims-page-header {
+            --hims-header-image: url('{{ asset('img/hims-supplier-management-hero-night.png') }}');
+        }
+    </style>
+
+    <div data-supplier-profile-header>
+        <x-ui.page-header
+            :title="$supplier->name"
+            subtitle="Supplier profile, onboarding evidence, and hospital review controls."
+            :breadcrumbs="[
+                'Home' => route(\App\Support\AuthenticationContext::dashboardRoute()),
+                'Suppliers' => route('inventory.suppliers'),
+                $supplier->name => null,
+            ]">
+            <x-slot:media>
+                <x-ui.supplier-logo :supplier="$supplier" size="xl" />
+            </x-slot:media>
+            <x-slot:actions>
+                <x-ui.button variant="secondary" :href="route('inventory.suppliers')" icon="arrow-left">Back to Suppliers</x-ui.button>
+            </x-slot:actions>
+        </x-ui.page-header>
+    </div>
 
     @if ($errors->any())
         <x-ui.alert variant="danger" class="mt-4" title="Operation refused">
@@ -82,40 +96,41 @@
     @endif
 
     @if ($canApprove && $supplier->status === \App\Enums\SupplierStatus::Active)
-        <x-ui.card id="supplier-portal-access" title="Supplier Portal Access" :subtitle="$supplier->isProcurementEligible() ? 'Hospital invitation-only accounts for this approved supplier.' : 'Invite a Vendor Administrator to complete the company profile before approval.'" class="mt-5 scroll-mt-24">
-            <x-slot:actions>
-                <x-ui.button
-                    type="button"
-                    size="sm"
-                    icon="plus"
-                    x-data
-                    x-on:click="$dispatch('open-modal', 'invite-supplier-user')"
-                >Invite supplier user</x-ui.button>
-            </x-slot:actions>
-
+        <x-ui.card id="supplier-portal-access" :padding="false" class="mt-5 scroll-mt-24 !rounded-2xl">
             @if($portalUsers->isNotEmpty())
-                <ul class="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
+                <ul class="divide-y divide-neutral-200 px-4 text-sm sm:px-5 dark:divide-neutral-800">
                     @foreach($portalUsers as $portalUser)
                         @php
                             $invitation = $portalUser->supplierInvitation;
+                            $portalUserInitials = collect(preg_split('/\s+/', trim($portalUser->name)))
+                                ->filter()
+                                ->take(2)
+                                ->map(fn (string $part) => str($part)->substr(0, 1)->upper())
+                                ->join('');
                         @endphp
-                        <li class="grid gap-3 py-4 md:grid-cols-2 md:items-center xl:grid-cols-5">
-                            <div class="min-w-0 xl:col-span-2">
-                                <p class="font-medium text-neutral-900 dark:text-neutral-100">{{ $portalUser->name }}</p>
-                                <p class="break-words text-xs text-neutral-500 dark:text-neutral-400">{{ $portalUser->email }}</p>
-                                @if($invitation)
-                                    <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                                        @if($invitation->accepted_at)
-                                            Accepted {{ $invitation->accepted_at->timezone(config('app.timezone'))->format('M d, Y g:i A') }}
-                                        @elseif($invitation->opened_at)
-                                            Opened {{ $invitation->opened_at->timezone(config('app.timezone'))->format('M d, Y g:i A') }} · Awaiting account setup
-                                        @elseif($invitation->sent_at)
-                                            Sent {{ $invitation->sent_at->timezone(config('app.timezone'))->format('M d, Y g:i A') }} · Expires {{ $invitation->expires_at->timezone(config('app.timezone'))->format('M d, Y g:i A') }}
-                                        @else
-                                            Delivery has not completed. The pending account is preserved for retry.
-                                        @endif
-                                    </p>
-                                @endif
+                        <li class="grid gap-4 py-4 md:grid-cols-2 md:items-center xl:grid-cols-5">
+                            <div class="flex min-w-0 items-center gap-3 xl:col-span-2">
+                                <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-50 text-sm font-bold text-primary-700 ring-1 ring-primary-100 dark:bg-primary-950 dark:text-primary-300 dark:ring-primary-900">{{ $portalUserInitials }}</span>
+                                <div class="min-w-0">
+                                    <p class="font-semibold text-neutral-950 dark:text-white">{{ $portalUser->name }}</p>
+                                    <p class="break-words text-xs text-neutral-500 dark:text-neutral-400">{{ $portalUser->email }}</p>
+                                    @if($invitation)
+                                        <p class="mt-1 flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+                                            <x-ui.icon name="calendar" class="h-3.5 w-3.5 shrink-0" />
+                                            <span>
+                                                @if($invitation->accepted_at)
+                                                    Accepted {{ $invitation->accepted_at->timezone(config('app.timezone'))->format('M d, Y g:i A') }}
+                                                @elseif($invitation->opened_at)
+                                                    Opened {{ $invitation->opened_at->timezone(config('app.timezone'))->format('M d, Y g:i A') }} · Awaiting account setup
+                                                @elseif($invitation->sent_at)
+                                                    Sent {{ $invitation->sent_at->timezone(config('app.timezone'))->format('M d, Y g:i A') }} · Expires {{ $invitation->expires_at->timezone(config('app.timezone'))->format('M d, Y g:i A') }}
+                                                @else
+                                                    Delivery has not completed. The pending account is preserved for retry.
+                                                @endif
+                                            </span>
+                                        </p>
+                                    @endif
+                                </div>
                             </div>
                             <div class="flex min-w-0 flex-col gap-2 md:items-end xl:col-span-3 xl:grid xl:grid-cols-3 xl:items-center xl:gap-4">
                                 <div class="flex flex-wrap items-center gap-2 xl:flex-col xl:items-start">
@@ -172,6 +187,7 @@
                                         type="button"
                                         variant="secondary"
                                         size="sm"
+                                        icon="adjustments-horizontal"
                                         x-data
                                         x-on:click="$dispatch('manage-supplier-account', {{ \Illuminate\Support\Js::from([
                                             'actionUrl' => route('inventory.suppliers.portal-users.update', [$supplier, $portalUser]),
@@ -200,8 +216,25 @@
                     @endforeach
                 </ul>
             @else
-                <p class="text-sm text-neutral-500 dark:text-neutral-400">No supplier portal users yet.</p>
+                <div class="flex items-center gap-3 px-4 py-5 sm:px-5">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-300">
+                        <x-ui.icon name="users" class="h-5 w-5" />
+                    </span>
+                    <div>
+                        <p class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">No supplier portal users yet</p>
+                        <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Invite a Vendor Administrator to complete the supplier profile.</p>
+                    </div>
+                </div>
             @endif
+            <div class="flex justify-end border-t border-neutral-200 bg-neutral-50/70 px-4 py-3 sm:px-5 dark:border-neutral-800 dark:bg-neutral-800/40">
+                <x-ui.button
+                    type="button"
+                    size="sm"
+                    icon="plus"
+                    x-data
+                    x-on:click="$dispatch('open-modal', 'invite-supplier-user')"
+                >Invite supplier user</x-ui.button>
+            </div>
         </x-ui.card>
 
         <div
@@ -381,27 +414,80 @@
     @endif
 
     @if(auth()->user()?->can(\App\Enums\Permission::ViewSupplierSensitiveData->value) && is_array($submittedProfile))
-        <x-ui.card title="Supplier-submitted company profile" subtitle="Proposed information remains separate from the verified supplier master until an authorized approval is recorded." class="mt-5">
+        <x-ui.card class="mt-5 !rounded-2xl">
+            <x-slot:header>
+                <div class="flex min-w-0 items-center gap-3">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 ring-1 ring-primary-100 dark:bg-primary-950/70 dark:text-primary-300 dark:ring-primary-900">
+                        <x-ui.icon name="clipboard-document-list" class="h-5 w-5" />
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-base font-semibold text-neutral-950 dark:text-white">Supplier-submitted company profile</h2>
+                        <p class="mt-0.5 text-xs leading-5 text-neutral-500 dark:text-neutral-400">Proposed information remains separate from the verified supplier master until an authorized approval is recorded.</p>
+                    </div>
+                </div>
+            </x-slot:header>
             <x-slot:actions>
                 <x-ui.badge :status="$supplier->company_profile_status->value" dot>{{ $supplier->company_profile_status->label() }}</x-ui.badge>
             </x-slot:actions>
             @if ($profileAmendmentReview)
                 <x-ui.alert variant="info" title="Proposed amendment" class="mb-4">The currently approved supplier master remains in effect until this proposal is approved.</x-ui.alert>
             @endif
-            <dl class="grid gap-x-6 gap-y-4 text-sm md:grid-cols-2 xl:grid-cols-3">
-                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Registered name</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['name'] ?? '—' }}</dd></div>
-                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Trade name</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['trade_name'] ?? '—' }}</dd></div>
-                <div><dt class="text-xs font-semibold uppercase text-neutral-500">TIN</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['tax_number'] ?? '—' }}</dd></div>
-                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Business structure</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ filled($submittedProfile['business_structure'] ?? null) ? str($submittedProfile['business_structure'])->headline() : '—' }}</dd></div>
-                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Regulated health products</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ ($submittedProfile['provides_regulated_health_products'] ?? false) ? 'Yes' : 'No' }}</dd></div>
-                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Standard lead time</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ filled($submittedProfile['standard_lead_time_days'] ?? null) ? $submittedProfile['standard_lead_time_days'].' days' : '—' }}</dd></div>
-                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Payment terms</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['payment_terms'] ?? '—' }}</dd></div>
-                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Primary contact</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['contact_person'] ?? '—' }}@if(filled($submittedProfile['contact_position'] ?? null)) · {{ $submittedProfile['contact_position'] }}@endif</dd></div>
-                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Contact details</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['email'] ?? '—' }}<span class="block">{{ $submittedProfile['phone'] ?? '—' }}</span></dd></div>
-                <div class="md:col-span-2 xl:col-span-3"><dt class="text-xs font-semibold uppercase text-neutral-500">Registered address</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['address'] ?? '—' }}</dd></div>
-                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Billing address</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['billing_address'] ?? '—' }}</dd></div>
-                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Delivery address</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $submittedProfile['delivery_address'] ?? '—' }}</dd></div>
-                <div><dt class="text-xs font-semibold uppercase text-neutral-500">Submitted</dt><dd class="mt-1 font-medium text-neutral-900 dark:text-white">{{ $supplier->company_profile_submitted_at?->format('M d, Y g:i A') ?? 'Draft not submitted' }}</dd></div>
+            @php
+                $profileFacts = [
+                    ['icon' => 'building-office-2', 'label' => 'Registered name', 'value' => $submittedProfile['name'] ?? '—'],
+                    ['icon' => 'tag', 'label' => 'Trade name', 'value' => $submittedProfile['trade_name'] ?? '—'],
+                    ['icon' => 'document-text', 'label' => 'TIN', 'value' => $submittedProfile['tax_number'] ?? '—'],
+                    ['icon' => 'squares-2x2', 'label' => 'Business structure', 'value' => filled($submittedProfile['business_structure'] ?? null) ? str($submittedProfile['business_structure'])->headline() : '—'],
+                    ['icon' => 'shield-check', 'label' => 'Regulated health products', 'value' => ($submittedProfile['provides_regulated_health_products'] ?? false) ? 'Yes' : 'No'],
+                    ['icon' => 'clock', 'label' => 'Standard lead time', 'value' => filled($submittedProfile['standard_lead_time_days'] ?? null) ? $submittedProfile['standard_lead_time_days'].' days' : '—'],
+                    ['icon' => 'document-text', 'label' => 'Payment terms', 'value' => $submittedProfile['payment_terms'] ?? '—'],
+                    ['icon' => 'user-circle', 'label' => 'Primary contact', 'value' => collect([$submittedProfile['contact_person'] ?? null, $submittedProfile['contact_position'] ?? null])->filter()->join(' · ') ?: '—'],
+                    ['icon' => 'phone', 'label' => 'Contact details', 'value' => collect([$submittedProfile['email'] ?? null, $submittedProfile['phone'] ?? null])->filter()->all()],
+                ];
+                $profileLocations = [
+                    ['icon' => 'map-pin', 'label' => 'Registered address', 'value' => $submittedProfile['address'] ?? '—'],
+                    ['icon' => 'document-text', 'label' => 'Billing address', 'value' => $submittedProfile['billing_address'] ?? '—'],
+                    ['icon' => 'truck', 'label' => 'Delivery address', 'value' => $submittedProfile['delivery_address'] ?? '—'],
+                    ['icon' => 'calendar', 'label' => 'Submitted', 'value' => $supplier->company_profile_submitted_at?->format('M d, Y g:i A') ?? 'Draft not submitted'],
+                ];
+            @endphp
+
+            <dl class="grid gap-x-5 gap-y-5 text-sm md:grid-cols-2 xl:grid-cols-3">
+                @foreach ($profileFacts as $fact)
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-950/70 dark:text-primary-300">
+                            <x-ui.icon :name="$fact['icon']" class="h-5 w-5" />
+                        </span>
+                        <div class="min-w-0">
+                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">{{ $fact['label'] }}</dt>
+                            <dd class="mt-1 break-words font-semibold leading-5 text-neutral-950 dark:text-white">
+                                @if (is_array($fact['value']))
+                                    @forelse ($fact['value'] as $line)
+                                        <span class="block">{{ $line }}</span>
+                                    @empty
+                                        —
+                                    @endforelse
+                                @else
+                                    {{ $fact['value'] }}
+                                @endif
+                            </dd>
+                        </div>
+                    </div>
+                @endforeach
+            </dl>
+
+            <dl class="mt-5 grid gap-5 border-t border-neutral-200 pt-5 text-sm md:grid-cols-2 xl:grid-cols-4 dark:border-neutral-800">
+                @foreach ($profileLocations as $location)
+                    <div class="flex min-w-0 items-start gap-3 xl:border-l xl:border-neutral-200 xl:pl-5 xl:first:border-l-0 xl:first:pl-0 dark:xl:border-neutral-800">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-950/70 dark:text-primary-300">
+                            <x-ui.icon :name="$location['icon']" class="h-5 w-5" />
+                        </span>
+                        <div class="min-w-0">
+                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">{{ $location['label'] }}</dt>
+                            <dd class="mt-1 break-words font-medium leading-5 text-neutral-900 dark:text-white">{{ $location['value'] }}</dd>
+                        </div>
+                    </div>
+                @endforeach
             </dl>
         </x-ui.card>
     @endif
@@ -449,31 +535,48 @@
     @endif
 
     @if ($pendingDecision && ($canReview || $canApprove))
-        <x-ui.card
-            title="Hospital review checklist"
-            subtitle="Follow these steps in order before this supplier can become eligible for procurement."
-            class="mt-5"
-        >
-            <ol class="grid gap-3 lg:grid-cols-3">
-                <li class="rounded-lg border border-success-200 bg-success-50/60 p-4 dark:border-success-900/60 dark:bg-success-950/20">
-                    <div class="flex items-center justify-between gap-3">
-                        <p class="text-sm font-semibold text-neutral-900 dark:text-white">1. Review company profile</p>
-                        <x-ui.badge status="success">Submitted</x-ui.badge>
+        <x-ui.card class="mt-5 !rounded-2xl">
+            <x-slot:header>
+                <div class="flex min-w-0 items-center gap-3">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 ring-1 ring-primary-100 dark:bg-primary-950/70 dark:text-primary-300 dark:ring-primary-900">
+                        <x-ui.icon name="clipboard-document-check" class="h-5 w-5" />
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-base font-semibold text-neutral-950 dark:text-white">Hospital review checklist</h2>
+                        <p class="mt-0.5 text-xs leading-5 text-neutral-500 dark:text-neutral-400">Follow these steps in order before this supplier can become eligible for procurement.</p>
                     </div>
-                    <p class="mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-300">Compare the proposed company details with its legal and supporting records.</p>
+                </div>
+            </x-slot:header>
+            <ol class="grid gap-4 lg:grid-cols-3 lg:gap-5">
+                <li class="relative rounded-xl border border-success-200 bg-success-50/60 p-4 dark:border-success-900/60 dark:bg-success-950/20">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-success-600 text-sm font-bold text-white shadow-sm">1</span>
+                        <div class="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 pt-1.5">
+                            <p class="text-sm font-semibold text-neutral-950 dark:text-white">Review company profile</p>
+                            <x-ui.badge status="success">Submitted</x-ui.badge>
+                        </div>
+                    </div>
+                    <p class="ml-12 mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-300">Compare the proposed company details with its legal and supporting records.</p>
+                    <span class="absolute -right-4 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white text-success-600 shadow-sm ring-1 ring-neutral-200 lg:flex dark:bg-neutral-900 dark:ring-neutral-700" aria-hidden="true">
+                        <x-ui.icon name="chevron-right" class="h-4 w-4" />
+                    </span>
                 </li>
 
-                <li class="rounded-lg border border-neutral-200 bg-neutral-50/70 p-4 dark:border-neutral-700 dark:bg-neutral-800/50">
-                    <div class="flex items-center justify-between gap-3">
-                        <p class="text-sm font-semibold text-neutral-900 dark:text-white">2. Verify supporting evidence</p>
-                        @if ($pendingReviewDocuments->isNotEmpty())
-                            <x-ui.badge status="warning">Action needed</x-ui.badge>
-                        @elseif ($verifiedReviewDocuments->isNotEmpty())
-                            <x-ui.badge status="success">Verified</x-ui.badge>
-                        @else
-                            <x-ui.badge status="danger">Evidence required</x-ui.badge>
-                        @endif
+                <li class="relative rounded-xl border border-neutral-200 bg-neutral-50/70 p-4 dark:border-neutral-700 dark:bg-neutral-800/50">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-50 text-sm font-bold text-primary-700 ring-1 ring-primary-200 dark:bg-primary-950 dark:text-primary-300 dark:ring-primary-800">2</span>
+                        <div class="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 pt-1.5">
+                            <p class="text-sm font-semibold text-neutral-950 dark:text-white">Verify supporting evidence</p>
+                            @if ($pendingReviewDocuments->isNotEmpty())
+                                <x-ui.badge status="warning">Action needed</x-ui.badge>
+                            @elseif ($verifiedReviewDocuments->isNotEmpty())
+                                <x-ui.badge status="success">Verified</x-ui.badge>
+                            @else
+                                <x-ui.badge status="danger">Evidence required</x-ui.badge>
+                            @endif
+                        </div>
                     </div>
+                    <div class="ml-12">
                     @if ($pendingReviewDocuments->isNotEmpty())
                         <p class="mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-300">{{ $pendingReviewDocuments->count() }} current document(s) still need a verification decision.</p>
                         <x-ui.button type="button" size="sm" variant="secondary" class="mt-3" x-data x-on:click="$dispatch('supplier-profile-tab', 'compliance')">Go to Compliance</x-ui.button>
@@ -483,19 +586,27 @@
                     @else
                         <p class="mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-300">No current acceptable evidence is available. Request a replacement document from the supplier.</p>
                     @endif
+                    </div>
+                    <span class="absolute -right-4 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white text-neutral-400 shadow-sm ring-1 ring-neutral-200 lg:flex dark:bg-neutral-900 dark:ring-neutral-700" aria-hidden="true">
+                        <x-ui.icon name="chevron-right" class="h-4 w-4" />
+                    </span>
                 </li>
 
-                <li class="rounded-lg border border-neutral-200 bg-neutral-50/70 p-4 dark:border-neutral-700 dark:bg-neutral-800/50">
-                    <div class="flex items-center justify-between gap-3">
-                        <p class="text-sm font-semibold text-neutral-900 dark:text-white">3. Record final decision</p>
-                        @if ($pendingReviewDocuments->isNotEmpty() || $verifiedReviewDocuments->isEmpty())
-                            <x-ui.badge status="neutral">Waiting</x-ui.badge>
-                        @elseif ($canDecide)
-                            <x-ui.badge status="primary">Ready</x-ui.badge>
-                        @else
-                            <x-ui.badge status="warning">Different approver</x-ui.badge>
-                        @endif
+                <li class="rounded-xl border border-neutral-200 bg-neutral-50/70 p-4 dark:border-neutral-700 dark:bg-neutral-800/50">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-50 text-sm font-bold text-primary-700 ring-1 ring-primary-200 dark:bg-primary-950 dark:text-primary-300 dark:ring-primary-800">3</span>
+                        <div class="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 pt-1.5">
+                            <p class="text-sm font-semibold text-neutral-950 dark:text-white">Record final decision</p>
+                            @if ($pendingReviewDocuments->isNotEmpty() || $verifiedReviewDocuments->isEmpty())
+                                <x-ui.badge status="neutral">Waiting</x-ui.badge>
+                            @elseif ($canDecide)
+                                <x-ui.badge status="primary">Ready</x-ui.badge>
+                            @else
+                                <x-ui.badge status="warning">Different approver</x-ui.badge>
+                            @endif
+                        </div>
                     </div>
+                    <div class="ml-12">
                     @if ($pendingReviewDocuments->isNotEmpty() || $verifiedReviewDocuments->isEmpty())
                         <p class="mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-300">Complete the evidence review before approving, returning, or rejecting the profile.</p>
                     @elseif (! $canApprove)
@@ -506,6 +617,7 @@
                         <p class="mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-300">Evidence is verified. Approve the supplier, request corrections, or record a rejection.</p>
                         <x-ui.button type="button" size="sm" class="mt-3" x-data x-on:click="$dispatch('open-modal', 'manage-lifecycle')">Open Final Decision</x-ui.button>
                     @endif
+                    </div>
                 </li>
             </ol>
         </x-ui.card>
@@ -671,7 +783,18 @@
             </x-ui.card>
             @endunless
 
-            <x-ui.card title="Compliance evidence" subtitle="Uploaded evidence remains unverified until a reviewer records a decision." :padding="false">
+            <x-ui.card :padding="false" class="!rounded-2xl">
+                <x-slot:header>
+                    <div class="flex min-w-0 items-center gap-3">
+                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 ring-1 ring-primary-100 dark:bg-primary-950/70 dark:text-primary-300 dark:ring-primary-900">
+                            <x-ui.icon name="document-text" class="h-5 w-5" />
+                        </span>
+                        <div class="min-w-0">
+                            <h2 class="text-base font-semibold text-neutral-950 dark:text-white">Compliance evidence</h2>
+                            <p class="mt-0.5 text-xs leading-5 text-neutral-500 dark:text-neutral-400">Uploaded evidence remains unverified until a reviewer records a decision.</p>
+                        </div>
+                    </div>
+                </x-slot:header>
                 @can(\App\Enums\Permission::ManageSuppliers->value)
                     <x-slot:actions>
                         <x-ui.button type="button" size="sm" icon="arrow-up-tray" x-data x-on:click="$dispatch('open-modal', 'upload-evidence')">Upload for Verification</x-ui.button>
@@ -682,7 +805,17 @@
                     <tbody>
                     @forelse ($supplier->documents as $document)
                         <x-ui.table.row>
-                            <x-ui.table.td><a class="font-medium text-primary-700 hover:underline" href="{{ route('inventory.suppliers.documents.download', [$supplier, $document]) }}" data-hims-download data-loading-text="Preparing document..." data-download-name="{{ $document->document_number ?: $document->original_name }}">{{ $document->document_type }}</a><span class="block text-xs text-neutral-500">{{ $document->document_number ?: $document->original_name }}</span></x-ui.table.td>
+                            <x-ui.table.td>
+                                <div class="flex min-w-0 items-center gap-3">
+                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-950/70 dark:text-primary-300">
+                                        <x-ui.icon name="document-text" class="h-5 w-5" />
+                                    </span>
+                                    <div class="min-w-0">
+                                        <a class="font-semibold text-primary-700 underline-offset-2 hover:underline dark:text-primary-300" href="{{ route('inventory.suppliers.documents.download', [$supplier, $document]) }}" data-hims-download data-loading-text="Preparing document..." data-download-name="{{ $document->document_number ?: $document->original_name }}">{{ $document->document_type }}</a>
+                                        <span class="block break-words text-xs text-neutral-500 dark:text-neutral-400">{{ $document->document_number ?: $document->original_name }}</span>
+                                    </div>
+                                </div>
+                            </x-ui.table.td>
                             <x-ui.table.td><span class="{{ $document->isExpired() ? 'font-medium text-danger-700' : '' }}">{{ $document->expires_at?->format('M d, Y') ?? 'No expiry recorded' }}</span></x-ui.table.td>
                             <x-ui.table.td><x-ui.badge :status="$document->isExpired() ? 'expired' : $document->verification_status->value">{{ $document->isExpired() ? 'Expired' : $document->verification_status->label() }}</x-ui.badge>@if($document->verifier)<span class="mt-1 block text-xs text-neutral-500">by {{ $document->verifier->name }}</span>@endif</x-ui.table.td>
                             <x-ui.table.td><span class="text-xs">{{ $document->required_for_accreditation ? 'Required for this review' : 'Supporting' }}</span>@if($document->blocks_procurement_when_invalid)<span class="block text-xs font-medium text-danger-700">Blocks when invalid</span>@endif @if(!$document->is_current)<span class="block text-xs text-neutral-500">Historical version</span>@endif</x-ui.table.td>
