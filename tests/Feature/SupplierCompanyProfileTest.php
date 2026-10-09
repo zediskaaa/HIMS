@@ -122,6 +122,10 @@ class SupplierCompanyProfileTest extends TestCase
         $this->assertSame(SupplierAccreditationStatus::PendingReview, $supplier->accreditation_status);
         $this->assertSame('Invited Supplier', $supplier->name);
 
+        $this->actingAs($administrator->fresh())->get(route('supplier.dashboard'))
+            ->assertOk()
+            ->assertSee('Supplier Dashboard');
+
         $this->actingAs($reviewer, 'admin')->get(route('inventory.suppliers.show', $supplier))
             ->assertOk()
             ->assertSee('Hospital review checklist')

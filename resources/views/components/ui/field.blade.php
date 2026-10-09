@@ -78,8 +78,15 @@
             </select>
         </div>
     @elseif ($type === 'textarea')
-        <textarea {{ $shared }} rows="{{ $rows }}" placeholder="{{ $placeholder }}"
-                  @required($required) @disabled($disabled)>{{ old($name, $value) }}</textarea>
+        <div class="relative min-w-0 max-w-full">
+            @if ($icon)
+                <span class="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-10 items-center justify-center text-neutral-400 dark:text-neutral-500">
+                    <x-ui.icon :name="$icon" class="h-5 w-5" />
+                </span>
+            @endif
+            <textarea {{ $shared }} rows="{{ $rows }}" placeholder="{{ $placeholder }}"
+                      @required($required) @disabled($disabled)>{{ old($name, $value) }}</textarea>
+        </div>
     @elseif ($type === 'password' && $toggleable)
         <div class="relative min-w-0 max-w-full w-full" x-data="{ showPassword: false }">
             <input type="password" :type="showPassword ? 'text' : 'password'" value="{{ old($name, $value) }}" placeholder="{{ $placeholder }}"

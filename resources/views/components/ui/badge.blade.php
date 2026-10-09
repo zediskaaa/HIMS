@@ -14,6 +14,7 @@
         'resolved' => 'success', 'delivered' => 'success', 'healthy' => 'success',
         'accepted' => 'success', 'arrived_at_dock' => 'success',
         'posted' => 'success', 'stored' => 'success', 'complete' => 'success',
+        'verified' => 'success',
         'good' => 'success', 'sent' => 'success',
 
         // amber — needs attention, in flight
@@ -77,7 +78,7 @@
 @endphp
 
 <span {{ $attributes->merge([
-    'class' => 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium '
+    'class' => 'inline-flex shrink-0 items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium '
         .'ring-1 ring-inset whitespace-nowrap '.$styles[$key],
 ]) }}>
     @if ($dot || strtolower((string) $status) === 'approved')

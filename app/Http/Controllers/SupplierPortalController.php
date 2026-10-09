@@ -42,7 +42,11 @@ class SupplierPortalController extends Controller
     {
         $supplier = $request->user()->supplier;
         if ($request->user()->can(Permission::SupplierManageProfile->value)
-            && $supplier->company_profile_status !== SupplierCompanyProfileStatus::Approved) {
+            && in_array($supplier->company_profile_status, [
+                SupplierCompanyProfileStatus::Draft,
+                SupplierCompanyProfileStatus::ChangesRequested,
+                SupplierCompanyProfileStatus::Rejected,
+            ], true)) {
             return redirect()->route('supplier.company-profile.edit');
         }
 
