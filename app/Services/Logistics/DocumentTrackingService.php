@@ -116,6 +116,13 @@ class DocumentTrackingService
 
                 return $document;
             });
+
+            app(\App\Services\HimsNotificationWorkflowService::class)->logisticsDocumentUploaded(
+                $doc,
+                $uploader,
+            );
+
+            return $doc;
         } catch (\Throwable $e) {
             Storage::disk('local')->delete($path);
             throw $e;
@@ -127,7 +134,7 @@ class DocumentTrackingService
      */
     public function verifyDocument(LogisticsDocument $document, string $decision, ?string $notes, User $verifier): LogisticsDocument
     {
-        return DB::transaction(function () use ($document, $decision, $notes, $verifier): LogisticsDocument {
+        $locked = DB::transaction(function () use ($document, $decision, $notes, $verifier): LogisticsDocument {
             $locked = LogisticsDocument::lockForUpdate()->findOrFail($document->id);
 
             if ($locked->isArchived()) {
@@ -164,6 +171,15 @@ class DocumentTrackingService
 
             return $locked;
         });
+
+        app(\App\Services\HimsNotificationWorkflowService::class)->logisticsDocumentVerified(
+            $locked,
+            $verifier,
+            $decision,
+            $notes,
+        );
+
+        return $locked;
     }
 
     /**

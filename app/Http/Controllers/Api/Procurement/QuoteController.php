@@ -156,6 +156,8 @@ class QuoteController extends Controller implements HasMiddleware
                 ['quote_number' => $quote->quote_number, 'supplier_id' => $supplier->id, 'sealed' => $isSealed]
             );
 
+            app(\App\Services\HimsNotificationWorkflowService::class)->rfqBidSubmitted($rfq, $quote, $supplier);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Supplier quotation bid submitted successfully.',

@@ -172,6 +172,11 @@ class SupplierPortalController extends Controller
             return $ack;
         });
         $audit->log(AuditAction::AcknowledgedPurchaseOrder, $request->user(), "Supplier responded {$data['response']} to {$purchaseOrder->po_number}.", $ack, $purchaseOrder->po_number, newValues: ['response' => $data['response']]);
+        app(\App\Services\HimsNotificationWorkflowService::class)->purchaseOrderAcknowledged(
+            $purchaseOrder,
+            $data['response'],
+            $data['message'] ?? null,
+        );
         return back()->with('success', 'Purchase order response recorded.');
     }
 
@@ -197,6 +202,10 @@ class SupplierPortalController extends Controller
             return $shipment;
         });
         $audit->log(AuditAction::SubmittedAdvanceShipNotice, $request->user(), "Submitted ASN {$shipment->shipment_number} for {$purchaseOrder->po_number}.", $shipment, $shipment->shipment_number);
+        app(\App\Services\HimsNotificationWorkflowService::class)->purchaseOrderShipmentDispatched(
+            $purchaseOrder,
+            $shipment->shipment_number,
+        );
         return back()->with('success', 'Advance Ship Notice submitted.');
     }
 
@@ -212,6 +221,7 @@ class SupplierPortalController extends Controller
         $data = $request->validate(['supplier_response_type' => ['required', Rule::in(['replacement_scheduled', 'supplemental_delivery', 'credit_requested', 'dispute', 'explanation', 'other'])], 'supplier_response' => ['required', 'string', 'max:2000']]);
         $discrepancy->update([...$data, 'status' => 'supplier_responded', 'responded_by' => $request->user()->id, 'responded_at' => now()]);
         $audit->log(AuditAction::RespondedToSupplierDiscrepancy, $request->user(), 'Supplier responded to a receiving discrepancy.', $discrepancy, "Discrepancy {$discrepancy->id}", newValues: ['status' => 'supplier_responded', 'response_type' => $data['supplier_response_type']]);
+        app(\App\Services\HimsNotificationWorkflowService::class)->discrepancyResponded($discrepancy);
         return back()->with('success', 'Discrepancy response submitted for hospital review.');
     }
 
@@ -236,6 +246,7 @@ class SupplierPortalController extends Controller
             $invitation->update(['status' => 'submitted', 'acknowledged_at' => now()]); return $quote;
         });
         $audit->log(AuditAction::SubmittedSupplierQuote, $request->user(), "Submitted bid for {$rfq->rfq_number}.", $quote, $data['quote_number']);
+        app(\App\Services\HimsNotificationWorkflowService::class)->rfqBidSubmitted($rfq, $quote, $invitation->supplier);
         return back()->with('success', 'Bid submitted securely. Competitor bids remain inaccessible.');
     }
 
@@ -256,6 +267,7 @@ class SupplierPortalController extends Controller
             $invoice->lines()->createMany($rows); return $invoice;
         });
         $audit->log(AuditAction::SubmittedSupplierInvoice, $request->user(), "Submitted invoice {$invoice->invoice_number}.", $invoice, $invoice->invoice_number, newValues: ['status' => $invoice->status]);
+        app(\App\Services\HimsNotificationWorkflowService::class)->invoiceSubmitted($po, $invoice->invoice_number);
         return back()->with('success', "Invoice submitted with status: {$invoice->status}.");
     }
 
@@ -309,7 +321,7 @@ class SupplierPortalController extends Controller
         $path = $file->store('supplier-documents/'.$supplier->id, 'local');
         abort_if($path === false, 500, 'The supplier document could not be stored.');
         try {
-            DB::transaction(function () use ($supplier, $data, $file, $path, $request, $audit): void {
+            $createdDoc = DB::transaction(function () use ($supplier, $data, $file, $path, $request, $audit): SupplierDocument {
                 $replacement = isset($data['replaces_document_id'])
                     ? $supplier->documents()->whereKey($data['replaces_document_id'])->where('is_current', true)->where('verification_status', SupplierDocumentStatus::Pending->value)->lockForUpdate()->firstOrFail()
                     : null;
@@ -325,7 +337,15 @@ class SupplierPortalController extends Controller
                 ]);
                 $replacement?->update(['is_current' => false, 'superseded_by_id' => $document->id]);
                 $audit->log(AuditAction::UploadedSupplierDocument, $request->user(), 'Supplier uploaded compliance evidence for hospital review.', $document, $document->original_name, newValues: ['supplier_id' => $supplier->id, 'document_type' => $document->document_type, 'replaces_document_id' => $replacement?->id]);
+
+                return $document;
             });
+
+            app(\App\Services\HimsNotificationWorkflowService::class)->supplierComplianceUploaded(
+                $supplier,
+                $createdDoc,
+                $request->user(),
+            );
         } catch (Throwable $exception) {
             Storage::disk('local')->delete($path);
             throw $exception;
@@ -379,6 +399,10 @@ class SupplierPortalController extends Controller
         ]);
         $product = SupplierProduct::create([...$data, 'supplier_id' => $request->user()->supplier_id, 'approval_status' => 'pending_review', 'is_active' => false]);
         $audit->log(AuditAction::AddedSupplierProduct, $request->user(), 'Submitted a supplier catalogue product for hospital review.', $product, $product->supplier_product_name, newValues: ['approval_status' => 'pending_review']);
+        app(\App\Services\HimsNotificationWorkflowService::class)->catalogProductSubmitted(
+            $request->user()->supplier,
+            $product,
+        );
 
         return back()->with('success', 'Catalog product submitted for hospital approval. The item master was not changed.');
     }

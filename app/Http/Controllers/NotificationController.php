@@ -25,8 +25,9 @@ class NotificationController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $notifications = $this->notifications
-            ->feedFor($this->user($request))
+        $feed = $this->notifications->feedFor($this->user($request));
+        $unreadCount = (clone $feed)->whereNull('read_at')->count();
+        $notifications = $feed
             ->latest()
             ->orderByDesc('id')
             ->cursorPaginate(HimsNotificationService::FEED_BATCH_SIZE)
@@ -37,6 +38,7 @@ class NotificationController extends Controller
                 'notifications' => $notifications->getCollection(),
             ])->render(),
             'loaded_count' => $notifications->count(),
+            'unread_count' => $unreadCount,
             'next_url' => $notifications->nextPageUrl(),
         ]);
     }
@@ -87,7 +89,7 @@ class NotificationController extends Controller
         $parameters = $this->resolveLegacyInventoryAlertTarget($destination, $stored, $parameters);
 
         if ($destination === null
-            || ! $destination->isAuthorizedFor($user)
+            || ! $destination->isAuthorizedFor($user, $parameters)
             || ! $destination->isAvailable($parameters)) {
             return redirect()
                 ->route(AuthenticationPanel::forRole($user->role)->dashboardRoute())

@@ -211,7 +211,16 @@ class ApprovalRoutingEngine
             return $step;
         });
 
-        $this->notifyCurrentStep($chain->fresh(), $approver);
+        $freshChain = $chain->fresh();
+        if ($freshChain->status === 'approved') {
+            app(\App\Services\HimsNotificationWorkflowService::class)->approvalChainDecided(
+                $freshChain,
+                'approved',
+                $approver,
+            );
+        } else {
+            $this->notifyCurrentStep($freshChain, $approver);
+        }
 
         return $approvedStep;
     }
@@ -225,7 +234,7 @@ class ApprovalRoutingEngine
             throw new DomainException('A rejection reason must be documented for audit compliance.');
         }
 
-        return DB::transaction(function () use ($chain, $approver, $rejectionReason) {
+        $rejectedStep = DB::transaction(function () use ($chain, $approver, $rejectionReason) {
             $step = $chain->currentPendingStep();
 
             if (! $step) {
@@ -273,6 +282,15 @@ class ApprovalRoutingEngine
 
             return $step;
         });
+
+        app(\App\Services\HimsNotificationWorkflowService::class)->approvalChainDecided(
+            $chain->fresh(),
+            'rejected',
+            $approver,
+            $rejectionReason,
+        );
+
+        return $rejectedStep;
     }
 
     /**

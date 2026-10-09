@@ -2,11 +2,9 @@
 
 namespace App\Observers;
 
-use App\Enums\NotificationDestination;
-use App\Enums\NotificationPriority;
 use App\Enums\PurchaseOrderStatus;
 use App\Models\PurchaseOrder;
-use App\Services\HimsNotificationService;
+use App\Services\HimsNotificationWorkflowService;
 
 class PurchaseOrderObserver
 {
@@ -28,15 +26,9 @@ class PurchaseOrderObserver
             return;
         }
 
-        $purchaseOrder->supplier?->users()
-            ->where('status', 'active')
-            ->eachById(fn ($user) => app(HimsNotificationService::class)->sendToUser(
-                $user,
-                "supplier-po-issued:{$purchaseOrder->id}:{$purchaseOrder->statusEnum()->value}",
-                'Purchase order requires action',
-                "{$purchaseOrder->po_number} is ready for supplier acknowledgement.",
-                NotificationPriority::Info,
-                NotificationDestination::Dashboard,
-            ));
+        app(HimsNotificationWorkflowService::class)->purchaseOrderIssued(
+            $purchaseOrder,
+            ($purchaseOrder->revision_number ?? 1) > 1,
+        );
     }
 }

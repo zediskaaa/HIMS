@@ -96,6 +96,7 @@ class SupplierComplianceAlertService
         ?int $contractId = null,
     ): string {
         $alert = SupplierComplianceAlert::firstOrNew(['source_key' => $sourceKey]);
+        $isNew = ! $alert->exists || $alert->status === AlertStatus::Resolved;
         $alert->fill([
             'supplier_id' => $supplier->id,
             'supplier_document_id' => $documentId,
@@ -109,6 +110,20 @@ class SupplierComplianceAlertService
         ]);
         $alert->first_detected_at ??= now();
         $alert->save();
+
+        if ($isNew) {
+            $priority = $severity === AlertSeverity::Critical ? \App\Enums\NotificationPriority::Critical : \App\Enums\NotificationPriority::Warning;
+            app(HimsNotificationService::class)->sendToSupplierPermission(
+                $supplier,
+                \App\Enums\Permission::SupplierManageProfile,
+                "compliance-alert:{$alert->id}:".now()->toDateString(),
+                'Compliance action required',
+                $message,
+                $priority,
+                \App\Enums\NotificationDestination::SupplierCompliance,
+                ['supplier' => $supplier->id],
+            );
+        }
 
         return $sourceKey;
     }

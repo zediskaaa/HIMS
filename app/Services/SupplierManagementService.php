@@ -40,7 +40,14 @@ class SupplierManagementService
         'payment_terms',
     ];
 
-    public function __construct(private readonly AuditLogger $audit) {}
+    private readonly HimsNotificationWorkflowService $workflowNotifications;
+
+    public function __construct(
+        private readonly AuditLogger $audit,
+        ?HimsNotificationWorkflowService $workflowNotifications = null,
+    ) {
+        $this->workflowNotifications = $workflowNotifications ?? app(HimsNotificationWorkflowService::class);
+    }
 
     public function create(array $data, User $actor): Supplier
     {
@@ -184,7 +191,7 @@ class SupplierManagementService
 
     public function submitCompanyProfile(Supplier $supplier, array $data, User $actor): SupplierAccreditation
     {
-        return DB::transaction(function () use ($supplier, $data, $actor): SupplierAccreditation {
+        $review = DB::transaction(function () use ($supplier, $data, $actor): SupplierAccreditation {
             $supplier = Supplier::query()->whereKey($supplier->getKey())->lockForUpdate()->firstOrFail();
             if (! in_array($supplier->company_profile_status, [
                 SupplierCompanyProfileStatus::Draft,
@@ -240,11 +247,15 @@ class SupplierManagementService
 
             return $review;
         });
+
+        $this->workflowNotifications->supplierProfileSubmitted($supplier, $actor);
+
+        return $review;
     }
 
     public function requestCompanyProfileChanges(Supplier $supplier, User $actor, string $notes): Supplier
     {
-        return DB::transaction(function () use ($supplier, $actor, $notes): Supplier {
+        $updated = DB::transaction(function () use ($supplier, $actor, $notes): Supplier {
             $supplier = Supplier::query()->whereKey($supplier->getKey())->lockForUpdate()->firstOrFail();
             $this->requirePendingCompanyProfile($supplier);
             $this->requireIndependentDecision($supplier, $actor);
@@ -265,11 +276,15 @@ class SupplierManagementService
 
             return $supplier->fresh();
         });
+
+        $this->workflowNotifications->supplierProfileChangesRequested($updated, $actor, $notes);
+
+        return $updated;
     }
 
     public function submitForReview(Supplier $supplier, User $actor): SupplierAccreditation
     {
-        return DB::transaction(function () use ($supplier, $actor): SupplierAccreditation {
+        $accreditation = DB::transaction(function () use ($supplier, $actor): SupplierAccreditation {
             $supplier = Supplier::query()->whereKey($supplier->getKey())->lockForUpdate()->firstOrFail();
             if (! in_array($supplier->effectiveAccreditationStatus(), [SupplierAccreditationStatus::Draft, SupplierAccreditationStatus::Rejected, SupplierAccreditationStatus::Expired], true)) {
                 throw ValidationException::withMessages(['accreditation' => 'Only a draft, rejected, or expired accreditation can be submitted for review.']);
@@ -295,11 +310,15 @@ class SupplierManagementService
 
             return $accreditation;
         });
+
+        $this->workflowNotifications->supplierAccreditationSubmitted($supplier, $actor);
+
+        return $accreditation;
     }
 
     public function approve(Supplier $supplier, User $actor, ?string $expiresAt, ?string $notes): Supplier
     {
-        return DB::transaction(function () use ($supplier, $actor, $expiresAt, $notes): Supplier {
+        $updated = DB::transaction(function () use ($supplier, $actor, $expiresAt, $notes): Supplier {
             $supplier = Supplier::query()->whereKey($supplier->getKey())->lockForUpdate()->firstOrFail();
             $this->requirePendingReview($supplier);
             $this->requireIndependentDecision($supplier, $actor);
@@ -369,11 +388,15 @@ class SupplierManagementService
 
             return $supplier->fresh();
         });
+
+        $this->workflowNotifications->supplierAccreditationDecided($updated, 'approved', $actor, $notes);
+
+        return $updated;
     }
 
     public function reject(Supplier $supplier, User $actor, string $notes): Supplier
     {
-        return DB::transaction(function () use ($supplier, $actor, $notes): Supplier {
+        $updated = DB::transaction(function () use ($supplier, $actor, $notes): Supplier {
             $supplier = Supplier::query()->whereKey($supplier->getKey())->lockForUpdate()->firstOrFail();
             $this->requirePendingReview($supplier);
             $this->requireIndependentDecision($supplier, $actor);
@@ -408,11 +431,15 @@ class SupplierManagementService
 
             return $supplier->fresh();
         });
+
+        $this->workflowNotifications->supplierAccreditationDecided($updated, 'rejected', $actor, $notes);
+
+        return $updated;
     }
 
     public function suspend(Supplier $supplier, User $actor, string $reason): Supplier
     {
-        return DB::transaction(function () use ($supplier, $actor, $reason): Supplier {
+        $updated = DB::transaction(function () use ($supplier, $actor, $reason): Supplier {
             $supplier = Supplier::query()->whereKey($supplier->getKey())->lockForUpdate()->firstOrFail();
             if ($supplier->status !== SupplierStatus::Active) {
                 throw ValidationException::withMessages(['status' => 'Only an active supplier can be suspended.']);
@@ -422,11 +449,15 @@ class SupplierManagementService
 
             return $supplier->fresh();
         });
+
+        $this->workflowNotifications->supplierStatusChanged($updated, 'suspended', $actor, $reason);
+
+        return $updated;
     }
 
     public function reactivate(Supplier $supplier, User $actor): Supplier
     {
-        return DB::transaction(function () use ($supplier, $actor): Supplier {
+        $updated = DB::transaction(function () use ($supplier, $actor): Supplier {
             $supplier = Supplier::query()->whereKey($supplier->getKey())->lockForUpdate()->firstOrFail();
             if (! in_array($supplier->status, [SupplierStatus::Suspended, SupplierStatus::Inactive], true)) {
                 throw ValidationException::withMessages(['status' => 'Only a suspended or inactive supplier can be reactivated.']);
@@ -437,6 +468,10 @@ class SupplierManagementService
 
             return $supplier->fresh();
         });
+
+        $this->workflowNotifications->supplierStatusChanged($updated, 'reactivated', $actor);
+
+        return $updated;
     }
 
     public function inactivate(Supplier $supplier, User $actor, string $reason): Supplier
@@ -459,7 +494,7 @@ class SupplierManagementService
 
     public function verifyDocument(Supplier $supplier, SupplierDocument $document, User $actor, bool $verified, ?string $notes): SupplierDocument
     {
-        return DB::transaction(function () use ($supplier, $document, $actor, $verified, $notes): SupplierDocument {
+        $doc = DB::transaction(function () use ($supplier, $document, $actor, $verified, $notes): SupplierDocument {
             $document = SupplierDocument::query()->whereKey($document->getKey())->where('supplier_id', $supplier->id)->lockForUpdate()->firstOrFail();
             if (! $document->is_current) {
                 throw ValidationException::withMessages(['document' => 'Historical document versions cannot be reviewed again.']);
@@ -477,11 +512,19 @@ class SupplierManagementService
 
             return $document->fresh();
         });
+
+        $this->workflowNotifications->supplierDocumentVerified($supplier, $doc, $actor, $verified, $notes);
+
+        return $doc;
     }
 
     public function recordSupplierProductChange(Supplier $supplier, SupplierProduct $product, User $actor, bool $created): void
     {
         $this->audit->log($created ? AuditAction::AddedSupplierProduct : AuditAction::UpdatedSupplierProduct, $actor, $created ? 'Linked a product to the supplier.' : 'Updated the supplier product relationship.', $supplier, $supplier->name, newValues: ['supplier_product_id' => $product->id, 'item_id' => $product->item_id, 'active' => $product->is_active]);
+
+        if ($created) {
+            $this->workflowNotifications->catalogProductSubmitted($supplier, $product);
+        }
     }
 
     private function requirePendingReview(Supplier $supplier): void

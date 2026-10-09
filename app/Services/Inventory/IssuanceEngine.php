@@ -220,6 +220,14 @@ class IssuanceEngine
 
             return $req;
         });
+
+        app(\App\Services\HimsNotificationWorkflowService::class)->materialRequisitionDecided(
+            $requisition->fresh() ?? $requisition,
+            'approved',
+            $approver,
+        );
+
+        return $requisition->fresh() ?? $requisition;
     }
 
     /**
@@ -317,6 +325,15 @@ class IssuanceEngine
 
             return $req;
         });
+
+        app(\App\Services\HimsNotificationWorkflowService::class)->materialRequisitionDecided(
+            $requisition->fresh() ?? $requisition,
+            'rejected',
+            $approver,
+            $reason,
+        );
+
+        return $requisition->fresh() ?? $requisition;
     }
 
     /**
@@ -533,6 +550,14 @@ class IssuanceEngine
 
             return $req;
         });
+
+        app(\App\Services\HimsNotificationWorkflowService::class)->materialRequisitionDecided(
+            $requisition->fresh() ?? $requisition,
+            'issued',
+            $picker,
+        );
+
+        return $requisition->fresh() ?? $requisition;
     }
 
     private function releaseReservedStock(int $itemId, int $quantity, ?int $locationId = null, ?int $batchId = null): void

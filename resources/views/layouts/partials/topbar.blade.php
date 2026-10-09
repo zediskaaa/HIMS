@@ -261,10 +261,39 @@
         class="relative"
         x-data="{
             open: false,
+            unreadCount: @js($topbarUnreadCount),
             nextUrl: @js($topbarNotificationsNextUrl),
             loading: false,
             loadError: '',
             statusMessage: '',
+            init() {
+                setInterval(() => {
+                    if (!document.hidden) {
+                        this.refresh();
+                    }
+                }, 60000);
+            },
+            async refresh() {
+                try {
+                    const response = await fetch(@js(route('notifications.index')), {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.unread_count !== undefined) {
+                            const countChanged = this.unreadCount !== data.unread_count;
+                            this.unreadCount = data.unread_count;
+                            if (countChanged && data.html) {
+                                this.$refs.notificationItems.innerHTML = data.html;
+                                this.nextUrl = data.next_url;
+                            }
+                        }
+                    }
+                } catch (_) {}
+            },
             async loadMore() {
                 if (!this.nextUrl || this.loading) return;
 
@@ -298,7 +327,7 @@
     >
         <button
             type="button"
-            x-on:click="open = !open"
+            x-on:click="open = !open; if (open) refresh();"
             class="relative flex h-11 w-11 items-center justify-center rounded-md text-neutral-500 transition sm:h-9 sm:w-9
                    hover:bg-neutral-100 hover:text-neutral-900
                    dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100
@@ -307,15 +336,16 @@
             aria-controls="notification-panel"
             aria-haspopup="dialog"
         >
-            <span class="sr-only">Open notifications{{ $topbarUnreadCount > 0 ? ', '.$topbarUnreadCount.' unread' : '' }}</span>
+            <span class="sr-only" x-text="unreadCount > 0 ? `Open notifications, ${unreadCount} unread` : 'Open notifications'">Open notifications</span>
             <x-ui.icon name="bell-alert" class="h-5 w-5" />
-            @if($topbarUnreadCount > 0)
-                <span class="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full
-                             border-2 border-white dark:border-neutral-900 bg-rose-600 px-1 text-[10px] font-bold leading-none text-white"
-                      aria-hidden="true">
-                    {{ $topbarUnreadCount > 99 ? '99+' : $topbarUnreadCount }}
-                </span>
-            @endif
+            <span x-show="unreadCount > 0"
+                  x-cloak
+                  class="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full
+                         border-2 border-white dark:border-neutral-900 bg-rose-600 px-1 text-[10px] font-bold leading-none text-white"
+                  x-text="unreadCount > 99 ? '99+' : unreadCount"
+                  aria-hidden="true">
+                {{ $topbarUnreadCount > 99 ? '99+' : $topbarUnreadCount }}
+            </span>
         </button>
 
         <div
@@ -334,20 +364,23 @@
             <div class="flex min-w-0 items-center justify-between gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
                 <div class="min-w-0">
                     <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Notifications</h2>
-                    <p class="text-xs text-neutral-500 dark:text-neutral-400">
+                    <p class="text-xs text-neutral-500 dark:text-neutral-400"
+                       x-text="unreadCount > 0 ? `${unreadCount} unread` : 'You are all caught up'">
                         {{ $topbarUnreadCount > 0 ? $topbarUnreadCount.' unread' : 'You are all caught up' }}
                     </p>
                 </div>
                 @if($topbarUnreadCount > 0)
-                    <form method="POST" action="{{ route('notifications.read-all') }}" class="shrink-0">
-                        @csrf
-                        @method('PATCH')
-                        <button type="submit" class="whitespace-nowrap rounded-md px-2 py-1 text-xs font-semibold text-primary-700 hover:bg-primary-50
-                                                       dark:text-primary-400 dark:hover:bg-primary-950/50
-                                                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-                            Mark all as read
-                        </button>
-                    </form>
+                    <div x-show="unreadCount > 0">
+                        <form method="POST" action="{{ route('notifications.read-all') }}" class="shrink-0">
+                            @csrf
+                            @method('PATCH')
+                            <button type="submit" class="whitespace-nowrap rounded-md px-2 py-1 text-xs font-semibold text-primary-700 hover:bg-primary-50
+                                                           dark:text-primary-400 dark:hover:bg-primary-950/50
+                                                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                                Mark all as read
+                            </button>
+                        </form>
+                    </div>
                 @endif
             </div>
 

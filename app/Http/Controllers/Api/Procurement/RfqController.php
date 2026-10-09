@@ -192,6 +192,8 @@ class RfqController extends Controller implements HasMiddleware
                 ['rfq_number' => $rfq->rfq_number, 'deadline' => $rfq->submission_deadline->toIso8601String()]
             );
 
+            app(\App\Services\HimsNotificationWorkflowService::class)->rfqPublished($rfq, $eligibleSuppliers);
+
             $rfq->load(['lines.item', 'invitations.supplier']);
 
             return response()->json([

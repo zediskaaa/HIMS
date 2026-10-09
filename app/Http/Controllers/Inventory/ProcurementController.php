@@ -576,7 +576,11 @@ class ProcurementController extends Controller implements HasMiddleware
                 null,
                 ['rfq_number' => $rfq->rfq_number, 'purchase_request_id' => $purchaseRequest?->id, 'deadline' => $rfq->submission_deadline->toIso8601String()]
             );
+
+            return $rfq;
         });
+
+        app(\App\Services\HimsNotificationWorkflowService::class)->rfqPublished($rfq, $eligibleSuppliers);
 
         return redirect()->route('inventory.purchases')->with('success', 'Sourcing RFQ package published to accredited suppliers.');
     }

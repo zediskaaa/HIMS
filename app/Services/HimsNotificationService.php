@@ -8,6 +8,7 @@ use App\Enums\Permission;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\User;
+use App\Models\Supplier;
 use App\Notifications\HimsNotification;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -42,7 +43,7 @@ class HimsNotificationService
         NotificationDestination $destination,
         array $routeParameters = [],
     ): bool {
-        if (! $destination->isAuthorizedFor($recipient)) {
+        if (! $destination->isAuthorizedFor($recipient, $routeParameters)) {
             return false;
         }
 
@@ -154,6 +155,53 @@ class HimsNotificationService
         User::query()
             ->where('status', UserStatus::Active->value)
             ->whereIn('role', $roleValues)
+            ->when($except !== null, fn ($query) => $query->where('id', '!=', $except->getKey()))
+            ->eachById(function (User $recipient) use (
+                &$sent,
+                $dedupeKey,
+                $title,
+                $message,
+                $priority,
+                $destination,
+                $routeParameters,
+            ): void {
+                $sent += (int) $this->sendToUser(
+                    $recipient,
+                    $dedupeKey,
+                    $title,
+                    $message,
+                    $priority,
+                    $destination,
+                    $routeParameters,
+                );
+            });
+
+        return $sent;
+    }
+
+    /**
+     * @param  array<string, scalar|null>  $routeParameters
+     */
+    public function sendToSupplierPermission(
+        Supplier $supplier,
+        Permission $permission,
+        string $dedupeKey,
+        string $title,
+        string $message,
+        NotificationPriority $priority,
+        NotificationDestination $destination,
+        array $routeParameters = [],
+        ?User $except = null,
+    ): int {
+        $roles = collect(UserRole::cases())
+            ->filter(fn (UserRole $role) => $role->isSupplier() && $role->grants($permission))
+            ->map->value
+            ->all();
+        $sent = 0;
+
+        $supplier->users()
+            ->where('status', UserStatus::Active->value)
+            ->whereIn('role', $roles)
             ->when($except !== null, fn ($query) => $query->where('id', '!=', $except->getKey()))
             ->eachById(function (User $recipient) use (
                 &$sent,

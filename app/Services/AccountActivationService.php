@@ -219,14 +219,24 @@ class AccountActivationService
 
             $challenge->forceFill(['consumed_at' => now()])->save();
 
-            SupplierInvitation::query()
+            $invitation = SupplierInvitation::query()
                 ->where('user_id', $lockedUser->getKey())
                 ->where('status', SupplierInvitation::STATUS_PENDING)
-                ->update([
+                ->with('supplier')
+                ->first();
+
+            if ($invitation) {
+                $invitation->update([
                     'status' => SupplierInvitation::STATUS_ACCEPTED,
                     'accepted_at' => now(),
                     'updated_at' => now(),
                 ]);
+
+                app(\App\Services\HimsNotificationWorkflowService::class)->supplierInvitationAccepted(
+                    $invitation,
+                    $activated,
+                );
+            }
 
             return $activated;
         }, 3);

@@ -221,7 +221,7 @@
                         <x-ui.icon name="users" class="h-5 w-5" />
                     </span>
                     <div>
-                        <p class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">No supplier portal users yet</p>
+                        <p class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">No supplier portal users yet.</p>
                         <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Invite a Vendor Administrator to complete the supplier profile.</p>
                     </div>
                 </div>

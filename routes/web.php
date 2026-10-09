@@ -77,9 +77,7 @@ Route::get('/dashboard/ai-assistant/attachment/{message}', [DashboardAiAssistant
  * by being forgotten in this file. See App\Enums\UserRole::permissions() for
  * who holds what, and /admin/permissions for the matrix that renders it.
  */
-Route::middleware(['auth:web,admin,super_admin', 'verified', 'internal-user'])->group(function () {
-    Route::get('/global-search', [GlobalSearchController::class, 'search'])->name('global-search');
-
+Route::middleware(['auth:web,admin,super_admin', 'verified'])->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead'])
@@ -88,6 +86,10 @@ Route::middleware(['auth:web,admin,super_admin', 'verified', 'internal-user'])->
     Route::get('/notifications/{notification}', [NotificationController::class, 'open'])
         ->whereUuid('notification')
         ->name('notifications.open');
+});
+
+Route::middleware(['auth:web,admin,super_admin', 'verified', 'internal-user'])->group(function () {
+    Route::get('/global-search', [GlobalSearchController::class, 'search'])->name('global-search');
 
     Route::get('/inventory', function () {
         return redirect()->route('dashboard');

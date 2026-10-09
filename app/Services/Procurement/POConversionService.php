@@ -413,6 +413,10 @@ class POConversionService
 
             return $po;
         });
+
+        app(\App\Services\HimsNotificationWorkflowService::class)->rfqAwardDecided($rfq, $awardedQuote, $buyer);
+
+        return $po;
     }
 
     /**
